@@ -119,11 +119,56 @@ test("메뉴 → Sprint 40L: 하드 드롭·홀드·일시정지·재시작", as
   await page.keyboard.press("Escape");
   assert.equal(await visible(page, "pause"), false);
 
+  // R은 바로 지우지 않고 묻는다. 기본 포커스는 "계속하기"라 Space를 눌러도 다시 시작하지 않는다.
+  await page.keyboard.press("KeyR");
+  assert.equal(await visible(page, "confirm"), true, "다시 시작할지 묻는다");
+  assert.equal(await text(page, "hud-pieces"), "3", "아직 그대로");
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("data-confirm")), "cancel");
+  await page.keyboard.press("Escape");
+  assert.equal(await visible(page, "confirm"), false);
+  assert.equal(await visible(page, "pause"), true, "취소하면 일시정지 화면");
+
+  // 일시정지 중 R → 묻고, R을 한 번 더 누르면 다시 시작
+  await page.keyboard.press("KeyR");
+  assert.equal(await visible(page, "confirm"), true);
   await page.keyboard.press("KeyR");
   await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "0", null, {
     timeout: 3000,
   });
   assert.equal(await visible(page, "countdown"), true, "다시 카운트다운");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("로고: 게임 중이면 물은 뒤 첫 화면으로, 결과 화면에서는 바로 첫 화면으로", async () => {
+  const { context, page, errors } = await openPage();
+  await startMode(page, "zen");
+  await page.keyboard.press("Space");
+  await page.click("#go-home");
+  assert.equal(await visible(page, "confirm"), true);
+  assert.equal(await text(page, "confirm-title"), "첫 화면으로 갈까요?");
+  await page.click('[data-confirm="cancel"]');
+  assert.equal(await visible(page, "pause"), true, "취소하면 판이 남아 있다");
+  await page.click("#go-home");
+  await page.click('[data-confirm="ok"]');
+  assert.equal(await visible(page, "menu"), true);
+
+  // 끝난 판: 묻지 않는다. 결과 화면의 R도 바로 다시 시작
+  await startMode(page, "zen");
+  for (let i = 0; i < 40; i++) await page.keyboard.press("Space");
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
+  await page.keyboard.press("KeyR");
+  assert.equal(await visible(page, "confirm"), false, "결과 화면에서는 묻지 않는다");
+  await page.waitForFunction(
+    () => document.body.dataset.screen === "countdown" || document.body.dataset.screen === "play"
+  );
+  await page.keyboard.press("Escape");
+  await page.click('#pause [data-action="menu"]');
+  await startMode(page, "zen");
+  for (let i = 0; i < 40; i++) await page.keyboard.press("Space");
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
+  await page.click("#go-home");
+  assert.equal(await visible(page, "menu"), true, "결과 화면에서 로고를 누르면 바로 첫 화면");
   assert.deepEqual(errors, []);
   await context.close();
 });

@@ -17,7 +17,9 @@
   <body>
     <main id="app" class="app">
       <header class="app-header">
-        <h1 class="logo"><span class="logo-mark" aria-hidden="true"></span>Tetri#</h1>
+        <h1 class="logo">
+          <button id="go-home" class="logo-btn" type="button" title="첫 화면으로"><span class="logo-mark" aria-hidden="true"></span>Tetri#</button>
+        </h1>
         <p id="session-title" class="session-title"></p>
         <div class="header-actions">
           <button id="pause-game" class="btn btn-ghost" type="button" aria-label="일시정지"><span data-icon="pause"></span></button>
@@ -136,6 +138,18 @@
                 <button type="button" class="btn btn-primary" data-action="resume"><span data-icon="play"></span>계속 <kbd><kbd class="keycap">Esc</kbd></kbd></button>
                 <button type="button" class="btn" data-action="retry"><span data-icon="restart"></span>다시 시작 <kbd data-key="RESTART"></kbd></button>
                 <button type="button" class="btn" data-action="menu"><span data-icon="menu"></span>첫 화면으로</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 진행 중인 판을 버리기 전에 묻는다(R·로고). 기본 포커스는 "계속하기" — Space 연타로 넘어가지 않게 -->
+          <div id="confirm" class="panel" hidden>
+            <div class="panel-card confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-desc">
+              <h2 id="confirm-title" class="panel-title"></h2>
+              <p id="confirm-desc" class="confirm-desc">진행 중인 판은 기록되지 않고 사라져요.</p>
+              <div class="actions-row">
+                <button type="button" class="btn" data-confirm="cancel"><span data-icon="play"></span>계속하기 <kbd><kbd class="keycap">Esc</kbd></kbd></button>
+                <button type="button" class="btn btn-primary" data-confirm="ok"><span class="confirm-ok-icon"></span><span class="confirm-ok-text">다시 시작</span> <kbd class="confirm-ok-key"></kbd></button>
               </div>
             </div>
           </div>

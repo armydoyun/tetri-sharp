@@ -57,6 +57,41 @@ body:not([data-screen="play"], [data-screen="countdown"]) #pause-game {
   line-height: 1;
 }
 
+.logo-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 0 -6px;
+  padding: 6px;
+  border: 0;
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  transition: background-color var(--dur) var(--ease);
+}
+
+.logo-btn:hover {
+  background: var(--surface-2);
+}
+
+.logo-btn:active .logo-mark {
+  transform: translateY(1px);
+}
+
+.confirm-desc {
+  margin: 0 0 var(--space-2);
+  color: var(--text-dim);
+  font-size: var(--text-m);
+}
+
+.confirm-card .actions-row {
+  width: 100%;
+}
+
 .logo-mark {
   width: 21px;
   height: 14px;
