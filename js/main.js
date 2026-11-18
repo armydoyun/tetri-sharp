@@ -47,7 +47,7 @@ const GO_FRAMES = 20; // "GO!" — 이 동안에는 이미 플레이 중
 
 const $ = id => /** @type {HTMLElement} */ (document.getElementById(id));
 const canvas = /** @type {HTMLCanvasElement} */ ($("board"));
-const panels = { menu: $("menu"), pause: $("pause"), results: $("results") };
+const panels = { menu: $("menu"), pause: $("pause"), confirm: $("confirm"), results: $("results") };
 const countdownEl = $("countdown");
 const hud = {
   timeLabel: $("hud-time-label"),
@@ -271,8 +271,9 @@ const renderRaceModes = ruleSet => {
       const info = document.createElement("small");
       info.textContent = target ? m.formatRecord(target.best) : t("끝까지 간 리플레이 필요");
       const body = document.createElement("span");
+      body.className = "race-mode-text";
       body.append(name, info);
-      btn.append(body, icon("arrow-right"));
+      btn.append(body, icon("chevron-right"));
       btn.addEventListener("click", () => startRace(m));
       return btn;
     })
@@ -285,20 +286,26 @@ const renderMenu = () => {
   renderRaceModes(ruleSet);
   const list = $("mode-list");
   list.replaceChildren(
-    ...MODES.map(m => {
+    ...MODES.map((m, i) => {
       const best = records.best(m, ruleSet);
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "mode-card";
+      btn.className = "menu-row";
       btn.dataset.mode = m.id;
+      const index = document.createElement("span");
+      index.className = "menu-index num";
+      index.textContent = String(i + 1).padStart(2, "0");
+      const text = document.createElement("span");
+      text.className = "menu-text";
       const name = document.createElement("strong");
       name.textContent = m.name;
       const desc = document.createElement("small");
       desc.textContent = m.description;
-      const pb = document.createElement("small");
-      pb.className = "mode-best";
+      text.append(name, desc);
+      const pb = document.createElement("span");
+      pb.className = "mode-best num";
       pb.textContent = best ? t("최고 기록 {record}", { record: m.formatRecord(best) }) : "";
-      btn.append(name, desc, pb, icon("arrow-right"));
+      btn.append(index, text, pb, icon("chevron-right"));
       btn.addEventListener("click", () => start(m));
       return btn;
     })
@@ -339,6 +346,7 @@ const setScreen = next => {
 };
 
 const toMenu = (initial = false) => {
+  confirming = null;
   game = null;
   race = null;
   racePanel.hidden = true;
@@ -362,6 +370,7 @@ const showModeHud = (m, replay = false) => {
 };
 
 const start = (m, selectedRules = currentRules(), target = null) => {
+  confirming = null;
   if (screen === "replay") stopReplay();
   mode = m;
   if (!m.practice) store.set("lastMode", m.id);
@@ -405,9 +414,62 @@ $("pause-game").addEventListener("click", pause);
 
 const resume = () => {
   if (screen !== "paused") return;
+  confirming = null;
   showPanel(null);
   setScreen(pausedFrom);
 };
+
+// ---- 진행 중인 판을 버리기 전에 묻기(R 다시 시작 · 로고로 첫 화면) ----
+
+/** @type {null | "restart" | "menu"} 지금 묻고 있는 것 */
+let confirming = null;
+/** 게임이 진행 중(끝나지 않음)이라 버리면 잃는 게 있는가 */
+const inProgress = () => screen === "play" || screen === "countdown" || screen === "paused";
+
+const askConfirm = kind => {
+  if (!inProgress()) return;
+  pause();
+  confirming = kind;
+  const restart = kind === "restart";
+  $("confirm-title").textContent = restart ? t("다시 시작할까요?") : t("첫 화면으로 갈까요?");
+  const ok = /** @type {HTMLElement} */ (panels.confirm.querySelector('[data-confirm="ok"]'));
+  /** @type {HTMLElement} */ (ok.querySelector(".confirm-ok-icon")).replaceChildren(icon(restart ? "restart" : "menu"));
+  /** @type {HTMLElement} */ (ok.querySelector(".confirm-ok-text")).textContent = restart
+    ? t("다시 시작")
+    : t("첫 화면으로");
+  const first = keysOf("RESTART")[0];
+  /** @type {HTMLElement} */ (ok.querySelector(".confirm-ok-key")).replaceChildren(
+    ...(restart && first ? [keycap(first)] : [])
+  );
+  showPanel("confirm");
+};
+
+const cancelConfirm = () => {
+  if (!confirming) return;
+  confirming = null;
+  showPanel("pause");
+};
+
+const acceptConfirm = () => {
+  const kind = confirming;
+  if (!kind) return;
+  confirming = null;
+  if (kind === "restart") start(mode, rules, race?.target);
+  else toMenu();
+};
+
+for (const btn of panels.confirm.querySelectorAll("[data-confirm]")) {
+  btn.addEventListener("click", () => (btn.getAttribute("data-confirm") === "ok" ? acceptConfirm() : cancelConfirm()));
+}
+
+/** 로고: 첫 화면으로. 게임 중이면 먼저 묻는다 */
+$("go-home").addEventListener("click", () => {
+  if (settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen || statsUI.isOpen || practiceUI.isOpen) return;
+  if (screen === "menu") return window.scrollTo(0, 0);
+  if (inProgress()) return askConfirm("menu");
+  if (screen === "replay") stopReplay();
+  toMenu();
+});
 
 const renderResultSplits = () => {
   const details = /** @type {HTMLDetailsElement} */ ($("results-splits"));
@@ -645,7 +707,15 @@ const handleSystem = action => {
     else stopReplay();
     return;
   }
-  if (action === "restart" && screen !== "menu") return start(mode, rules, race?.target);
+  // 묻는 중: R은 한 번 더 누르면 다시 시작, Esc는 취소
+  if (confirming) {
+    if (action === "pause") cancelConfirm();
+    else if (action === "restart" && confirming === "restart") acceptConfirm();
+    return;
+  }
+  // 진행 중인 판은 묻고, 끝난 판(결과 화면)은 바로 다시 시작
+  if (action === "restart" && inProgress()) return askConfirm("restart");
+  if (action === "restart" && screen === "results") return start(mode, rules, race?.target);
   if (action !== "pause") return;
   if (screen === "play" || screen === "countdown") pause();
   else if (screen === "paused") resume();

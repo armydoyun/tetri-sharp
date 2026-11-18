@@ -79,6 +79,9 @@ export const ICONS = Object.freeze({
   "arrow-right": [["path", { d: "M5 12h14M13 6l6 6-6 6" }]],
   "arrow-up": [["path", { d: "M12 19V5M6 11l6-6 6 6" }]],
   "arrow-down": [["path", { d: "M12 5v14M6 13l6 6 6-6" }]],
+  "chevron-down": [["path", { d: "M6.5 9.5 12 15l5.5-5.5" }]],
+  "chevron-right": [["path", { d: "M9.5 6.5 15 12l-5.5 5.5" }]],
+  check: [["path", { d: "M5.5 12.5 10 17l8.5-9.5" }]],
 });
 
 /**

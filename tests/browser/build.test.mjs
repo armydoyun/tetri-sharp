@@ -76,6 +76,11 @@ test("브라우저에서 오류 없이 뜨고 보드를 그린다", async () => 
   await context.close();
 });
 
+/** 직접 만든 드롭다운(js/ui/select.js)에서 값을 고른다 */
+const choose = async (page, id, value) => {
+  await page.click(`#${id}`);
+  await page.click(`#${id}-list [data-value="${value}"]`);
+};
 const text = (page, id) => page.locator(`#${id}`).textContent();
 const visible = (page, id) => page.locator(`#${id}`).isVisible();
 /** 메뉴에서 모드를 골라 카운트다운이 끝날 때까지 기다린다. */
@@ -114,11 +119,56 @@ test("메뉴 → Sprint 40L: 하드 드롭·홀드·일시정지·재시작", as
   await page.keyboard.press("Escape");
   assert.equal(await visible(page, "pause"), false);
 
+  // R은 바로 지우지 않고 묻는다. 기본 포커스는 "계속하기"라 Space를 눌러도 다시 시작하지 않는다.
+  await page.keyboard.press("KeyR");
+  assert.equal(await visible(page, "confirm"), true, "다시 시작할지 묻는다");
+  assert.equal(await text(page, "hud-pieces"), "3", "아직 그대로");
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("data-confirm")), "cancel");
+  await page.keyboard.press("Escape");
+  assert.equal(await visible(page, "confirm"), false);
+  assert.equal(await visible(page, "pause"), true, "취소하면 일시정지 화면");
+
+  // 일시정지 중 R → 묻고, R을 한 번 더 누르면 다시 시작
+  await page.keyboard.press("KeyR");
+  assert.equal(await visible(page, "confirm"), true);
   await page.keyboard.press("KeyR");
   await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "0", null, {
     timeout: 3000,
   });
   assert.equal(await visible(page, "countdown"), true, "다시 카운트다운");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("로고: 게임 중이면 물은 뒤 첫 화면으로, 결과 화면에서는 바로 첫 화면으로", async () => {
+  const { context, page, errors } = await openPage();
+  await startMode(page, "zen");
+  await page.keyboard.press("Space");
+  await page.click("#go-home");
+  assert.equal(await visible(page, "confirm"), true);
+  assert.equal(await text(page, "confirm-title"), "첫 화면으로 갈까요?");
+  await page.click('[data-confirm="cancel"]');
+  assert.equal(await visible(page, "pause"), true, "취소하면 판이 남아 있다");
+  await page.click("#go-home");
+  await page.click('[data-confirm="ok"]');
+  assert.equal(await visible(page, "menu"), true);
+
+  // 끝난 판: 묻지 않는다. 결과 화면의 R도 바로 다시 시작
+  await startMode(page, "zen");
+  for (let i = 0; i < 40; i++) await page.keyboard.press("Space");
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
+  await page.keyboard.press("KeyR");
+  assert.equal(await visible(page, "confirm"), false, "결과 화면에서는 묻지 않는다");
+  await page.waitForFunction(
+    () => document.body.dataset.screen === "countdown" || document.body.dataset.screen === "play"
+  );
+  await page.keyboard.press("Escape");
+  await page.click('#pause [data-action="menu"]');
+  await startMode(page, "zen");
+  for (let i = 0; i < 40; i++) await page.keyboard.press("Space");
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
+  await page.click("#go-home");
+  assert.equal(await visible(page, "menu"), true, "결과 화면에서 로고를 누르면 바로 첫 화면");
   assert.deepEqual(errors, []);
   await context.close();
 });
@@ -187,7 +237,7 @@ test("설정: 슬라이더 값과 키 변경이 저장되고 새로고침 후에
 
 test("Ultra: 남은 시간이 줄어들고 하드 드롭으로 점수가 오른다, 메뉴에 일곱 모드", async () => {
   const { context, page, errors } = await openPage();
-  assert.equal(await page.locator(".mode-card").count(), 7);
+  assert.equal(await page.locator("#mode-list .menu-row").count(), 7);
   await startMode(page, "ultra");
   assert.equal(await text(page, "hud-time-label"), "남은 시간");
   await page.waitForTimeout(300);
@@ -243,7 +293,7 @@ test("Custom 규칙: 편집 내용이 저장되고 기록표 id가 바뀌며, �
   assert.notEqual(after, before, "조합이 바뀌면 기록표도 바뀐다");
   // 프리셋 버튼으로 채우면 해당 값으로 바뀐다
   await page.click('[data-preset="arcade"]');
-  assert.equal(await page.locator("#rule-rotation option:checked").textContent(), "ARS");
+  assert.equal(await page.locator("#rule-rotation .select-value").textContent(), "ARS");
   assert.match(
     await page.locator('label[for="rule-rotation"] small').textContent(),
     /중앙열/,
@@ -403,7 +453,15 @@ const rects = (page, selectors) =>
 
 test("레이아웃 고정: 규칙 탭을 바꾸거나 메뉴 알림이 생겨도 메뉴 요소가 움직이지 않는다", async () => {
   const { context, page, errors } = await openPage();
-  const sels = ["#rule-tabs", "#edit-rules", "#mode-list", ".mode-card", "#watch-last", "#menu-notice", "#board"];
+  const sels = [
+    "#rule-tabs",
+    "#edit-rules",
+    "#mode-list",
+    "#mode-list .menu-row",
+    "#watch-last",
+    "#menu-notice",
+    "#board",
+  ];
   const before = await rects(page, sels);
   for (const id of ["retro", "arcade", "custom", "modern", "custom"]) {
     await page.click(`[data-rules="${id}"]`);
@@ -433,7 +491,7 @@ test("레이아웃 고정: 규칙 편집에서 조건 항목이 비활성이 돼
 
   await page.click('.dialog-tabs [data-value="고정·낙하"]');
   const lockRows = await rows();
-  await page.selectOption("#rule-lock-type", { label: "닿으면 다음 낙하 때 즉시 고정" });
+  await choose(page, "rule-lock-type", "none");
   assert.equal(await page.locator("#rule-lock-delay").isDisabled(), true, "고정 지연은 비활성");
   assert.deepEqual(await rows(), lockRows);
   assert.match(await page.locator('label[for="rule-lock-delay"] small').textContent(), /즉시 고정/, "이유가 보인다");
@@ -501,7 +559,7 @@ test("테마: 라이트에서 UI는 밝고 게임 화면(보드)은 어둡다, �
     const colors = await page.evaluate(() => ({
       body: getComputedStyle(document.body).backgroundColor,
       game: getComputedStyle(document.querySelector(".board-wrap")).backgroundColor,
-      card: getComputedStyle(document.querySelector(".mode-card")).backgroundColor,
+      card: getComputedStyle(document.querySelector("#mode-list .menu-row")).backgroundColor,
     }));
     assert.ok(lum(colors.game) < 40, `${scheme}: 게임 화면은 어둡다`);
     // 첫 화면의 카드는 보드 위가 아니라 페이지에 있으므로 테마를 따른다
@@ -574,12 +632,12 @@ test("기록 화면: 표는 늘 10줄, 조건을 바꿔도 크기가 그대로, 
       const r = document.getElementById("records").getBoundingClientRect();
       return [Math.round(r.width), Math.round(r.height)];
     });
-  await page.locator("#records-mode").selectOption("sprint40");
-  await page.locator("#records-rules").selectOption("modern");
+  await choose(page, "records-mode", "sprint40");
+  await choose(page, "records-rules", "modern");
   const before = await size();
   assert.match(await page.locator(".records-table tbody tr").first().textContent(), /1:00\.00/);
   assert.equal(await page.locator("#records-watch").isDisabled(), true, "리플레이가 없으면 비활성");
-  await page.locator("#records-mode").selectOption("marathon");
+  await choose(page, "records-mode", "marathon");
   assert.deepEqual(await size(), before, "조건을 바꿔도 크기 그대로");
   assert.equal(await page.locator(".records-table tbody tr.is-empty").count(), 10);
   await page.click("#records-close");
@@ -646,7 +704,7 @@ test("기록 이름을 저장하고 플레이하면 그 기록에 당시 이름�
   assert.equal(await visible(page, "results"), true);
   await page.keyboard.press("Escape");
   await page.click("#open-records");
-  await page.locator("#records-mode").selectOption("ultra");
+  await choose(page, "records-mode", "ultra");
   assert.equal(await page.locator(".record-player").first().textContent(), "도윤");
 
   await page.fill("#record-player-name", "친구");
@@ -654,7 +712,7 @@ test("기록 이름을 저장하고 플레이하면 그 기록에 당시 이름�
   await page.reload();
   await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
   await page.click("#open-records");
-  await page.locator("#records-mode").selectOption("ultra");
+  await choose(page, "records-mode", "ultra");
   assert.equal(await page.locator("#record-player-name").inputValue(), "친구");
   assert.equal(await page.locator(".record-player").first().textContent(), "도윤");
   assert.deepEqual(errors, []);
@@ -732,7 +790,7 @@ test("규칙 공유: 편집기에서 코드를 붙여 넣으면 불러오고, #r
   await page.click("#rule-share-load");
   assert.match(await text(page, "rules-record"), /불러왔어요/);
   await page.click('.dialog-tabs [data-value="피스"]');
-  assert.match(await page.locator("#rule-rotation option:checked").textContent(), /킥 없음/);
+  assert.match(await page.locator("#rule-rotation .select-value").textContent(), /킥 없음/);
   await page.click('.dialog-tabs [data-value="공유"]');
   await page.locator("#rule-share-paste").fill("엉터리");
   await page.click("#rule-share-load");
@@ -751,7 +809,7 @@ test("규칙 공유: 편집기에서 코드를 붙여 넣으면 불러오고, #r
   assert.match(await p2.locator("#menu-notice").textContent(), /불러왔어요/);
   assert.equal(new URL(p2.url()).hash, "", "주소의 해시는 지운다");
   await p2.click("#edit-rules");
-  assert.match(await p2.locator("#rule-rotation option:checked").textContent(), /킥 없음/);
+  assert.match(await p2.locator("#rule-rotation .select-value").textContent(), /킥 없음/);
   assert.deepEqual([...errors, ...errs2], []);
   await fresh.close();
 });
@@ -759,7 +817,7 @@ test("규칙 공유: 편집기에서 코드를 붙여 넣으면 불러오고, #r
 test("연습: 메뉴에서 고르면 시작하고, 놓을 때마다 성공/시도를 센다", async () => {
   const { context, page, errors } = await openPage();
   await page.click("#open-practice");
-  assert.equal(await page.locator("#practice .mode-card").count(), 7);
+  assert.equal(await page.locator("#practice .menu-row").count(), 7);
   assert.equal(await page.locator('[data-drill="double"]').isVisible(), true);
   await page.click('[data-drill="tsd"]');
   await page.waitForFunction(() => document.getElementById("countdown")?.textContent === "GO!", null, {
@@ -931,7 +989,7 @@ test("전체 흐름: Survival 한 판 → 결과·새 기록 → 기록표 리�
 
   // 기록표: 1위 기록과 그 리플레이
   await page.click("#open-records");
-  await page.locator("#records-mode").selectOption("survival");
+  await choose(page, "records-mode", "survival");
   assert.equal(await page.locator(".records-table tbody tr.is-empty").count(), 9);
   assert.equal(await page.locator("#records-watch").isDisabled(), false);
   await page.click("#records-watch");
@@ -989,6 +1047,32 @@ test("효과음: 소리를 켜면 게임 중 오디오를 만들고, 끄면 만�
   await page.keyboard.press("Space");
   await page.waitForTimeout(100);
   assert.equal(await count(), 1);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("드롭다운: 키보드로 열고 고르며, Esc는 목록만 닫고 대화상자는 그대로", async () => {
+  const { context, page, errors } = await openPage();
+  await page.click("#open-records");
+  await page.focus("#records-mode");
+  await page.keyboard.press("ArrowDown");
+  assert.equal(await page.locator("#records-mode-list").isVisible(), true, "↓로 열린다");
+  assert.equal(await page.locator("#records-mode").getAttribute("aria-expanded"), "true");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  assert.equal(await page.locator("#records-mode-list").count(), 0, "고르면 닫힌다");
+  assert.equal(await page.locator("#records-mode").getAttribute("data-value"), "marathon");
+  assert.equal(await page.locator("#records-mode .select-value").textContent(), "Marathon");
+
+  await page.click("#records-mode");
+  await page.keyboard.press("Escape");
+  assert.equal(await page.locator("#records-mode-list").count(), 0, "Esc로 목록이 닫힌다");
+  assert.equal(await page.locator("#records").isVisible(), true, "대화상자는 열려 있다");
+  assert.equal(await page.evaluate(() => document.activeElement?.id), "records-mode", "포커스는 열기 버튼으로");
+
+  await page.click("#records-mode");
+  await page.mouse.click(5, 5);
+  assert.equal(await page.locator("#records-mode-list").count(), 0, "바깥을 누르면 닫힌다");
   assert.deepEqual(errors, []);
   await context.close();
 });

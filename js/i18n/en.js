@@ -3,9 +3,6 @@
 /** @type {Record<string, string>} */
 export const EN = {
   // ---- 첫 화면 ----
-  "오프라인 테트리스": "Offline block puzzle",
-  "다양한 규칙들을 직접 선택해 자신만의 테트리스를 플레이 해보세요.":
-    "Pick and mix the rules yourself and play your own falling-block game.",
   "Tetri# — 규칙을 직접 조합하는 낙하 블록 퍼즐.": "Tetri# — a falling-block puzzle where you mix the rules.",
   "첫 화면": "Home",
   규칙: "Rules",
@@ -86,6 +83,10 @@ export const EN = {
   "0 / 40줄": "0 / 40 lines",
   일시정지: "Pause",
   계속: "Resume",
+  계속하기: "Keep playing",
+  "다시 시작할까요?": "Restart?",
+  "첫 화면으로 갈까요?": "Go back to home?",
+  "진행 중인 판은 기록되지 않고 사라져요.": "The game in progress won't be saved.",
   "다시 시작": "Restart",
   "첫 화면으로": "Back to home",
   "터치 조작": "Touch controls",

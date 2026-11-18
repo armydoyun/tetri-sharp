@@ -4,6 +4,7 @@ import { PRESET_LIST } from "../rules/presets.js";
 import { recordKey } from "../storage/records.js";
 import { MAX_RANKED } from "../replay/replay.js";
 import { button, el, fillDialog, fieldRow } from "./dom.js";
+import { dropdown } from "./select.js";
 import { t } from "../i18n/index.js";
 
 const ROWS = 10;
@@ -44,22 +45,28 @@ export const createRecordsUI = ({ dialog, modes, records, replayFor, onWatch }) 
     const key = recordKey(mode, rules);
     const replays = list.slice(0, MAX_RANKED).map(e => replayFor(key, e));
 
-    const modeSelect = el("select", { id: "records-mode", class: "select" });
-    for (const m of modes) modeSelect.append(el("option", { value: m.id, text: m.name, selected: m.id === mode.id }));
-    modeSelect.addEventListener("change", () => {
-      modeId = modeSelect.value;
-      render();
-      /** @type {HTMLElement | null} */ (dialog.querySelector("#records-mode"))?.focus();
+    const modeSelect = dropdown({
+      id: "records-mode",
+      label: t("모드"),
+      options: modes.map(m => ({ value: m.id, label: m.name })),
+      value: mode.id,
+      onChange: v => {
+        modeId = v;
+        render();
+        /** @type {HTMLElement | null} */ (dialog.querySelector("#records-mode"))?.focus();
+      },
     });
-    const rulesSelect = el("select", { id: "records-rules", class: "select" });
-    for (const [id, name] of options)
-      rulesSelect.append(el("option", { value: id, text: name, selected: id === rulesId }));
-    rulesSelect.addEventListener("change", () => {
-      rulesId = rulesSelect.value;
-      render();
-      /** @type {HTMLElement | null} */ (dialog.querySelector("#records-rules"))?.focus();
+    const rulesSelect = dropdown({
+      id: "records-rules",
+      label: t("규칙"),
+      options: options.map(([id, name]) => ({ value: id, label: name })),
+      value: rulesId,
+      onChange: v => {
+        rulesId = v;
+        render();
+        /** @type {HTMLElement | null} */ (dialog.querySelector("#records-rules"))?.focus();
+      },
     });
-
     const nameInput = el("input", {
       id: "record-player-name",
       class: "text-input",
@@ -116,7 +123,7 @@ export const createRecordsUI = ({ dialog, modes, records, replayFor, onWatch }) 
             e.frames ? (e.pieces / (e.frames / 60)).toFixed(2) : "—",
             formatDate(e.date),
           ]
-        : [`${i + 1}`, "—", "", "", "", ""];
+        : [`${i + 1}`, "", "", "", "", ""];
       return el(
         "tr",
         { class: e ? "" : "is-empty" },
