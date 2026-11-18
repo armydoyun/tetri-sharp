@@ -9,13 +9,14 @@
 | 항목 | 결정 | 이유 |
 |---|---|---|
 | 언어 | 순수 JS (ES Modules) + JSDoc 타입 주석 | "html/css/js만" 조건 유지, 에디터 자동완성은 JSDoc으로 확보 |
-| 번들 | **Vite + `vite-plugin-singlefile`** | 개발은 모듈로 쪼개고, 빌드 시 JS/CSS/폰트/효과음까지 `dist/index.html` 하나로 인라인 |
+| 번들 | **esbuild + `tools/build.mjs`** (field-studio와 같은 방식) | 개발은 ES 모듈로 쪼개고, 빌드 시 JS/CSS를 `deploy/index.html` 하나로 인라인 |
 | 런타임 라이브러리 | **기본 0개** (필요 시 소형만: 예: 효과음용 ZzFX ~1KB) | 테트리스류 로직은 작아서 엔진이 필요 없음 |
-| 개발 전용 의존성 | `vite`, `vite-plugin-singlefile`, `vitest` | 번들에 안 들어감 |
+| 개발 전용 의존성 | `esbuild`, `eslint`, `prettier`, `playwright` (테스트는 Node 내장 `node:test`) | 번들에 안 들어감 |
 | 렌더링 | 보드/미노/이펙트 = `<canvas>` 2D, 메뉴/설정/HUD = DOM + CSS | 게임 화면은 빠르게, UI는 스타일링 쉽게 |
 | 게임 루프 | **고정 타임스텝 60Hz 로직 틱** + rAF 렌더 (누적기 방식) | 규칙을 "프레임" 단위로 정의 → NES/TGM 계열 규칙 재현 정확, 리플레이 결정론 보장 |
 | 랜덤 | 시드 기반 PRNG (mulberry32 등) | 리플레이, 같은 시드로 기록 비교 |
 | 저장 | `localStorage` (설정, 키맵, 개인 기록, 리플레이) | 서버 없음 |
+| CI | GitHub Actions (`.github/workflows/ci.yml`) | push마다 lint → unit/browser 테스트 → 통과 시 단일 파일 빌드를 Artifacts로 업로드 |
 
 > 제미나이 답변과 다른 점: "deltaTime으로 ms 단위 처리"보다 **고정 틱(프레임) 단위**를 추천합니다.
 > 가변 deltaTime은 144Hz/60Hz에서 미세하게 결과가 달라져 리플레이가 깨지고, 클래식 규칙(예: "레벨 0은 48프레임마다 1칸")을 그대로 옮기기 어렵습니다.
@@ -42,7 +43,7 @@
 ```
 
 원칙
-1. **Core는 DOM을 모른다.** `engine.step(inputFrame)`만 호출하면 상태가 한 틱 진행되고, 발생한 사건을 `events` 배열로 돌려준다 (`lock`, `lineClear{lines, tspin, b2b, combo}`, `hold`, `spawn`, `topOut` ...). → Node에서 vitest로 그대로 테스트 가능.
+1. **Core는 DOM을 모른다.** `engine.step(inputFrame)`만 호출하면 상태가 한 틱 진행되고, 발생한 사건을 `events` 배열로 돌려준다 (`lock`, `lineClear{lines, tspin, b2b, combo}`, `hold`, `spawn`, `topOut` ...). → Node에서 `node:test`로 그대로 테스트 가능.
 2. **규칙은 데이터 + 전략 함수.** 엔진 안에 `if (mode === 'nes')` 같은 분기를 두지 않고, RuleSet 객체가 들고 있는 전략 모듈을 호출한다.
 3. **Mode ≠ RuleSet.** RuleSet은 "조작 물리"(회전, 고정, 생성기...), Mode는 "목표와 진행"(40줄 끝, 2분 제한, 레벨업 곡선...). 둘을 조합해 한 판을 만든다.
 4. **결정론.** 같은 시드 + 같은 RuleSet + 같은 입력 기록 = 같은 결과. 리플레이는 입력 로그만 저장하면 된다.
@@ -54,9 +55,10 @@
 ```
 tetri-sharp/
 ├─ index.html
-├─ vite.config.js            # singlefile 플러그인
+├─ tools/build.mjs           # esbuild 번들 + HTML 인라인 → deploy/index.html
+├─ .github/workflows/ci.yml  # lint · 테스트 · 빌드
 ├─ package.json
-├─ src/
+├─ js/
 │  ├─ main.js                # 부트스트랩, 화면 전환
 │  ├─ core/
 │  │  ├─ engine.js           # createGame(config, seed) → { step, getState }
@@ -82,8 +84,10 @@ tetri-sharp/
 │  ├─ audio/sfx.js
 │  ├─ ui/                    # menu.js, ruleEditor.js, settings.js, results.js
 │  ├─ storage/               # settings.js, records.js, replays.js
-│  └─ styles/main.css
-└─ tests/                    # srs.test.js, randomizer.test.js, tspin.test.js, replay.test.js ...
+├─ css/                     # tokens.css → base.css → game.css (index.html 링크 순서 = 빌드 순서)
+└─ tests/
+   ├─ unit/                  # *.test.mjs — Node만으로 (코어·규칙·빌드 도구)
+   └─ browser/               # *.test.mjs — 배포본을 Chromium으로 열어 확인
 ```
 
 ---
@@ -107,7 +111,7 @@ tetri-sharp/
     maxResets: 15,
   },
   are: { spawnFrames: 0, lineClearFrames: 0 },   // 생성 지연 / 라인 클리어 지연
-  spawn: { row: 21, orientation: 'guideline', irs: true, ihs: true },
+  spawn: { row: 18,      // y-down 기준: 보이는 영역(20~39) 바로 위 orientation: 'guideline', irs: true, ihs: true },
   gravity: 'guidelineCurve',    // 'guidelineCurve' | 'nesTable' | 'tgmTable' | 고정값 {g: 20}
   tspin: 'threeCorner',         // 'none' | 'threeCorner' | 'immobile'(all-spin)
   scoring: 'guideline',         // 'guideline' | 'nes' | 'none'
@@ -143,6 +147,7 @@ tetri-sharp/
 
 ### 4.2 보드
 - `Uint8Array(10 * 40)`, 0 = 빈칸, 1~7 = 미노 색, 8 = 가비지. 화면에는 아래 20줄(+버퍼 일부)만 표시.
+- 좌표는 y가 **아래로** 증가(0 = 맨 위 버퍼). 미노 모양 좌표와 방향이 같아 변환이 필요 없다.
 - 라인 삭제는 `copyWithin`으로 한 번에 당김.
 
 ### 4.3 회전 시스템 인터페이스
@@ -240,7 +245,13 @@ export default {
 
 ---
 
-## 9. 테스트 전략 (vitest, Node에서 core만)
+## 9. 테스트 전략
+
+- `npm run test:unit` — `node:test`, core/rules/빌드 도구
+- `npm run test:browser` — 단일 파일 배포본을 Chromium에서 열어 오류·외부 요청·렌더링 확인
+- CI에서 둘 다 실행, 둘 다 통과해야 빌드 업로드
+
+단위 테스트 대상
 
 - SRS 킥: 대표 상황(T-spin Triple 셋업, I 미노 벽킥) 스냅샷
 - 7-Bag: 7개마다 정확히 1세트, 시드 고정 시 동일 수열
@@ -255,15 +266,17 @@ export default {
 
 | 단계 | 내용 | 완료 기준 |
 |---|---|---|
-| **M0 셋업** | Vite + singlefile + vitest, 빈 캔버스 | `npm run build` → `dist/index.html` 하나로 열림 |
-| **M1 코어 MVP** | 보드, 7종 미노, SRS, 7-Bag, 중력, moveReset, 하드드롭, 고스트, 홀드, 넥스트 5 | 키보드로 끝없이 플레이 가능 |
-| **M2 조작감** | DAS/ARR/SDF, 키 리매핑, 설정 저장 | ARR 0 / SDF ∞ 정상 동작 |
-| **M3 Sprint 40L** | 모드 인터페이스, 타이머, 결과 화면, 개인 기록 | 첫 "완성된 게임" |
-| **M4 점수 & Marathon/Ultra** | T-spin, B2B, 콤보, PC, 레벨 곡선 | |
-| **M5 규칙 샌드박스** | 전략 모듈 추가(ARS, Classic, 생성기들, lock 타입), 프리셋, 규칙 편집 UI, 기록 분리 | Modern/Retro/Arcade 전환 |
-| **M6 고속 플레이** | ARE, IRS/IHS, 20G, Master 모드 | |
-| **M7 연출 & 사운드** | 이펙트, 효과음, 스킨 | |
-| **M8 리플레이 & 부가** | 리플레이 저장/재생, Zen, Dig, 게임패드 | |
+| **M0 셋업** ✅ | esbuild 단일 파일 빌드, ESLint/Prettier, node:test, Playwright, GitHub Actions, 빈 보드 | CI 통과 시 Artifacts에 `index.html` 하나 |
+| **M1 코어 MVP** ✅ | 보드, 7종 미노, SRS, 7-Bag, 중력, moveReset, 하드드롭, 고스트, 홀드, 넥스트 5 | 키보드로 끝없이 플레이 가능 |
+| **M2 조작감** ✅ | DAS/ARR/SDF, 키 리매핑, 설정 저장 | ARR 0 / SDF ∞ 정상 동작 |
+| **M3 Sprint 40L** ✅ (+ Endless) | 모드 인터페이스, 타이머, 결과 화면, 개인 기록 | 첫 "완성된 게임" |
+| **M4 점수 & Marathon/Ultra** ✅ | T-spin, B2B, 콤보, PC, 레벨 곡선 | |
+| **M5 규칙 샌드박스** ✅ | 전략 모듈 추가(ARS, Classic, 생성기들, lock 타입), 프리셋, 규칙 편집 UI, 기록 분리 | Modern/Retro/Arcade 전환 |
+| **M6 고속 플레이** ✅ | ARE, IRS/IHS, 20G, Master 모드 | |
+| **M7 연출** ✅ (사운드는 제외) | 이펙트, 효과음, 스킨 | |
+| **M8 리플레이 & 부가** ✅ | 리플레이 저장/재생, Zen, Dig, 게임패드 | |
+
+| **M9 마무리·배포** ✅ | 기록 화면·최고 기록 리플레이·Sprint 구간 기록, 게임패드 버튼 바꾸기, 판 통계, Custom 규칙 공유(코드·링크), 연습 모드, 터치 조작, PWA + GitHub Pages | main에 합치면 Pages 주소로 바로 플레이 |
 
 ---
 

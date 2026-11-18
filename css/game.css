@@ -1,0 +1,476 @@
+/* 배치와 게임 화면 — docs/DESIGN_SYSTEM.md "배치"
+   보드와 정보 칸은 고정 폭 격자에 놓여, 숫자가 길어져도 보드가 움직이지 않는다. */
+
+.app {
+  min-height: 100vh;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-4);
+}
+
+.app-header {
+  width: min(760px, 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-4xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+
+.logo-sharp {
+  color: var(--accent);
+}
+
+/* [보드 | 정보 칸] (+ 보드 아래 터치 버튼) — 정보 칸 폭 고정 */
+.stage {
+  display: grid;
+  grid-template-columns: auto var(--hud-width);
+  grid-template-areas:
+    "board hud"
+    "touch hud";
+  align-items: start;
+  gap: var(--space-4);
+}
+
+.stage > .board-wrap {
+  grid-area: board;
+}
+
+.stage > .hud {
+  grid-area: hud;
+}
+
+.stage > .touchpad {
+  grid-area: touch;
+}
+
+@media (max-width: 720px) {
+  .stage {
+    grid-template-columns: auto;
+    grid-template-areas:
+      "board"
+      "touch"
+      "hud";
+    justify-items: center;
+  }
+}
+
+/* ---- 게임 화면: 항상 다크 ---- */
+.board-wrap {
+  position: relative;
+  border-radius: var(--radius-m);
+  background: var(--game-bg);
+  color: var(--text);
+  overflow: hidden;
+}
+
+/* 캔버스는 20×22칸 비율. 화면 높이에 맞춰 줄어든다(해상도는 렌더러가 devicePixelRatio로 맞춘다). */
+.board {
+  display: block;
+  width: min(560px, calc(100vw - 32px), calc((100vh - 200px - var(--touch-space)) * 20 / 22));
+  height: auto;
+}
+
+@supports (height: 100dvh) {
+  .board {
+    width: min(560px, calc(100vw - 32px), calc((100dvh - 200px - var(--touch-space)) * 20 / 22));
+  }
+}
+
+/* ---- 터치 버튼: 5×2 고정 격자, 보드와 같은 폭 ---- */
+:root {
+  --touch-space: 0px;
+}
+
+body.touch-on {
+  --touch-btn: 56px;
+  --touch-space: calc(2 * var(--touch-btn) + var(--space-2) + var(--space-4));
+}
+
+.touchpad {
+  --touch-btn: 56px;
+  display: none;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-2);
+  width: 100%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+body.touch-on .touchpad {
+  display: grid;
+}
+
+.touchpad > button {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--touch-btn);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 22px;
+  transition: background-color var(--dur) var(--ease);
+}
+
+.touchpad > button.is-down {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.touchpad > .touch-system {
+  color: var(--text-dim);
+}
+
+/* 보드 위에 겹치는 화면(메뉴·일시정지·결과): 넘치면 패널 안에서 스크롤 */
+.panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  overflow-y: auto;
+  background: var(--scrim);
+  text-align: center;
+}
+
+.panel:focus {
+  outline: none;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: var(--text-2xl);
+}
+
+.actions {
+  display: grid;
+  gap: var(--space-2);
+  width: min(240px, 100%);
+}
+
+.actions-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+/* 규칙 선택 줄: [탭][편집] — 편집 버튼은 늘 같은 자리에 있고 Custom이 아닐 때 비활성 */
+.rule-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.mode-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  width: min(480px, 100%);
+}
+
+@media (max-width: 420px) {
+  .mode-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 모드 카드: 세 줄 모두 한 줄 고정(길면 말줄임) → 기록이 생겨도 카드 크기 그대로 */
+.mode-card {
+  appearance: none;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease);
+}
+
+.mode-card > * {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mode-card:hover,
+.mode-card:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.mode-card strong {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+}
+
+.mode-card small {
+  font-size: var(--text-s);
+  color: var(--text-dim);
+}
+
+.mode-card .mode-best {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.replay-actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.menu-notice {
+  width: min(320px, 100%);
+}
+
+/* 카운트다운·액션 문구는 보드 위에 겹쳐서 다른 요소를 밀지 않는다 */
+.countdown {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 48px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+  text-shadow: 0 2px 12px var(--game-bg);
+}
+
+/* 액션 표시: 홀드 칸 아래에 잠깐 떴다 사라진다 */
+.action {
+  position: absolute;
+  left: 0;
+  width: 25%;
+  top: 40%;
+  display: grid;
+  gap: var(--space-1);
+  justify-items: center;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: clamp(10px, 1.6vw, 14px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--game-text);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.action .action-main {
+  color: var(--game-accent);
+  font-size: 1.25em;
+}
+
+.action.is-shown {
+  animation: action-show 1.4s var(--ease) forwards;
+}
+
+/* 투명도만 바뀐다(자리 이동 없음) */
+@keyframes action-show {
+  0% {
+    opacity: 0;
+  }
+  8%,
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ---- 결과 화면: 배지·순위 줄은 늘 자리를 차지한다 ---- */
+.results-mode {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--text-m);
+}
+
+.results-main {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-5xl);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.results-stats {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-1) var(--space-4);
+  width: min(260px, 100%);
+}
+
+.results-stats dt {
+  color: var(--text-dim);
+  text-align: right;
+}
+
+.results-stats dd {
+  margin: 0;
+  text-align: left;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 리플레이 막대: 칸 폭이 고정이라 상태 글자가 바뀌어도 버튼이 그대로 ---- */
+.replay-bar {
+  position: absolute;
+  left: 25%;
+  right: 25%;
+  top: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 3em;
+  grid-template-areas:
+    "tag title status"
+    "buttons buttons buttons";
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  padding: var(--space-2);
+  background: var(--scrim);
+  border-radius: 0 0 var(--radius-m) var(--radius-m);
+  font-size: var(--text-s);
+}
+
+.replay-tag {
+  grid-area: tag;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+
+.replay-title {
+  grid-area: title;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-dim);
+}
+
+.replay-status {
+  grid-area: status;
+  text-align: right;
+  color: var(--text-dim);
+}
+
+.replay-buttons {
+  grid-area: buttons;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.replay-buttons .btn {
+  padding: 0 var(--space-1);
+}
+
+/* ---- 정보 칸(HUD): 폭 고정, 값은 한 줄 ---- */
+.hud {
+  margin: 0;
+  display: grid;
+  gap: var(--space-3);
+  width: var(--hud-width);
+}
+
+@media (max-width: 720px) {
+  .hud {
+    width: min(560px, calc(100vw - 32px));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.hud > div {
+  min-width: 0;
+}
+
+.hud dt {
+  color: var(--text-dim);
+  font-size: var(--text-s);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.hud dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ---- 키 안내: 세 줄 자리를 늘 차지한다(규칙·패드에 따라 줄 수가 달라져도 아래가 안 움직이게) ---- */
+.keys {
+  margin: 0;
+  width: min(760px, 100%);
+  min-height: calc(3 * 2em);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: flex-start;
+  gap: var(--space-1) var(--space-3);
+  color: var(--text-dim);
+  font-size: var(--text-s);
+}
+
+.keys > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+.keys .keys-break {
+  flex-basis: 100%;
+  height: 0;
+}
+
+.keys .icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* PB 대비: 앞서면 강조색, 뒤처지면 보조색(부호로도 구분된다) */
+.hud-split[data-ahead="true"] {
+  color: var(--accent);
+}
+
+.hud-split[data-ahead="false"] {
+  color: var(--text-dim);
+}
+
+/* 터치 버튼을 쓸 때는 키보드 안내를 숨긴다(설정으로만 바뀐다) */
+body.touch-on .keys {
+  display: none;
+}

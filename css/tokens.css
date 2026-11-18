@@ -1,0 +1,115 @@
+/* 디자인 토큰 — docs/DESIGN_SYSTEM.md
+   UI(머리·정보 칸·대화상자)는 시스템 설정을 따라 라이트/다크, 게임 화면(.surface-game: 보드와 그 위의 패널)은 항상 다크.
+   다크 값은 :root와 .surface-game이 함께 쓰고, 라이트 값은 미디어 쿼리 안의 :root만 덮어쓴다 → .surface-game은 늘 다크로 남는다. */
+
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  /* 라틴·숫자만(약 22KB). 한글은 시스템 글꼴로 넘어간다. SIL OFL 1.1 — assets/fonts/SpaceGrotesk-OFL.txt */
+  src: url("../assets/fonts/space-grotesk-latin-wght.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  /* ---- 글꼴 ---- */
+  --font-ui: system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+  --font-display: "Space Grotesk", var(--font-ui);
+
+  /* 글자 크기 단계 */
+  --text-xs: 11px;
+  --text-s: 12px;
+  --text-m: 13px;
+  --text-l: 14px;
+  --text-xl: 16px;
+  --text-2xl: 20px;
+  --text-3xl: 24px;
+  --text-4xl: 32px;
+  --text-5xl: 40px;
+
+  /* ---- 간격 (4px 단위) ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* ---- 모양 ---- */
+  --radius-s: 2px; /* 키캡·배지·작은 칸 */
+  --radius-m: 4px; /* 버튼·카드·입력·대화상자 */
+  --border-w: 1px;
+  --icon-stroke: 1.75;
+
+  /* ---- 움직임: 색·투명도만, 자리 이동 없음 ---- */
+  --dur: 120ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /* ---- 고정 크기(내용이 바뀌어도 밀리지 않게) ---- */
+  --hud-width: 148px;
+  --control-h: 36px;
+  --control-h-s: 28px;
+
+  /* 블록 색은 게임 테마가 정한다 — js/render/themes.js */
+
+
+  /* ---- 게임 화면 색(항상 다크) ---- */
+  --game-bg: #101114;
+  --game-board: #17191e;
+  --game-grid: #23262d;
+  --game-text: #e8e9ec;
+  --game-text-dim: #8b8f99;
+  --game-accent: #7c9cff;
+}
+
+/* ---- 색: 다크(기본) — UI와 게임 화면이 함께 쓴다 ---- */
+:root,
+.surface-game {
+  color-scheme: dark;
+  --bg: #101114;
+  --surface: #17191e;
+  --surface-2: #1e2127;
+  --border: #2a2e36;
+  --border-strong: #3d424d;
+  --text: #e8e9ec;
+  --text-dim: #9a9fab;
+  --text-faint: #6b707b;
+  --accent: #7c9cff;
+  --accent-hover: #96b0ff;
+  --on-accent: #0b0d14;
+  --accent-soft: rgb(124 156 255 / 0.14);
+  --scrim: rgb(16 17 20 / 0.88);
+  --backdrop: rgb(0 0 0 / 0.55);
+  --shadow: 0 8px 24px rgb(0 0 0 / 0.45);
+}
+
+/* ---- 색: 라이트 — UI만. 게임 화면은 위의 다크 값을 그대로 쓴다 ---- */
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #f3f4f6;
+    --surface: #ffffff;
+    --surface-2: #eceef2;
+    --border: #d8dbe1;
+    --border-strong: #b9bec8;
+    --text: #15171c;
+    --text-dim: #555b66;
+    --text-faint: #858b96;
+    /* 같은 파랑 계열을 흰 바탕 대비 4.5:1 이상으로 진하게 */
+    --accent: #3a5bd9;
+    --accent-hover: #2f4cc0;
+    --on-accent: #ffffff;
+    --accent-soft: rgb(58 91 217 / 0.1);
+    --scrim: rgb(243 244 246 / 0.9);
+    --backdrop: rgb(20 22 28 / 0.35);
+    --shadow: 0 8px 24px rgb(20 22 28 / 0.14);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur: 0ms;
+  }
+}
