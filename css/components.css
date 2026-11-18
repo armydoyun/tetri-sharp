@@ -131,7 +131,6 @@
   height: 20px;
   padding: 0 var(--space-1);
   border: var(--border-w) solid var(--border-strong);
-  border-bottom-width: 2px;
   border-radius: var(--radius-s);
   background: var(--surface);
   color: var(--text);
@@ -182,8 +181,8 @@
   max-height: calc(100vh - 48px);
   padding: 0;
   border: var(--border-w) solid var(--border);
-  border-radius: var(--radius-m);
-  background: var(--bg);
+  border-radius: var(--radius-l);
+  background: var(--surface);
   color: var(--text);
   box-shadow: var(--shadow);
 }
@@ -224,12 +223,13 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-3) var(--space-2) var(--space-5);
+  padding: var(--space-4) var(--space-4) var(--space-3) var(--space-5);
 }
 
 .dialog-title {
   margin: 0;
-  font-size: var(--text-2xl);
+  font-size: var(--text-3xl);
+  letter-spacing: -0.04em;
 }
 
 .dialog-body {
@@ -578,7 +578,7 @@
 /* ---- 선택: 카드(이름 + 설명이 긴 선택지, 예: 게임 테마) ---- */
 .choice-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(138px, 100%), 1fr));
   gap: var(--space-2);
 }
 
@@ -596,6 +596,23 @@
   transition:
     border-color var(--dur) var(--ease),
     background-color var(--dur) var(--ease);
+}
+
+.theme-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 42px;
+  margin-bottom: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+}
+
+.theme-preview > span {
+  width: 17px;
+  aspect-ratio: 1;
+  border-radius: var(--preview-radius);
 }
 
 .choice-card strong {

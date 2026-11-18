@@ -1,17 +1,16 @@
 // 렌더러. 엔진 상태를 읽어서 그리기만 한다(상태를 바꾸지 않는다).
 // 한 캔버스에 [홀드 | 보드 | 넥스트]를 나란히 그린다. 보드 위로 2줄 여유를 둬서 막 생성된 피스가 보이게 한다.
 // 모습은 게임 테마(./themes.js)가 정한다. 접근성 설정(색각 친화 색, 효과 줄임/끄기)은 테마 위에 덮인다.
-import { VISIBLE_ROWS, createBoard, get } from "../core/board.js";
+import { VISIBLE_ROWS, WIDTH as COLS, createBoard, get } from "../core/board.js";
 import { CELL_ID } from "../core/pieces.js";
 import { VISIBLE_TOP } from "../core/engine.js";
 import { createEffects } from "./effects.js";
 import { createSlide } from "./motion.js";
 import { CONTRAST_PALETTE, findTheme } from "./themes.js";
 
-const SIDE = 5; // 홀드·넥스트 칸 너비(셀)
 const MARGIN_TOP = 2; // 보드 위 여유 줄
-const COLS = 10;
-export const LAYOUT = Object.freeze({ cols: SIDE + COLS + SIDE, rows: VISIBLE_ROWS + MARGIN_TOP, cssCell: 28 });
+const ROWS = VISIBLE_ROWS + MARGIN_TOP;
+const CSS_CELL = 28;
 
 /**
  * @typedef {{ theme: string, effects: "full" | "reduced" | "off", palette: "theme" | "contrast" }} Visual
@@ -24,16 +23,21 @@ export const createRenderer = (canvas, { getVisual }) => {
   const slide = createSlide();
   const emptyBoard = createBoard();
 
+  const narrow = window.matchMedia("(max-width: 720px)");
   let cell = 0;
+  let side = 0;
   /** devicePixelRatio를 반영해 캔버스 해상도를 정하고 셀 크기를 정수로 맞춘다(번짐 방지). */
   const fit = () => {
     const dpr = window.devicePixelRatio || 1;
-    const next = Math.max(8, Math.round(LAYOUT.cssCell * dpr));
-    if (next === cell) return;
+    const next = Math.max(8, Math.round(CSS_CELL * dpr));
+    const nextSide = narrow.matches ? 3 : 5;
+    if (next === cell && nextSide === side) return;
     cell = next;
-    canvas.width = LAYOUT.cols * cell;
-    canvas.height = LAYOUT.rows * cell;
-    canvas.style.aspectRatio = `${LAYOUT.cols} / ${LAYOUT.rows}`;
+    side = nextSide;
+    const cols = COLS + side * 2;
+    canvas.width = cols * cell;
+    canvas.height = ROWS * cell;
+    canvas.style.aspectRatio = `${cols} / ${ROWS}`;
   };
 
   /** 미리보기 상자(4×2칸) 가운데에 피스를 그린다. */
@@ -50,37 +54,32 @@ export const createRenderer = (canvas, { getVisual }) => {
     ctx.globalAlpha = 1;
   };
 
-  const label = (theme, text, x, y) => {
-    ctx.fillStyle = theme.board.label;
-    ctx.font = `${theme.label.weight} ${Math.round(cell * 0.45)}px "Space Grotesk", system-ui, sans-serif`;
-    if ("letterSpacing" in ctx) ctx.letterSpacing = `${theme.label.spacing}em`;
+  const label = (text, x, y) => {
+    ctx.fillStyle = "#b1b9b0";
+    ctx.font = `600 ${Math.round(cell * 0.46)}px "Space Grotesk", system-ui, sans-serif`;
     ctx.textBaseline = "top";
-    ctx.fillText(theme.label.upper ? text.toUpperCase() : text.toLowerCase(), x, y);
-    if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
+    ctx.fillText(text, x, y);
   };
 
-  const drawGrid = (theme, bx, by) => {
-    const { grid, gridColor } = theme.board;
-    if (grid === "lines") {
-      ctx.strokeStyle = gridColor;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let x = 1; x < COLS; x++) {
-        ctx.moveTo(bx + x * cell + 0.5, by);
-        ctx.lineTo(bx + x * cell + 0.5, by + VISIBLE_ROWS * cell);
-      }
-      for (let y = 1; y < VISIBLE_ROWS; y++) {
-        ctx.moveTo(bx, by + y * cell + 0.5);
-        ctx.lineTo(bx + COLS * cell, by + y * cell + 0.5);
-      }
-      ctx.stroke();
-    } else if (grid === "dots") {
-      ctx.fillStyle = gridColor;
-      const d = Math.max(2, Math.round(cell * 0.08));
-      for (let x = 1; x < COLS; x++) {
-        for (let y = 1; y < VISIBLE_ROWS; y++) ctx.fillRect(bx + x * cell - d / 2, by + y * cell - d / 2, d, d);
-      }
+  const drawGrid = ({ bg, grid, edge }, bx, by) => {
+    const width = COLS * cell;
+    const height = VISIBLE_ROWS * cell;
+    ctx.fillStyle = bg;
+    ctx.fillRect(bx, by, width, height);
+    ctx.strokeStyle = grid;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 1; x < COLS; x++) {
+      ctx.moveTo(bx + x * cell + 0.5, by);
+      ctx.lineTo(bx + x * cell + 0.5, by + height);
     }
+    for (let y = 1; y < VISIBLE_ROWS; y++) {
+      ctx.moveTo(bx, by + y * cell + 0.5);
+      ctx.lineTo(bx + width, by + y * cell + 0.5);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = edge;
+    ctx.strokeRect(bx + 0.5, by + 0.5, width - 1, height - 1);
   };
 
   /**
@@ -95,32 +94,30 @@ export const createRenderer = (canvas, { getVisual }) => {
     const { board, active, hold, holdUsed, queue } = game
       ? game.state
       : { board: emptyBoard, active: null, hold: null, holdUsed: false, queue: [] };
-    const bx = SIDE * cell;
+    const bx = side * cell;
     const by = MARGIN_TOP * cell;
     const toY = y => by + (y - VISIBLE_TOP) * cell;
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const { dx, dy } = theme.fx.shake && motion ? effects.shake(now, cell / 10) : { dx: 0, dy: 0 };
-    ctx.translate(dx, dy);
+    effects.prune(now, visual.effects);
+    drawGrid(theme.board, bx, by);
 
-    // 보드 바탕
-    if (theme.board.bgTop) {
-      const grad = ctx.createLinearGradient(0, by, 0, by + VISIBLE_ROWS * cell);
-      grad.addColorStop(0, theme.board.bgTop);
-      grad.addColorStop(1, theme.board.bg);
-      ctx.fillStyle = grad;
-    } else {
-      ctx.fillStyle = theme.board.bg;
-    }
-    ctx.fillRect(bx, by, COLS * cell, VISIBLE_ROWS * cell);
-    drawGrid(theme, bx, by);
-
-    // 쌓인 블록(보이는 영역 + 바로 위 여유 줄)
+    // 방금 놓인 피스의 아래 모서리를 기준으로 높이만 압축한다.
     for (let y = VISIBLE_TOP - MARGIN_TOP; y < board.height; y++) {
       for (let x = 0; x < board.width; x++) {
-        const c = get(board, x, y);
-        if (c) theme.block(ctx, bx + x * cell, toY(y), cell, palette[c]);
+        const value = get(board, x, y);
+        if (!value) continue;
+        const impact = effects.landing(x, y, value, now);
+        if (impact) {
+          const floor = toY(impact.floor);
+          ctx.save();
+          ctx.translate(0, floor);
+          ctx.scale(1, impact.scale);
+          ctx.translate(0, -floor);
+        }
+        theme.block(ctx, bx + x * cell, toY(y), cell, palette[value]);
+        if (impact) ctx.restore();
       }
     }
 
@@ -132,42 +129,36 @@ export const createRenderer = (canvas, { getVisual }) => {
       if (game.rules.ghost && gy !== null && gy !== active.y) {
         for (const [x, y] of cells) theme.ghost(ctx, bx + x * cell, toY(y + gy - active.y), cell, color);
       }
-      // 그리는 위치는 테마에 따라 짧게 미끄러질 수 있다(효과 "전체"일 때만).
-      const shown = slide.at(game.state.pieceId, active.x, active.y, now, motion ? theme.slideMs : 0);
+      // 그리는 위치는 효과 설정에 따라 짧게 미끄러질 수 있다(효과 "전체"일 때만).
+      const shown = slide.at(game.state.pieceId, active.x, active.y, now, motion ? 42 : 0);
       const ox = (shown.x - active.x) * cell;
       const oy = (shown.y - active.y) * cell;
       // 고정까지 남은 시간만큼 살짝 어두워진다.
       const lock = game.state.lock;
       const delay = game.rules.lock.delay;
       ctx.globalAlpha = lock.timer > 0 && delay > 0 ? 1 - 0.4 * Math.min(1, lock.timer / delay) : 1;
-      if (theme.glow > 0) {
-        ctx.shadowColor = color;
-        ctx.shadowBlur = cell * theme.glow;
-      }
       for (const [x, y] of cells) {
         if (y >= VISIBLE_TOP - MARGIN_TOP) theme.block(ctx, bx + x * cell + ox, toY(y) + oy, cell, color);
       }
-      ctx.shadowBlur = 0;
-      ctx.shadowColor = "transparent";
       ctx.globalAlpha = 1;
     }
 
-    effects.draw(ctx, { bx, cell, toY, cols: COLS }, now, theme);
+    effects.draw(ctx, { bx, cell, toY, cols: COLS }, now, theme.board.ink, visual.effects);
 
     if (!game) return;
 
     // 홀드
-    const small = Math.round(cell * 0.8);
-    const sidePad = Math.round((SIDE * cell - 4 * small) / 2);
+    const small = Math.round(cell * (narrow.matches ? 0.57 : 0.8));
+    const sidePad = Math.round((side * cell - 4 * small) / 2);
     if (game.rules.hold.enabled) {
-      label(theme, "Hold", sidePad, by);
+      label("Hold", sidePad, by);
       if (hold) preview(theme, palette, game, hold, sidePad, by + cell, small, holdUsed);
     }
 
     // 넥스트
     const nx = bx + COLS * cell + sidePad;
     if (game.rules.previewCount > 0) {
-      label(theme, "Next", nx, by);
+      label("Next", nx, by);
       queue.slice(0, game.rules.previewCount).forEach((type, i) => {
         preview(theme, palette, game, type, nx, by + cell + i * small * 3, small);
       });
@@ -179,8 +170,11 @@ export const createRenderer = (canvas, { getVisual }) => {
     /** 엔진 이벤트로 효과를 만든다 */
     addEvents: (events, now = performance.now()) => {
       const visual = getVisual();
-      effects.add(events, visual.effects, now, findTheme(visual.theme));
+      effects.add(events, visual.effects, now);
     },
-    clearEffects: () => effects.clear(),
+    clearEffects() {
+      effects.clear();
+      slide.reset();
+    },
   };
 };

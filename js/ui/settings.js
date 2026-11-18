@@ -13,7 +13,7 @@ import {
 import { icon } from "./icons.js";
 import { DEFAULT_SETTINGS, HANDLING_LIMITS, SDF_INFINITE, defaultVisual } from "../storage/settings.js";
 import { button, choice, choiceCards, el, fieldRow, fillDialog, tabBar } from "./dom.js";
-import { THEMES, THEME_IDS } from "../render/themes.js";
+import { CONTRAST_PALETTE, THEMES, THEME_IDS } from "../render/themes.js";
 import { keycap } from "./keycap.js";
 
 const HANDLING_ROWS = [
@@ -37,8 +37,8 @@ const EFFECT_OPTIONS = [
   ["off", "끄기"],
 ];
 const EFFECT_HINTS = {
-  full: "테마가 정한 연출을 모두 보여요(섬광·파편·흔들림·미끄러짐)",
-  reduced: "움직이는 연출 없이 섬광·반짝임만 보여요",
+  full: "짧은 이동, 착지 눌림, 줄 삭제 표시를 보여요",
+  reduced: "줄이 삭제된 위치에 가는 선을 잠깐 표시해요",
   off: "연출을 모두 꺼요",
 };
 const TOUCH_OPTIONS = [
@@ -121,12 +121,23 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
       fieldRow({
         id: "set-theme",
         label: "게임 테마",
-        hint: "보드의 블록 모양·색·격자·움직임·연출이 바뀌어요. 메뉴와 설정 화면은 그대로예요",
+        hint: "격자 색과 블록의 색·모서리를 바꿔요",
         className: "is-wide",
         control: choiceCards({
           id: "set-theme",
           label: "게임 테마",
-          options: THEME_IDS.map(id => ({ value: id, title: THEMES[id].name, desc: THEMES[id].description })),
+          options: THEME_IDS.map(id => {
+            const theme = THEMES[id];
+            const palette = visual.palette === "contrast" ? CONTRAST_PALETTE : theme.palette;
+            const preview = el(
+              "span",
+              { class: "theme-preview", "aria-hidden": "true" },
+              ...[1, 3, 4, 6].map(i => el("span", { style: `background-color: ${palette[i]}` }))
+            );
+            preview.style.backgroundColor = theme.board.bg;
+            preview.style.setProperty("--preview-radius", `${theme.radius * 20}px`);
+            return { value: id, title: theme.name, desc: theme.description, preview };
+          }),
           value: visual.theme,
           onChange: v => setVisual("theme", v),
         }),

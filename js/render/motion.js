@@ -1,9 +1,9 @@
-// 피스 미끄러짐(모던 테마): 화면에 그리는 위치만 짧게 따라가게 한다. 게임 판정·입력은 그대로 즉시 반영된다.
+// 피스 미끄러짐: 화면에 그리는 위치만 짧게 따라가게 한다. 게임 판정·입력은 그대로 즉시 반영된다.
 // 새 피스(id가 바뀜)는 미끄러지지 않고 그 자리에 바로 나타난다.
 
 const easeOut = t => 1 - (1 - t) * (1 - t);
 
-/** @returns {{ at: (id: number, x: number, y: number, now: number, durationMs: number) => { x: number, y: number } }} */
+/** @returns {{ at: (id: number, x: number, y: number, now: number, durationMs: number) => { x: number, y: number }, reset: () => void }} */
 export const createSlide = () => {
   let id = -1;
   let from = { x: 0, y: 0 };
@@ -21,7 +21,8 @@ export const createSlide = () => {
   return {
     /** 지금 그릴 위치(칸 단위, 소수 가능) */
     at(nextId, x, y, now, durationMs) {
-      if (nextId !== id || durationMs <= 0) {
+      const jump = Math.abs(x - to.x) > 1 || Math.abs(y - to.y) > 1;
+      if (nextId !== id || durationMs <= 0 || jump) {
         id = nextId;
         from = to = { x, y };
         duration = 0;
@@ -34,6 +35,9 @@ export const createSlide = () => {
         duration = durationMs;
       }
       return shown(now);
+    },
+    reset() {
+      id = -1;
     },
   };
 };
