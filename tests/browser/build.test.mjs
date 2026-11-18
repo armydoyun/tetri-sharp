@@ -38,9 +38,9 @@ test("결과는 파일 하나이고 바깥 파일을 참조하지 않는다", ()
   assert.ok(result.bytes < 1024 * 1024, `배포본 크기 ${result.bytes} bytes`);
 });
 
-const openPage = async (initScript = null) => {
+const openPage = async (initScript = null, initArg = undefined) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true });
-  if (initScript) await context.addInitScript(initScript);
+  if (initScript) await context.addInitScript(initScript, initArg);
   const blocked = [];
   await context.route("**/*", route => {
     if (route.request().url() === url) return route.continue();
@@ -276,6 +276,12 @@ test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파�
   // 보기: 4배속으로 끝까지
   await page.click('[data-action="watch"]');
   assert.equal(await visible(page, "replay-bar"), true);
+  await page.click('[data-replay="step"]');
+  const stepFrame = await page.locator("#replay-progress").evaluate(progress => progress.value);
+  await page.click('[data-replay="step"]');
+  assert.equal(await page.locator("#replay-progress").evaluate(progress => progress.value), stepFrame + 1);
+  assert.match(await text(page, "replay-time"), / \/ /);
+  await page.click('[data-replay="toggle"]');
   await page.keyboard.press("Digit4");
   await page.waitForFunction(() => document.getElementById("replay-status")?.textContent === "끝", null, {
     timeout: 10000,
@@ -297,9 +303,22 @@ test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파�
   assert.equal(await page.locator("#watch-last").isEnabled(), true);
   await page.locator("#replay-file").setInputFiles(file);
   await page.waitForFunction(() => !document.getElementById("replay-bar")?.hidden, null, { timeout: 5000 });
-  assert.equal(await text(page, "menu-notice"), "", "검증 통과 → 경고 없음");
+  assert.equal(await text(page, "replay-note"), "", "검증 통과 → 경고 없음");
   await page.keyboard.press("Escape");
   assert.equal(await visible(page, "menu"), true);
+
+  // 파일 구조가 유효하지만 결과가 다르면 재생 화면에서 알린다.
+  saved.result.score += 1;
+  await page.locator("#replay-file").setInputFiles({
+    name: "different-result.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(saved)),
+  });
+  await page.waitForFunction(() => !document.getElementById("replay-bar")?.hidden);
+  assert.match(await text(page, "replay-note"), /저장된 결과와 재생 결과가 달라요/);
+  await page.click('[data-replay="restart"]');
+  assert.equal(await visible(page, "replay-note"), true);
+  await page.keyboard.press("Escape");
 
   // 망가진 파일
   await page
@@ -568,6 +587,75 @@ test("기록 화면: 표는 늘 10줄, 조건을 바꿔도 크기가 그대로, 
   await context.close();
 });
 
+test("Sprint 최고 기록과 달리기: 같은 규칙에서 시작하고 상대 진행을 같이 멈춘다", async () => {
+  // 실제 엔진에서 입력을 기록해 완주한 판. 예전 기록처럼 splits 없이 저장한다.
+  const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
+  delete fixture.record.splits;
+  const { context, page, errors } = await openPage(({ replay, record }) => {
+    const key = "sprint40|modern";
+    localStorage.setItem("tetrisharp:records", JSON.stringify({ [key]: [record] }));
+    localStorage.setItem("tetrisharp:replay:best", JSON.stringify({ [key]: replay }));
+  }, fixture);
+  await page.click('[data-rules="retro"]');
+  assert.equal(await page.locator("#start-pb-race").isDisabled(), true);
+  await page.click('[data-rules="modern"]');
+  await page.click("#start-pb-race");
+  assert.equal(await visible(page, "race-board"), true);
+  await page.waitForFunction(() => document.getElementById("race-progress").value > 0);
+  await page.click("#pause-game");
+  const progress = () => page.locator("#race-progress").evaluate(element => element.value);
+  const pausedAt = await progress();
+  await page.waitForTimeout(500);
+  assert.equal(await progress(), pausedAt);
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await visible(page, "race-panel"), true);
+  assert.equal(await visible(page, "race-board"), false);
+  await page.click('#pause [data-action="retry"]');
+  assert.equal(await progress(), 0);
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+
+  for (let i = 0; i < 25 && !(await visible(page, "results")); i++) {
+    await page.keyboard.press("Space");
+    await page.waitForTimeout(25);
+  }
+  assert.match(await text(page, "race-result"), /완주하지 못했어요/);
+  await page.keyboard.press("Escape");
+  assert.equal(await visible(page, "race-panel"), false);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("기록 이름을 저장하고 플레이하면 그 기록에 당시 이름이 남는다", async () => {
+  const { context, page, errors } = await openPage();
+  await page.click("#open-records");
+  await page.fill("#record-player-name", "  도윤  ");
+  await page.getByRole("button", { name: "플레이어 이름 저장" }).click();
+  assert.equal(await page.locator("#record-player-name").inputValue(), "도윤");
+  await page.click("#records-close");
+
+  await startMode(page, "ultra");
+  for (let i = 0; i < 25 && !(await visible(page, "results")); i++) {
+    await page.keyboard.press("Space");
+    await page.waitForTimeout(25);
+  }
+  assert.equal(await visible(page, "results"), true);
+  await page.keyboard.press("Escape");
+  await page.click("#open-records");
+  await page.locator("#records-mode").selectOption("ultra");
+  assert.equal(await page.locator(".record-player").first().textContent(), "도윤");
+
+  await page.fill("#record-player-name", "친구");
+  await page.locator("#record-player-name").press("Enter");
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  await page.click("#open-records");
+  await page.locator("#records-mode").selectOption("ultra");
+  assert.equal(await page.locator("#record-player-name").inputValue(), "친구");
+  assert.equal(await page.locator(".record-player").first().textContent(), "도윤");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
 test("게임패드 버튼 바꾸기: 설정에서 칸을 누르고 패드 버튼을 누르면 그 버튼으로 동작한다", async () => {
   const { context, page, errors } = await openPage(() => {
     window.__pad = { pressed: new Set() };
@@ -666,7 +754,8 @@ test("규칙 공유: 편집기에서 코드를 붙여 넣으면 불러오고, #r
 test("연습: 메뉴에서 고르면 시작하고, 놓을 때마다 성공/시도를 센다", async () => {
   const { context, page, errors } = await openPage();
   await page.click("#open-practice");
-  assert.equal(await page.locator("#practice .mode-card").count(), 3);
+  assert.equal(await page.locator("#practice .mode-card").count(), 4);
+  assert.equal(await page.locator('[data-drill="double"]').isVisible(), true);
   await page.click('[data-drill="tsd"]');
   await page.waitForFunction(() => document.getElementById("countdown")?.textContent === "GO!", null, {
     timeout: 3000,

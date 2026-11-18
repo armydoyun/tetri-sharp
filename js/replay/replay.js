@@ -114,10 +114,13 @@ export const createPlayer = (replay, findMode) => {
 };
 
 /** 끝까지 돌려 기록된 결과와 같은지 확인한다(불러온 파일 검증). */
-export const verifyReplay = (replay, findMode) => {
+export const verifyReplay = (replay, findMode, onFrame) => {
   const player = createPlayer(replay, findMode);
   const limit = (replay.result?.frames ?? 0) + 10;
-  while (!player.game.state.over && player.frame < limit) player.step();
+  while (!player.game.state.over && player.frame < limit) {
+    player.step();
+    onFrame?.(player.game.state);
+  }
   const actual = resultOf(player.game.state);
   const expected = replay.result ?? {};
   const same = ["frames", "lines", "pieces", "score", "level"].every(k => actual[k] === expected[k]);

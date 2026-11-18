@@ -378,30 +378,90 @@ body[data-screen="menu"] .stage {
   font-variant-numeric: tabular-nums;
 }
 
-.home-actions {
+.home-tools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--space-6);
+}
+
+.tool-group {
+  display: grid;
+  align-content: start;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-strong);
+}
+
+.tool-group .section-title {
+  padding-bottom: var(--space-2);
+}
+
+.tool-row {
+  appearance: none;
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur) var(--ease);
 }
 
-.home-actions .btn {
-  gap: 7px;
-  padding-inline: 14px;
+.tool-row:enabled:hover {
+  background: var(--surface-2);
 }
 
-.home-actions .icon {
-  width: 20px;
-  height: 20px;
-  margin-inline-start: -3px; /* SVG 격자 자체의 빈 여백 보정 */
+.tool-row > .icon,
+.tool-row:disabled,
+.tool-row > small {
+  color: var(--text-dim);
+}
+
+.tool-row > small {
+  font-size: var(--text-s);
+  font-weight: 400;
+}
+
+.tool-row:enabled > small,
+.tool-row:disabled > .icon {
+  display: none;
+}
+
+.tool-row:disabled {
+  cursor: default;
 }
 
 .menu-notice {
-  margin-top: calc(-1 * var(--space-2));
+  grid-column: 1 / -1;
+  padding-top: var(--space-1);
+}
+
+@media (max-width: 600px) {
+  .home-tools {
+    grid-template-columns: 1fr;
+    row-gap: var(--space-3);
+  }
 }
 
 .help-card {
-  display: grid;
-  gap: var(--space-3);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.help-card summary {
+  padding: var(--space-3) 0;
+  cursor: pointer;
+}
+
+.help-card .keys {
+  padding-bottom: var(--space-4);
 }
 
 /* 터치 버튼을 쓸 때는 키보드 조작법을 숨긴다(설정으로만 바뀐다) */
@@ -459,8 +519,72 @@ body.touch-on .help-card {
   grid-area: board;
 }
 
-.stage > .hud {
+.stage-side {
   grid-area: hud;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.race-entry {
+  padding-inline: var(--space-3);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.race-entry > span {
+  display: grid;
+  gap: var(--space-1);
+  padding-block: var(--space-1);
+}
+
+#race-availability {
+  color: var(--text-dim);
+  font-size: var(--text-s);
+  font-weight: 400;
+}
+
+.race-panel {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+}
+
+body[data-screen="replay"] .race-panel,
+.race-result:empty {
+  display: none;
+}
+
+.race-panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-1);
+  width: 100%;
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+}
+
+.race-panel progress {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--accent);
+}
+
+.race-board {
+  display: block;
+  width: min(94px, max(64px, calc((100dvh - 420px) * 10 / 22)));
+  height: auto;
+  border-radius: var(--radius-s);
+  background: var(--game-bg);
+}
+
+.race-result {
+  margin: 0;
+  color: var(--game-accent);
+  font-size: var(--text-m);
 }
 
 .stage > .touchpad,
@@ -479,6 +603,14 @@ body.touch-on .help-card {
     justify-items: center;
     gap: var(--space-2);
   }
+
+  .race-board {
+    display: none;
+  }
+
+  body:not([data-screen="replay"]):has(.race-panel:not([hidden])) {
+    --chrome-h: 232px;
+  }
 }
 
 .board-wrap {
@@ -495,6 +627,7 @@ body.touch-on .help-card {
   --chrome-h: 120px;
   --under-h: 0px;
   --board-ratio: calc(20 / 22);
+  --board-inline-reserve: calc(32px + var(--hud-width) + var(--space-5));
 }
 
 body.touch-on {
@@ -503,18 +636,29 @@ body.touch-on {
 }
 
 body[data-screen="replay"] {
-  --under-h: 64px;
+  --replay-controls-h: 104px;
+  --under-h: var(--replay-controls-h);
+}
+
+body[data-screen="replay"]:has(.replay-note:not(:empty)) {
+  --under-h: calc(var(--replay-controls-h) + 48px);
+}
+
+@media (max-width: 720px) {
+  body[data-screen="replay"] {
+    --replay-controls-h: 154px;
+  }
 }
 
 .board {
   display: block;
-  width: min(640px, calc(100vw - 32px), calc((100vh - var(--chrome-h) - var(--under-h)) * var(--board-ratio)));
+  width: min(640px, calc(100vw - var(--board-inline-reserve)), calc((100vh - var(--chrome-h) - var(--under-h)) * var(--board-ratio)));
   height: auto;
 }
 
 @supports (height: 100dvh) {
   .board {
-    width: min(640px, calc(100vw - 32px), calc((100dvh - var(--chrome-h) - var(--under-h)) * var(--board-ratio)));
+    width: min(640px, calc(100vw - var(--board-inline-reserve)), calc((100dvh - var(--chrome-h) - var(--under-h)) * var(--board-ratio)));
   }
 }
 
@@ -523,6 +667,7 @@ body[data-screen="replay"] {
     /* 휴대폰은 보드 위 정보 줄(약 54) + 간격까지 */
     --chrome-h: 176px;
     --board-ratio: calc(16 / 22);
+    --board-inline-reserve: 32px;
   }
 }
 
@@ -681,6 +826,40 @@ body[data-screen="replay"] {
   font-variant-numeric: tabular-nums;
 }
 
+.results-splits {
+  width: 100%;
+  border-block: 1px solid var(--border);
+  font-size: var(--text-m);
+  text-align: left;
+}
+
+.results-splits summary {
+  padding-block: var(--space-2);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.results-splits table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.results-splits :is(th, td) {
+  padding: var(--space-1);
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+}
+
+.results-splits :is(th, td):first-child {
+  text-align: left;
+}
+
+.results-splits p {
+  margin-block: var(--space-2);
+  color: var(--text-dim);
+}
+
 /* ---- 리플레이 조작: 보드 아래, 글자 있는 버튼 ---- */
 .replay-bar {
   width: 100%;
@@ -713,9 +892,35 @@ body[data-screen="replay"] {
   color: var(--text-dim);
 }
 
+.replay-note {
+  margin: 0;
+  padding-left: var(--space-2);
+  border-left: 2px solid var(--border-strong);
+  color: var(--text-dim);
+  font-size: var(--text-m);
+}
+
+.replay-note:empty {
+  display: none;
+}
+
+.replay-timeline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+  font-size: var(--text-s);
+}
+
+.replay-timeline progress {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--accent);
+}
+
 .replay-buttons {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(96px, 100%), 1fr));
   gap: var(--space-2);
 }
 

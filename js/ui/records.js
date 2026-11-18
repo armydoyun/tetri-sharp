@@ -57,10 +57,31 @@ export const createRecordsUI = ({ dialog, modes, records, bestReplay, onWatch })
       /** @type {HTMLElement | null} */ (dialog.querySelector("#records-rules"))?.focus();
     });
 
+    const nameInput = el("input", {
+      id: "record-player-name",
+      class: "text-input",
+      type: "text",
+      value: records.playerName,
+      placeholder: "이름 없음",
+      autocomplete: "off",
+    });
+    const nameSave = button({ type: "submit", text: "저장", "aria-label": "플레이어 이름 저장" });
+    const nameForm = el("form", { class: "record-name-form" }, nameInput, nameSave);
+    nameForm.addEventListener("submit", event => {
+      event.preventDefault();
+      const saved = records.setPlayerName(nameInput.value);
+      nameInput.value = records.playerName;
+      notice.textContent = !saved
+        ? "이번 접속에만 이름을 적용했어요. 브라우저에 저장하지 못했어요."
+        : records.playerName
+          ? "새 기록에 이 이름을 사용해요."
+          : "새 기록을 이름 없이 남겨요.";
+    });
+
     const head = el(
       "tr",
       {},
-      ...["순위", "기록", "줄", "피스", "PPS", "날짜", "리플레이"].map(t => el("th", { scope: "col", text: t }))
+      ...["순위", "이름", "기록", "줄", "피스", "PPS", "날짜", "리플레이"].map(t => el("th", { scope: "col", text: t }))
     );
     const rows = Array.from({ length: ROWS }, (_, i) => {
       const e = list[i];
@@ -92,7 +113,9 @@ export const createRecordsUI = ({ dialog, modes, records, bestReplay, onWatch })
       return el(
         "tr",
         { class: e ? "" : "is-empty" },
-        ...cells.map(t => el("td", { class: "num", text: t })),
+        el("td", { class: "num", text: cells[0] }),
+        el("td", { class: "record-player", text: e ? e.playerName || "이름 없음" : "", title: e?.playerName }),
+        ...cells.slice(1).map(t => el("td", { class: "num", text: t })),
         el("td", {}, ...(watch ? [watch] : []))
       );
     });
@@ -103,6 +126,12 @@ export const createRecordsUI = ({ dialog, modes, records, bestReplay, onWatch })
       el(
         "section",
         { class: "field-section" },
+        fieldRow({
+          id: "record-player-name",
+          label: "플레이어 이름",
+          hint: "새 기록에 표시돼요. 최대 24자.",
+          control: nameForm,
+        }),
         fieldRow({ id: "records-mode", label: "모드", control: modeSelect }),
         fieldRow({ id: "records-rules", label: "규칙", control: rulesSelect })
       ),

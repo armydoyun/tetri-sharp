@@ -4,7 +4,7 @@ import { BTN, createGame } from "../../js/core/engine.js";
 import { HEIGHT, WIDTH, get, isEmpty } from "../../js/core/board.js";
 import { GARBAGE } from "../../js/core/pieces.js";
 import { MODERN } from "../../js/rules/presets.js";
-import { DRILLS, buildTsd, findPractice, practiceMode } from "../../js/modes/practice.js";
+import { DRILLS, buildDoubleWell, buildTsd, findPractice, practiceMode } from "../../js/modes/practice.js";
 import { findMode } from "../../js/modes/index.js";
 
 const drill = id => DRILLS.find(d => d.id === id);
@@ -79,4 +79,19 @@ test("연습은 기록하지 않고, 리플레이에서 찾을 수 있다", () =
   assert.equal(mode.isRecordable({}), false);
   assert.equal(findPractice("practice-quad").id, "practice-quad");
   assert.equal(findMode("practice-tsd"), mode);
+});
+
+test("2줄 우물: O로 두 번 성공하면 연속 기록이 쌓이고 실패해도 최고는 남는다", () => {
+  const { g } = start("double");
+  assert.equal(g.state.active.type, "O");
+  const column = 4;
+  for (const x of [column, column, column - 2]) {
+    buildDoubleWell(g.state.board, column);
+    const minX = Math.min(...g.shapeOf("O", 0).map(([cx]) => cx));
+    g.state.active.x = x - minX;
+    g.step({ pressed: BTN.HARD });
+    g.step();
+  }
+  const { success, tries, streak, bestStreak } = g.state.practice;
+  assert.deepEqual({ success, tries, streak, bestStreak }, { success: 2, tries: 3, streak: 0, bestStreak: 2 });
 });

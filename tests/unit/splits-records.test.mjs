@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { advanceSplits, formatDelta, splitDelta } from "../../js/modes/splits.js";
+import { advanceSplits, analyzeSplits, formatDelta, splitDelta } from "../../js/modes/splits.js";
 import { SPRINT_40, ZEN } from "../../js/modes/index.js";
 import { MODERN, RETRO } from "../../js/rules/presets.js";
 import { createRecords, recordKey } from "../../js/storage/records.js";
@@ -44,4 +44,43 @@ test("기록: 구간은 숫자 배열일 때만 남고, 규칙별 기록표 목�
   assert.deepEqual(records.rulesIdsFor(SPRINT_40).sort(), ["custom-abc1234", "modern", "retro"]);
   assert.deepEqual(records.rulesIdsFor(ZEN), ["modern"]);
   assert.equal(recordKey(SPRINT_40, { id: "custom-abc1234" }), "sprint40|custom-abc1234");
+});
+
+test("구간 분석: 누적 격차가 아니라 그 구간에서 가장 많이 잃은 시간을 고른다", () => {
+  const { rows, slowest } = analyzeSplits(SPRINT_40.splits, [570, 1230, 1810], [600, 1200, 1800, 2400]);
+  assert.deepEqual(rows, [
+    { to: 10, frames: 570, delta: -30 },
+    { to: 20, frames: 1230, delta: 30 },
+    { to: 30, frames: 1810, delta: 10 },
+  ]);
+  assert.deepEqual(slowest, { from: 10, to: 20, lost: 60 });
+  assert.deepEqual(analyzeSplits(SPRINT_40.splits, [], undefined), { rows: [], slowest: null });
+  assert.deepEqual(analyzeSplits(SPRINT_40.splits, [570, 1230], [600]), {
+    rows: [
+      { to: 10, frames: 570, delta: -30 },
+      { to: 20, frames: 1230, delta: null },
+    ],
+    slowest: null,
+  });
+});
+
+test("플레이어 이름은 새 기록마다 남고 이름을 바꿔도 예전 기록은 유지된다", () => {
+  const store = createStore(memoryBackend());
+  const records = createRecords(store);
+  const entry = { frames: 3600, lines: 40, pieces: 100, date: "2026-11-01T00:00:00.000Z" };
+  records.add(SPRINT_40, MODERN, entry);
+  records.setPlayerName("  첫 번째   사람  ");
+  records.add(SPRINT_40, MODERN, { ...entry, frames: 3500, playerName: records.playerName });
+  records.setPlayerName("두 번째 사람");
+
+  const reopened = createRecords(store);
+  assert.equal(reopened.playerName, "두 번째 사람");
+  assert.deepEqual(
+    reopened.list(SPRINT_40, MODERN).map(r => r.playerName),
+    ["첫 번째 사람", undefined]
+  );
+  reopened.setPlayerName("가".repeat(30));
+  assert.equal(reopened.playerName.length, 24);
+  reopened.setPlayerName("  ");
+  assert.equal(createRecords(store).playerName, "");
 });

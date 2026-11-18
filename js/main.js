@@ -6,7 +6,7 @@ import { createKeyboard } from "./input/keyboard.js";
 import { createTouch, touchVisible } from "./input/touch.js";
 import { PAD_ICONS, compilePadmap, createGamepad, padButtonName } from "./input/gamepad.js";
 import { ACTIONS, compileKeymap } from "./input/keymap.js";
-import { MODES, findMode } from "./modes/index.js";
+import { MODES, SPRINT_40, findMode } from "./modes/index.js";
 import { formatScore, formatTime } from "./modes/format.js";
 import { clearName } from "./rules/scoring/guideline.js";
 import { createStore } from "./storage/store.js";
@@ -18,7 +18,7 @@ import { createRecordsUI } from "./ui/records.js";
 import { createStatsUI } from "./ui/stats.js";
 import { createPracticeUI } from "./ui/practice.js";
 import { practiceMode } from "./modes/practice.js";
-import { advanceSplits, formatDelta, splitDelta } from "./modes/splits.js";
+import { advanceSplits, analyzeSplits, formatDelta, splitDelta } from "./modes/splits.js";
 import { hydrateIcons, icon } from "./ui/icons.js";
 import { keycap } from "./ui/keycap.js";
 import { createPlayer, createRecorder, createReplayStore, sanitizeReplay, verifyReplay } from "./replay/replay.js";
@@ -46,6 +46,7 @@ const hud = {
   pieces: $("hud-pieces"),
   pps: $("hud-pps"),
   split: $("hud-split"),
+  streak: $("hud-streak"),
 };
 
 const store = createStore();
@@ -55,6 +56,17 @@ let bindings = compileKeymap(settings.keymap);
 let padBindings = compilePadmap(settings.padmap);
 
 const renderer = createRenderer(canvas, { getVisual: () => settings.visual });
+const racePanel = $("race-panel");
+const raceProgress = /** @type {HTMLProgressElement} */ ($("race-progress"));
+const raceLabel = $("race-progress-label");
+const raceEntry = /** @type {HTMLButtonElement} */ ($("start-pb-race"));
+const raceBoard = /** @type {HTMLCanvasElement} */ ($("race-board"));
+const raceBoardVisible = window.matchMedia("(width > 720px)");
+const raceRenderer = createRenderer(raceBoard, {
+  compact: true,
+  getVisual: () => ({ ...settings.visual, effects: "off" }),
+});
+let race = null;
 
 /** @type {"menu" | "countdown" | "play" | "paused" | "results" | "replay"} */
 let screen = "menu";
@@ -69,6 +81,7 @@ let customBody = sanitizeRuleBody(store.get("customRules", MODERN));
 const currentRules = () => (ruleChoice === "custom" ? makeCustomRules(customBody) : PRESETS[ruleChoice]);
 /** 이번 판에 쓰는 규칙(게임 중에 Custom을 고쳐도 이번 판 기록은 시작할 때 규칙으로 남는다) */
 let rules = currentRules();
+let runPlayerName = "";
 /** @type {ReturnType<typeof createGame> | null} */
 let game = null;
 let countdown = 0;
@@ -186,9 +199,39 @@ const renderRuleTabs = () => {
       : `${RULE_DESCRIPTIONS[ruleChoice]} 바꾸고 싶으면 Custom을 골라 편집하세요.`;
 };
 
+const raceTargetFor = ruleSet => {
+  const best = records.best(SPRINT_40, ruleSet);
+  if (!best) return null;
+  const replay = replays.best(recordKey(SPRINT_40, ruleSet));
+  if (
+    !replay ||
+    replay.mode !== SPRINT_40.id ||
+    replay.rules.id !== ruleSet.id ||
+    replay.result.over !== "clear" ||
+    replay.result.lines < SPRINT_40.goal ||
+    replay.result.frames !== best.frames ||
+    replay.result.lines !== best.lines ||
+    replay.result.pieces !== best.pieces
+  )
+    return null;
+  return { replay, best };
+};
+
+const updateRaceProgress = () => {
+  if (!race) return;
+  const lines = Math.min(SPRINT_40.goal, race.player.game.state.stats.lines);
+  raceProgress.value = lines;
+  raceLabel.textContent = race.player.done ? formatTime(race.target.best.frames) : `${lines} / ${SPRINT_40.goal}줄`;
+};
+
 const renderMenu = () => {
   renderRuleTabs();
   const ruleSet = currentRules();
+  const target = raceTargetFor(ruleSet);
+  raceEntry.disabled = !target;
+  $("race-availability").textContent = target
+    ? `Sprint 40L · ${formatTime(target.best.frames)}`
+    : "Sprint 40L 완주 리플레이 필요";
   const list = $("mode-list");
   list.replaceChildren(
     ...MODES.map(m => {
@@ -223,6 +266,8 @@ const updateHud = () => {
   hud.linesLabel.textContent = lines.label;
   hud.lines.textContent = lines.value;
   hud.pieces.textContent = String(stats.pieces);
+  const practice = game?.state.practice;
+  hud.streak.textContent = practice ? `${practice.streak} / ${practice.bestStreak}` : "0 / 0";
   hud.pps.textContent = frame ? (stats.pieces / (frame / 60)).toFixed(2) : "0.00";
   const delta = game && mode.splits ? splitDelta(splits, pbSplits) : null;
   hud.split.textContent = formatDelta(delta);
@@ -242,6 +287,8 @@ const setScreen = next => {
 
 const toMenu = (initial = false) => {
   game = null;
+  race = null;
+  racePanel.hidden = true;
   setScreen("menu");
   countdownEl.hidden = true;
   renderMenu();
@@ -253,21 +300,29 @@ const toMenu = (initial = false) => {
   });
 };
 
-const start = m => {
+const showModeHud = (m, replay = false) => {
+  const items = m.hud ?? ["time", "score", "level", "lines", "pieces", "pps"];
+  for (const cell of document.querySelectorAll(".hud [data-hud]")) {
+    const item = cell.getAttribute("data-hud");
+    cell.classList.toggle("is-off", !items.includes(item) || (replay && item === "split"));
+  }
+};
+
+const start = (m, selectedRules = currentRules(), target = null) => {
   if (screen === "replay") stopReplay();
   mode = m;
   if (!m.practice) store.set("lastMode", m.id);
-  rules = currentRules();
-  const seed = (Math.random() * 2 ** 32) >>> 0;
+  rules = selectedRules;
+  runPlayerName = records.playerName;
+  const seed = target?.replay.seed ?? (Math.random() * 2 ** 32) >>> 0;
+  race = target ? { target, player: createPlayer(target.replay, findMode) } : null;
+  racePanel.hidden = !race;
+  updateRaceProgress();
   game = createGame({ rules, handling: toEngineHandling(settings.handling), seed, mode: m });
   recorder = createRecorder({ seed, mode: m, rules, handling: game.handling });
   splits = [];
-  // 정보 칸: 이 모드에 필요한 칸만(게임 중에는 바뀌지 않는다)
-  const items = m.hud ?? ["time", "score", "level", "lines", "pieces", "pps"];
-  for (const cell of document.querySelectorAll(".hud [data-hud]")) {
-    cell.classList.toggle("is-off", !items.includes(cell.getAttribute("data-hud")));
-  }
-  pbSplits = records.best(m, rules)?.splits;
+  showModeHud(m);
+  pbSplits = target?.splits ?? records.best(m, rules)?.splits;
   acc = 0;
   countdown = READY_FRAMES;
   goTimer = 0;
@@ -281,6 +336,21 @@ const start = m => {
   countdownEl.dataset.phase = "ready";
   $("countdown-label").textContent = "READY";
 };
+
+raceEntry.addEventListener("click", () => {
+  const selected = currentRules();
+  const target = raceTargetFor(selected);
+  if (!target) return;
+  let targetSplits = [];
+  const verified = verifyReplay(target.replay, findMode, state => {
+    targetSplits = advanceSplits(SPRINT_40.splits, targetSplits, state.stats.lines, state.frame);
+  });
+  if (!verified.ok || verified.actual.over !== "clear") {
+    showMenuNotice("이 최고 기록은 현재 버전에서 재현할 수 없어요. 새 최고 기록이 필요해요.");
+    return;
+  }
+  start(SPRINT_40, selected, { ...target, splits: targetSplits });
+});
 
 let pausedFrom = /** @type {"play" | "countdown"} */ ("play");
 
@@ -299,6 +369,35 @@ const resume = () => {
   setScreen(pausedFrom);
 };
 
+const renderResultSplits = () => {
+  const details = /** @type {HTMLDetailsElement} */ ($("results-splits"));
+  details.hidden = !mode.splits;
+  details.open = false;
+  if (!mode.splits) return;
+
+  const { rows, slowest } = analyzeSplits(mode.splits, splits, pbSplits);
+  $("results-split-rows").replaceChildren(
+    ...rows.map(({ to, frames, delta }) => {
+      const row = document.createElement("tr");
+      for (const value of [`${to}줄`, formatTime(frames), formatDelta(delta === null ? null : delta / 60)]) {
+        row.insertCell().textContent = value;
+      }
+      return row;
+    })
+  );
+  const note = slowest
+    ? `가장 많이 밀린 구간 ${slowest.from}–${slowest.to}줄 (${formatDelta(slowest.lost / 60)}초)`
+    : rows.length === 0
+      ? "10줄부터 구간 기록이 남아요."
+      : rows.every(row => row.delta === null)
+        ? "같은 규칙의 최고 기록이 쌓이면 비교할 수 있어요."
+        : "완료한 비교 구간에서 잃은 시간이 없어요.";
+  $("results-split-note").textContent = note;
+  details.querySelector("summary").textContent = slowest
+    ? `구간 기록 · ${slowest.from}–${slowest.to}줄 확인`
+    : "구간 기록";
+};
+
 const finish = () => {
   if (!game) return;
   const state = game.state;
@@ -314,6 +413,7 @@ const finish = () => {
       score: state.score,
       level: state.level,
       ...(mode.splits ? { splits } : {}),
+      playerName: runPlayerName,
       date: new Date().toISOString(),
     });
   }
@@ -331,6 +431,15 @@ const finish = () => {
   $("results-title").textContent = summary.title;
   $("results-main").textContent = summary.main;
   $("results-badge").classList.toggle("is-invisible", !outcome?.isBest);
+
+  const delta = race && state.over === "clear" ? state.frame - race.target.best.frames : null;
+  $("race-result").textContent = !race
+    ? ""
+    : delta === null
+      ? `완주하지 못했어요 · 상대 기록 ${formatTime(race.target.best.frames)}`
+      : delta === 0
+        ? "내 최고 기록과 같은 시간이에요."
+        : `이전 최고 기록보다 ${(Math.abs(delta) / 60).toFixed(2)}초 ${delta < 0 ? "빨라요" : "느려요"}.`;
 
   const seconds = state.frame / 60;
   const rows = [
@@ -354,6 +463,7 @@ const finish = () => {
       return [dt, dd];
     })
   );
+  renderResultSplits();
   showPanel("results");
 };
 
@@ -465,7 +575,7 @@ const handleSystem = action => {
     else stopReplay();
     return;
   }
-  if (action === "restart" && screen !== "menu") return start(mode);
+  if (action === "restart" && screen !== "menu") return start(mode, rules, race?.target);
   if (action !== "pause") return;
   if (screen === "play" || screen === "countdown") pause();
   else if (screen === "paused") resume();
@@ -516,7 +626,7 @@ for (const btn of document.querySelectorAll("[data-action]")) {
   btn.addEventListener("click", () => {
     const action = btn.getAttribute("data-action");
     if (action === "resume") resume();
-    if (action === "retry") start(mode);
+    if (action === "retry") start(mode, rules, race?.target);
     if (action === "menu") toMenu();
     if (action === "watch" && lastReplay) startReplay(lastReplay);
     if (action === "stats" && game) statsUI.open(game.state, `${mode.name} · ${rules.name}`);
@@ -545,6 +655,20 @@ let replayReturn = /** @type {{ screen: string, game: any, mode: any, rules: any
 const SPEEDS = [1, 2, 4];
 const replayBar = $("replay-bar");
 const replayStatus = $("replay-status");
+const replayNote = $("replay-note");
+const replayProgress = /** @type {HTMLProgressElement} */ ($("replay-progress"));
+const replayTime = $("replay-time");
+const replayStep = /** @type {HTMLButtonElement} */ (replayBar.querySelector('[data-replay="step"]'));
+const replayToggle = /** @type {HTMLButtonElement} */ (replayBar.querySelector('[data-replay="toggle"]'));
+
+const updateReplayProgress = () => {
+  const frame = player?.frame ?? 0;
+  const length = playing?.result?.frames ?? 0;
+  replayProgress.max = length || 1;
+  if (length) replayProgress.value = Math.min(frame, length);
+  else replayProgress.removeAttribute("value");
+  replayTime.textContent = length ? `${formatTime(frame)} / ${formatTime(length)}` : formatTime(frame);
+};
 const menuNotice = $("menu-notice");
 
 const updateReplayBar = () => {
@@ -556,9 +680,12 @@ const updateReplayBar = () => {
     : "일시정지";
   /** @type {HTMLElement} */ (replayBar.querySelector(".replay-speed")).textContent = `${replaySpeed}x`;
   replayStatus.textContent = player?.done ? "끝" : "";
+  replayStep.disabled = !player || player.done;
+  replayToggle.disabled = replayStep.disabled;
+  updateReplayProgress();
 };
 
-const startReplay = (replay, returnTo = screen) => {
+const startReplay = (replay, returnTo = screen, note = "") => {
   if (screen !== "replay") replayReturn = { screen: returnTo, game, mode, rules };
   playing = replay;
   player = createPlayer(replay, findMode);
@@ -572,12 +699,14 @@ const startReplay = (replay, returnTo = screen) => {
   countdownEl.hidden = true;
   showPanel(null);
   setScreen("replay");
+  showModeHud(mode, true);
   replayBar.hidden = false;
+  replayNote.textContent = note;
   $("replay-title").textContent = `${mode.name} · ${rules.name}`;
   updateReplayBar();
 };
 
-const restartReplay = () => playing && startReplay(playing);
+const restartReplay = () => playing && startReplay(playing, screen, replayNote.textContent);
 
 const stopReplay = () => {
   if (screen !== "replay") return;
@@ -587,6 +716,7 @@ const stopReplay = () => {
   renderer.clearEffects();
   ({ game, mode, rules } = replayReturn);
   if (replayReturn.screen === "results") {
+    showModeHud(mode);
     setScreen("results");
     showPanel("results");
   } else {
@@ -594,14 +724,19 @@ const stopReplay = () => {
   }
 };
 
-const tickReplay = () => {
-  if (!player || replayPaused || player.done) return;
-  for (let i = 0; i < replaySpeed && !player.done; i++) {
+const advanceReplay = count => {
+  if (!player || player.done) return;
+  for (let i = 0; i < count && !player.done; i++) {
     const events = player.step();
     for (const e of events) announce(e);
     renderer.addEvents(events);
   }
   if (player.done) updateReplayBar();
+  else updateReplayProgress();
+};
+
+const tickReplay = () => {
+  if (!replayPaused) advanceReplay(replaySpeed);
 };
 
 for (const btn of replayBar.querySelectorAll("[data-replay]")) {
@@ -609,6 +744,10 @@ for (const btn of replayBar.querySelectorAll("[data-replay]")) {
     const action = btn.getAttribute("data-replay");
     if (action === "toggle") replayPaused = !replayPaused;
     if (action === "speed") replaySpeed = SPEEDS[(SPEEDS.indexOf(replaySpeed) + 1) % SPEEDS.length];
+    if (action === "step") {
+      replayPaused = true;
+      advanceReplay(1);
+    }
     if (action === "restart") return restartReplay();
     if (action === "exit") return stopReplay();
     updateReplayBar();
@@ -627,7 +766,7 @@ window.addEventListener("keydown", e => {
     e.repeat
   )
     return;
-  if (e.code === "Space") replayPaused = !replayPaused;
+  if (e.code === "Space" && !replayBar.contains(document.activeElement)) replayPaused = !replayPaused;
   else if (["Digit1", "Digit2", "Digit4"].includes(e.code)) replaySpeed = Number(e.code.slice(5));
   else return;
   e.preventDefault();
@@ -666,8 +805,9 @@ const openReplayText = text => {
     return false;
   }
   const check = verifyReplay(replay, findMode);
-  showMenuNotice(check.ok ? "" : "이 리플레이는 기록된 결과와 다르게 재생돼요(다른 버전에서 만든 파일일 수 있어요).");
-  startReplay(replay, "menu");
+  showMenuNotice("");
+  const note = check.ok ? "" : "저장된 결과와 재생 결과가 달라요. 다른 버전의 파일일 수 있어요.";
+  startReplay(replay, "menu", note);
   return true;
 };
 
@@ -677,10 +817,21 @@ $("watch-last").addEventListener("click", () => {
 });
 const fileInput = /** @type {HTMLInputElement} */ ($("replay-file"));
 $("open-replay").addEventListener("click", () => fileInput.click());
+let replayFileRequest = 0;
 fileInput.addEventListener("change", async () => {
   const file = fileInput.files?.[0];
   fileInput.value = "";
-  if (file) openReplayText(await file.text());
+  if (!file) return;
+
+  const request = ++replayFileRequest;
+  let text;
+  try {
+    text = await file.text();
+  } catch {
+    if (request === replayFileRequest && screen === "menu") showMenuNotice("파일을 읽지 못했어요. 다시 선택해 주세요.");
+    return;
+  }
+  if (request === replayFileRequest && screen === "menu") openReplayText(text);
 });
 
 // ---- 루프 ----
@@ -706,6 +857,10 @@ const tick = () => {
   recorder?.input(held, pressed);
   const events = game.step({ held, pressed });
   if (mode.splits) splits = advanceSplits(mode.splits, splits, game.state.stats.lines, game.state.frame);
+  if (race && !race.player.done) {
+    race.player.step();
+    updateRaceProgress();
+  }
   for (const e of events) announce(e);
   renderer.addEvents(events);
   if (events.some(e => e.type === "gameOver" || e.type === "finish")) finish();
@@ -727,6 +882,7 @@ const loop = now => {
     acc -= FRAME_MS;
   }
   renderer.draw(game);
+  if (race && screen !== "replay" && raceBoardVisible.matches) raceRenderer.draw(race.player.game);
   updateHud();
   requestAnimationFrame(loop);
 };
