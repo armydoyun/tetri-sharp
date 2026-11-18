@@ -22,7 +22,7 @@ import {
   handlingPresetOf,
 } from "../storage/settings.js";
 import { button, choice, choiceCards, el, fieldRow, fillDialog, rangeRow, slider, tabBar } from "./dom.js";
-import { CONTRAST_PALETTE, THEMES, THEME_IDS } from "../render/themes.js";
+import { COLOR_SWATCHES, PIECE_ORDER, THEMES, THEME_IDS, findTheme, paletteFor } from "../render/themes.js";
 import { keycap } from "./keycap.js";
 import { drawThemePreview } from "../render/preview.js";
 import { t } from "../i18n/index.js";
@@ -267,6 +267,71 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
     );
   };
 
+  /** 블록 색 직접 고르기: [피스 7칸] + [견본 16색]. 고른 피스에 견본 색을 입힌다 */
+  let colorPiece = "T";
+  const colorPicker = visual => {
+    const palette = paletteFor(visual, findTheme(visual.theme));
+    const pieces = el(
+      "div",
+      { class: "color-pieces", role: "group", "aria-label": t("색을 바꿀 피스") },
+      ...PIECE_ORDER.map((piece, i) => {
+        const b = el(
+          "button",
+          {
+            type: "button",
+            class: "color-piece",
+            "data-piece": piece,
+            "aria-pressed": String(piece === colorPiece),
+            "aria-label": t("{piece} 피스", { piece }),
+          },
+          el("span", { class: "color-chip", style: `background-color: ${palette[i + 1]}` }),
+          el("strong", { text: piece })
+        );
+        b.addEventListener("click", () => {
+          colorPiece = piece;
+          render();
+          /** @type {HTMLElement | null} */ (dialog.querySelector(`.color-piece[data-piece="${piece}"]`))?.focus();
+        });
+        return b;
+      })
+    );
+    const swatches = el(
+      "div",
+      { class: "color-swatches", role: "group", "aria-label": t("색 견본") },
+      ...COLOR_SWATCHES.map(color => {
+        const chosen = (visual.colors[colorPiece] ?? "") === color;
+        const b = el("button", {
+          type: "button",
+          class: "color-swatch",
+          "data-color": color,
+          "aria-pressed": String(chosen),
+          "aria-label": t("{piece} 피스를 이 색으로 · {color}", { piece: colorPiece, color }),
+          style: `background-color: ${color}`,
+        });
+        b.addEventListener("click", () => {
+          update({
+            visual: { ...getSettings().visual, colors: { ...getSettings().visual.colors, [colorPiece]: color } },
+          });
+          render();
+          /** @type {HTMLElement | null} */ (dialog.querySelector(`.color-swatch[data-color="${color}"]`))?.focus();
+        });
+        return b;
+      })
+    );
+    const reset = button({ text: t("테마 색으로"), iconName: "reset", className: "btn btn-small", id: "color-reset" });
+    reset.addEventListener("click", () => {
+      update({ visual: { ...getSettings().visual, colors: {} } });
+      render();
+    });
+    return fieldRow({
+      id: "color-pieces",
+      label: t("피스 색"),
+      hint: t("{piece} 피스를 고른 상태예요", { piece: colorPiece }),
+      className: "is-wide",
+      control: el("div", { class: "color-picker" }, pieces, swatches, el("div", {}, reset)),
+    });
+  };
+
   const setVisual = (key, v) => {
     update({ visual: { ...getSettings().visual, [key]: v } });
     render();
@@ -325,7 +390,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
           label: t("게임 테마"),
           options: THEME_IDS.map(id => {
             const theme = THEMES[id];
-            const palette = visual.palette === "contrast" ? CONTRAST_PALETTE : theme.palette;
+            const palette = paletteFor(visual, theme);
             const preview = el("canvas", { class: "theme-preview", "aria-hidden": "true" });
             drawThemePreview(preview, theme, palette);
             return { value: id, title: theme.name, desc: theme.description, preview };
@@ -349,18 +414,25 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
       fieldRow({
         id: "set-palette",
         label: t("블록 색"),
-        hint: visual.palette === "contrast" ? t("색을 구분하기 쉬운 색 조합을 써요") : t("고른 테마의 색을 써요"),
+        hint:
+          visual.palette === "contrast"
+            ? t("색을 구분하기 쉬운 색 조합을 써요")
+            : visual.palette === "custom"
+              ? t("아래에서 피스를 고르고 색을 눌러요. 고르지 않은 피스는 테마 색이에요")
+              : t("고른 테마의 색을 써요"),
         control: choice({
           id: "set-palette",
           label: t("블록 색"),
           options: [
             ["theme", t("테마 색")],
             ["contrast", t("색각 친화")],
+            ["custom", t("직접 고르기")],
           ],
           value: visual.palette,
           onChange: v => setVisual("palette", v),
         }),
       }),
+      ...(visual.palette === "custom" ? [colorPicker(visual)] : []),
       fieldRow({
         id: "set-ghost",
         label: t("고스트"),

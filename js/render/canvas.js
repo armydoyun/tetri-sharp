@@ -6,7 +6,7 @@ import { CELL_ID } from "../core/pieces.js";
 import { VISIBLE_TOP } from "../core/engine.js";
 import { createEffects } from "./effects.js";
 import { createSlide } from "./motion.js";
-import { CONTRAST_PALETTE, drawMark, findTheme } from "./themes.js";
+import { drawMark, findTheme, paletteFor } from "./themes.js";
 
 const MARGIN_TOP = 2; // 보드 위 여유 줄
 const ROWS = VISIBLE_ROWS + MARGIN_TOP;
@@ -99,7 +99,7 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     fit();
     const visual = getVisual();
     const theme = findTheme(visual.theme);
-    const palette = visual.palette === "contrast" ? CONTRAST_PALETTE : theme.palette;
+    const palette = paletteFor(visual, theme);
     const motion = visual.effects === "full";
     const { board, active, hold, holdUsed, queue } = game
       ? game.state

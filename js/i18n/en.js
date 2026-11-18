@@ -282,6 +282,17 @@ export const EN = {
   "게임과 리플레이에서 누르는 키를 정보 칸 아래에 보여 줘요":
     "Shows the keys being pressed under the HUD, in games and replays",
 
+  "직접 고르기": "Custom",
+  "아래에서 피스를 고르고 색을 눌러요. 고르지 않은 피스는 테마 색이에요":
+    "Pick a piece below, then a color. Untouched pieces keep the theme color",
+  "색을 바꿀 피스": "Piece to recolor",
+  "{piece} 피스": "{piece} piece",
+  "색 견본": "Color swatches",
+  "{piece} 피스를 이 색으로 · {color}": "Color the {piece} piece {color}",
+  "테마 색으로": "Theme colors",
+  "피스 색": "Piece colors",
+  "{piece} 피스를 고른 상태예요": "{piece} piece selected",
+
   // ---- 결과 ----
   "새 기록": "New record",
   "최고 기록": "Best",

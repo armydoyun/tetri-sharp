@@ -170,11 +170,21 @@ test("시각 설정 보정과 예전 형식 옮기기", () => {
   const old = sanitizeVisual({ effects: "off", skin: "outline", palette: "default" });
   assert.deepEqual(
     old,
-    { theme: "modern", effects: "off", palette: "theme", pattern: "off", ghost: "normal", grid: "on", inputs: "off" },
+    {
+      theme: "modern",
+      effects: "off",
+      palette: "theme",
+      pattern: "off",
+      ghost: "normal",
+      grid: "on",
+      inputs: "off",
+      colors: {},
+    },
     "skin은 버리고 default → theme, 새 항목은 기본값"
   );
   assert.equal(sanitizeVisual({ palette: "contrast", theme: "retro" }).theme, "retro");
   assert.deepEqual(Object.keys(sanitizeSettings({}).visual).sort(), [
+    "colors",
     "effects",
     "ghost",
     "grid",
@@ -185,4 +195,5 @@ test("시각 설정 보정과 예전 형식 옮기기", () => {
   ]);
   assert.equal(sanitizeVisual({ ghost: "huge", grid: 0, pattern: "on" }).ghost, "normal");
   assert.equal(sanitizeVisual({ pattern: "on" }).pattern, "on");
+  assert.deepEqual(sanitizeVisual({ colors: { T: "#AABBCC", I: "red", Q: "#000000" } }).colors, { T: "#aabbcc" });
 });

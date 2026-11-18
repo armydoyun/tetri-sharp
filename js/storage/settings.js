@@ -25,7 +25,7 @@ export const VISUAL_OPTIONS = Object.freeze({
   theme: THEME_IDS,
   // 접근성: 테마와 상관없이 적용
   effects: Object.freeze(["full", "reduced", "off"]),
-  palette: Object.freeze(["theme", "contrast"]),
+  palette: Object.freeze(["theme", "contrast", "custom"]),
   // 블록 무늬: 피스마다 다른 무늬(색을 구분하기 어려워도 알아볼 수 있게)
   pattern: Object.freeze(["off", "on"]),
   // 고스트 진하기
@@ -83,6 +83,7 @@ export const defaultVisual = () => ({
   ghost: "normal",
   grid: "on",
   inputs: "off",
+  colors: {},
 });
 
 export const DEFAULT_SETTINGS = Object.freeze({
@@ -107,6 +108,16 @@ export const DEFAULT_SETTINGS = Object.freeze({
 
 export const VOLUME_LIMITS = Object.freeze({ min: 0, max: 100, step: 5, default: 0 });
 
+/** 직접 고른 블록 색: 피스(I~Z) → "#rrggbb". 잘못된 값은 버린다(그 피스는 테마 색) */
+export const sanitizeColors = raw => {
+  /** @type {Record<string, string>} */
+  const out = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const piece of ["I", "J", "L", "O", "S", "T", "Z"])
+    if (typeof raw[piece] === "string" && /^#[0-9a-f]{6}$/i.test(raw[piece])) out[piece] = raw[piece].toLowerCase();
+  return out;
+};
+
 export const sanitizeVisual = raw => {
   const r = { ...(raw && typeof raw === "object" ? raw : {}) };
   // 예전 형식: palette "default"는 지금의 "theme"(테마 색). skin(블록 모양)은 테마로 흡수됐다.
@@ -115,6 +126,7 @@ export const sanitizeVisual = raw => {
   /** @type {any} */
   const out = {};
   for (const [key, allowed] of Object.entries(VISUAL_OPTIONS)) out[key] = allowed.includes(r[key]) ? r[key] : d[key];
+  out.colors = sanitizeColors(r.colors);
   return out;
 };
 

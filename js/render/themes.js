@@ -179,4 +179,37 @@ export const THEMES = Object.freeze({
   }),
 });
 
+/** 블록 색 직접 고르기에 쓰는 견본(어두운·밝은 보드 모두에서 잘 보이는 색) */
+export const COLOR_SWATCHES = Object.freeze([
+  "#8ed6cd",
+  "#4fb3a9",
+  "#9baff4",
+  "#5a78d6",
+  "#c4a6ec",
+  "#8c63c9",
+  "#f5ab87",
+  "#e07a45",
+  "#d6ed84",
+  "#a8c43f",
+  "#8bc994",
+  "#4f9a5b",
+  "#ee9095",
+  "#cf4f5a",
+  "#f2d06b",
+  "#c9cfc5",
+]);
+
+/** 피스 순서(셀 값 1~7) */
+export const PIECE_ORDER = Object.freeze(["I", "J", "L", "O", "S", "T", "Z"]);
+
+/**
+ * 지금 설정의 블록 색: 테마 색 · 색각 친화 · 직접 고른 색(고르지 않은 피스는 테마 색)
+ * @returns {readonly string[]} 셀 값(1~8) → 색
+ */
+export const paletteFor = (visual, theme) => {
+  if (visual.palette === "contrast") return CONTRAST_PALETTE;
+  if (visual.palette !== "custom" || !visual.colors) return theme.palette;
+  return theme.palette.map((color, i) => (i >= 1 && i <= 7 ? (visual.colors[PIECE_ORDER[i - 1]] ?? color) : color));
+};
+
 export const findTheme = id => (Object.hasOwn(THEMES, id) ? THEMES[id] : THEMES[DEFAULT_THEME]);
