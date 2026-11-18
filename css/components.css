@@ -620,20 +620,12 @@
 }
 
 .theme-preview {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  min-height: 42px;
+  display: block;
+  width: 100%;
+  height: auto;
   margin-bottom: var(--space-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-s);
-}
-
-.theme-preview > span {
-  width: 17px;
-  aspect-ratio: 1;
-  border-radius: var(--preview-radius);
 }
 
 .choice-card strong {

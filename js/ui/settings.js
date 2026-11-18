@@ -15,6 +15,7 @@ import { DEFAULT_SETTINGS, HANDLING_LIMITS, SDF_INFINITE, VOLUME_LIMITS, default
 import { button, choice, choiceCards, el, fieldRow, fillDialog, tabBar } from "./dom.js";
 import { CONTRAST_PALETTE, THEMES, THEME_IDS } from "../render/themes.js";
 import { keycap } from "./keycap.js";
+import { drawThemePreview } from "../render/preview.js";
 
 const HANDLING_ROWS = [
   { key: "das", label: "DAS (자동 이동 시작)", hint: "방향키를 누른 채로 있을 때 자동 이동이 시작되기까지의 시간" },
@@ -130,13 +131,8 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
           options: THEME_IDS.map(id => {
             const theme = THEMES[id];
             const palette = visual.palette === "contrast" ? CONTRAST_PALETTE : theme.palette;
-            const preview = el(
-              "span",
-              { class: "theme-preview", "aria-hidden": "true" },
-              ...[1, 3, 4, 6].map(i => el("span", { style: `background-color: ${palette[i]}` }))
-            );
-            preview.style.backgroundColor = theme.board.bg;
-            preview.style.setProperty("--preview-radius", `${theme.radius * 20}px`);
+            const preview = el("canvas", { class: "theme-preview", "aria-hidden": "true" });
+            drawThemePreview(preview, theme, palette);
             return { value: id, title: theme.name, desc: theme.description, preview };
           }),
           value: visual.theme,
