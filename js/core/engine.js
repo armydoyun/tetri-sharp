@@ -68,6 +68,7 @@ export const msToFrames = ms => (ms * 60) / 1000;
  * @property {(state: any, lines: number) => number} [levelAfterLock]  고정마다 레벨을 올리는 방식(levelFor 대신)
  * @property {number} [levelStep]                     레벨업 알림 간격 (기본 1, Master는 100)
  * @property {(state: any) => number} [scoreLevel]    점수에 곱할 레벨 (기본 state.level)
+ * @property {(state: any, rng: import("./rng.js").Rng) => void} [setup]  시작 전에 보드를 꾸민다(Dig의 쓰레기 줄 등)
  */
 
 /**
@@ -116,6 +117,8 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
   };
 
   state.level = mode?.initialLevel ?? 1;
+  // 피스 순서와 따로 노는 난수(같은 시드에서 피스 순서가 바뀌지 않게)
+  mode?.setup?.(state, createRng((seed ^ 0x9e3779b9) >>> 0));
   if (mode?.levelFor) state.level = mode.levelFor(state);
 
   /** 이번 프레임에 누르고 있는 버튼 — 생성 순간의 IRS/IHS 판정에 쓴다 */

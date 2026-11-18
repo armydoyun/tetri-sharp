@@ -3,6 +3,7 @@
 import { createGame } from "./core/engine.js";
 import { createRenderer } from "./render/canvas.js";
 import { createKeyboard } from "./input/keyboard.js";
+import { createGamepad } from "./input/gamepad.js";
 import { ACTIONS, compileKeymap, keyLabel } from "./input/keymap.js";
 import { MODES, findMode } from "./modes/index.js";
 import { formatScore, formatTime } from "./modes/format.js";
@@ -80,9 +81,21 @@ const showPanel = name => {
 
 const keysFor = id => (settings.keymap[id] ?? []).map(keyLabel).join("/");
 
+/** @type {ReturnType<typeof createGamepad> | null} 아래에서 만든 뒤 채운다 */
+let padRef = null;
+const PAD_HELP =
+  "게임패드: 십자키 이동·↑ 하드 드롭 · B 시계 · A/X 반시계 · Y 180° · LB/RB 홀드 · Start 일시정지 · Back 다시 시작";
+
+/** 키 안내. 지금 규칙에서 쓸 수 없는 동작(하드 드롭·홀드가 꺼진 규칙 등)은 뺀다. */
 const renderKeyHelp = () => {
-  const parts = ACTIONS.map(a => (keysFor(a.id) ? `${a.label} ${keysFor(a.id)}` : null)).filter(Boolean);
-  $("key-help").textContent = [...parts, "메뉴·일시정지 Esc"].join(" · ");
+  const r = game?.rules ?? currentRules();
+  const unavailable = new Set([...(r.hardDrop ? [] : ["HARD"]), ...(r.hold.enabled ? [] : ["HOLD"])]);
+  const parts = ACTIONS.filter(a => !unavailable.has(a.id))
+    .map(a => (keysFor(a.id) ? `${a.label} ${keysFor(a.id)}` : null))
+    .filter(Boolean);
+  const lines = [[...parts, "메뉴·일시정지 Esc"].join(" · ")];
+  if (padRef?.connected) lines.push(PAD_HELP);
+  $("key-help").textContent = lines.join("\n");
   for (const kbd of document.querySelectorAll("kbd[data-key]")) kbd.textContent = keysFor(kbd.getAttribute("data-key"));
 };
 
@@ -100,6 +113,7 @@ const renderRuleTabs = () => {
         ruleChoice = id;
         store.set("lastRules", id);
         renderMenu();
+        renderKeyHelp();
         /** @type {HTMLElement | null} */ (tabs.querySelector(`[data-rules="${id}"]`))?.focus();
       });
       return b;
@@ -180,6 +194,7 @@ const start = m => {
   showPanel(null);
   actionEl.classList.remove("is-shown");
   renderer.clearEffects();
+  renderKeyHelp();
   setScreen("countdown");
   countdownEl.hidden = false;
   countdownEl.textContent = "READY";
@@ -325,22 +340,43 @@ const rulesUI = createRulesUI({
 
 $("edit-rules").addEventListener("click", () => rulesUI.open());
 
-const keyboard = createKeyboard({
-  getBindings: () => bindings,
-  onSystem: action => {
-    if (settingsUI.isOpen || rulesUI.isOpen) return;
-    if (screen === "replay") {
-      if (action === "restart") restartReplay();
-      else stopReplay();
-      return;
-    }
-    if (action === "restart" && screen !== "menu") return start(mode);
-    if (action !== "pause") return;
-    if (screen === "play" || screen === "countdown") pause();
-    else if (screen === "paused") resume();
-    else if (screen === "results") toMenu();
-  },
-});
+const handleSystem = action => {
+  if (settingsUI.isOpen || rulesUI.isOpen) return;
+  if (screen === "replay") {
+    if (action === "restart") restartReplay();
+    else stopReplay();
+    return;
+  }
+  if (action === "restart" && screen !== "menu") return start(mode);
+  if (action !== "pause") return;
+  if (screen === "play" || screen === "countdown") pause();
+  else if (screen === "paused") resume();
+  else if (screen === "results") toMenu();
+};
+
+const keyboard = createKeyboard({ getBindings: () => bindings, onSystem: handleSystem });
+
+/** 메뉴·결과·일시정지 화면에서 게임패드로 버튼 사이를 옮겨 다니고 누른다. */
+const handlePadMenu = action => {
+  if (settingsUI.isOpen || rulesUI.isOpen) return;
+  const panel = Object.values(panels).find(p => !p.hidden);
+  if (!panel || screen === "play" || screen === "countdown" || screen === "replay") return;
+  const buttons = /** @type {HTMLButtonElement[]} */ ([...panel.querySelectorAll("button")]).filter(
+    b => !b.disabled && b.offsetParent !== null
+  );
+  if (!buttons.length) return;
+  const at = buttons.indexOf(/** @type {any} */ (document.activeElement));
+  if (action === "select") {
+    if (at >= 0) buttons[at].click();
+    else buttons[0].focus();
+  } else {
+    const next = at < 0 ? 0 : (at + (action === "down" ? 1 : -1) + buttons.length) % buttons.length;
+    buttons[next].focus();
+  }
+};
+
+const pad = createGamepad({ onSystem: handleSystem, onMenu: handlePadMenu });
+padRef = pad;
 
 $("open-settings").addEventListener("click", () => {
   pause();
@@ -521,7 +557,7 @@ const tick = () => {
   if (screen === "replay") return tickReplay();
   if (screen !== "play" || !game) return;
   if (goTimer > 0 && --goTimer === 0) countdownEl.hidden = true;
-  const held = keyboard.held;
+  const held = keyboard.held | pad.held;
   const pressed = keyboard.takePressed();
   recorder?.input(held, pressed);
   const events = game.step({ held, pressed });
@@ -530,7 +566,14 @@ const tick = () => {
   if (events.some(e => e.type === "gameOver" || e.type === "finish")) finish();
 };
 
+let padCount = 0;
 const loop = now => {
+  pad.poll();
+  // gamepadconnected 이벤트는 버튼을 한 번 눌러야 오는 브라우저가 있어 개수 변화로도 확인한다.
+  if (pad.connected !== padCount) {
+    padCount = pad.connected;
+    renderKeyHelp();
+  }
   acc += Math.min(now - last, MAX_CATCH_UP_MS);
   last = now;
   if (screen !== "play" && screen !== "countdown" && !(screen === "replay" && !replayPaused)) acc = 0;

@@ -38,8 +38,9 @@ test("결과는 파일 하나이고 바깥 파일을 참조하지 않는다", ()
   assert.ok(result.bytes < 1024 * 1024, `배포본 크기 ${result.bytes} bytes`);
 });
 
-const openPage = async () => {
+const openPage = async (initScript = null) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true });
+  if (initScript) await context.addInitScript(initScript);
   const blocked = [];
   await context.route("**/*", route => {
     if (route.request().url() === url) return route.continue();
@@ -179,9 +180,9 @@ test("설정: 슬라이더 값과 키 변경이 저장되고 새로고침 후에
   await context.close();
 });
 
-test("Ultra: 남은 시간이 줄어들고 하드 드롭으로 점수가 오른다, 메뉴에 다섯 모드", async () => {
+test("Ultra: 남은 시간이 줄어들고 하드 드롭으로 점수가 오른다, 메뉴에 여섯 모드", async () => {
   const { context, page, errors } = await openPage();
-  assert.equal(await page.locator(".mode-card").count(), 5);
+  assert.equal(await page.locator(".mode-card").count(), 6);
   await startMode(page, "ultra");
   assert.equal(await text(page, "hud-time-label"), "남은 시간");
   await page.waitForTimeout(300);
@@ -298,6 +299,62 @@ test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파�
     .setInputFiles({ name: "bad.json", mimeType: "application/json", buffer: Buffer.from("{oops") });
   await page.waitForFunction(() => !document.getElementById("menu-notice")?.hidden, null, { timeout: 3000 });
   assert.match(await text(page, "menu-notice"), /읽을 수 없는/);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("Dig: 쓰레기 10줄로 시작, 키 안내는 규칙에 따라 하드 드롭·홀드를 숨긴다", async () => {
+  const { context, page, errors } = await openPage();
+  assert.match(await text(page, "key-help"), /하드 드롭/);
+  await page.click('[data-rules="retro"]');
+  const help = await text(page, "key-help");
+  assert.doesNotMatch(help, /하드 드롭/);
+  assert.doesNotMatch(help, /홀드/);
+  await page.click('[data-rules="modern"]');
+  await startMode(page, "dig");
+  assert.equal(await text(page, "hud-lines-label"), "남은 쓰레기");
+  assert.equal(await text(page, "hud-lines"), "10");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("게임패드: A로 메뉴 선택, 십자키 위로 하드 드롭, Start로 일시정지", async () => {
+  // 가짜 패드: window.__pad.pressed에 버튼 번호를 넣으면 눌린 것으로 보인다.
+  const { context, page, errors } = await openPage(() => {
+    window.__pad = { pressed: new Set() };
+    const make = () => ({
+      id: "test pad",
+      index: 0,
+      connected: true,
+      mapping: "standard",
+      axes: [0, 0, 0, 0],
+      buttons: Array.from({ length: 17 }, (_, i) => {
+        const on = window.__pad.pressed.has(i);
+        return { pressed: on, touched: on, value: on ? 1 : 0 };
+      }),
+    });
+    Object.defineProperty(navigator, "getGamepads", { value: () => [make()] });
+  });
+  const tap = async button => {
+    await page.evaluate(b => window.__pad.pressed.add(b), button);
+    await page.waitForTimeout(80);
+    await page.evaluate(b => window.__pad.pressed.delete(b), button);
+    await page.waitForTimeout(80);
+  };
+  assert.match(await text(page, "key-help"), /게임패드/, "연결되면 패드 안내가 보인다");
+  await tap(13); // 아래: Sprint → Marathon
+  await tap(12); // 위: 다시 Sprint
+  await tap(0); // A: 선택
+  await page.waitForFunction(() => document.getElementById("countdown")?.textContent === "GO!", null, {
+    timeout: 3000,
+  });
+  assert.equal(await text(page, "hud-lines-label"), "남은 줄", "Sprint가 시작됐다");
+  await tap(12);
+  await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "1", null, {
+    timeout: 3000,
+  });
+  await tap(9);
+  assert.equal(await visible(page, "pause"), true);
   assert.deepEqual(errors, []);
   await context.close();
 });

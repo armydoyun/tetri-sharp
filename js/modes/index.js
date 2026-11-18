@@ -1,6 +1,8 @@
 // 모드: 목표·종료 조건·레벨 진행·HUD·기록 방식. 조작 물리는 RuleSet(rules/presets.js)이 정한다.
 // 모든 함수가 순수 함수라 엔진과 함께 Node 테스트에서 그대로 돈다.
 import { MODERN } from "../rules/presets.js";
+import { GARBAGE } from "../core/pieces.js";
+import { get, set } from "../core/board.js";
 import { formatScore, formatTime } from "./format.js";
 
 /**
@@ -69,7 +71,7 @@ const MARATHON_GOAL = 150;
 export const MARATHON = Object.freeze({
   id: "marathon",
   name: "Marathon",
-  description: "150줄 — 10줄마다 레벨업, 점점 빨라진다",
+  description: "150줄 · 10줄마다 빨라진다",
   rules: MODERN,
   goal: MARATHON_GOAL,
   check: state => (state.stats.lines >= MARATHON_GOAL ? { result: "clear" } : null),
@@ -92,7 +94,7 @@ const ULTRA_FRAMES = 2 * 60 * 60;
 export const ULTRA = Object.freeze({
   id: "ultra",
   name: "Ultra",
-  description: "2분 동안 최고 점수 — T-spin과 B2B를 노려라",
+  description: "2분 동안 최고 점수",
   rules: MODERN,
   timeLimit: ULTRA_FRAMES,
   check: state => (state.frame >= ULTRA_FRAMES ? { result: "timeUp" } : null),
@@ -156,7 +158,7 @@ const MASTER_MAX = 999;
 export const MASTER = Object.freeze({
   id: "master",
   name: "Master",
-  description: "레벨 999까지 — 500부터 20G (Arcade 규칙 추천)",
+  description: "레벨 999까지 · 500부터 20G",
   rules: MODERN,
   initialLevel: 0,
   levelStep: 100,
@@ -181,11 +183,60 @@ export const MASTER = Object.freeze({
   isRecordable: state => state.level > 0,
 });
 
+// ---- Dig: 바닥에 깔린 쓰레기 줄(줄마다 구멍 하나)을 모두 파내기 ----
+
+const DIG_ROWS = 10;
+
+/** 쓰레기 줄이 몇 개 남았는지(가비지 칸이 하나라도 있는 줄 수) */
+export const garbageRows = board => {
+  let n = 0;
+  for (let y = 0; y < board.height; y++) {
+    for (let x = 0; x < board.width; x++) {
+      if (get(board, x, y) === GARBAGE) {
+        n += 1;
+        break;
+      }
+    }
+  }
+  return n;
+};
+
+/** @type {Mode} */
+export const DIG = Object.freeze({
+  id: "dig",
+  name: "Dig",
+  description: `쓰레기 ${DIG_ROWS}줄을 가장 빨리 파내기`,
+  rules: MODERN,
+  goal: DIG_ROWS,
+  setup: (state, rng) => {
+    const b = state.board;
+    let hole = -1;
+    for (let i = 0; i < DIG_ROWS; i++) {
+      // 바로 위 줄과 같은 열에는 구멍을 내지 않는다(한 번에 여러 줄이 뚫리지 않게).
+      let h = rng.int(b.width - 1);
+      if (h >= hole && hole >= 0) h += 1;
+      hole = h;
+      const y = b.height - 1 - i;
+      for (let x = 0; x < b.width; x++) if (x !== h) set(b, x, y, GARBAGE);
+    }
+  },
+  check: state => (garbageRows(state.board) === 0 ? { result: "clear" } : null),
+  hudLines: state => ({ label: "남은 쓰레기", value: String(garbageRows(state.board)) }),
+  hudTime: elapsed,
+  summary: state =>
+    state.over === "clear"
+      ? { title: "완료!", main: formatTime(state.frame) }
+      : { title: "게임 오버", main: `${DIG_ROWS - garbageRows(state.board)} / ${DIG_ROWS}줄` },
+  record: Object.freeze({ metric: "frames", order: "asc" }),
+  formatRecord: recordTime,
+  isRecordable: state => state.over === "clear",
+});
+
 /** @type {Mode} */
 export const ZEN = Object.freeze({
   id: "zen",
   name: "Endless",
-  description: "끝없이 쌓고 지우기 — 막힐 때까지",
+  description: "막힐 때까지 끝없이",
   rules: MODERN,
   check: () => null,
   hudLines: state => ({ label: "줄", value: String(state.stats.lines) }),
@@ -196,5 +247,5 @@ export const ZEN = Object.freeze({
   isRecordable: state => state.stats.lines > 0,
 });
 
-export const MODES = Object.freeze([SPRINT_40, MARATHON, ULTRA, MASTER, ZEN]);
+export const MODES = Object.freeze([SPRINT_40, MARATHON, ULTRA, MASTER, DIG, ZEN]);
 export const findMode = id => MODES.find(m => m.id === id) ?? SPRINT_40;
