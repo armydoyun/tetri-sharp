@@ -52,9 +52,13 @@ const EFFECT_HINTS = {
   off: t("연출을 모두 꺼요"),
 };
 const SCHEME_HINTS = {
-  system: "기기의 라이트·다크 설정을 따라요. 게임 화면은 늘 어두워요",
-  light: "첫 화면과 메뉴를 밝게 써요. 게임 화면은 늘 어두워요",
-  dark: "첫 화면과 메뉴도 어둡게 써요",
+  system: "기기의 라이트·다크 설정을 따라요",
+  light: "첫 화면과 메뉴를 밝게 써요",
+  dark: "첫 화면과 메뉴를 어둡게 써요",
+};
+const GAME_SURFACE_HINTS = {
+  dark: "게임 중에는 화면 색과 상관없이 어둡게 써요. 보드에 집중하기 좋아요",
+  scheme: "게임 중에도 위의 화면 색을 그대로 써요",
 };
 const TOUCH_OPTIONS = [
   ["auto", t("자동")],
@@ -150,6 +154,24 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
           value: scheme,
           onChange: v => {
             update({ scheme: v });
+            render();
+          },
+        }),
+      }),
+      fieldRow({
+        id: "set-game-surface",
+        label: t("게임 중 화면"),
+        hint: t(GAME_SURFACE_HINTS[getSettings().gameSurface]),
+        control: choice({
+          id: "set-game-surface",
+          label: t("게임 중 화면"),
+          options: [
+            ["dark", t("늘 어둡게")],
+            ["scheme", t("화면 색 따르기")],
+          ],
+          value: getSettings().gameSurface,
+          onChange: v => {
+            update({ gameSurface: v });
             render();
           },
         }),
@@ -333,6 +355,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
         visual: defaultVisual(),
         volume: DEFAULT_SETTINGS.volume,
         scheme: DEFAULT_SETTINGS.scheme,
+        gameSurface: DEFAULT_SETTINGS.gameSurface,
       });
       notice.textContent = t("모든 설정을 기본값으로 되돌렸어요.");
       render();

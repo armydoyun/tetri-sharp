@@ -51,8 +51,8 @@
 
 /* ---- 색: 다크(기본). 게임 화면(첫 화면이 아닐 때 body 전체)과 .surface-game은 늘 이 값 ---- */
 :root,
-.surface-game,
-body:not([data-screen="menu"]) {
+body:not([data-game-surface="scheme"]) .surface-game,
+body:not([data-screen="menu"], [data-game-surface="scheme"]) {
   color-scheme: dark;
   --bg: #141614;
   --surface: #1d201d;
