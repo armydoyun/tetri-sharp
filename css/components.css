@@ -496,3 +496,9 @@
 .text-input[readonly] {
   color: var(--text-dim);
 }
+
+/* 연습 고르기: 대화상자 안에서는 한 줄에 하나 */
+.practice-list {
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+}

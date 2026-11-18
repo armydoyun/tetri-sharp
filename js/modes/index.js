@@ -3,6 +3,7 @@
 import { MODERN } from "../rules/presets.js";
 import { GARBAGE } from "../core/pieces.js";
 import { get, set } from "../core/board.js";
+import { findPractice } from "./practice.js";
 import { formatScore, formatTime } from "./format.js";
 
 /**
@@ -251,4 +252,4 @@ export const ZEN = Object.freeze({
 });
 
 export const MODES = Object.freeze([SPRINT_40, MARATHON, ULTRA, MASTER, DIG, ZEN]);
-export const findMode = id => MODES.find(m => m.id === id) ?? SPRINT_40;
+export const findMode = id => MODES.find(m => m.id === id) ?? findPractice(id) ?? SPRINT_40;

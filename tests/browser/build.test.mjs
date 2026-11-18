@@ -632,3 +632,21 @@ test("규칙 공유: 편집기에서 코드를 붙여 넣으면 불러오고, #r
   assert.deepEqual([...errors, ...errs2], []);
   await fresh.close();
 });
+
+test("연습: 메뉴에서 고르면 시작하고, 놓을 때마다 성공/시도를 센다", async () => {
+  const { context, page, errors } = await openPage();
+  await page.click("#open-practice");
+  assert.equal(await page.locator("#practice .mode-card").count(), 3);
+  await page.click('[data-drill="tsd"]');
+  await page.waitForFunction(() => document.getElementById("countdown")?.textContent === "GO!", null, {
+    timeout: 3000,
+  });
+  assert.equal(await text(page, "hud-lines-label"), "성공");
+  assert.equal(await text(page, "hud-lines"), "0 / 0");
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => document.getElementById("hud-lines")?.textContent === "0 / 1", null, {
+    timeout: 3000,
+  });
+  assert.deepEqual(errors, []);
+  await context.close();
+});

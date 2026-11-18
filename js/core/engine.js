@@ -69,6 +69,8 @@ export const msToFrames = ms => (ms * 60) / 1000;
  * @property {number} [levelStep]                     레벨업 알림 간격 (기본 1, Master는 100)
  * @property {(state: any) => number} [scoreLevel]    점수에 곱할 레벨 (기본 state.level)
  * @property {(state: any, rng: import("./rng.js").Rng) => void} [setup]  시작 전에 보드를 꾸민다(Dig의 쓰레기 줄 등)
+ * @property {readonly string[]} [sequence]  정해진 피스 순서를 반복(연습 모드). 있으면 규칙의 생성기 대신 쓴다
+ * @property {(state: any, lockEvent: any, events: any[]) => boolean | void} [onLock]  고정·줄 삭제 직후, 다음 피스 전에 불린다. 보드를 되돌렸으면 true
  */
 
 /**
@@ -86,7 +88,12 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
   const withRules = h => (rules.fixedHandling ? { ...h, ...rules.fixedHandling } : h);
   handling = withRules(handling);
 
-  const randomizer = makeRandomizer(createRng(seed));
+  const randomizer = mode?.sequence?.length
+    ? (() => {
+        let i = 0;
+        return { next: () => mode.sequence[i++ % mode.sequence.length] };
+      })()
+    : makeRandomizer(createRng(seed));
   const board = createBoard();
   const queueSize = Math.max(1, rules.previewCount);
 
@@ -264,9 +271,17 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
     if (Math.floor(nextLevel / levelStep) > Math.floor(state.level / levelStep))
       events.push({ type: "levelUp", level: nextLevel });
     state.level = nextLevel;
+    // 모드가 보드를 되돌렸으면(연습 모드) 방금 놓은 피스는 사라졌으니 Lock Out을 따지지 않는다.
+    const reset = mode?.onLock
+      ? mode.onLock(
+          state,
+          events.findLast(e => e.type === "lock"),
+          events
+        ) === true
+      : false;
 
     // 줄이 지워지지 않았고 모든 칸이 보이는 영역 위에 있으면 Lock Out.
-    if (!cleared.length && shape.every(([, cy]) => a.y + cy < VISIBLE_TOP)) {
+    if (!reset && !cleared.length && shape.every(([, cy]) => a.y + cy < VISIBLE_TOP)) {
       state.over = "lockOut";
       events.push({ type: "gameOver", reason: "lockOut" });
       return;
