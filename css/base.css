@@ -18,6 +18,7 @@ body {
 
 body {
   overscroll-behavior: none;
+  transition: background-color 180ms var(--ease);
 }
 
 button,
@@ -29,13 +30,17 @@ select {
 
 /* 숫자는 항상 같은 폭(값이 바뀌어도 글자가 흔들리지 않게) */
 .num {
-  font-family: var(--font-ui);
   font-variant-numeric: tabular-nums;
 }
 
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 /* 아이콘: 글자 크기를 따라가고 색은 글자색 */
@@ -46,8 +51,8 @@ select {
   fill: none;
   stroke: currentColor;
   stroke-width: var(--icon-stroke);
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
 }
 
 /* [hidden]은 자리까지 없앤다 — 겹쳐 뜨는 패널(position: absolute)에만 쓴다.
@@ -58,4 +63,10 @@ select {
 
 .is-invisible {
   visibility: hidden;
+}
+
+/* 스크롤바도 각지게 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
 }

@@ -12,7 +12,7 @@ import {
 } from "../input/gamepad.js";
 import { icon } from "./icons.js";
 import { DEFAULT_SETTINGS, HANDLING_LIMITS, SDF_INFINITE, VOLUME_LIMITS, defaultVisual } from "../storage/settings.js";
-import { button, choice, choiceCards, el, fieldRow, fillDialog, tabBar } from "./dom.js";
+import { button, choice, choiceCards, el, fieldRow, fillDialog, slider, tabBar } from "./dom.js";
 import { CONTRAST_PALETTE, THEMES, THEME_IDS } from "../render/themes.js";
 import { keycap } from "./keycap.js";
 import { drawThemePreview } from "../render/preview.js";
@@ -88,8 +88,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
         const value = getSettings().handling[key];
         const id = `set-${key}`;
         const output = el("output", { text: formatValue(key, value), htmlFor: id });
-        const input = el("input", {
-          type: "range",
+        const input = slider({
           id,
           min: String(limits.min),
           max: String(limits.max),
@@ -207,8 +206,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
   const volumeRow = () => {
     const value = getSettings().volume;
     const output = el("output", { text: formatVolume(value), htmlFor: "set-volume" });
-    const input = el("input", {
-      type: "range",
+    const input = slider({
       id: "set-volume",
       min: String(VOLUME_LIMITS.min),
       max: String(VOLUME_LIMITS.max),

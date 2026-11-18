@@ -25,69 +25,77 @@
         </div>
       </header>
       <!-- 첫 화면: 보드 위 덮개가 아닌 독립된 화면. 넓은 화면에서는 넓게 쓴다 -->
+      <!-- 첫 화면: 게임 메뉴. 넓으면 [규칙·모드 | 도구] 두 칸, 좁으면 한 칸 -->
       <section id="menu" class="home" aria-label="첫 화면" hidden>
-        <section class="home-intro surface-game" aria-labelledby="intro-title">
-          <div class="intro-copy">
-            <h2 id="intro-title">오프라인 테트리스</h2>
-            <p>다양한 규칙들을 직접 선택해 자신만의 테트리스를 플레이 해보세요.</p>
-          </div>
-          <div class="intro-art" aria-hidden="true">
-            <div class="intro-grid">
-              <span class="intro-piece intro-piece-t"></span>
-              <span class="intro-piece intro-piece-l"></span>
-              <span class="intro-piece intro-piece-s"></span>
-              <span class="intro-piece intro-piece-o"></span>
-              <span class="intro-piece intro-piece-ghost"></span>
+        <div class="home-main">
+          <section class="home-block rule-card" aria-labelledby="rules-title">
+            <div class="block-head">
+              <h2 id="rules-title" class="section-title">규칙</h2>
+              <button id="edit-rules" type="button" class="btn btn-small" title="Custom 규칙 편집">
+                <span data-icon="edit"></span>편집
+              </button>
             </div>
-          </div>
-        </section>
+            <div id="rule-tabs" class="segmented rule-tabs" role="group" aria-label="규칙"></div>
+            <!-- 고른 규칙 설명: 두 줄 자리를 늘 차지한다 -->
+            <p id="rule-desc" class="rule-desc"></p>
+          </section>
 
-        <div class="rule-card">
-          <div class="rule-card-head">
-            <h2 class="section-title">규칙</h2>
-            <div id="rule-tabs" class="segmented" role="group" aria-label="규칙"></div>
-            <button id="edit-rules" type="button" class="btn" title="Custom 규칙 편집">
-              <span data-icon="edit"></span>편집
-            </button>
-          </div>
-          <!-- 고른 규칙 설명: 두 줄 자리를 늘 차지한다 -->
-          <p id="rule-desc" class="rule-desc"></p>
+          <section class="home-block home-modes" aria-labelledby="mode-title">
+            <div class="block-head">
+              <h2 id="mode-title" class="section-title">플레이 모드</h2>
+            </div>
+            <div id="mode-list" class="menu-list"></div>
+          </section>
         </div>
 
-        <section class="home-modes" aria-labelledby="mode-title">
-          <h2 id="mode-title" class="section-title">플레이 모드</h2>
-          <div id="mode-list" class="mode-grid"></div>
-          <div class="race-entry" role="group" aria-labelledby="race-title">
-            <p class="race-entry-head"><strong id="race-title">내 기록과 달리기</strong><span>같은 규칙의 최고 기록 리플레이와 같은 블록 순서로 겨뤄요</span></p>
-            <div id="race-modes" class="race-modes"></div>
-          </div>
-        </section>
-
-        <section class="home-tools" aria-label="플레이 도구">
-          <section class="tool-group" aria-labelledby="training-tools-title">
-            <h2 id="training-tools-title" class="section-title">연습과 기록</h2>
-            <button id="open-practice" class="tool-row" type="button">연습<span data-icon="arrow-right"></span></button>
-            <button id="open-records" class="tool-row" type="button">기록<span data-icon="arrow-right"></span></button>
+        <aside class="home-side" aria-label="플레이 도구">
+          <section class="home-block race-entry" aria-labelledby="race-title">
+            <div class="block-head">
+              <h2 id="race-title" class="section-title">내 기록과 달리기</h2>
+            </div>
+            <p class="block-note">같은 규칙의 최고 기록 리플레이와 같은 블록 순서로 겨뤄요</p>
+            <div id="race-modes" class="tool-list"></div>
           </section>
-          <section class="tool-group" aria-labelledby="replay-tools-title">
-            <h2 id="replay-tools-title" class="section-title">리플레이</h2>
-            <button id="watch-last" class="tool-row" type="button" disabled>마지막 판 다시 보기<span data-icon="arrow-right"></span><small>저장된 판 없음</small></button>
-            <button id="open-replay" class="tool-row" type="button">파일 열기<span data-icon="arrow-right"></span></button>
+
+          <section class="home-block" aria-labelledby="training-tools-title">
+            <div class="block-head">
+              <h2 id="training-tools-title" class="section-title">연습과 기록</h2>
+            </div>
+            <div class="tool-list">
+              <button id="open-practice" class="tool-row" type="button"><span>연습</span><span data-icon="chevron-right"></span></button>
+              <button id="open-records" class="tool-row" type="button"><span>기록</span><span data-icon="chevron-right"></span></button>
+            </div>
+          </section>
+
+          <section class="home-block" aria-labelledby="replay-tools-title">
+            <div class="block-head">
+              <h2 id="replay-tools-title" class="section-title">리플레이</h2>
+            </div>
+            <div class="tool-list">
+              <button id="watch-last" class="tool-row" type="button" disabled><span>마지막 판 다시 보기</span><small>저장된 판 없음</small><span data-icon="chevron-right"></span></button>
+              <button id="open-replay" class="tool-row" type="button"><span>파일 열기</span><span data-icon="folder"></span></button>
+            </div>
             <input id="replay-file" type="file" accept=".json,application/json" hidden />
           </section>
-          <section class="tool-group" aria-labelledby="data-tools-title">
-            <h2 id="data-tools-title" class="section-title">데이터</h2>
-            <button id="export-backup" class="tool-row" type="button">백업 파일로 저장<span data-icon="download"></span></button>
-            <button id="import-backup" class="tool-row" type="button">백업 불러오기<span data-icon="arrow-right"></span></button>
+
+          <section class="home-block" aria-labelledby="data-tools-title">
+            <div class="block-head">
+              <h2 id="data-tools-title" class="section-title">데이터</h2>
+            </div>
+            <div class="tool-list">
+              <button id="export-backup" class="tool-row" type="button"><span>백업 파일로 저장</span><span data-icon="download"></span></button>
+              <button id="import-backup" class="tool-row" type="button"><span>백업 불러오기</span><span data-icon="folder"></span></button>
+            </div>
             <input id="backup-file" type="file" accept=".json,application/json" hidden />
           </section>
-          <p id="menu-notice" class="notice-slot menu-notice" role="status"></p>
-        </section>
 
-        <details class="help-card">
-          <summary id="help-title" class="section-title">조작법</summary>
-          <p id="key-help" class="keys" aria-label="조작 안내"></p>
-        </details>
+          <p id="menu-notice" class="notice-slot menu-notice" role="status"></p>
+
+          <details class="help-card">
+            <summary id="help-title">조작법</summary>
+            <p id="key-help" class="keys" aria-label="조작 안내"></p>
+          </details>
+        </aside>
       </section>
 
       <!-- 게임 화면: 첫 화면에서는 숨긴다 -->

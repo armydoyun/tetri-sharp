@@ -62,7 +62,7 @@ export const fieldRow = ({ id, label, hint, control, disabled = false, className
       { class: "field-label", htmlFor: id },
       el("strong", { text: label }),
       // 줄 높이를 지키려고 빈 설명도 공백 한 칸으로 남긴다.
-      el("small", { text: hint || " " })
+      ...(hint === undefined ? [] : [el("small", { text: hint || " " })])
     ),
     control
   );
@@ -100,6 +100,24 @@ export const choiceCards = ({ id, label, options, value, onChange }) => {
   }
   return group;
 };
+
+/** 슬라이더: 채운 만큼을 --fill로 넘겨 칸 모양 막대를 그린다(css .range). */
+export const slider = attrs => {
+  const input = /** @type {HTMLInputElement} */ (el("input", { type: "range", ...attrs }));
+  const paint = () => {
+    const min = Number(input.min);
+    const max = Number(input.max);
+    const pct = max > min ? ((Number(input.value) - min) / (max - min)) * 100 : 0;
+    input.style.setProperty("--fill", `${pct}%`);
+  };
+  input.addEventListener("input", paint);
+  paint();
+  return input;
+};
+
+/** 켜기/끄기 스위치(체크박스를 블록 모양으로) */
+export const switchInput = attrs =>
+  /** @type {HTMLInputElement} */ (el("input", { type: "checkbox", class: "switch", role: "switch", ...attrs }));
 
 /** 대화상자 탭 줄 */
 export const tabBar = ({ tabs, active, onSelect }) =>

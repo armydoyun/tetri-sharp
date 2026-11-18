@@ -1,7 +1,8 @@
 // Custom 규칙 편집 대화상자. 바꿀 때마다 onChange(규칙 내용)를 부르고, 저장·적용은 호출한 쪽이 한다.
 import { PRESET_LIST } from "../rules/presets.js";
 import { GRAVITY_OPTIONS, LIMITS, makeCustomRules, sanitizeRuleBody } from "../rules/sanitize.js";
-import { button, el, fieldRow, fillDialog, tabBar } from "./dom.js";
+import { button, el, fieldRow, fillDialog, slider, switchInput, tabBar } from "./dom.js";
+import { dropdown } from "./select.js";
 import { decodeRules, encodeRules, rulesLink } from "../rules/share.js";
 import { t } from "../i18n/index.js";
 
@@ -206,24 +207,28 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
       render(id);
     };
     if (field.type === "select") {
-      const select = el("select", { id, class: "select", disabled });
-      field.options.forEach(([v, label], i) => {
-        // 선택 상자에는 짧은 이름만(긴 설명은 잘리므로 아래 설명 줄에 보여 준다)
-        select.append(el("option", { value: String(i), text: splitOption(label)[0], selected: v === value }));
+      // 닫혀 있을 때는 짧은 이름만, 목록에서는 설명까지 보여 준다.
+      return dropdown({
+        id,
+        label: field.label,
+        disabled,
+        value,
+        onChange: commit,
+        options: field.options.map(([v, text]) => {
+          const [name, hint] = splitOption(text);
+          return { value: v, label: name, hint };
+        }),
       });
-      select.addEventListener("change", () => commit(field.options[Number(select.value)][0]));
-      return select;
     }
     if (field.type === "toggle") {
-      const input = el("input", { id, type: "checkbox", class: "toggle", checked: Boolean(value), disabled });
+      const input = switchInput({ id, checked: Boolean(value), disabled });
       input.addEventListener("change", () => commit(input.checked));
       return input;
     }
     const [min, max] = field.range;
     const output = el("output", { text: field.unit(value), htmlFor: id });
-    const input = el("input", {
+    const input = slider({
       id,
-      type: "range",
       min: String(min),
       max: String(max),
       step: "1",
@@ -376,7 +381,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
         if (current !== tab) continue;
         const disabled = Boolean(field.when && !field.when(rules));
         const id = `rule-${field.path.replace(/\./g, "-")}`;
-        const hint = disabled ? field.off : selectedDescription(field, rules) || field.hint;
+        const hint = disabled ? field.off : selectedDescription(field, rules) || field.hint || "";
         section.append(fieldRow({ id, label: field.label, hint, control: control(field, rules, disabled), disabled }));
       }
       body.append(section);

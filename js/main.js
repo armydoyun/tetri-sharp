@@ -271,8 +271,9 @@ const renderRaceModes = ruleSet => {
       const info = document.createElement("small");
       info.textContent = target ? m.formatRecord(target.best) : t("끝까지 간 리플레이 필요");
       const body = document.createElement("span");
+      body.className = "race-mode-text";
       body.append(name, info);
-      btn.append(body, icon("arrow-right"));
+      btn.append(body, icon("chevron-right"));
       btn.addEventListener("click", () => startRace(m));
       return btn;
     })
@@ -285,20 +286,26 @@ const renderMenu = () => {
   renderRaceModes(ruleSet);
   const list = $("mode-list");
   list.replaceChildren(
-    ...MODES.map(m => {
+    ...MODES.map((m, i) => {
       const best = records.best(m, ruleSet);
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "mode-card";
+      btn.className = "menu-row";
       btn.dataset.mode = m.id;
+      const index = document.createElement("span");
+      index.className = "menu-index num";
+      index.textContent = String(i + 1).padStart(2, "0");
+      const text = document.createElement("span");
+      text.className = "menu-text";
       const name = document.createElement("strong");
       name.textContent = m.name;
       const desc = document.createElement("small");
       desc.textContent = m.description;
-      const pb = document.createElement("small");
-      pb.className = "mode-best";
+      text.append(name, desc);
+      const pb = document.createElement("span");
+      pb.className = "mode-best num";
       pb.textContent = best ? t("최고 기록 {record}", { record: m.formatRecord(best) }) : "";
-      btn.append(name, desc, pb, icon("arrow-right"));
+      btn.append(index, text, pb, icon("chevron-right"));
       btn.addEventListener("click", () => start(m));
       return btn;
     })
