@@ -1076,3 +1076,24 @@ test("드롭다운: 키보드로 열고 고르며, Esc는 목록만 닫고 대�
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("조작법을 펼쳐 페이지가 길어져도(스크롤바가 생겨도) 첫 화면이 좌우로 움직이지 않는다", async () => {
+  // 헤드리스는 스크롤바를 겹쳐 그려 자리를 차지하지 않으므로, 폭을 차지하는 스크롤바를 켜서 연다.
+  const real = await chromium.launch({ ...launchOptions(chromium), ignoreDefaultArgs: ["--hide-scrollbars"] });
+  const page = await real.newPage({ locale: "ko-KR", viewport: { width: 1280, height: 900 } });
+  await page.goto(url);
+  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  const xs = () =>
+    page.evaluate(() =>
+      [".logo", ".home-main", ".home-side", "#mode-list"].map(s =>
+        Math.round(document.querySelector(s).getBoundingClientRect().x)
+      )
+    );
+  const closed = await xs();
+  await page.click("#help-title");
+  assert.ok(await page.evaluate(() => document.documentElement.scrollHeight > innerHeight), "펼치면 스크롤이 생긴다");
+  assert.deepEqual(await xs(), closed, "펼친 뒤");
+  await page.click("#help-title");
+  assert.deepEqual(await xs(), closed, "접은 뒤");
+  await real.close();
+});
