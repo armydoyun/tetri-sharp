@@ -1281,3 +1281,9 @@ body.gestures-mode {
     display: none;
   }
 }
+
+/* 퍼즐을 깼을 때 "다음 단계"는 결과 카드 버튼 맨 위 한 줄 전체 */
+.results-card [data-action="next-puzzle"] {
+  grid-column: 1 / -1;
+  order: -1;
+}

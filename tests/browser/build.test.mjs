@@ -10,6 +10,8 @@ import { chromium } from "playwright";
 import { build } from "../../tools/build.mjs";
 import { launchOptions } from "../helpers/browser.mjs";
 import { runScenarios } from "../helpers/ui-scenarios.mjs";
+import { keysFor, solvePuzzle } from "../helpers/puzzle-solve.mjs";
+import { PUZZLES } from "../../js/modes/puzzles.js";
 import { botDailyReplay } from "../helpers/daily.mjs";
 import { dateKey } from "../../js/modes/daily.js";
 import { encodeReplayCode } from "../../js/replay/share.js";
@@ -1408,5 +1410,35 @@ test("편의: 제스처 방식이면 보드 아래 버튼 대신 보드를 튕�
     fire("pointerup", y0 + 200);
   });
   await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "1", null, { timeout: 2000 });
+  await context.close();
+});
+
+test("퍼즐: 단계를 풀면 성공·다음 단계로 이어지고, 첫 화면에 진행도가 남는다. 틀리면 실패", async () => {
+  const { context, page, errors } = await openPage(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  assert.equal(await text(page, "puzzle-progress"), `0 / ${PUZZLES.length}`);
+  await page.click("#open-puzzles");
+  assert.equal(await page.locator(".puzzle-tile").count(), PUZZLES.length);
+  await page.click('[data-puzzle="1"]');
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  for (const key of keysFor(solvePuzzle(PUZZLES[0]))) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(20);
+  }
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
+  assert.equal(await text(page, "results-title"), "성공!");
+  assert.equal(await page.locator('[data-action="next-puzzle"]').isVisible(), true);
+  await page.click('[data-action="next-puzzle"]');
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  assert.match(await text(page, "session-title"), /퍼즐 2/);
+  // 아무렇게나 떨어뜨리면 실패, 다음 단계 버튼은 없다
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
+  assert.equal(await text(page, "results-title"), "실패");
+  assert.equal(await page.locator('[data-action="next-puzzle"]').isVisible(), false);
+  await page.keyboard.press("Escape");
+  assert.equal(await text(page, "puzzle-progress"), `1 / ${PUZZLES.length}`);
+  assert.deepEqual(errors, []);
   await context.close();
 });

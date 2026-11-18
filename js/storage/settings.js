@@ -90,8 +90,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
   /** 터치 버튼: auto(터치 화면이면) · on · off */
   touch: "auto",
   visual: Object.freeze(defaultVisual()),
-  /** 효과음 크기 0~100 (0 = 끄기) */
-  volume: 50,
+  /** 효과음 크기 0~100 (0 = 끄기). 공용 PC라 기본은 음소거 */
+  volume: 0,
   /** 화면 언어: auto(브라우저 언어) · ko · en */
   lang: "auto",
   /** 화면 색: system(기기 설정) · light · dark */
@@ -102,7 +102,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   touchMode: "buttons",
 });
 
-export const VOLUME_LIMITS = Object.freeze({ min: 0, max: 100, step: 5, default: 50 });
+export const VOLUME_LIMITS = Object.freeze({ min: 0, max: 100, step: 5, default: 0 });
 
 export const sanitizeVisual = raw => {
   const r = { ...(raw && typeof raw === "object" ? raw : {}) };

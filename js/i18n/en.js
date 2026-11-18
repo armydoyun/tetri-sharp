@@ -246,6 +246,23 @@ export const EN = {
   "격자 선 없이 블록만 보여요": "Shows blocks without grid lines",
   "보드에 칸을 나누는 선을 그려요": "Draws lines between cells",
 
+  // ---- 퍼즐 ----
+  퍼즐: "Puzzles",
+  "판 비우기": "Clear the board",
+  "퍼즐 {n} · {kind}": "Puzzle {n} · {kind}",
+  "남은 피스": "Pieces left",
+  "성공!": "Solved!",
+  실패: "Failed",
+  "단계 {n}": "Stage {n}",
+  "다음 단계": "Next stage",
+  "{n}단계 · {kind} · 피스 {count}개{done}": "Stage {n} · {kind} · {count} pieces{done}",
+  깸: "solved",
+  "{n}피스": "{n} pcs",
+  "{done} / {total}단계 깸 · 중력 없음, 정해진 피스만 써요":
+    "{done} / {total} solved · no gravity, only the given pieces",
+  "판 비우기는 주어진 피스로 아래 두 줄을 모두 지우고, T-spin은 T 하나로 해내요.":
+    "Clear the board: use the given pieces to clear the bottom two lines. T-spin stages: do it with a single T.",
+
   // ---- 결과 ----
   "새 기록": "New record",
   "최고 기록": "Best",

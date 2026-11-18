@@ -47,6 +47,8 @@ import { createBot } from "./ai/bot.js";
 import { createGestures } from "./input/gestures.js";
 import { createUndo } from "./modes/undo.js";
 import { createHelpUI } from "./ui/help.js";
+import { PUZZLES, createPuzzleProgress, findPuzzle, puzzleMode } from "./modes/puzzles.js";
+import { createPuzzleUI } from "./ui/puzzles.js";
 import { createVersusUI } from "./ui/versus.js";
 import { lang, t, translateDom } from "./i18n/index.js";
 
@@ -127,7 +129,7 @@ const addVersusResult = (levelId, won) => {
 /** @type {"menu" | "countdown" | "play" | "paused" | "results" | "replay"} */
 let screen = "menu";
 /** 모드 찾기: 오늘의 도전(날짜별) + 나머지 */
-const findMode = id => findDaily(id) ?? findBaseMode(id);
+const findMode = id => findDaily(id) ?? findPuzzle(id) ?? findBaseMode(id);
 let mode = findMode(store.get("lastMode", null));
 
 // ---- 규칙 선택 (Modern / Retro / Arcade / Custom) ----
@@ -326,6 +328,7 @@ const renderRaceModes = ruleSet => {
 
 const renderMenu = () => {
   renderRuleTabs();
+  renderPuzzleProgress();
   const ruleSet = currentRules();
   renderRaceModes(ruleSet);
   const list = $("mode-list");
@@ -633,7 +636,8 @@ $("go-home").addEventListener("click", () => {
     practiceUI.isOpen ||
     versusUI.isOpen ||
     dailyUI.isOpen ||
-    helpUI.isOpen
+    helpUI.isOpen ||
+    puzzleUI.isOpen
   )
     return;
   if (screen === "menu") return window.scrollTo(0, 0);
@@ -732,6 +736,10 @@ const finish = () => {
   const best = records.best(mode, rules);
 
   if (mode.versus) addVersusResult(mode.versus.id, state.over === WIN);
+  // 퍼즐: 깬 단계를 남기고, 깼으면 "다음 단계"를 보인다(마지막 단계면 다시 하기만)
+  if (mode.puzzle && state.over === "clear") puzzleProgress.markCleared(mode.puzzle.number);
+  const nextPuzzle = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="next-puzzle"]'));
+  nextPuzzle.hidden = !(mode.puzzle && state.over === "clear" && mode.puzzle.number < PUZZLES.length);
   lastReplay = recorder ? recorder.finish(state) : null;
   /** @type {HTMLButtonElement} */ for (const b of panels.results.querySelectorAll(
     '[data-action="watch"], [data-action="export"]'
@@ -895,6 +903,22 @@ const practiceUI = createPracticeUI({
   onPick: drill => start(practiceMode(drill)),
 });
 $("open-practice").addEventListener("click", () => practiceUI.open());
+
+// ---- 퍼즐 ----
+const puzzleProgress = createPuzzleProgress(store);
+const puzzleUI = createPuzzleUI({
+  dialog: /** @type {HTMLDialogElement} */ ($("puzzles")),
+  progress: puzzleProgress,
+  onPick: p => start(puzzleMode(p), MODERN),
+});
+$("open-puzzles").addEventListener("click", () => puzzleUI.open());
+$("puzzles").addEventListener("close", () => {
+  if (screen === "menu") /** @type {HTMLElement | null} */ ($("open-puzzles"))?.focus();
+});
+/** 첫 화면 "퍼즐" 줄의 진행도 */
+const renderPuzzleProgress = () => {
+  $("puzzle-progress").textContent = `${puzzleProgress.cleared().size} / ${PUZZLES.length}`;
+};
 $("practice").addEventListener("close", () => {
   if (screen === "menu") /** @type {HTMLElement | null} */ ($("open-practice"))?.focus();
 });
@@ -935,7 +959,8 @@ const handleSystem = action => {
     practiceUI.isOpen ||
     versusUI.isOpen ||
     dailyUI.isOpen ||
-    helpUI.isOpen
+    helpUI.isOpen ||
+    puzzleUI.isOpen
   )
     return;
   if (screen === "replay") {
@@ -1056,7 +1081,8 @@ const handlePadMenu = action => {
     practiceUI.isOpen ||
     versusUI.isOpen ||
     dailyUI.isOpen ||
-    helpUI.isOpen
+    helpUI.isOpen ||
+    puzzleUI.isOpen
   )
     return;
   const panel = Object.values(panels).find(p => !p.hidden);
@@ -1117,6 +1143,10 @@ for (const btn of document.querySelectorAll("[data-action]")) {
     const action = btn.getAttribute("data-action");
     if (action === "resume") resume();
     if (action === "retry") start(mode, rules, race?.target);
+    if (action === "next-puzzle" && mode.puzzle) {
+      const next = PUZZLES[mode.puzzle.number] ?? puzzleProgress.next();
+      start(puzzleMode(next), MODERN);
+    }
     if (action === "menu") toMenu();
     if (action === "watch" && lastReplay) startReplay(lastReplay);
     if (action === "stats" && game) statsUI.open(game.state, `${mode.name} · ${rules.name}`);
@@ -1347,6 +1377,7 @@ window.addEventListener("keydown", e => {
     versusUI.isOpen ||
     dailyUI.isOpen ||
     helpUI.isOpen ||
+    puzzleUI.isOpen ||
     e.repeat
   )
     return;

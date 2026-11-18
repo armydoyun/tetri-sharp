@@ -1243,3 +1243,68 @@ body.touch-on :is(.btn, .btn-small, .key-slot, .select, .text-input, .choice > b
   gap: var(--space-2);
   margin-top: var(--space-3);
 }
+
+/* 도구 줄 오른쪽 작은 정보(퍼즐 진행도 등) — 누를 수 있는 줄에서도 보인다 */
+.tool-row:enabled > small.tool-meta {
+  display: inline;
+  color: var(--text-dim);
+}
+
+/* ---- 퍼즐 단계 격자 ---- */
+.puzzle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-2) 0 var(--space-4);
+}
+
+.puzzle-tile {
+  appearance: none;
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: var(--space-2) var(--space-1) var(--space-3);
+  border: var(--border-w) solid var(--border-strong);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  box-shadow: inset 0 calc(-1 * var(--ledge)) 0 var(--ledge-color);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.puzzle-tile:hover {
+  background: var(--surface-2);
+}
+
+.puzzle-tile strong {
+  font-family: var(--font-num);
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.puzzle-tile small {
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.puzzle-tile > .icon {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+}
+
+.puzzle-tile.is-done {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.puzzle-tile.is-next {
+  border-width: 2px;
+  border-color: var(--accent);
+}

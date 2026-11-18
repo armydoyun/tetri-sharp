@@ -184,7 +184,10 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     const nx = bx + COLS * cell + sidePad;
     if (game.rules.previewCount > 0) {
       label("Next", nx, by);
-      queue.slice(0, game.rules.previewCount).forEach((type, i) => {
+      // 퍼즐은 주어진 피스만(돌아오는 피스는 보이지 않게): 지금 피스를 뺀 남은 수까지
+      const puzzle = game.state.puzzle;
+      const shown = puzzle ? Math.max(0, puzzle.need - puzzle.placed - 1) : game.rules.previewCount;
+      queue.slice(0, Math.min(game.rules.previewCount, shown)).forEach((type, i) => {
         preview(theme, palette, game, type, nx, by + cell + i * small * 3, small);
       });
     }

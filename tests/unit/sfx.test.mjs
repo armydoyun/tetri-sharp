@@ -49,10 +49,10 @@ test("엔진은 좌우 이동마다 move 이벤트를 낸다", () => {
   assert.ok(events.some(e => e.type === "move"));
 });
 
-test("효과음 크기 설정: 기본 50, 0~100으로 맞춘다", () => {
-  assert.equal(DEFAULT_SETTINGS.volume, 50);
-  assert.equal(sanitizeSettings({}).volume, 50);
+test("효과음 크기 설정: 기본은 음소거(0), 0~100으로 맞춘다", () => {
+  assert.equal(DEFAULT_SETTINGS.volume, 0);
+  assert.equal(sanitizeSettings({}).volume, 0);
   assert.equal(sanitizeSettings({ volume: 0 }).volume, 0);
   assert.equal(sanitizeSettings({ volume: 400 }).volume, 100);
-  assert.equal(sanitizeSettings({ volume: "x" }).volume, 50);
+  assert.equal(sanitizeSettings({ volume: "x" }).volume, 0);
 });
