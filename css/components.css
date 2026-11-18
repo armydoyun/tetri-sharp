@@ -376,6 +376,11 @@
   font-family: var(--font-num);
 }
 
+/* 빈 칸 안내 문구는 본문 글꼴(고정폭 숫자 글꼴로 한글을 쓰면 간격이 벌어진다) */
+.text-input:placeholder-shown {
+  font-family: var(--font-ui);
+}
+
 /* ---- 키캡 ---- */
 .keycap {
   display: inline-flex;
@@ -1060,4 +1065,62 @@
 
 body.touch-on :is(.btn, .btn-small, .key-slot, .select, .text-input, .choice > button, .segmented > button, .tool-row) {
   min-height: 44px;
+}
+
+/* ---- 오늘의 도전 대화상자 ---- */
+.daily-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-1) 0 var(--space-2);
+  border: var(--border-w) solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius-m);
+  background: var(--surface-2);
+}
+
+.daily-today {
+  display: grid;
+  gap: 2px;
+}
+
+.daily-today strong {
+  font-family: var(--font-num);
+  font-size: var(--text-2xl);
+  font-weight: 800;
+}
+
+.daily-today small {
+  color: var(--text-dim);
+  font-size: var(--text-s);
+}
+
+.daily-best {
+  color: var(--accent);
+  font-size: var(--text-m);
+  font-weight: 700;
+}
+
+.daily-section {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-m);
+  font-weight: 800;
+}
+
+.daily-section::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+}
+
+@media (max-width: 560px) {
+  .daily-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

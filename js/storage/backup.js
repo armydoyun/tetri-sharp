@@ -19,6 +19,7 @@ export const BACKUP_KEYS = Object.freeze([
   "customRules",
   "replay:last",
   "replay:best",
+  "versus:stats",
 ]);
 
 const MAX_TABLES = 500;
@@ -85,6 +86,15 @@ export const parseBackup = (raw, findMode) => {
       replayCount += list.length;
     }
     data["replay:best"] = best;
+  }
+  if (isPlainObject(src["versus:stats"])) {
+    const stats = {};
+    const count = v => (Number.isInteger(v) && v >= 0 ? Math.min(v, 1e6) : 0);
+    for (const [key, value] of Object.entries(src["versus:stats"]).slice(0, 20)) {
+      if (!/^[\w-]{1,20}$/.test(key) || !isPlainObject(value)) continue;
+      stats[key] = { win: count(value.win), loss: count(value.loss) };
+    }
+    data["versus:stats"] = stats;
   }
   return {
     date: typeof raw.date === "string" ? raw.date.slice(0, 40) : "",

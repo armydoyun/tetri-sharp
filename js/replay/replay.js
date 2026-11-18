@@ -157,9 +157,11 @@ export const sanitizeReplay = (raw, findMode) => {
   const rules = preset ?? makeCustomRules(raw.rules);
   const r = raw.result && typeof raw.result === "object" ? raw.result : {};
   const n = v => (Number.isFinite(v) && v >= 0 ? v : 0);
+  const name = typeof raw.name === "string" ? [...raw.name.replace(/\s+/gu, " ").trim()].slice(0, 24).join("") : "";
   return {
     app: APP,
     v: REPLAY_VERSION,
+    ...(name ? { name } : {}),
     date: typeof raw.date === "string" ? raw.date.slice(0, 40) : "",
     seed,
     mode: mode.id,

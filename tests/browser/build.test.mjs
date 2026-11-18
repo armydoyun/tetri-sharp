@@ -9,6 +9,9 @@ import path from "node:path";
 import { chromium } from "playwright";
 import { build } from "../../tools/build.mjs";
 import { launchOptions } from "../helpers/browser.mjs";
+import { botDailyReplay } from "../helpers/daily.mjs";
+import { dateKey } from "../../js/modes/daily.js";
+import { encodeReplayCode } from "../../js/replay/share.js";
 
 let dir, html, result, server, url, browser;
 
@@ -237,7 +240,7 @@ test("설정: 슬라이더 값과 키 변경이 저장되고 새로고침 후에
 
 test("Ultra: 남은 시간이 줄어들고 하드 드롭으로 점수가 오른다, 메뉴에 일곱 모드", async () => {
   const { context, page, errors } = await openPage();
-  assert.equal(await page.locator("#mode-list .menu-row").count(), 7);
+  assert.equal(await page.locator("#mode-list .menu-row").count(), 9);
   await startMode(page, "ultra");
   assert.equal(await text(page, "hud-time-label"), "남은 시간");
   await page.waitForTimeout(300);
@@ -1128,4 +1131,73 @@ test("화면 색: 시스템이 라이트여도 다크를 고르면 첫 화면이
   await page.click('#set-scheme [data-value="system"]');
   assert.ok((await lum()) > 200, "시스템으로 돌리면 다시 라이트");
   await context.close();
+});
+test("CPU 대전: 난이도를 골라 시작하면 CPU 보드가 함께 움직이고, 막히면 패배와 전적이 남는다", async () => {
+  const { context, page, errors } = await openPage();
+  await page.click('[data-mode="versus"]');
+  assert.equal(await page.locator("#versus .menu-row").count(), 4);
+  await page.click('#versus [data-level="master"]');
+  await page.waitForFunction(() => document.body.dataset.screen === "play", null, { timeout: 3000 });
+  assert.equal(await visible(page, "versus-panel"), true);
+  assert.equal(await visible(page, "cpu-board"), true);
+  assert.equal(await text(page, "versus-name"), "CPU · 최강");
+  assert.equal(await text(page, "hud-lines-label"), "받을 쓰레기");
+  // CPU가 피스를 놓는다(보드에 블록이 생긴다)
+  await page.waitForFunction(
+    () => {
+      const c = /** @type {HTMLCanvasElement} */ (document.getElementById("cpu-board"));
+      const d = c.getContext("2d").getImageData(0, Math.floor(c.height * 0.9), c.width, 4).data;
+      let lit = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 300) lit++;
+      return lit > 10;
+    },
+    null,
+    { timeout: 5000 }
+  );
+  for (let i = 0; i < 60 && !(await visible(page, "results")); i++) await page.keyboard.press("Space");
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 5000 });
+  assert.equal(await text(page, "results-title"), "패배");
+  assert.match(await page.locator("#results-stats").textContent(), /전적0승 1패/);
+  assert.equal(
+    await page.locator('#results [data-action="watch"]').isDisabled(),
+    true,
+    "대전은 리플레이를 남기지 않는다"
+  );
+  await page.keyboard.press("Escape");
+  await page.click('[data-mode="versus"]');
+  assert.equal(await page.locator('#versus [data-level="master"] .mode-best').textContent(), "0승 1패");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("오늘의 도전: 창에서 시작하고, 받은 코드(이름 포함)로 겨루며, #daily= 링크로 열면 코드가 채워진다", async () => {
+  const code = await encodeReplayCode(botDailyReplay(dateKey()), "봇");
+  const { context, page, errors } = await openPage();
+  await page.click('[data-mode="daily"]');
+  assert.equal(await page.locator("#daily").isVisible(), true);
+  assert.equal(await page.locator("#daily-copy").isDisabled(), true, "오늘 기록이 없으면 공유할 수 없다");
+  await page.fill("#daily-paste", "엉터리");
+  await page.click("#daily-race");
+  assert.match(await text(page, "daily-notice"), /읽을 수 없는 코드/);
+
+  await page.fill("#daily-paste", code);
+  await page.click("#daily-race");
+  await page.waitForFunction(
+    () => document.body.dataset.screen === "countdown" || document.body.dataset.screen === "play"
+  );
+  assert.equal(await visible(page, "race-panel"), true);
+  assert.equal(await text(page, "race-label"), "봇의 기록");
+  assert.match(await text(page, "session-title"), /오늘의 도전/);
+  await page.waitForFunction(() => Number(document.getElementById("race-progress").value) > 0, null, { timeout: 8000 });
+  await context.close();
+
+  const linked = await browser.newContext({ locale: "ko-KR", viewport: { width: 1280, height: 900 } });
+  const p2 = await linked.newPage();
+  await p2.goto(`${url}#daily=${code}`);
+  await p2.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  await p2.waitForFunction(() => document.getElementById("daily")?.open, null, { timeout: 3000 });
+  assert.match(await p2.locator("#daily-paste").inputValue(), /daily=TD1-/);
+  assert.equal(await p2.evaluate(() => location.hash), "", "주소의 해시는 지운다");
+  assert.deepEqual(errors, []);
+  await linked.close();
 });

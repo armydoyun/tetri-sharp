@@ -514,6 +514,16 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
       handling = withRules(next);
     },
     ghostY,
+    /**
+     * 바깥 사정으로 판을 끝낸다(대전에서 상대가 먼저 막혔을 때 등). 이미 끝났으면 아무것도 하지 않는다.
+     * @returns {any[]} 이벤트(finish)
+     */
+    finishAs(result) {
+      if (state.over) return [];
+      state.over = result;
+      state.active = null;
+      return [{ type: "finish", result }];
+    },
     /** 현재 피스의 칸 좌표(보드 기준) */
     activeCells: () =>
       state.active ? cells(state.active).map(([x, y]) => [state.active.x + x, state.active.y + y]) : [],
