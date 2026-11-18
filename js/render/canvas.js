@@ -56,7 +56,7 @@ export const createRenderer = (canvas, { getVisual }) => {
 
   const label = (text, x, y) => {
     ctx.fillStyle = "#b1b9b0";
-    ctx.font = `600 ${Math.round(cell * 0.46)}px "Space Grotesk", system-ui, sans-serif`;
+    ctx.font = `600 ${Math.round(cell * 0.46)}px system-ui, sans-serif`;
     ctx.textBaseline = "top";
     ctx.fillText(text, x, y);
   };
@@ -102,6 +102,7 @@ export const createRenderer = (canvas, { getVisual }) => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     effects.prune(now, visual.effects);
     drawGrid(theme.board, bx, by);
+    effects.drawDrops(ctx, { bx, by, cell, toY }, now, theme.board.ink);
 
     // 방금 놓인 피스의 아래 모서리를 기준으로 높이만 압축한다.
     for (let y = VISIBLE_TOP - MARGIN_TOP; y < board.height; y++) {
@@ -130,7 +131,7 @@ export const createRenderer = (canvas, { getVisual }) => {
         for (const [x, y] of cells) theme.ghost(ctx, bx + x * cell, toY(y + gy - active.y), cell, color);
       }
       // 그리는 위치는 효과 설정에 따라 짧게 미끄러질 수 있다(효과 "전체"일 때만).
-      const shown = slide.at(game.state.pieceId, active.x, active.y, now, motion ? 42 : 0);
+      const shown = slide.at(game.state.pieceId, active.x, active.y, now, motion ? theme.motion.slideMs : 0);
       const ox = (shown.x - active.x) * cell;
       const oy = (shown.y - active.y) * cell;
       // 고정까지 남은 시간만큼 살짝 어두워진다.
@@ -169,8 +170,9 @@ export const createRenderer = (canvas, { getVisual }) => {
     draw,
     /** 엔진 이벤트로 효과를 만든다 */
     addEvents: (events, now = performance.now()) => {
+      if (!events.length) return;
       const visual = getVisual();
-      effects.add(events, visual.effects, now);
+      effects.add(events, visual.effects, now, findTheme(visual.theme).motion);
     },
     clearEffects() {
       effects.clear();

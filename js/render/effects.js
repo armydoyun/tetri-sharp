@@ -2,72 +2,140 @@
 import { WIDTH } from "../core/board.js";
 import { CELL_ID } from "../core/pieces.js";
 
-const LAND_MS = 145;
-const CLEAR_MS = 175;
+const REDUCED_CLEAR_MS = 175;
 const PRESS_AT = 0.2;
+const REBOUND_AT = 0.62;
 
 export const createEffects = () => {
   const landings = new Map();
   let clears = [];
+  let drops = [];
 
-  const add = (events, level, now) => {
+  const add = (events, level, now, motion) => {
     if (level === "off") return;
     const full = level === "full";
+    let dropDistance = 0;
     for (const e of events) {
+      if (e.type === "hardDrop" && full && e.distance > 0) {
+        dropDistance = e.distance;
+        const tops = new Map();
+        for (const [x, y] of e.cells) tops.set(x, Math.min(tops.get(x) ?? y, y));
+        drops.push({ tops, distance: Math.min(motion.trailCells, e.distance), start: now, duration: motion.trailMs });
+      }
       if (e.type === "practice") {
         landings.clear();
         clears = [];
+        drops = [];
       }
       if (e.type !== "lock") continue;
       if (e.lines > 0) {
         landings.clear();
-        clears.push({ rows: e.rows, start: now });
+        clears.push({ rows: e.rows, start: now, motion });
       } else if (full && e.cells?.length) {
         const floors = new Map();
         for (const [x, y] of e.cells) floors.set(x, Math.max(floors.get(x) ?? 0, y + 1));
         for (const [x, y] of e.cells) {
-          landings.set(y * WIDTH + x, { value: CELL_ID[e.piece], floor: floors.get(x), start: now });
+          landings.set(y * WIDTH + x, {
+            value: CELL_ID[e.piece],
+            floor: floors.get(x),
+            start: now,
+            duration: motion.landMs,
+            rebound: motion.rebound,
+            depth: motion.depth * (1 + Math.min(1, dropDistance / 6) / 3),
+          });
         }
       }
+      dropDistance = 0;
     }
   };
 
   const prune = (now, level) => {
     for (const [key, impact] of landings) {
-      if (level !== "full" || now - impact.start >= LAND_MS) landings.delete(key);
+      if (level !== "full" || now - impact.start >= impact.duration) landings.delete(key);
     }
-    clears = level === "off" ? [] : clears.filter(clear => now - clear.start < CLEAR_MS);
+    drops = level === "full" ? drops.filter(drop => now - drop.start < drop.duration) : [];
+    clears =
+      level === "off"
+        ? []
+        : clears.filter(clear => now - clear.start < (level === "full" ? clear.motion.clearMs : REDUCED_CLEAR_MS));
   };
 
   const landing = (x, y, value, now) => {
     const impact = landings.get(y * WIDTH + x);
     if (!impact || impact.value !== value) return null;
-    const t = Math.max(0, (now - impact.start) / LAND_MS);
+    const t = Math.max(0, (now - impact.start) / impact.duration);
     if (t >= 1) return null;
-    const pressure = t < PRESS_AT ? t / PRESS_AT : (1 - (t - PRESS_AT) / (1 - PRESS_AT)) ** 2;
-    return { floor: impact.floor, scale: 1 - 0.12 * pressure };
+    let scale;
+    if (t < PRESS_AT) {
+      scale = 1 - impact.depth * (t / PRESS_AT);
+    } else if (t < REBOUND_AT) {
+      const recovery = (t - PRESS_AT) / (REBOUND_AT - PRESS_AT);
+      scale = 1 - impact.depth + (impact.depth + impact.rebound) * (1 - (1 - recovery) ** 2);
+    } else {
+      scale = 1 + impact.rebound * ((1 - t) / (1 - REBOUND_AT)) ** 2;
+    }
+    return { floor: impact.floor, scale };
+  };
+
+  const drawDrops = (ctx, { bx, by, cell, toY }, now, color) => {
+    if (!drops.length) return;
+    ctx.save();
+    ctx.fillStyle = color;
+    for (const drop of drops) {
+      const remaining = 1 - Math.max(0, now - drop.start) / drop.duration;
+      ctx.globalAlpha = 0.42 * remaining;
+      for (const [x, row] of drop.tops) {
+        const bottom = toY(row);
+        const top = Math.max(by, bottom - drop.distance * cell * remaining);
+        if (bottom > top) ctx.fillRect(bx + (x + 0.44) * cell, top, 0.12 * cell, bottom - top);
+      }
+    }
+    ctx.restore();
   };
 
   const draw = (ctx, { bx, cell, toY, cols }, now, color, level) => {
+    if (!clears.length) return;
+    const width = cols * cell;
     ctx.save();
     ctx.fillStyle = color;
-    for (const clear of clears) {
-      const remaining = 1 - Math.max(0, now - clear.start) / CLEAR_MS;
-      const height = cell * (level === "full" ? 0.12 + remaining * 0.5 : 0.12);
-      ctx.globalAlpha = 0.55 * remaining;
-      for (const row of clear.rows) ctx.fillRect(bx, toY(row) + (cell - height) / 2, cols * cell, height);
+    for (const { rows, start, motion } of clears) {
+      const full = level === "full";
+      const duration = full ? motion.clearMs : REDUCED_CLEAR_MS;
+      const t = Math.max(0, (now - start) / duration);
+      const remaining = 1 - t;
+      ctx.globalAlpha = (full && rows.length >= 4 ? 0.75 : 0.55) * remaining;
+      for (const row of rows) {
+        const middle = toY(row) + cell / 2;
+        if (!full) {
+          ctx.fillRect(bx, middle - cell * 0.06, width, cell * 0.12);
+        } else if (motion.clear === "spread") {
+          const span = width * (1 - (1 - Math.min(1, t * 2.5)) ** 2);
+          const height = cell * (0.12 + remaining * 0.5);
+          ctx.fillRect(bx + (width - span) / 2, middle - height / 2, span, height);
+        } else if (motion.clear === "wipe") {
+          const span = width * Math.min(1, t * 2.8);
+          ctx.fillRect(bx, middle - cell * 0.1, span, cell * 0.2);
+        } else {
+          const offset = cell * (0.1 + 0.26 * t);
+          const thickness = cell * 0.09;
+          ctx.fillRect(bx, middle - offset - thickness / 2, width, thickness);
+          ctx.fillRect(bx, middle + offset - thickness / 2, width, thickness);
+        }
+      }
     }
     ctx.restore();
   };
 
   return {
     add,
+    drawDrops,
     prune,
     landing,
     draw,
     clear() {
       landings.clear();
       clears = [];
+      drops = [];
     },
   };
 };
