@@ -12,7 +12,7 @@ import {
 } from "../input/gamepad.js";
 import { icon } from "./icons.js";
 import { DEFAULT_SETTINGS, HANDLING_LIMITS, SDF_INFINITE, VOLUME_LIMITS, defaultVisual } from "../storage/settings.js";
-import { button, choice, choiceCards, el, fieldRow, fillDialog, slider, tabBar } from "./dom.js";
+import { button, choice, choiceCards, el, fieldRow, fillDialog, rangeRow, slider, tabBar } from "./dom.js";
 import { CONTRAST_PALETTE, THEMES, THEME_IDS } from "../render/themes.js";
 import { keycap } from "./keycap.js";
 import { drawThemePreview } from "../render/preview.js";
@@ -109,7 +109,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
           output.textContent = formatValue(key, v);
           update({ handling: { ...getSettings().handling, [key]: v } });
         });
-        return fieldRow({ id, label, hint, control: el("span", { class: "range" }, input, output) });
+        return fieldRow({ id, label, hint, control: rangeRow(input, output, v => formatValue(key, v)) });
       }),
       fieldRow({
         id: "set-touch",
@@ -271,7 +271,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
       id: "set-volume",
       label: t("효과음"),
       hint: t("블록 이동·회전·줄 삭제 소리의 크기. 맨 왼쪽은 끄기"),
-      control: el("span", { class: "range" }, input, output),
+      control: rangeRow(input, output, formatVolume),
     });
   };
 
@@ -317,7 +317,8 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
               name,
             }),
           });
-          if (waiting) btn.textContent = t(kind === "key" ? "키를 누르세요" : "버튼을 누르세요");
+          // 좁은 칸에도 들어가게 짧게. 무엇을 기다리는지는 aria-label과 아래 안내에 있다.
+          if (waiting) btn.textContent = t("누르세요");
           else if (has) btn.append(kind === "key" ? keycap(value) : padCap(value));
           else btn.textContent = t("없음");
           btn.addEventListener("click", () => startCapture(kind, action.id, slot));

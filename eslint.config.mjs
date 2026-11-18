@@ -51,4 +51,9 @@ export default [
     files: ["tests/browser/**/*.mjs"],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
+  // UI 검수: 함수 일부를 Playwright가 브라우저 안에서 실행한다
+  {
+    files: ["tests/helpers/ui-audit.mjs", "tests/helpers/ui-scenarios.mjs"],
+    languageOptions: { globals: { ...globals.browser, ...globals.node } },
+  },
 ];

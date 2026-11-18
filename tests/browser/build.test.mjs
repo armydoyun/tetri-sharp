@@ -9,6 +9,7 @@ import path from "node:path";
 import { chromium } from "playwright";
 import { build } from "../../tools/build.mjs";
 import { launchOptions } from "../helpers/browser.mjs";
+import { runScenarios } from "../helpers/ui-scenarios.mjs";
 import { botDailyReplay } from "../helpers/daily.mjs";
 import { dateKey } from "../../js/modes/daily.js";
 import { encodeReplayCode } from "../../js/replay/share.js";
@@ -1294,3 +1295,25 @@ test("게임 중 화면: 기본은 늘 어둡고, '화면 색 따르기'를 고�
   assert.ok((await lum("body")) > 200, "새로고침 후에도 유지");
   await context.close();
 });
+
+// UI 검수(tests/helpers/ui-audit.mjs): 모든 화면·대화상자·탭을 돌며 슬라이더를 끝값으로, 선택지·드롭다운을 바꿔 가며
+// 가로 넘침·잘림·밖으로 나감·글자 겹침이 없는지 본다. 크기와 언어를 바꿔 세 번.
+for (const [locale, width, height] of [
+  ["ko-KR", 1280, 800],
+  ["en-US", 390, 844],
+  ["ko-KR", 768, 1024],
+]) {
+  test(`UI 검수: 넘침·잘림·겹침 없음 (${locale} ${width}×${height})`, { timeout: 240000 }, async () => {
+    const context = await browser.newContext({ locale, viewport: { width, height }, hasTouch: width < 800 });
+    const page = await context.newPage();
+    page.setDefaultTimeout(5000);
+    const errors = [];
+    page.on("pageerror", e => errors.push(e.message));
+    await page.goto(url);
+    await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+    const problems = await runScenarios(page, { quick: true });
+    assert.deepEqual(problems, []);
+    assert.deepEqual(errors, []);
+    await context.close();
+  });
+}

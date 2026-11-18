@@ -88,8 +88,10 @@ body:not([data-screen="play"], [data-screen="countdown"]) #pause-game {
   font-size: var(--text-m);
 }
 
+/* 확인 카드: 두 버튼을 세로로(긴 이름·단축키가 들어가게). "계속하기"가 위 — 기본 포커스 */
 .confirm-card .actions-row {
   width: 100%;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .logo-mark {
@@ -448,7 +450,13 @@ body[data-screen="replay"] .race-panel,
   --chrome-h: 120px;
   --under-h: 0px;
   --board-ratio: calc(20 / 22);
-  --board-inline-reserve: calc(32px + var(--hud-width) + var(--space-5));
+  /* 가로: .app의 내용 폭(cqi — 스크롤바 자리·여백을 뺀 실제 폭)에서 정보 칸·간격·보드 테두리(2px)를 뺀다 */
+  --board-inline-reserve: calc(var(--hud-width) + var(--space-5) + 2px);
+}
+
+/* 보드 폭을 화면 폭(100vw) 대신 실제 내용 폭으로 재기 위한 기준 상자 */
+.app {
+  container-type: inline-size;
 }
 
 body.touch-on {
@@ -473,13 +481,13 @@ body[data-screen="replay"]:has(.replay-note:not(:empty)) {
 
 .board {
   display: block;
-  width: min(640px, calc(100vw - var(--board-inline-reserve)), calc((100vh - var(--chrome-h) - var(--under-h)) * var(--board-ratio)));
+  width: min(640px, calc(100cqi - var(--board-inline-reserve)), calc((100vh - var(--chrome-h) - var(--under-h)) * var(--board-ratio)));
   height: auto;
 }
 
 @supports (height: 100dvh) {
   .board {
-    width: min(640px, calc(100vw - var(--board-inline-reserve)), calc((100dvh - var(--chrome-h) - var(--under-h)) * var(--board-ratio)));
+    width: min(640px, calc(100cqi - var(--board-inline-reserve)), calc((100dvh - var(--chrome-h) - var(--under-h)) * var(--board-ratio)));
   }
 }
 
@@ -488,7 +496,7 @@ body[data-screen="replay"]:has(.replay-note:not(:empty)) {
     /* 휴대폰은 보드 위 정보 줄(약 54) + 간격까지 */
     --chrome-h: 176px;
     --board-ratio: calc(16 / 22);
-    --board-inline-reserve: 32px;
+    --board-inline-reserve: 2px;
   }
 }
 
@@ -575,6 +583,11 @@ body[data-screen="replay"]:has(.replay-note:not(:empty)) {
 
 .countdown[data-phase="go"] > span {
   color: var(--game-accent);
+}
+
+/* 일시정지·확인 카드가 떠 있을 때는 카운트다운("GO!") 글자를 감춘다(카드 뒤로 비치지 않게) */
+body[data-screen="paused"] .countdown {
+  visibility: hidden;
 }
 
 /* 액션 표시: 홀드 칸 아래에 잠깐 떴다 사라진다 */
@@ -814,7 +827,7 @@ body[data-screen="replay"]:has(.replay-note:not(:empty)) {
 /* 휴대폰: 보드 위 한 줄 */
 @media (max-width: 720px) {
   .hud {
-    width: min(640px, calc(100vw - 32px));
+    width: min(640px, 100cqi);
     grid-auto-flow: column;
     grid-auto-columns: minmax(0, 1fr);
     border-top: 0;
@@ -822,9 +835,19 @@ body[data-screen="replay"]:has(.replay-note:not(:empty)) {
   }
 
   .hud > div {
-    padding: var(--space-1) var(--space-2);
+    min-width: 0;
+    padding: 3px 4px;
     border-bottom: 0;
     border-right: var(--border-w) solid var(--border);
+  }
+
+  /* 한 줄에 다 넣으려고: 초당 피스(PPS)는 결과·통계에서 보고, 시간 칸은 두 칸 폭 */
+  .hud > [data-hud="pps"] {
+    display: none;
+  }
+
+  .hud > [data-hud="time"] {
+    grid-column: span 2;
   }
 
   .hud > div:last-child {
@@ -832,11 +855,21 @@ body[data-screen="replay"]:has(.replay-note:not(:empty)) {
   }
 
   .hud dt {
-    font-size: var(--text-xs);
+    font-size: 10px;
+    letter-spacing: 0;
+    white-space: nowrap;
   }
 
+  /* 칸이 좁으니 값은 본문 글꼴(고정폭보다 좁다)의 같은 폭 숫자로, 칸 폭에 맞춘 크기 */
   .hud dd {
-    font-size: clamp(11px, 3.5vw, 16px);
+    font-family: var(--font-ui);
+    font-variant-numeric: tabular-nums;
+    font-size: clamp(11px, 3.8cqi, 16px);
+    letter-spacing: -0.01em;
+  }
+
+  .hud > [data-hud="time"] dd {
+    font-family: var(--font-num);
   }
 }
 
@@ -999,7 +1032,6 @@ body[data-screen="replay"] .touchpad {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  margin: 0 var(--space-2);
   white-space: nowrap;
 }
 
@@ -1017,10 +1049,14 @@ body[data-screen="replay"] .touchpad {
 }
 
 .replay-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px var(--space-3);
+  min-width: 0;
   margin: 0;
   color: var(--text-dim);
   font-size: var(--text-s);
-  text-align: center;
 }
 
 .replay-buttons .btn[data-replay="back"],

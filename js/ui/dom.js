@@ -41,6 +41,12 @@ export const fillDialog = (dialog, { title, body, notice, actions, closeId, tabs
   done.addEventListener("click", () => dialog.close());
   body.classList.add("dialog-body");
   dialog.classList.toggle("dialog-tabbed", Boolean(tabs));
+  // 같은 구역의 슬라이더는 값 칸 폭을 가장 긴 것에 맞춘다 → 막대 끝이 줄마다 나란하다
+  for (const section of body.querySelectorAll(".field-section")) {
+    const outs = [...section.querySelectorAll(".range output[data-ch]")];
+    const widest = Math.max(0, ...outs.map(o => Number(o.dataset.ch)));
+    for (const o of outs) o.style.minWidth = `${widest}ch`;
+  }
   dialog.replaceChildren(
     el("header", { class: "dialog-head" }, el("h2", { class: "dialog-title", text: title }), close),
     ...(tabs ? [el("div", { class: "dialog-tabs" }, tabs)] : []),
@@ -113,6 +119,25 @@ export const slider = attrs => {
   input.addEventListener("input", paint);
   paint();
   return input;
+};
+
+/**
+ * 슬라이더 + 값 한 줄. 값 칸 폭은 이 슬라이더가 보일 수 있는 가장 긴 값(최솟값·최댓값·중간값)에 맞춘다
+ * → 값이 바뀌어도 막대 길이가 흔들리지 않고, 긴 값("120F · 2000ms")도 잘리지 않는다.
+ * @param {HTMLInputElement} input
+ * @param {HTMLElement} output
+ * @param {(v: number) => string} format
+ */
+export const rangeRow = (input, output, format) => {
+  const min = Number(input.min);
+  const max = Number(input.max);
+  const step = Number(input.step) || 1;
+  let longest = 0;
+  // 값이 많지 않으니 전부 재 본다(가장 긴 값이 끝값이 아닐 수도 있다: "즉시" 등)
+  for (let v = min; v <= max + 1e-9; v += step) longest = Math.max(longest, [...format(v)].length);
+  output.dataset.ch = String(longest + 0.5);
+  output.style.minWidth = `${longest + 0.5}ch`;
+  return el("span", { class: "range" }, input, output);
 };
 
 /** 켜기/끄기 스위치(체크박스를 블록 모양으로) */

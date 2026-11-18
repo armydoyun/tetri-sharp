@@ -147,6 +147,16 @@
   min-width: 0;
 }
 
+/* 설정 선택지(.choice)는 이름이 길면(영어 등) 두 줄로 꺾는다. 한국어는 단어 중간에서 꺾지 않는다 */
+.choice > button {
+  height: auto;
+  min-height: calc(var(--control-h) - 2 * var(--segment-padding) - 2px);
+  padding-block: 3px 5px;
+  white-space: normal;
+  line-height: 1.15;
+  word-break: keep-all;
+}
+
 /* ---- 드롭다운(js/ui/select.js) ---- */
 .select {
   appearance: none;
@@ -283,7 +293,8 @@
 /* ---- 슬라이더: 칸으로 나뉜 막대(채운 칸은 강조색) + 블록 손잡이 ---- */
 .range {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 7ch;
+  /* 값 칸 폭은 js/ui/dom.js rangeRow()가 가장 긴 값에 맞춰 정한다 */
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-3);
 }
@@ -652,8 +663,29 @@
   width: 100%;
 }
 
+/* 탭 이름이 길면(영어 "Display & sound" 등) 두 줄로 꺾는다 — 옆 탭과 겹치지 않게 */
+/* 탭 폭은 글자 길이에 맞춰 나눈 뒤 남는 폭을 고루 더한다(긴 이름이 좁아지지 않게).
+   그래도 모자라면 두 줄로 꺾되, 한국어는 단어 중간에서 꺾지 않는다. */
+.dialog-tabs .segmented {
+  display: flex;
+}
+
 .dialog-tabs .segmented > button {
-  padding-inline: var(--space-1);
+  flex: 1 1 auto;
+  min-width: min-content;
+  height: auto;
+  min-height: calc(var(--control-h) - 2 * var(--segment-padding) - 2px);
+  padding: 2px var(--space-2) 4px;
+  white-space: normal;
+  line-height: 1.15;
+  word-break: keep-all;
+}
+
+@media (max-width: 420px) {
+  .dialog-tabs .segmented > button {
+    padding-inline: var(--space-1);
+    font-size: var(--text-s);
+  }
 }
 
 .dialog-body {
@@ -672,6 +704,22 @@
   padding: var(--space-3) var(--space-5) var(--space-4);
   border-top: var(--border-w) solid var(--border);
   background: var(--surface);
+}
+
+/* 좁은 화면: 알림은 버튼 위 한 줄 전체(좁은 칸에서 두 줄을 넘겨 잘리지 않게), 버튼은 그 아래 오른쪽 */
+@media (max-width: 560px) {
+  .dialog-foot {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    padding-inline: var(--space-4);
+  }
+
+  .dialog-foot > .notice-slot {
+    grid-column: 1 / -1;
+  }
+
+  .dialog-foot > :not(.notice-slot):first-of-type {
+    grid-column: 2;
+  }
 }
 
 /* ---- 설정 줄: [이름·설명 | 조작] — 설명 줄은 항상 한 줄 자리를 차지한다 ---- */
