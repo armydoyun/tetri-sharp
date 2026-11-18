@@ -26,7 +26,43 @@ export const VISUAL_OPTIONS = Object.freeze({
   // 접근성: 테마와 상관없이 적용
   effects: Object.freeze(["full", "reduced", "off"]),
   palette: Object.freeze(["theme", "contrast"]),
+  // 블록 무늬: 피스마다 다른 무늬(색을 구분하기 어려워도 알아볼 수 있게)
+  pattern: Object.freeze(["off", "on"]),
+  // 고스트 진하기
+  ghost: Object.freeze(["normal", "strong", "faint"]),
+  // 격자 선
+  grid: Object.freeze(["on", "off"]),
 });
+
+/** 접근성·편의: 화면 읽기 알림, 진동, 카운트다운 길이 */
+export const ACCESS_OPTIONS = Object.freeze({
+  announce: Object.freeze(["on", "off"]),
+  vibrate: Object.freeze(["on", "off"]),
+  countdown: Object.freeze(["normal", "short", "off"]),
+});
+export const defaultAccess = () => ({ announce: "on", vibrate: "on", countdown: "normal" });
+export const sanitizeAccess = raw => {
+  const r = raw && typeof raw === "object" ? raw : {};
+  const d = defaultAccess();
+  /** @type {any} */
+  const out = {};
+  for (const [key, allowed] of Object.entries(ACCESS_OPTIONS)) out[key] = allowed.includes(r[key]) ? r[key] : d[key];
+  return out;
+};
+
+/** 터치 조작 방식: buttons(보드 아래 버튼) · gestures(보드를 밀고 두드리기) */
+export const TOUCH_MODE_OPTIONS = Object.freeze(["buttons", "gestures"]);
+
+/** 조작감 프리셋(ms·배율). 처음 하는 사람이 숫자를 몰라도 고를 수 있게 */
+export const HANDLING_PRESETS = Object.freeze({
+  relaxed: Object.freeze({ das: 200, arr: 50, sdf: 10 }),
+  standard: Object.freeze({ das: 133, arr: 10, sdf: 20 }),
+  fast: Object.freeze({ das: 100, arr: 0, sdf: 30 }),
+  instant: Object.freeze({ das: 67, arr: 0, sdf: 41 }),
+});
+/** 지금 조작감과 같은 프리셋 id(없으면 null = 직접 조절) */
+export const handlingPresetOf = h =>
+  Object.entries(HANDLING_PRESETS).find(([, p]) => p.das === h.das && p.arr === h.arr && p.sdf === h.sdf)?.[0] ?? null;
 
 /** 동작 줄이기를 켠 환경이면 효과 기본값을 "reduced"로 */
 const prefersReducedMotion = () => {
@@ -41,6 +77,9 @@ export const defaultVisual = () => ({
   theme: DEFAULT_THEME,
   effects: prefersReducedMotion() ? "reduced" : "full",
   palette: "theme",
+  pattern: "off",
+  ghost: "normal",
+  grid: "on",
 });
 
 export const DEFAULT_SETTINGS = Object.freeze({
@@ -59,6 +98,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
   scheme: "system",
   /** 게임 화면: dark(늘 어둡게, 기본) · scheme(화면 색을 따르기) */
   gameSurface: "dark",
+  access: Object.freeze(defaultAccess()),
+  touchMode: "buttons",
 });
 
 export const VOLUME_LIMITS = Object.freeze({ min: 0, max: 100, step: 5, default: 50 });
@@ -102,6 +143,8 @@ export const sanitizeSettings = raw => {
     lang: LANG_OPTIONS.includes(s.lang) ? s.lang : "auto",
     scheme: SCHEME_OPTIONS.includes(s.scheme) ? s.scheme : "system",
     gameSurface: GAME_SURFACE_OPTIONS.includes(s.gameSurface) ? s.gameSurface : "dark",
+    access: sanitizeAccess(s.access),
+    touchMode: TOUCH_MODE_OPTIONS.includes(s.touchMode) ? s.touchMode : "buttons",
   };
 };
 

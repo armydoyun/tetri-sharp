@@ -19,6 +19,7 @@ export const DEFAULT_PADMAP = Object.freeze({
   HOLD: [4, 5],
   RESTART: [8],
   PAUSE: [9],
+  UNDO: [],
 });
 
 /** 버튼 이름(패드에 적힌 글자). 십자키는 화면에서 화살표 아이콘으로 보여 준다(PAD_ICONS). */

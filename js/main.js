@@ -44,12 +44,17 @@ import { analyzeReplay } from "./replay/analyze.js";
 import { ROTATIONS } from "./rules/rotation/index.js";
 import { WIN, exchangeGarbage, versusMode } from "./modes/versus.js";
 import { createBot } from "./ai/bot.js";
+import { createGestures } from "./input/gestures.js";
+import { createUndo } from "./modes/undo.js";
+import { createHelpUI } from "./ui/help.js";
 import { createVersusUI } from "./ui/versus.js";
 import { lang, t, translateDom } from "./i18n/index.js";
 
 const FRAME_MS = 1000 / 60;
 const MAX_CATCH_UP_MS = 250; // 시간이 크게 튀면(탭 복귀 등) 한꺼번에 따라잡지 않는다.
 const READY_FRAMES = 40; // "READY"
+/** 카운트다운 길이 설정 → 프레임 */
+const COUNTDOWN_FRAMES = { normal: READY_FRAMES, short: 15, off: 0 };
 const GO_FRAMES = 20; // "GO!" — 이 동안에는 이미 플레이 중
 
 const $ = id => /** @type {HTMLElement} */ (document.getElementById(id));
@@ -477,6 +482,8 @@ const setScreen = next => {
   document.body.dataset.screen = next;
   keyboard.setEnabled(next === "play" || next === "countdown");
   touch.setEnabled(next === "play" || next === "countdown");
+  gestures.setEnabled((next === "play" || next === "countdown") && gesturesOn());
+  document.body.classList.toggle("is-practice", Boolean(mode.practice) && next !== "menu");
   $("session-title").textContent = next === "menu" ? "" : mode.name;
 };
 
@@ -534,8 +541,9 @@ const start = (m, selectedRules = currentRules(), target = null) => {
   showModeHud(m);
   pbSplits = target?.splits ?? records.best(m, rules)?.splits;
   acc = 0;
-  countdown = READY_FRAMES;
+  countdown = COUNTDOWN_FRAMES[settings.access.countdown] ?? READY_FRAMES;
   goTimer = 0;
+  undo.reset();
   showPanel(null);
   actionEl.classList.remove("is-shown");
   renderer.clearEffects();
@@ -545,7 +553,13 @@ const start = (m, selectedRules = currentRules(), target = null) => {
   countdownEl.hidden = false;
   countdownEl.dataset.phase = "ready";
   $("countdown-label").textContent = "READY";
-  sfx.play("ready");
+  // 카운트다운 "없음": 바로 시작
+  if (countdown <= 0) {
+    countdownEl.hidden = true;
+    setScreen("play");
+    sfx.play("go");
+  } else sfx.play("ready");
+  say(t("{mode} 시작", { mode: mode.name }));
 };
 
 let pausedFrom = /** @type {"play" | "countdown"} */ ("play");
@@ -618,7 +632,8 @@ $("go-home").addEventListener("click", () => {
     statsUI.isOpen ||
     practiceUI.isOpen ||
     versusUI.isOpen ||
-    dailyUI.isOpen
+    dailyUI.isOpen ||
+    helpUI.isOpen
   )
     return;
   if (screen === "menu") return window.scrollTo(0, 0);
@@ -733,6 +748,7 @@ const finish = () => {
   const summary = mode.summary(state);
   $("results-title").textContent = summary.title;
   $("results-main").textContent = summary.main;
+  say(`${summary.title} ${summary.main}`);
   $("results-badge").classList.toggle("is-invisible", !outcome?.isBest);
 
   $("race-result").textContent = race ? raceResultText(state, race.target.best, race.target.friend) : "";
@@ -918,7 +934,8 @@ const handleSystem = action => {
     statsUI.isOpen ||
     practiceUI.isOpen ||
     versusUI.isOpen ||
-    dailyUI.isOpen
+    dailyUI.isOpen ||
+    helpUI.isOpen
   )
     return;
   if (screen === "replay") {
@@ -935,6 +952,7 @@ const handleSystem = action => {
   // 진행 중인 판은 묻고, 끝난 판(결과 화면)은 바로 다시 시작
   if (action === "restart" && inProgress()) return askConfirm("restart");
   if (action === "restart" && screen === "results") return start(mode, rules, race?.target);
+  if (action === "undo") return undoPiece();
   if (action !== "pause") return;
   if (screen === "play" || screen === "countdown") pause();
   else if (screen === "paused") resume();
@@ -942,7 +960,76 @@ const handleSystem = action => {
 };
 
 const keyboard = createKeyboard({ getBindings: () => bindings, onSystem: handleSystem });
-const touch = createTouch({ root: $("touchpad"), onSystem: handleSystem });
+const touch = createTouch({
+  root: $("touchpad"),
+  onSystem: handleSystem,
+  vibrate: () => settings.access.vibrate === "on",
+});
+
+// ---- 편의: 제스처 조작 · 되돌리기 · 진동 · 화면 읽기 알림 ----
+
+/** 보드 한 칸의 화면 폭(px): 캔버스 폭 ÷ 칸 수(넓으면 20, 좁으면 16) */
+const boardCellPx = () =>
+  canvas.getBoundingClientRect().width / (window.matchMedia("(max-width: 720px)").matches ? 16 : 20);
+const gestures = createGestures({
+  root: /** @type {HTMLElement} */ (document.querySelector(".board-wrap")),
+  cellSize: boardCellPx,
+});
+/** 제스처 방식을 쓰는가: 설정이 제스처이고 터치 조작이 보이는 기기 */
+const gesturesOn = () => settings.touchMode === "gestures" && touchVisible(settings.touch, isTouchScreen());
+
+const undo = createUndo();
+/** 연습 모드에서 바로 앞 피스로 되돌린다 */
+const undoPiece = () => {
+  if (!game || !mode.practice || (screen !== "play" && screen !== "paused")) return;
+  if (!undo.undo(game.state)) {
+    say(t("더 되돌릴 수 없어요"));
+    return;
+  }
+  renderer.clearEffects();
+  announceText([t("되돌리기")]);
+  say(t("한 피스 되돌렸어요"));
+};
+$("undo-piece").addEventListener("click", undoPiece);
+
+/** 진동(설정이 켜져 있고 지원하는 기기만) */
+const buzz = pattern => {
+  if (settings.access.vibrate !== "on") return;
+  try {
+    navigator.vibrate?.(pattern);
+  } catch {
+    /* 무시 */
+  }
+};
+
+/** 화면 읽기 프로그램에 알린다(설정이 켜져 있을 때). 같은 글을 연달아 보내도 읽도록 비웠다가 넣는다 */
+const srStatus = $("sr-status");
+const say = text => {
+  if (settings.access.announce !== "on" || !text) return;
+  srStatus.textContent = "";
+  requestAnimationFrame(() => (srStatus.textContent = text));
+};
+
+/** 이벤트 → 진동·읽기 */
+const feedback = events => {
+  for (const e of events) {
+    if (e.type === "lock") {
+      if (e.lines > 0) {
+        buzz(e.lines >= 4 || e.tspin !== "none" ? [25, 30, 25] : 15);
+        const name = clearName(e);
+        const left = game ? mode.hudLines(game.state) : null;
+        say(
+          [name || t("{n}줄 지움", { n: e.lines }), left ? `${left.label} ${left.value}` : ""]
+            .filter(Boolean)
+            .join(" · ")
+        );
+      } else buzz(6);
+    } else if (e.type === "levelUp") say(t("레벨 {n}", { n: e.level }));
+    else if (e.type === "garbage") buzz(20);
+    else if (e.type === "gameOver") buzz([60, 40, 90]);
+    else if (e.type === "finish") buzz([30, 30, 30]);
+  }
+};
 
 /** 터치 버튼 보이기: 설정 + 기기(굵은 포인터). 설정을 바꿀 때만 바뀐다(원칙 2). */
 // 터치 화면 판정: 굵은 포인터이거나, 마우스 올리기가 없는 화면에서 터치를 지원할 때(iPhone 등)
@@ -950,7 +1037,12 @@ const coarse = typeof matchMedia === "function" ? matchMedia("(pointer: coarse)"
 const noHover = typeof matchMedia === "function" ? matchMedia("(hover: none)") : null;
 const isTouchScreen = () =>
   Boolean(coarse?.matches) || (Boolean(noHover?.matches) && (navigator.maxTouchPoints ?? 0) > 0);
-const applyTouch = () => document.body.classList.toggle("touch-on", touchVisible(settings.touch, isTouchScreen()));
+const applyTouch = () => {
+  document.body.classList.toggle("touch-on", touchVisible(settings.touch, isTouchScreen()));
+  // 제스처 방식: 보드 아래 버튼 대신 보드를 밀고 두드린다
+  document.body.classList.toggle("gestures-mode", gesturesOn());
+  gestures.setEnabled((screen === "play" || screen === "countdown") && gesturesOn());
+};
 coarse?.addEventListener?.("change", applyTouch);
 noHover?.addEventListener?.("change", applyTouch);
 
@@ -963,7 +1055,8 @@ const handlePadMenu = action => {
     statsUI.isOpen ||
     practiceUI.isOpen ||
     versusUI.isOpen ||
-    dailyUI.isOpen
+    dailyUI.isOpen ||
+    helpUI.isOpen
   )
     return;
   const panel = Object.values(panels).find(p => !p.hidden);
@@ -984,6 +1077,35 @@ const handlePadMenu = action => {
 
 const pad = createGamepad({ onSystem: handleSystem, onMenu: handlePadMenu, getMap: () => padBindings });
 padRef = pad;
+
+// ---- 도움말 · 처음 오신 분 안내 ----
+const helpUI = createHelpUI({
+  dialog: /** @type {HTMLDialogElement} */ ($("help")),
+  getSettings: () => settings,
+  isTouch: () => touchVisible(settings.touch, isTouchScreen()),
+  onOpenSettings: tab => {
+    pause();
+    settingsUI.open(tab);
+  },
+});
+const welcome = $("welcome");
+const dismissWelcome = () => {
+  welcome.hidden = true;
+  store.set("welcomeSeen", true);
+};
+welcome.hidden = Boolean(store.get("welcomeSeen", false));
+$("welcome-open").addEventListener("click", () => {
+  dismissWelcome();
+  helpUI.open();
+});
+$("welcome-close").addEventListener("click", dismissWelcome);
+$("open-help").addEventListener("click", () => {
+  pause();
+  helpUI.open();
+});
+$("help").addEventListener("close", () => {
+  if (screen === "paused") showPanel("pause");
+});
 
 $("open-settings").addEventListener("click", () => {
   pause();
@@ -1224,6 +1346,7 @@ window.addEventListener("keydown", e => {
     practiceUI.isOpen ||
     versusUI.isOpen ||
     dailyUI.isOpen ||
+    helpUI.isOpen ||
     e.repeat
   )
     return;
@@ -1380,6 +1503,7 @@ const tick = () => {
   if (screen === "countdown") {
     keyboard.takePressed(); // 카운트다운 중 누른 키는 버린다(누르고 있는 키는 시작하자마자 반영).
     touch.takePressed();
+    gestures.takePressed();
     countdown -= 1;
     if (countdown <= 0) {
       setScreen("play");
@@ -1393,8 +1517,9 @@ const tick = () => {
   if (screen === "replay") return tickReplay();
   if (screen !== "play" || !game) return;
   if (goTimer > 0 && --goTimer === 0) countdownEl.hidden = true;
-  const held = keyboard.held | pad.held | touch.held;
-  const pressed = keyboard.takePressed() | touch.takePressed();
+  const held = keyboard.held | pad.held | touch.held | gestures.held;
+  const pressed = keyboard.takePressed() | touch.takePressed() | gestures.takePressed();
+  if (mode.practice) undo.track(game.state);
   recorder?.input(held, pressed);
   const hadActive = Boolean(game.state.active);
   const events = game.step({ held, pressed });
@@ -1414,6 +1539,7 @@ const tick = () => {
   for (const e of events) announce(e);
   renderer.addEvents(events);
   sfx.events(events);
+  feedback(events);
   if (events.some(e => e.type === "gameOver" || e.type === "finish")) finish();
 };
 

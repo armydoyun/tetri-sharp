@@ -30,6 +30,74 @@ const drawCell = (ctx, x, y, size, theme, color, outline) => {
   }
 };
 
+/** 색이 밝은가(무늬를 어두운 잉크로 그릴지 정한다) */
+const isLight = hex => {
+  const n = parseInt(String(hex).slice(1), 16);
+  if (!Number.isFinite(n)) return false;
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 140;
+};
+
+/**
+ * 블록 무늬: 셀 값(1~7 = I J L O S T Z, 8 = 쓰레기)마다 다른 모양을 셀 가운데에 그린다.
+ * 색을 구분하기 어려워도 피스를 알아볼 수 있게 하는 접근성 설정.
+ */
+export const drawMark = (ctx, x, y, size, value, color) => {
+  const c = size / 2;
+  const r = size * 0.2;
+  ctx.save();
+  ctx.translate(x + c, y + c);
+  ctx.strokeStyle = isLight(color) ? "rgb(0 0 0 / 0.45)" : "rgb(255 255 255 / 0.6)";
+  ctx.fillStyle = ctx.strokeStyle;
+  ctx.lineWidth = Math.max(1, size * 0.08);
+  ctx.lineCap = "square";
+  ctx.beginPath();
+  switch (value) {
+    case 1: // I: 가로 막대
+      ctx.moveTo(-r, 0);
+      ctx.lineTo(r, 0);
+      break;
+    case 2: // J: 왼쪽 아래 모서리
+      ctx.moveTo(-r, -r);
+      ctx.lineTo(-r, r);
+      ctx.lineTo(r, r);
+      break;
+    case 3: // L: 오른쪽 아래 모서리
+      ctx.moveTo(r, -r);
+      ctx.lineTo(r, r);
+      ctx.lineTo(-r, r);
+      break;
+    case 4: // O: 작은 네모
+      ctx.rect(-r * 0.8, -r * 0.8, r * 1.6, r * 1.6);
+      break;
+    case 5: // S: 오른쪽 위로 비스듬히
+      ctx.moveTo(-r, r);
+      ctx.lineTo(r, -r);
+      break;
+    case 6: // T: 가운데 점
+      ctx.arc(0, 0, r * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      return;
+    case 7: // Z: 오른쪽 아래로 비스듬히
+      ctx.moveTo(-r, -r);
+      ctx.lineTo(r, r);
+      break;
+    default: // 쓰레기: 가로 두 줄
+      ctx.moveTo(-r, -r * 0.5);
+      ctx.lineTo(r, -r * 0.5);
+      ctx.moveTo(-r, r * 0.5);
+      ctx.lineTo(r, r * 0.5);
+  }
+  ctx.stroke();
+  ctx.restore();
+};
+
+/** 고스트 진하기 → [윤곽 투명도, 채움 투명도] */
+const GHOST_LEVEL = { faint: [0.32, 0], normal: [0.58, 0], strong: [0.95, 0.22] };
+
 const makeTheme = spec => {
   const theme = {
     ...spec,
@@ -40,9 +108,14 @@ const makeTheme = spec => {
   return Object.freeze({
     ...theme,
     block: (ctx, x, y, size, color) => drawCell(ctx, x, y, size, theme, color, false),
-    ghost: (ctx, x, y, size, color) => {
+    ghost: (ctx, x, y, size, color, level = "normal") => {
+      const [line, fill] = GHOST_LEVEL[level] ?? GHOST_LEVEL.normal;
       ctx.save();
-      ctx.globalAlpha = 0.58;
+      if (fill) {
+        ctx.globalAlpha = fill;
+        drawCell(ctx, x, y, size, theme, color, false);
+      }
+      ctx.globalAlpha = line;
       drawCell(ctx, x, y, size, theme, color, true);
       ctx.restore();
     },
