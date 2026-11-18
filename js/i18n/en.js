@@ -248,6 +248,15 @@ export const EN = {
   "색을 구분하기 쉬운 색 조합을 써요": "Uses colors that are easier to tell apart",
   "고른 테마의 색을 써요": "Uses the theme's colors",
   "테마 색": "Theme",
+  "화면 색": "Appearance",
+  시스템: "System",
+  라이트: "Light",
+  다크: "Dark",
+  "기기의 라이트·다크 설정을 따라요. 게임 화면은 늘 어두워요":
+    "Follows your device's light or dark setting. The game screen is always dark",
+  "첫 화면과 메뉴를 밝게 써요. 게임 화면은 늘 어두워요":
+    "Uses a light home screen and menus. The game screen is always dark",
+  "첫 화면과 메뉴도 어둡게 써요": "Uses a dark home screen and menus too",
   "색각 친화": "Color-blind friendly",
   효과음: "Sound effects",
   "블록 이동·회전·줄 삭제 소리의 크기. 맨 왼쪽은 끄기": "Volume of move, rotate and line clear sounds. Far left is off",

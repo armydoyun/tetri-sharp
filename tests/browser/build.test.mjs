@@ -1097,3 +1097,35 @@ test("조작법을 펼쳐 페이지가 길어져도(스크롤바가 생겨도) �
   assert.deepEqual(await xs(), closed, "접은 뒤");
   await real.close();
 });
+
+test("화면 색: 시스템이 라이트여도 다크를 고르면 첫 화면이 어두워지고, 새로고침 후에도 유지된다", async () => {
+  const context = await browser.newContext({
+    locale: "ko-KR",
+    colorScheme: "light",
+    viewport: { width: 1280, height: 900 },
+  });
+  const page = await context.newPage();
+  await page.goto(url);
+  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  // 배경색은 짧게 전환되므로 끝날 때까지 기다린 뒤 잰다.
+  const lum = async () => {
+    await page.waitForTimeout(300);
+    return page.evaluate(() => {
+      const [r, g, b] = getComputedStyle(document.body).backgroundColor.match(/\d+/g).map(Number);
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    });
+  };
+  assert.ok((await lum()) > 200, "시스템(라이트)");
+  await page.click("#open-settings");
+  await page.click('.dialog-tabs [data-value="visual"]');
+  await page.click('#set-scheme [data-value="dark"]');
+  assert.ok((await lum()) < 40, "다크를 고르면 바로 어두워진다");
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  assert.ok((await lum()) < 40, "새로고침 후에도 다크");
+  await page.click("#open-settings");
+  await page.click('.dialog-tabs [data-value="visual"]');
+  await page.click('#set-scheme [data-value="system"]');
+  assert.ok((await lum()) > 200, "시스템으로 돌리면 다시 라이트");
+  await context.close();
+});
