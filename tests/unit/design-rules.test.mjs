@@ -74,3 +74,16 @@ test("원칙 2: 흐름 안 요소를 hidden으로 끄지 않는다 — hidden은
   const overlays = new Set(["countdown", "replay-bar", "menu", "pause", "results"]);
   for (const id of toggled) assert.ok(overlays.has(id), `${id}는 흐름 안 요소 — .is-invisible이나 비활성을 쓴다`);
 });
+
+test("CSS 파일마다 중괄호 짝이 맞는다(하나라도 빠지면 그 뒤 규칙이 모두 무시된다)", () => {
+  for (const file of fs.readdirSync(path.join(ROOT, "css"))) {
+    const css = fs.readFileSync(path.join(ROOT, "css", file), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    let depth = 0;
+    for (const ch of css) {
+      if (ch === "{") depth += 1;
+      if (ch === "}") depth -= 1;
+      assert.ok(depth >= 0, `${file}: 닫는 괄호가 더 많다`);
+    }
+    assert.equal(depth, 0, `${file}: 닫히지 않은 규칙이 있다`);
+  }
+});

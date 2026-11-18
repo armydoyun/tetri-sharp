@@ -172,6 +172,7 @@ export const EN = {
   통계: "Stats",
   "다시 보기": "Watch replay",
   "리플레이 파일로 저장": "Save replay file",
+  "파일 저장": "Save file",
   "구간 기록": "Splits",
   "구간 기록 · {from}–{to}줄 확인": "Splits · check lines {from}–{to}",
   "누적 줄": "Lines",
@@ -249,8 +250,8 @@ export const EN = {
   "아직 기록이 없어요": "No records yet",
 
   // ---- 연습 ----
-  "중력이 없고 기록은 남지 않아요. 지금 고른 규칙으로 연습해요.":
-    "No gravity and no records. You practice with the rules you picked.",
+  "중력이 없어요. 소프트 드롭으로 내려 자리에 맞춰 돌려 넣으세요. 기록은 남지 않아요.":
+    "No gravity. Soft drop to bring the piece down, then rotate it into place. No records are kept.",
   "좌우가 바뀌는 T-spin Double 자리에 T를 돌려 넣기": "Spin a T into a T-spin Double slot that switches sides",
   "지붕 아래로 T를 돌려 넣어 세 줄 지우기 · 좌우가 바뀌어요":
     "Spin a T under the overhang to clear three lines · switches sides",

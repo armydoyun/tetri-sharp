@@ -1240,3 +1240,24 @@ test("리플레이 탐색: 막대로 원하는 시점에 가고, 표시로 건�
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("결과 카드는 보드 안에 스크롤 없이 들어간다(데스크톱 낮은 화면·휴대폰)", async () => {
+  for (const viewport of [
+    { width: 1280, height: 720 },
+    { width: 390, height: 844 },
+  ]) {
+    const context = await browser.newContext({ locale: "ko-KR", viewport });
+    const page = await context.newPage();
+    await page.goto(url);
+    await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+    await startMode(page, "sprint40");
+    for (let i = 0; i < 40; i++) await page.keyboard.press("Space");
+    await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
+    const { scroll, client } = await page.evaluate(() => {
+      const el = document.getElementById("results");
+      return { scroll: el.scrollHeight, client: el.clientHeight };
+    });
+    assert.ok(scroll <= client, `${viewport.width}×${viewport.height}: 결과 카드 ${scroll}px > 보드 ${client}px`);
+    await context.close();
+  }
+});

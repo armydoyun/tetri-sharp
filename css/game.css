@@ -922,6 +922,7 @@ body[data-screen="replay"] .touchpad {
   margin: 0;
   font-family: var(--font-num);
   font-weight: 700;
+}
 
 /* ---- 리플레이 진행 막대(이동 가능) + 분석 표시 ---- */
 .replay-track {
@@ -1017,4 +1018,67 @@ body[data-screen="replay"] .touchpad {
 .replay-buttons .btn[data-replay="step-back"],
 .replay-buttons .btn[data-replay="step"] {
   font-family: var(--font-num);
+}
+
+/* ---- 결과 카드: 보드 안에 스크롤 없이 들어가게 ----
+   숫자는 두 칸 격자, "새 기록" 배지는 카드 모서리에 띄워 줄을 차지하지 않는다, 보조 버튼은 한 줄에 셋.
+   화면이 낮으면 큰 숫자·여백을 줄인다. 그래도 넘치면(아주 낮은 화면) 패널이 스크롤한다. */
+.results-card {
+  position: relative;
+  width: min(380px, 100%);
+  padding: var(--space-4) var(--space-4) var(--space-4);
+  gap: var(--space-2);
+}
+
+.results-card #results-badge {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+}
+
+.results-card .panel-title {
+  font-size: var(--text-2xl);
+}
+
+.results-main {
+  font-size: clamp(28px, 5.2vh, 40px);
+}
+
+.results-stats {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  column-gap: var(--space-3);
+}
+
+.results-stats dt {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.results-splits summary {
+  padding-block: 6px;
+}
+
+.actions-row-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.actions-row-3 .btn {
+  padding-inline: var(--space-1);
+  gap: 4px;
+}
+
+@media (max-height: 760px), (max-width: 720px) {
+  .results-card {
+    padding: var(--space-3);
+    gap: 6px;
+  }
+
+  .results-stats :is(dt, dd) {
+    padding: 3px 0;
+  }
+
+  .results-card .btn:not(.btn-small) {
+    height: 34px;
+  }
 }

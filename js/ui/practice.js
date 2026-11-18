@@ -27,7 +27,7 @@ export const createPracticeUI = ({ dialog, onPick }) => {
           return card;
         })
       );
-      notice.textContent = t("중력이 없고 기록은 남지 않아요. 지금 고른 규칙으로 연습해요.");
+      notice.textContent = t("중력이 없어요. 소프트 드롭으로 내려 자리에 맞춰 돌려 넣으세요. 기록은 남지 않아요.");
       fillDialog(dialog, {
         title: t("연습"),
         body: el("div", {}, el("section", { class: "field-section" }, list)),

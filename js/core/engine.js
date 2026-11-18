@@ -395,7 +395,9 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
 
   const applyGravity = (a, held) => {
     let g = currentGravity();
-    if (held & BTN.SOFT) g = handling.sdf === Infinity ? Infinity : Math.max(g * handling.sdf, g);
+    // 소프트 드롭 = 중력 × 배율. 중력이 아주 낮거나 0이면(연습 모드) 그래도 내려오도록 1초에 1칸을 바탕으로 삼는다.
+    // 중력이 1칸/초 이상이면 예전과 같은 값이라 기존 기록·리플레이는 그대로다.
+    if (held & BTN.SOFT) g = handling.sdf === Infinity ? Infinity : Math.max(Math.max(g, 1 / 60) * handling.sdf, g);
     if (g >= 20) g = Infinity;
     state.gravityAcc += g;
     while (state.gravityAcc >= 1) {
