@@ -999,7 +999,10 @@ const touch = createTouch({
 
 /** 보드 한 칸의 화면 폭(px): 캔버스 폭 ÷ 칸 수(넓으면 20, 좁으면 16) */
 const boardCellPx = () =>
-  canvas.getBoundingClientRect().width / (window.matchMedia("(max-width: 720px)").matches ? 16 : 20);
+  canvas.getBoundingClientRect().width /
+  (window.matchMedia("(max-width: 720px) and (not ((orientation: landscape) and (max-height: 520px)))").matches
+    ? 16
+    : 20);
 const gestures = createGestures({
   root: /** @type {HTMLElement} */ (document.querySelector(".board-wrap")),
   cellSize: boardCellPx,

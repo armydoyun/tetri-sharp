@@ -1307,9 +1307,15 @@ for (const [locale, width, height] of [
   ["ko-KR", 1280, 800],
   ["en-US", 390, 844],
   ["ko-KR", 768, 1024],
+  ["ko-KR", 740, 360],
 ]) {
   test(`UI 검수: 넘침·잘림·겹침 없음 (${locale} ${width}×${height})`, { timeout: 240000 }, async () => {
-    const context = await browser.newContext({ locale, viewport: { width, height }, hasTouch: width < 800 });
+    // 휴대폰 크기(세로·가로)는 터치 화면으로 연다
+    const context = await browser.newContext({
+      locale,
+      viewport: { width, height },
+      hasTouch: width < 800 || height < 520,
+    });
     const page = await context.newPage();
     page.setDefaultTimeout(5000);
     const errors = [];

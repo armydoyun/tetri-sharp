@@ -23,7 +23,8 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
   const slide = createSlide();
   const emptyBoard = createBoard();
 
-  const narrow = window.matchMedia("(max-width: 720px)");
+  // 좁은 화면(휴대폰 세로)이면 홀드·넥스트 칸을 줄인다. 휴대폰 가로는 넓은 배치(css/game.css와 같은 조건)
+  const narrow = window.matchMedia("(max-width: 720px) and (not ((orientation: landscape) and (max-height: 520px)))");
   let cell = 0;
   let side = 0;
   /** devicePixelRatio를 반영해 캔버스 해상도를 정하고 셀 크기를 정수로 맞춘다(번짐 방지). */

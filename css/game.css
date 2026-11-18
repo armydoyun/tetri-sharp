@@ -465,7 +465,8 @@ body.touch-on {
 }
 
 body[data-screen="replay"] {
-  --replay-controls-h: 200px;
+  /* 정보 줄 + 진행 막대 + 분석 줄 + 버튼 두 줄 */
+  --replay-controls-h: 250px;
   --under-h: var(--replay-controls-h);
 }
 
@@ -904,7 +905,7 @@ body[data-screen="replay"] .touchpad {
   display: none;
 }
 
-.touchpad > button {
+.touchpad button {
   appearance: none;
   display: flex;
   align-items: center;
@@ -920,14 +921,14 @@ body[data-screen="replay"] .touchpad {
   transition: background-color var(--dur) var(--ease);
 }
 
-.touchpad > button.is-down {
+.touchpad button.is-down {
   background: var(--accent);
   border-color: var(--accent-ledge);
   box-shadow: inset 0 -1px 0 var(--accent-ledge);
   color: var(--on-accent);
 }
 
-.touchpad > .touch-system {
+.touchpad .touch-system {
   color: var(--text-dim);
 }
 
@@ -1322,5 +1323,248 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
 @media (max-width: 720px) {
   body.show-inputs .input-display {
     display: none !important;
+  }
+}
+
+/* 터치 버튼 묶음: 세로 화면에서는 묶음을 풀어(display: contents) 예전처럼 5×2 한 판으로, 순서는 order로 */
+.touch-group {
+  display: contents;
+}
+
+.touchpad [data-touch="HOLD"] { order: 1; }
+.touchpad [data-touch="CCW"] { order: 2; }
+.touchpad [data-touch="R180"] { order: 3; }
+.touchpad [data-touch="CW"] { order: 4; }
+.touchpad [data-touch="PAUSE"] { order: 5; }
+.touchpad [data-touch="LEFT"] { order: 6; }
+.touchpad [data-touch="SOFT"] { order: 7; }
+.touchpad [data-touch="HARD"] { order: 8; }
+.touchpad [data-touch="RIGHT"] { order: 9; }
+.touchpad [data-touch="RESTART"] { order: 10; }
+
+/* ---- 휴대폰 가로 화면: [정보·왼손 버튼 | 보드 | 오른손 버튼] ----
+   높이가 낮으니 머리글을 줄이고, 터치 버튼을 보드 아래가 아니라 양옆에 둔다(보드가 화면 높이를 다 쓴다). */
+@media (orientation: landscape) and (max-height: 520px) {
+  :root {
+    --chrome-h: 64px;
+    --board-ratio: calc(20 / 22);
+    --board-inline-reserve: calc(2 * 176px + 2 * var(--space-3));
+  }
+
+  body.touch-on,
+  body.gestures-mode {
+    --under-h: 0px;
+  }
+
+  .app {
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+  }
+
+  .app-header {
+    height: 36px;
+  }
+
+  .stage {
+    grid-template-columns: minmax(150px, 1fr) auto minmax(150px, 1fr);
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "hud board rside"
+      "lpad board rpad";
+    justify-items: stretch;
+    gap: var(--space-2) var(--space-3);
+    width: 100%;
+  }
+
+  .stage-side {
+    grid-area: hud;
+  }
+
+  /* 정보 칸: 두 칸 격자(시간은 한 줄 전체), 작게 */
+  .hud {
+    width: auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    column-gap: var(--space-2);
+    border-top: 2px solid var(--border-strong);
+    border-bottom: 0;
+  }
+
+  .hud > div {
+    padding: 2px 0 4px;
+    border-right: 0;
+    border-bottom: var(--border-w) solid var(--border);
+  }
+
+  .hud > [data-hud="time"] {
+    grid-column: 1 / -1;
+  }
+
+  .hud dd {
+    font-size: 16px;
+  }
+
+  .hud > [data-hud="pps"] {
+    display: block;
+  }
+
+  .hud > .is-off {
+    display: none !important;
+  }
+
+  .stage > .board-wrap {
+    grid-area: board;
+    align-self: start;
+  }
+
+  body.touch-on:not([data-screen="replay"]) .touchpad {
+    display: contents;
+  }
+
+  body.touch-on .touch-group {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+    align-content: end;
+  }
+
+  .touch-left {
+    grid-area: lpad;
+    grid-template-areas:
+      "hold . pause"
+      "left soft right";
+  }
+
+  .touch-right {
+    grid-area: rpad;
+    grid-template-areas:
+      "r180 . restart"
+      "ccw hard cw";
+  }
+
+  .touchpad button {
+    height: 46px;
+    order: 0;
+  }
+
+  .touchpad [data-touch="HOLD"] { grid-area: hold; }
+  .touchpad [data-touch="PAUSE"] { grid-area: pause; }
+  .touchpad [data-touch="LEFT"] { grid-area: left; }
+  .touchpad [data-touch="SOFT"] { grid-area: soft; }
+  .touchpad [data-touch="RIGHT"] { grid-area: right; }
+  .touchpad [data-touch="R180"] { grid-area: r180; }
+  .touchpad [data-touch="RESTART"] { grid-area: restart; }
+  .touchpad [data-touch="CCW"] { grid-area: ccw; }
+  .touchpad [data-touch="HARD"] { grid-area: hard; }
+  .touchpad [data-touch="CW"] { grid-area: cw; }
+
+  /* 리플레이: 보드 아래가 아니라 오른쪽 한 칸 전체(위아래 두 줄)에 조작을 모은다 */
+  body[data-screen="replay"] {
+    --under-h: 0px;
+  }
+
+  body[data-screen="replay"] .stage {
+    grid-template-columns: minmax(120px, 160px) auto minmax(0, 1fr);
+    grid-template-areas:
+      "hud board bar"
+      ". board bar";
+  }
+
+  .stage > .replay-bar {
+    grid-area: bar;
+    align-self: start;
+    gap: var(--space-1, 4px);
+    min-width: 0;
+  }
+
+  .replay-info,
+  .replay-note,
+  .replay-analysis {
+    font-size: var(--text-s);
+  }
+
+  .replay-analysis {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .replay-analysis .replay-summary {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .replay-buttons {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .replay-buttons .btn {
+    font-size: var(--text-s);
+  }
+
+  .replay-buttons .btn[data-replay="race"] {
+    grid-column: span 2;
+  }
+
+  /* 낮은 화면에서는 프레임 단위 이동을 빼고 나머지만 */
+  .replay-buttons .btn[data-replay="step-back"],
+  .replay-buttons .btn[data-replay="step"] {
+    display: none;
+  }
+
+  .input-display,
+  .undo-piece {
+    display: none !important;
+  }
+
+  /* CPU 대전: 정보 칸은 왼쪽 위, CPU 상황(숫자만)은 오른쪽 위 */
+  body.is-versus {
+    --board-inline-reserve: calc(2 * 176px + 2 * var(--space-3));
+  }
+
+  body.is-versus .stage {
+    grid-template-columns: minmax(150px, 1fr) auto minmax(150px, 1fr);
+  }
+
+  body.is-versus .stage-side {
+    display: contents;
+  }
+
+  body.is-versus .hud {
+    grid-area: hud;
+  }
+
+  body.is-versus .versus-panel {
+    grid-area: rside;
+    align-self: start;
+    padding-top: 0;
+    border-top: 2px solid var(--border-strong);
+  }
+
+  body.is-versus .cpu-board {
+    display: none;
+  }
+
+  body.is-versus .versus-stats {
+    font-size: var(--text-s);
+  }
+
+  /* 결과 카드: 이름 칸은 글자만큼, 값은 남은 폭. 터치 화면이라 키 표시는 뺀다 */
+  .results-stats {
+    grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
+    column-gap: var(--space-2);
+    font-size: var(--text-s);
+  }
+
+  .results-stats dt {
+    overflow: visible;
+  }
+
+  .results-card kbd {
+    display: none;
+  }
+
+  .actions-row-3 .btn {
+    font-size: var(--text-xs);
   }
 }
