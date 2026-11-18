@@ -33,8 +33,8 @@ const fakeCtx = (calls = []) =>
     }
   );
 
-test("테마 세 가지, 기본은 모던", () => {
-  assert.deepEqual([...THEME_IDS].sort(), ["minimal", "modern", "retro"]);
+test("테마 여섯 가지, 기본은 모던", () => {
+  assert.deepEqual([...THEME_IDS].sort(), ["blueprint", "candy", "minimal", "modern", "neon", "retro"]);
   assert.equal(DEFAULT_THEME, "modern");
   assert.equal(findTheme("없음"), THEMES.modern);
 });
@@ -51,10 +51,45 @@ test("테마마다 8색이 모두 다르고, 블록·고스트를 그린다", ()
   assert.equal(new Set(CONTRAST_PALETTE.slice(1)).size, 8);
 });
 
-test("세 테마의 보드 색과 블록 모서리가 서로 다르다", () => {
+test("테마마다 보드 색 · 블록 모서리 · 줄 삭제 모양이 서로 다르다", () => {
   const themes = Object.values(THEMES);
-  assert.equal(new Set(themes.map(theme => theme.board.bg)).size, 3);
-  assert.equal(new Set(themes.map(theme => theme.radius)).size, 3);
+  assert.equal(new Set(themes.map(theme => theme.board.bg)).size, themes.length);
+  assert.equal(new Set(themes.map(theme => theme.radius)).size, themes.length);
+  assert.equal(new Set(themes.map(theme => theme.motion.clear)).size, themes.length);
+});
+
+test("블록 마감(광택·빛·선)은 단색 위에 더 그리고, 고스트는 늘 윤곽선", () => {
+  const count = theme => {
+    const calls = [];
+    theme.block(fakeCtx(calls), 0, 0, 30, theme.palette[1]);
+    return calls.filter(([name]) => name === "fill" || name === "stroke").length;
+  };
+  assert.equal(count(THEMES.modern), 1);
+  for (const id of ["neon", "candy", "blueprint"]) assert.equal(count(THEMES[id]), 2, id);
+  const ghost = [];
+  THEMES.neon.ghost(fakeCtx(ghost), 0, 0, 30, "#fff");
+  assert.deepEqual(
+    ghost.filter(([name]) => name === "fill" || name === "stroke").map(([name]) => name),
+    ["stroke"]
+  );
+});
+
+test("새 줄 삭제 모양(번쩍임·작은 네모·훑기)도 수명이 끝나면 사라진다", () => {
+  for (const id of ["neon", "candy", "blueprint"]) {
+    const { motion } = THEMES[id];
+    const fx = createEffects();
+    fx.add([clearEvent], "full", 0, motion);
+    const calls = [];
+    fx.draw(fakeCtx(calls), { bx: 0, cell: 10, toY: y => y * 10, cols: 10 }, 30, "#fff", "full");
+    assert.ok(
+      calls.some(([name]) => name === "fillRect"),
+      id
+    );
+    fx.prune(motion.clearMs, "full");
+    const after = [];
+    fx.draw(fakeCtx(after), { bx: 0, cell: 10, toY: y => y * 10, cols: 10 }, motion.clearMs, "#fff", "full");
+    assert.deepEqual(after, [], id);
+  }
 });
 
 test("착지한 블록만 열 바닥을 기준으로 눌렸다가 원래 크기로 돌아온다", () => {
@@ -124,7 +159,7 @@ test("하드 드롭은 테마마다 다른 압축과 짧은 잔상을 만들고 
       assert.deepEqual(after, []);
     }
   }
-  assert.equal(new Set(samples).size, 3);
+  assert.equal(new Set(samples).size, samples.length);
   assert.equal(samples[0], 0.8);
 });
 
@@ -163,7 +198,7 @@ test("미끄러지는 중에 또 움직이면 지금 보이는 자리에서 이�
 });
 
 test("시각 설정 보정과 예전 형식 옮기기", () => {
-  const v = sanitizeVisual({ effects: "loud", theme: "neon", palette: 3 });
+  const v = sanitizeVisual({ effects: "loud", theme: "vapor", palette: 3 });
   assert.equal(v.theme, "modern");
   assert.ok(["full", "reduced"].includes(v.effects));
   assert.equal(v.palette, "theme");

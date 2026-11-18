@@ -506,6 +506,12 @@ export const EN = {
   "종이색 보드와 차분한 잉크색 블록": "Paper-colored board with calm ink blocks",
   슬레이트: "Slate",
   "푸른 회색 보드와 낮은 채도의 블록": "Blue-gray board with muted blocks",
+  네온: "Neon",
+  "밤하늘 보드와 은은하게 번지는 빛 블록": "Night-sky board with softly glowing blocks",
+  캔디: "Candy",
+  "밝은 분홍빛 보드와 동글동글 광택 블록": "Light pink board with round glossy blocks",
+  블루프린트: "Blueprint",
+  "도면처럼 파란 보드와 각진 선 블록": "Drafting-blue board with square lined blocks",
 
   // ---- Custom 규칙 ----
   "Custom 규칙": "Custom rules",

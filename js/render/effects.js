@@ -115,6 +115,19 @@ export const createEffects = () => {
         } else if (motion.clear === "wipe") {
           const span = width * Math.min(1, t * 2.8);
           ctx.fillRect(bx, middle - cell * 0.1, span, cell * 0.2);
+        } else if (motion.clear === "flash") {
+          // 줄 전체가 번쩍였다가 가늘어진다
+          const height = cell * (0.08 + 0.92 * remaining ** 2);
+          ctx.fillRect(bx, middle - height / 2, width, height);
+        } else if (motion.clear === "pop") {
+          // 칸마다 작은 네모가 줄어들며 사라진다
+          const size = cell * 0.7 * remaining;
+          for (let c = 0; c < cols; c++) ctx.fillRect(bx + c * cell + (cell - size) / 2, middle - size / 2, size, size);
+        } else if (motion.clear === "scan") {
+          // 오른쪽에서 왼쪽으로 훑는 가는 선과 그 머리
+          const head = width * (1 - Math.min(1, t * 2.2));
+          ctx.fillRect(bx + head, middle - cell * 0.04, width - head, cell * 0.08);
+          ctx.fillRect(bx + Math.max(0, head - cell * 0.15), toY(row), cell * 0.15, cell);
         } else {
           const offset = cell * (0.1 + 0.26 * t);
           const thickness = cell * 0.09;
