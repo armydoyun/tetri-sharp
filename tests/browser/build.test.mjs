@@ -755,7 +755,7 @@ test("규칙 공유: 편집기에서 코드를 붙여 넣으면 불러오고, #r
 test("연습: 메뉴에서 고르면 시작하고, 놓을 때마다 성공/시도를 센다", async () => {
   const { context, page, errors } = await openPage();
   await page.click("#open-practice");
-  assert.equal(await page.locator("#practice .mode-card").count(), 4);
+  assert.equal(await page.locator("#practice .mode-card").count(), 7);
   assert.equal(await page.locator('[data-drill="double"]').isVisible(), true);
   await page.click('[data-drill="tsd"]');
   await page.waitForFunction(() => document.getElementById("countdown")?.textContent === "GO!", null, {
