@@ -128,6 +128,40 @@ export const EN = {
   "홀드 안 씀": "no hold",
   "같은 블록 순서로 동시에 시작해요. 줄을 지우면 상대에게 쓰레기 줄을 보내요.":
     "You both start with the same pieces. Clearing lines sends garbage to the other side.",
+  // ---- 오늘의 도전 ----
+  "오늘의 도전": "Daily challenge",
+  "오늘의 도전 · {date}": "Daily challenge · {date}",
+  "날마다 바뀌는 같은 블록 순서로 40줄 · 결과를 공유해 겨루기":
+    "40 lines with a piece order that changes every day · share your result to compete",
+  "모두 같은 블록 순서로 40줄 · 결과를 공유해 겨루기":
+    "40 lines, same pieces for everyone · share your result to compete",
+  도전하기: "Play today's challenge",
+  "Sprint 40L · Modern · 모두 같은 블록 순서": "Sprint 40L · Modern · same pieces for everyone",
+  "오늘 최고 기록 {record}": "Today's best {record}",
+  "아직 오늘 기록이 없어요": "No result today yet",
+  "내 결과 공유": "Share my result",
+  "결과 코드": "Result code",
+  "오늘 최고 기록의 리플레이": "The replay of today's best",
+  "오늘 기록을 세우면 생겨요": "Appears after you finish today's challenge",
+  "결과 코드를 복사했어요. 친구에게 보내 보세요": "Copied the result code. Send it to a friend",
+  "링크를 복사했어요. 받은 사람이 열면 내 기록과 겨룰 수 있어요":
+    "Copied the link. Whoever opens it can race your result",
+  "받은 결과와 겨루기": "Race a result you received",
+  "받은 코드": "Received code",
+  "같은 날 같은 블록 순서로 상대 리플레이와 함께 달려요": "Race their replay with the same pieces",
+  "TD1-로 시작하는 코드나 링크": "A code starting with TD1- or a link",
+  겨루기: "Race",
+  상대: "Opponent",
+  "{name}의 기록": "{name}'s run",
+  "{name}와(과) 같은 시간이에요.": "Same time as {name}.",
+  "{name}보다 {n}초 빨라요.": "{n}s faster than {name}.",
+  "{name}보다 {n}초 느려요.": "{n}s slower than {name}.",
+  "끝까지 가지 못했어요 · {name} 기록 {record}": "Didn't finish · {name}'s time {record}",
+  "오늘의 도전을 끝까지 간 결과 코드만 겨룰 수 있어요": "Only finished daily challenge results can be raced",
+  "이 코드는 결과를 다시 만들 수 없어요. 다른 버전일 수 있어요":
+    "This result can't be reproduced. It may be from another version",
+  "받은 결과가 있어요. 겨루기를 누르면 같은 블록 순서로 함께 달려요":
+    "You received a result. Press Race to run against it with the same pieces",
 
   // ---- 결과 ----
   "새 기록": "New record",

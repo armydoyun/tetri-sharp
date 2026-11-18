@@ -9,6 +9,9 @@ import path from "node:path";
 import { chromium } from "playwright";
 import { build } from "../../tools/build.mjs";
 import { launchOptions } from "../helpers/browser.mjs";
+import { botDailyReplay } from "../helpers/daily.mjs";
+import { dateKey } from "../../js/modes/daily.js";
+import { encodeReplayCode } from "../../js/replay/share.js";
 
 let dir, html, result, server, url, browser;
 
@@ -237,7 +240,7 @@ test("설정: 슬라이더 값과 키 변경이 저장되고 새로고침 후에
 
 test("Ultra: 남은 시간이 줄어들고 하드 드롭으로 점수가 오른다, 메뉴에 일곱 모드", async () => {
   const { context, page, errors } = await openPage();
-  assert.equal(await page.locator("#mode-list .menu-row").count(), 8);
+  assert.equal(await page.locator("#mode-list .menu-row").count(), 9);
   await startMode(page, "ultra");
   assert.equal(await text(page, "hud-time-label"), "남은 시간");
   await page.waitForTimeout(300);
@@ -1113,4 +1116,36 @@ test("CPU 대전: 난이도를 골라 시작하면 CPU 보드가 함께 움직�
   assert.equal(await page.locator('#versus [data-level="master"] .mode-best').textContent(), "0승 1패");
   assert.deepEqual(errors, []);
   await context.close();
+});
+
+test("오늘의 도전: 창에서 시작하고, 받은 코드(이름 포함)로 겨루며, #daily= 링크로 열면 코드가 채워진다", async () => {
+  const code = await encodeReplayCode(botDailyReplay(dateKey()), "봇");
+  const { context, page, errors } = await openPage();
+  await page.click('[data-mode="daily"]');
+  assert.equal(await page.locator("#daily").isVisible(), true);
+  assert.equal(await page.locator("#daily-copy").isDisabled(), true, "오늘 기록이 없으면 공유할 수 없다");
+  await page.fill("#daily-paste", "엉터리");
+  await page.click("#daily-race");
+  assert.match(await text(page, "daily-notice"), /읽을 수 없는 코드/);
+
+  await page.fill("#daily-paste", code);
+  await page.click("#daily-race");
+  await page.waitForFunction(
+    () => document.body.dataset.screen === "countdown" || document.body.dataset.screen === "play"
+  );
+  assert.equal(await visible(page, "race-panel"), true);
+  assert.equal(await text(page, "race-label"), "봇의 기록");
+  assert.match(await text(page, "session-title"), /오늘의 도전/);
+  await page.waitForFunction(() => Number(document.getElementById("race-progress").value) > 0, null, { timeout: 8000 });
+  await context.close();
+
+  const linked = await browser.newContext({ locale: "ko-KR", viewport: { width: 1280, height: 900 } });
+  const p2 = await linked.newPage();
+  await p2.goto(`${url}#daily=${code}`);
+  await p2.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  await p2.waitForFunction(() => document.getElementById("daily")?.open, null, { timeout: 3000 });
+  assert.match(await p2.locator("#daily-paste").inputValue(), /daily=TD1-/);
+  assert.equal(await p2.evaluate(() => location.hash), "", "주소의 해시는 지운다");
+  assert.deepEqual(errors, []);
+  await linked.close();
 });

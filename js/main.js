@@ -6,7 +6,10 @@ import { createKeyboard } from "./input/keyboard.js";
 import { createTouch, touchVisible } from "./input/touch.js";
 import { PAD_ICONS, compilePadmap, createGamepad, padButtonName } from "./input/gamepad.js";
 import { ACTIONS, compileKeymap } from "./input/keymap.js";
-import { MODES, RACE_MODES, findMode } from "./modes/index.js";
+import { MODES, RACE_MODES, findMode as findBaseMode } from "./modes/index.js";
+import { dailyMode, dateKey, findDaily } from "./modes/daily.js";
+import { decodeReplayCode, encodeReplayCode, replayLink } from "./replay/share.js";
+import { createDailyUI } from "./ui/daily.js";
 import { formatScore, formatTime } from "./modes/format.js";
 import { clearName } from "./rules/scoring/guideline.js";
 import { createStore } from "./storage/store.js";
@@ -108,6 +111,8 @@ const addVersusResult = (levelId, won) => {
 
 /** @type {"menu" | "countdown" | "play" | "paused" | "results" | "replay"} */
 let screen = "menu";
+/** 모드 찾기: 오늘의 도전(날짜별) + 나머지 */
+const findMode = id => findDaily(id) ?? findBaseMode(id);
 let mode = findMode(store.get("lastMode", null));
 
 // ---- 규칙 선택 (Modern / Retro / Arcade / Custom) ----
@@ -333,7 +338,8 @@ const renderMenu = () => {
       btn.addEventListener("click", () => start(m));
       return btn;
     }),
-    versusRow(MODES.length + 1)
+    versusRow(MODES.length + 1),
+    dailyRow(MODES.length + 2)
   );
 };
 
@@ -362,6 +368,70 @@ const versusRow = n => {
   return btn;
 };
 
+// ---- 오늘의 도전 ----
+
+const today = () => {
+  const key = dateKey();
+  const m = dailyMode(key);
+  return { key, mode: m, best: records.best(m, MODERN), replay: replays.best(recordKey(m, MODERN)) };
+};
+
+/** 첫 화면 모드 목록 끝의 오늘의 도전 줄 */
+const dailyRow = n => {
+  const { key, best, mode: m } = today();
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "menu-row";
+  btn.dataset.mode = "daily";
+  const index = document.createElement("span");
+  index.className = "menu-index num";
+  index.textContent = String(n).padStart(2, "0");
+  const text = document.createElement("span");
+  text.className = "menu-text";
+  const name = document.createElement("strong");
+  name.textContent = t("오늘의 도전");
+  const desc = document.createElement("small");
+  desc.textContent = `${key} · ${t("모두 같은 블록 순서로 40줄 · 결과를 공유해 겨루기")}`;
+  text.append(name, desc);
+  const pb = document.createElement("span");
+  pb.className = "mode-best num";
+  pb.textContent = best ? t("최고 기록 {record}", { record: m.formatRecord(best) }) : "";
+  btn.append(index, text, pb, icon("chevron-right"));
+  btn.addEventListener("click", () => dailyUI.open());
+  return btn;
+};
+
+/** 받은 코드로 겨루기. 문제가 있으면 알림 문구를 돌려준다 */
+const raceFromCode = async text => {
+  const raw = await decodeReplayCode(text);
+  const replay = raw && sanitizeReplay(raw, findMode);
+  if (!replay) return t("읽을 수 없는 코드예요");
+  const m = findDaily(replay.mode);
+  if (!m || replay.rules.id !== MODERN.id || replay.result.over !== "clear")
+    return t("오늘의 도전을 끝까지 간 결과 코드만 겨룰 수 있어요");
+  let targetSplits = [];
+  const verified = verifyReplay(replay, findMode, state => {
+    targetSplits = advanceSplits(m.splits, targetSplits, state.stats.lines, state.frame);
+  });
+  if (!verified.ok) return t("이 코드는 결과를 다시 만들 수 없어요. 다른 버전일 수 있어요");
+  const r = replay.result;
+  const best = { frames: r.frames, lines: r.lines, pieces: r.pieces, score: r.score };
+  start(m, MODERN, { replay, best, splits: targetSplits, friend: replay.name || t("상대") });
+  return null;
+};
+
+const dailyUI = createDailyUI({
+  dialog: /** @type {HTMLDialogElement} */ ($("daily")),
+  getToday: today,
+  makeCode: replay => encodeReplayCode(replay, records.playerName),
+  makeLink: code => replayLink(code, location.href),
+  formatRecord: e => today().mode.formatRecord(e),
+  onStart: () => start(today().mode, MODERN),
+  onRace: raceFromCode,
+});
+$("daily").addEventListener("close", () => {
+  if (screen === "menu") /** @type {HTMLElement | null} */ (document.querySelector('[data-mode="daily"]'))?.focus();
+});
 const updateHud = () => {
   const frame = game?.state.frame ?? 0;
   const stats = game?.state.stats ?? { pieces: 0, lines: 0 };
@@ -433,7 +503,8 @@ const start = (m, selectedRules = currentRules(), target = null) => {
   if (!m.practice) store.set("lastMode", m.id);
   rules = selectedRules;
   runPlayerName = records.playerName;
-  const seed = target?.replay.seed ?? (Math.random() * 2 ** 32) >>> 0;
+  const seed = target?.replay.seed ?? m.fixedSeed ?? (Math.random() * 2 ** 32) >>> 0;
+  $("race-label").textContent = target?.friend ? t("{name}의 기록", { name: target.friend }) : t("내 최고 기록");
   race = target ? { target, player: createPlayer(target.replay, findMode) } : null;
   racePanel.hidden = !race;
   updateRaceProgress();
@@ -528,7 +599,15 @@ for (const btn of panels.confirm.querySelectorAll("[data-confirm]")) {
 
 /** 로고: 첫 화면으로. 게임 중이면 먼저 묻는다 */
 $("go-home").addEventListener("click", () => {
-  if (settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen || statsUI.isOpen || practiceUI.isOpen || versusUI.isOpen)
+  if (
+    settingsUI.isOpen ||
+    rulesUI.isOpen ||
+    recordsUI.isOpen ||
+    statsUI.isOpen ||
+    practiceUI.isOpen ||
+    versusUI.isOpen ||
+    dailyUI.isOpen
+  )
     return;
   if (screen === "menu") return window.scrollTo(0, 0);
   if (inProgress()) return askConfirm("menu");
@@ -574,7 +653,18 @@ const renderResultSplits = () => {
 };
 
 /** 달리기 결과 한 줄: 시간 기록 모드는 시간 차, 점수 모드는 점수 차 */
-const raceResultText = (state, best) => {
+const raceResultText = (state, best, friend = "") => {
+  if (friend) {
+    if (state.over !== mode.race.finish)
+      return t("끝까지 가지 못했어요 · {name} 기록 {record}", { name: friend, record: mode.formatRecord(best) });
+    const d = state.frame - best.frames;
+    return d === 0
+      ? t("{name}와(과) 같은 시간이에요.", { name: friend })
+      : t(d < 0 ? "{name}보다 {n}초 빨라요." : "{name}보다 {n}초 느려요.", {
+          name: friend,
+          n: (Math.abs(d) / 60).toFixed(2),
+        });
+  }
   if (state.over !== mode.race.finish)
     return t("끝까지 가지 못했어요 · 상대 기록 {record}", { record: mode.formatRecord(best) });
   if (mode.record.metric === "score") {
@@ -633,7 +723,7 @@ const finish = () => {
   $("results-main").textContent = summary.main;
   $("results-badge").classList.toggle("is-invisible", !outcome?.isBest);
 
-  $("race-result").textContent = race ? raceResultText(state, race.target.best) : "";
+  $("race-result").textContent = race ? raceResultText(state, race.target.best, race.target.friend) : "";
 
   const seconds = state.frame / 60;
   if (mode.versus && versus) {
@@ -808,7 +898,15 @@ $("records").addEventListener("close", () => {
 });
 
 const handleSystem = action => {
-  if (settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen || statsUI.isOpen || practiceUI.isOpen || versusUI.isOpen)
+  if (
+    settingsUI.isOpen ||
+    rulesUI.isOpen ||
+    recordsUI.isOpen ||
+    statsUI.isOpen ||
+    practiceUI.isOpen ||
+    versusUI.isOpen ||
+    dailyUI.isOpen
+  )
     return;
   if (screen === "replay") {
     if (action === "restart") restartReplay();
@@ -845,7 +943,15 @@ noHover?.addEventListener?.("change", applyTouch);
 
 /** 메뉴·결과·일시정지 화면에서 게임패드로 버튼 사이를 옮겨 다니고 누른다. */
 const handlePadMenu = action => {
-  if (settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen || statsUI.isOpen || practiceUI.isOpen || versusUI.isOpen)
+  if (
+    settingsUI.isOpen ||
+    rulesUI.isOpen ||
+    recordsUI.isOpen ||
+    statsUI.isOpen ||
+    practiceUI.isOpen ||
+    versusUI.isOpen ||
+    dailyUI.isOpen
+  )
     return;
   const panel = Object.values(panels).find(p => !p.hidden);
   if (!panel || screen === "play" || screen === "countdown" || screen === "replay") return;
@@ -1015,6 +1121,7 @@ window.addEventListener("keydown", e => {
     statsUI.isOpen ||
     practiceUI.isOpen ||
     versusUI.isOpen ||
+    dailyUI.isOpen ||
     e.repeat
   )
     return;
@@ -1220,6 +1327,21 @@ const loop = now => {
   requestAnimationFrame(loop);
 };
 
+/** 결과 링크(#daily=…)로 열었으면 오늘의 도전 창을 그 코드로 연다. 주소의 해시는 지운다. */
+const importDailyFromLink = () => {
+  if (!/[#&]daily=/.test(location.hash)) return;
+  const pasted = location.hash.slice(1);
+  try {
+    history.replaceState(null, "", location.pathname + location.search);
+  } catch {
+    /* file:// 등에서 막혀도 괜찮다 */
+  }
+  dailyUI.open({
+    pasted: `#${pasted}`,
+    message: t("받은 결과가 있어요. 겨루기를 누르면 같은 블록 순서로 함께 달려요"),
+  });
+};
+
 /** 공유 링크(#rules=…)로 열었으면 그 규칙을 Custom으로 들이고 알린다. 주소의 해시는 지운다. */
 const importRulesFromLink = () => {
   if (!/[#&]rules=/.test(location.hash)) return false;
@@ -1249,6 +1371,7 @@ renderKeyHelp();
 // 링크로 규칙을 받았으면 Custom 규칙 기준으로 키 안내를 다시 그린 뒤 메뉴를 연다.
 if (importRulesFromLink()) renderKeyHelp();
 toMenu(true);
+importDailyFromLink();
 requestAnimationFrame(loop);
 
 // 설치형 앱(GitHub Pages 배포본): 매니페스트가 걸려 있을 때만 서비스 워커를 등록한다.

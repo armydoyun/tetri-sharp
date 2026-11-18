@@ -118,7 +118,7 @@
           </dl>
           <aside id="race-panel" class="race-panel" aria-label="내 최고 기록 진행 상황" hidden>
             <div class="race-panel-head">
-              <strong>내 최고 기록</strong>
+              <strong id="race-label">내 최고 기록</strong>
               <span id="race-progress-label" class="num">0 / 40줄</span>
             </div>
             <progress id="race-progress" aria-label="최고 기록 진행" value="0" max="40"></progress>
@@ -237,6 +237,7 @@
     <dialog id="stats" class="dialog dialog-wide" aria-label="이번 판 통계"></dialog>
     <dialog id="practice" class="dialog" aria-label="연습"></dialog>
     <dialog id="versus" class="dialog" aria-label="CPU 대전"></dialog>
+    <dialog id="daily" class="dialog" aria-label="오늘의 도전"></dialog>
     <!-- ES Modules: 개발용 실행은 http://localhost를 사용한다. -->
     <script type="module" src="./js/main.js"></script>
   </body>
