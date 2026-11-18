@@ -20,73 +20,106 @@
         <h1 class="logo">Tetri<span class="logo-sharp">#</span></h1>
         <button id="open-settings" class="btn btn-ghost" type="button"><span data-icon="sliders"></span>설정</button>
       </header>
+      <!-- 첫 화면: 보드 위 덮개가 아닌 독립된 화면. 넓은 화면에서는 넓게 쓴다 -->
+      <section id="menu" class="home" aria-label="첫 화면" hidden>
+        <div class="card rule-card">
+          <div class="rule-card-head">
+            <h2 class="section-title">규칙</h2>
+            <div id="rule-tabs" class="segmented" role="group" aria-label="규칙"></div>
+            <button id="edit-rules" type="button" class="btn" title="Custom 규칙 편집">
+              <span data-icon="edit"></span>편집
+            </button>
+          </div>
+          <!-- 고른 규칙 설명: 두 줄 자리를 늘 차지한다 -->
+          <p id="rule-desc" class="rule-desc"></p>
+        </div>
+
+        <h2 class="section-title">모드</h2>
+        <div id="mode-list" class="mode-grid"></div>
+
+        <div class="home-actions">
+          <button id="open-records" type="button" class="btn"><span data-icon="trophy"></span>기록</button>
+          <button id="open-practice" type="button" class="btn"><span data-icon="target"></span>연습</button>
+          <button id="watch-last" type="button" class="btn" title="아직 끝낸 판이 없으면 비어 있어요"><span data-icon="play"></span>마지막 판 리플레이</button>
+          <button id="open-replay" type="button" class="btn"><span data-icon="folder"></span>리플레이 파일 열기</button>
+          <input id="replay-file" type="file" accept=".json,application/json" hidden />
+        </div>
+        <p id="menu-notice" class="notice-slot menu-notice" role="status"></p>
+
+        <!-- 키보드 조작법: 터치 버튼을 쓸 때는 숨긴다 -->
+        <section class="card help-card" aria-labelledby="help-title">
+          <h2 id="help-title" class="section-title">조작법</h2>
+          <p id="key-help" class="keys" aria-label="조작 안내"></p>
+        </section>
+      </section>
+
+      <!-- 게임 화면: 첫 화면에서는 숨긴다 -->
       <section class="stage" aria-label="게임 화면">
-        <!-- 게임 화면: 테마와 무관하게 항상 다크 -->
+        <!-- 정보 칸: 모드마다 필요한 칸만(게임 시작 때 정해지고 게임 중에는 그대로) -->
+        <dl class="hud">
+          <div data-hud="time"><dt id="hud-time-label">시간</dt><dd id="hud-time">0:00.00</dd></div>
+          <div data-hud="score"><dt>점수</dt><dd id="hud-score">0</dd></div>
+          <div data-hud="level"><dt>레벨</dt><dd id="hud-level">1</dd></div>
+          <div data-hud="lines"><dt id="hud-lines-label">줄</dt><dd id="hud-lines">0</dd></div>
+          <div data-hud="pieces"><dt>피스</dt><dd id="hud-pieces">0</dd></div>
+          <div data-hud="pps"><dt>PPS</dt><dd id="hud-pps">0.00</dd></div>
+          <div data-hud="split"><dt>PB 대비</dt><dd id="hud-split" class="hud-split">—</dd></div>
+        </dl>
+
+        <!-- 보드: 테마와 무관하게 항상 다크 -->
         <div class="board-wrap surface-game">
           <canvas id="board" class="board" aria-label="보드"></canvas>
-
-          <div id="menu" class="panel" hidden>
-            <div class="rule-bar">
-              <div id="rule-tabs" class="segmented" role="group" aria-label="규칙"></div>
-              <button id="edit-rules" type="button" class="btn btn-small" title="Custom 규칙 편집">
-                <span data-icon="edit"></span>편집
-              </button>
-            </div>
-            <h2 class="panel-title">모드 선택</h2>
-            <div id="mode-list" class="mode-list"></div>
-            <div class="replay-actions">
-              <button id="open-records" type="button" class="btn btn-small"><span data-icon="trophy"></span>기록</button>
-              <button id="open-practice" type="button" class="btn btn-small"><span data-icon="target"></span>연습</button>
-              <button id="watch-last" type="button" class="btn btn-small"><span data-icon="play"></span>마지막 판</button>
-              <button id="open-replay" type="button" class="btn btn-small"><span data-icon="folder"></span>파일 열기</button>
-              <input id="replay-file" type="file" accept=".json,application/json" hidden />
-            </div>
-            <p id="menu-notice" class="notice-slot menu-notice" role="status"></p>
-          </div>
-
           <div id="countdown" class="countdown" aria-live="assertive" hidden></div>
           <div id="action" class="action" aria-live="polite"></div>
 
           <div id="pause" class="panel" hidden>
-            <h2 class="panel-title">일시정지</h2>
-            <div class="actions">
-              <button type="button" class="btn btn-primary" data-action="resume"><span data-icon="play"></span>계속 <kbd><kbd class="keycap">Esc</kbd></kbd></button>
-              <button type="button" class="btn" data-action="retry"><span data-icon="restart"></span>다시 시작 <kbd data-key="RESTART"></kbd></button>
-              <button type="button" class="btn" data-action="menu"><span data-icon="menu"></span>메뉴로</button>
-            </div>
-          </div>
-
-          <div id="results" class="panel" tabindex="-1" hidden>
-            <p id="results-mode" class="results-mode"></p>
-            <h2 id="results-title" class="panel-title"></h2>
-            <p id="results-main" class="results-main"></p>
-            <!-- 새 기록일 때만 보이지만 자리는 늘 차지한다(원칙 2) -->
-            <p id="results-badge" class="badge is-invisible"><span data-icon="star"></span>새 기록</p>
-            <dl id="results-stats" class="results-stats"></dl>
-            <div class="actions">
-              <button type="button" class="btn btn-primary" data-action="retry"><span data-icon="restart"></span>다시 하기 <kbd data-key="RESTART"></kbd></button>
-              <button type="button" class="btn" data-action="menu"><span data-icon="menu"></span>메뉴로 <kbd><kbd class="keycap">Esc</kbd></kbd></button>
-              <div class="actions-row">
-                <button type="button" class="btn btn-small" data-action="stats"><span data-icon="chart"></span>통계</button>
-                <button type="button" class="btn btn-small" data-action="watch"><span data-icon="play"></span>리플레이</button>
-                <button type="button" class="btn btn-small" data-action="export"><span data-icon="download"></span>저장</button>
+            <div class="panel-card">
+              <h2 class="panel-title">일시정지</h2>
+              <div class="actions">
+                <button type="button" class="btn btn-primary" data-action="resume"><span data-icon="play"></span>계속 <kbd><kbd class="keycap">Esc</kbd></kbd></button>
+                <button type="button" class="btn" data-action="retry"><span data-icon="restart"></span>다시 시작 <kbd data-key="RESTART"></kbd></button>
+                <button type="button" class="btn" data-action="menu"><span data-icon="menu"></span>첫 화면으로</button>
               </div>
             </div>
           </div>
 
-          <div id="replay-bar" class="replay-bar" hidden>
+          <div id="results" class="panel" tabindex="-1" hidden>
+            <div class="panel-card results-card">
+              <p id="results-mode" class="results-mode"></p>
+              <h2 id="results-title" class="panel-title"></h2>
+              <p id="results-main" class="results-main"></p>
+              <!-- 새 기록일 때만 보이지만 자리는 늘 차지한다(원칙 2) -->
+              <p id="results-badge" class="badge is-invisible"><span data-icon="star"></span>새 기록</p>
+              <dl id="results-stats" class="results-stats"></dl>
+              <div class="actions">
+                <div class="actions-row">
+                  <button type="button" class="btn btn-primary" data-action="retry"><span data-icon="restart"></span>다시 하기 <kbd data-key="RESTART"></kbd></button>
+                  <button type="button" class="btn" data-action="menu"><span data-icon="menu"></span>첫 화면 <kbd><kbd class="keycap">Esc</kbd></kbd></button>
+                </div>
+                <div class="actions-row">
+                  <button type="button" class="btn" data-action="stats"><span data-icon="chart"></span>통계</button>
+                  <button type="button" class="btn" data-action="watch"><span data-icon="play"></span>다시 보기</button>
+                </div>
+                <button type="button" class="btn" data-action="export"><span data-icon="download"></span>리플레이 파일로 저장</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 보드 아래 자리: 게임 중에는 터치 버튼, 리플레이 중에는 리플레이 조작 -->
+        <div id="replay-bar" class="replay-bar" hidden>
+          <div class="replay-info">
             <span class="replay-tag">REPLAY</span>
             <span id="replay-title" class="replay-title"></span>
             <span id="replay-status" class="replay-status"></span>
-            <span class="replay-buttons">
-              <button type="button" class="btn btn-small" data-replay="toggle" aria-label="일시정지"><span data-icon="pause"></span></button>
-              <button type="button" class="btn btn-small num" data-replay="speed" aria-label="재생 속도"><span data-icon="forward"></span><span class="replay-speed">1x</span></button>
-              <button type="button" class="btn btn-small" data-replay="restart" aria-label="처음부터"><span data-icon="restart"></span></button>
-              <button type="button" class="btn btn-small" data-replay="exit" aria-label="닫기"><span data-icon="close"></span></button>
-            </span>
+          </div>
+          <div class="replay-buttons">
+            <button type="button" class="btn" data-replay="toggle"><span class="replay-toggle-icon"><span data-icon="pause"></span></span><span class="replay-toggle-text">일시정지</span></button>
+            <button type="button" class="btn num" data-replay="speed" aria-label="재생 속도 바꾸기"><span data-icon="forward"></span><span class="replay-speed">1x</span></button>
+            <button type="button" class="btn" data-replay="restart"><span data-icon="restart"></span>처음부터</button>
+            <button type="button" class="btn" data-replay="exit"><span data-icon="close"></span>닫기</button>
           </div>
         </div>
-        <!-- 터치 버튼: 설정(자동·켜기·끄기)에 따라 body.touch-on일 때만 보인다. 자리는 고정 -->
         <div id="touchpad" class="touchpad" aria-label="터치 조작">
           <button type="button" data-touch="HOLD" aria-label="홀드"><span data-icon="hold"></span></button>
           <button type="button" data-touch="CCW" aria-label="반시계 방향 회전"><span data-icon="rotate-ccw"></span></button>
@@ -99,17 +132,7 @@
           <button type="button" data-touch="RIGHT" aria-label="오른쪽 이동"><span data-icon="arrow-right"></span></button>
           <button type="button" data-touch="RESTART" aria-label="다시 시작" class="touch-system"><span data-icon="restart"></span></button>
         </div>
-        <dl class="hud">
-          <div><dt id="hud-time-label">시간</dt><dd id="hud-time">0:00.00</dd></div>
-          <div><dt>점수</dt><dd id="hud-score">0</dd></div>
-          <div><dt>레벨</dt><dd id="hud-level">1</dd></div>
-          <div><dt id="hud-lines-label">줄</dt><dd id="hud-lines">0</dd></div>
-          <div><dt>피스</dt><dd id="hud-pieces">0</dd></div>
-          <div><dt>PPS</dt><dd id="hud-pps">0.00</dd></div>
-          <div><dt>PB 대비</dt><dd id="hud-split" class="hud-split">—</dd></div>
-        </dl>
       </section>
-      <p id="key-help" class="keys" aria-label="조작 안내"></p>
     </main>
     <dialog id="settings" class="dialog" aria-label="설정"></dialog>
     <dialog id="rules-editor" class="dialog" aria-label="Custom 규칙"></dialog>

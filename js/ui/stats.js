@@ -52,7 +52,10 @@ const table = (title, rows) =>
     el(
       "dl",
       { class: "stat-list" },
-      ...rows.flatMap(([k, v]) => [el("dt", { text: k }), el("dd", { class: "num", text: v })])
+      ...rows.flatMap(([k, v]) => [
+        el("dt", { text: k }),
+        el("dd", { class: v === "0" ? "num is-zero" : "num", text: v }),
+      ])
     )
   );
 
