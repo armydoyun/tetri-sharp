@@ -38,6 +38,9 @@ import { createSfx } from "./audio/sfx.js";
 import { createBackup, parseBackup, restoreBackup } from "./storage/backup.js";
 import { createFinesseTracker } from "./modes/finesse.js";
 import { ROTATIONS } from "./rules/rotation/index.js";
+import { WIN, exchangeGarbage, versusMode } from "./modes/versus.js";
+import { createBot } from "./ai/bot.js";
+import { createVersusUI } from "./ui/versus.js";
 import { lang, t, translateDom } from "./i18n/index.js";
 
 const FRAME_MS = 1000 / 60;
@@ -61,6 +64,7 @@ const hud = {
   split: $("hud-split"),
   streak: $("hud-streak"),
   finesse: $("hud-finesse"),
+  attack: $("hud-attack"),
 };
 
 const store = createStore();
@@ -81,6 +85,26 @@ const raceRenderer = createRenderer(raceBoard, {
   getVisual: () => ({ ...settings.visual, effects: "off" }),
 });
 let race = null;
+
+// ---- CPU 대전: 상대 엔진 + CPU 입력 ----
+const versusPanel = $("versus-panel");
+const cpuRenderer = createRenderer(/** @type {HTMLCanvasElement} */ ($("cpu-board")), {
+  compact: true,
+  getVisual: () => ({ ...settings.visual, effects: "off" }),
+});
+/** @type {null | { cpu: ReturnType<typeof createGame>, bot: ReturnType<typeof createBot> }} */
+let versus = null;
+/** 난이도별 전적 */
+const versusStats = () => {
+  const raw = store.get("versus:stats", {});
+  return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+};
+const addVersusResult = (levelId, won) => {
+  const all = versusStats();
+  const s = all[levelId] && typeof all[levelId] === "object" ? all[levelId] : { win: 0, loss: 0 };
+  all[levelId] = { win: (s.win | 0) + (won ? 1 : 0), loss: (s.loss | 0) + (won ? 0 : 1) };
+  store.set("versus:stats", all);
+};
 
 /** @type {"menu" | "countdown" | "play" | "paused" | "results" | "replay"} */
 let screen = "menu";
@@ -308,8 +332,34 @@ const renderMenu = () => {
       btn.append(index, text, pb, icon("chevron-right"));
       btn.addEventListener("click", () => start(m));
       return btn;
-    })
+    }),
+    versusRow(MODES.length + 1)
   );
+};
+
+/** 첫 화면 모드 목록 끝의 CPU 대전 줄: 누르면 난이도를 고른다 */
+const versusRow = n => {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "menu-row";
+  btn.dataset.mode = "versus";
+  const index = document.createElement("span");
+  index.className = "menu-index num";
+  index.textContent = String(n).padStart(2, "0");
+  const text = document.createElement("span");
+  text.className = "menu-text";
+  const name = document.createElement("strong");
+  name.textContent = t("CPU 대전");
+  const desc = document.createElement("small");
+  desc.textContent = t("CPU와 쓰레기 줄을 주고받기 · 먼저 막히면 패배");
+  text.append(name, desc);
+  const wins = Object.values(versusStats()).reduce((sum, s) => sum + (s?.win | 0), 0);
+  const pb = document.createElement("span");
+  pb.className = "mode-best num";
+  pb.textContent = wins ? t("{n}승", { n: wins }) : "";
+  btn.append(index, text, pb, icon("chevron-right"));
+  btn.addEventListener("click", () => versusUI.open());
+  return btn;
 };
 
 const updateHud = () => {
@@ -324,6 +374,11 @@ const updateHud = () => {
   hud.linesLabel.textContent = lines.label;
   hud.lines.textContent = lines.value;
   hud.pieces.textContent = String(stats.pieces);
+  hud.attack.textContent = String(game?.state.garbage?.sent ?? 0);
+  if (versus) {
+    $("versus-cpu-sent").textContent = String(versus.cpu.state.garbage.sent);
+    $("versus-cpu-incoming").textContent = String(versus.cpu.state.garbage.pending);
+  }
   const practice = game?.state.practice;
   hud.streak.textContent = practice ? `${practice.streak} / ${practice.bestStreak}` : "0 / 0";
   const fin = game?.state.finesse;
@@ -350,6 +405,8 @@ const toMenu = (initial = false) => {
   game = null;
   race = null;
   racePanel.hidden = true;
+  versus = null;
+  versusPanel.hidden = true;
   setScreen("menu");
   countdownEl.hidden = true;
   renderMenu();
@@ -381,7 +438,14 @@ const start = (m, selectedRules = currentRules(), target = null) => {
   racePanel.hidden = !race;
   updateRaceProgress();
   game = createGame({ rules, handling: toEngineHandling(settings.handling), seed, mode: m });
-  recorder = createRecorder({ seed, mode: m, rules, handling: game.handling });
+  // 대전: CPU도 같은 시드(같은 블록 순서)로 시작한다. 상대와 함께라야 재현되므로 리플레이는 남기지 않는다.
+  if (m.versus) {
+    const cpu = createGame({ rules, seed, mode: m });
+    versus = { cpu, bot: createBot({ game: cpu, rotation: ROTATIONS[rules.rotation], level: m.versus, seed }) };
+    $("versus-name").textContent = t("CPU · {level}", { level: m.versus.name });
+  } else versus = null;
+  versusPanel.hidden = !versus;
+  recorder = m.noReplay ? null : createRecorder({ seed, mode: m, rules, handling: game.handling });
   finesse = createFinesseTracker(game, ROTATIONS[rules.rotation]);
   splits = [];
   showModeHud(m);
@@ -464,7 +528,8 @@ for (const btn of panels.confirm.querySelectorAll("[data-confirm]")) {
 
 /** 로고: 첫 화면으로. 게임 중이면 먼저 묻는다 */
 $("go-home").addEventListener("click", () => {
-  if (settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen || statsUI.isOpen || practiceUI.isOpen) return;
+  if (settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen || statsUI.isOpen || practiceUI.isOpen || versusUI.isOpen)
+    return;
   if (screen === "menu") return window.scrollTo(0, 0);
   if (inProgress()) return askConfirm("menu");
   if (screen === "replay") stopReplay();
@@ -549,7 +614,12 @@ const finish = () => {
   }
   const best = records.best(mode, rules);
 
+  if (mode.versus) addVersusResult(mode.versus.id, state.over === WIN);
   lastReplay = recorder ? recorder.finish(state) : null;
+  /** @type {HTMLButtonElement} */ for (const b of panels.results.querySelectorAll(
+    '[data-action="watch"], [data-action="export"]'
+  ))
+    b.disabled = !lastReplay;
   if (lastReplay) {
     replays.saveLast(lastReplay);
     if (outcome && outcome.rank < MAX_RANKED)
@@ -566,6 +636,34 @@ const finish = () => {
   $("race-result").textContent = race ? raceResultText(state, race.target.best) : "";
 
   const seconds = state.frame / 60;
+  if (mode.versus && versus) {
+    const g = state.garbage;
+    const cg = versus.cpu.state.garbage;
+    const vrows = [
+      [t("시간"), formatTime(state.frame)],
+      [t("줄"), String(state.stats.lines)],
+      [t("피스"), String(state.stats.pieces)],
+      ["PPS", seconds ? (state.stats.pieces / seconds).toFixed(2) : "0.00"],
+      [t("보낸 줄"), String(g.sent)],
+      [t("막은 쓰레기"), String(g.blocked)],
+      [t("받은 쓰레기"), String(g.received)],
+      [t("CPU가 보낸 줄"), String(cg.sent)],
+    ];
+    const s = versusStats()[mode.versus.id];
+    vrows.push([t("전적"), s ? t("{win}승 {loss}패", { win: s.win, loss: s.loss }) : "—"]);
+    $("results-stats").replaceChildren(
+      ...vrows.flatMap(([k, v]) => {
+        const dt = document.createElement("dt");
+        dt.textContent = k;
+        const dd = document.createElement("dd");
+        dd.textContent = v;
+        return [dt, dd];
+      })
+    );
+    renderResultSplits();
+    showPanel("results");
+    return;
+  }
   const rows = [
     [t("시간"), formatTime(state.frame)],
     [t("점수"), formatScore(state.score)],
@@ -682,6 +780,15 @@ $("practice").addEventListener("close", () => {
   if (screen === "menu") /** @type {HTMLElement | null} */ ($("open-practice"))?.focus();
 });
 
+const versusUI = createVersusUI({
+  dialog: /** @type {HTMLDialogElement} */ ($("versus")),
+  getStats: versusStats,
+  onPick: level => start(versusMode(level)),
+});
+$("versus").addEventListener("close", () => {
+  if (screen === "menu") /** @type {HTMLElement | null} */ (document.querySelector('[data-mode="versus"]'))?.focus();
+});
+
 const statsUI = createStatsUI({ dialog: /** @type {HTMLDialogElement} */ ($("stats")) });
 $("stats").addEventListener("close", () => {
   if (screen === "results")
@@ -701,7 +808,8 @@ $("records").addEventListener("close", () => {
 });
 
 const handleSystem = action => {
-  if (settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen || statsUI.isOpen || practiceUI.isOpen) return;
+  if (settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen || statsUI.isOpen || practiceUI.isOpen || versusUI.isOpen)
+    return;
   if (screen === "replay") {
     if (action === "restart") restartReplay();
     else stopReplay();
@@ -737,7 +845,8 @@ noHover?.addEventListener?.("change", applyTouch);
 
 /** 메뉴·결과·일시정지 화면에서 게임패드로 버튼 사이를 옮겨 다니고 누른다. */
 const handlePadMenu = action => {
-  if (settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen || statsUI.isOpen || practiceUI.isOpen) return;
+  if (settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen || statsUI.isOpen || practiceUI.isOpen || versusUI.isOpen)
+    return;
   const panel = Object.values(panels).find(p => !p.hidden);
   if (!panel || screen === "play" || screen === "countdown" || screen === "replay") return;
   const buttons = /** @type {HTMLButtonElement[]} */ ([...panel.querySelectorAll("button")]).filter(
@@ -905,6 +1014,7 @@ window.addEventListener("keydown", e => {
     recordsUI.isOpen ||
     statsUI.isOpen ||
     practiceUI.isOpen ||
+    versusUI.isOpen ||
     e.repeat
   )
     return;
@@ -1069,6 +1179,12 @@ const tick = () => {
   recorder?.input(held, pressed);
   const hadActive = Boolean(game.state.active);
   const events = game.step({ held, pressed });
+  if (versus) {
+    versus.cpu.step(versus.bot.input());
+    exchangeGarbage(game, versus.cpu);
+    // CPU가 먼저 막히면 내가 이긴다(같은 프레임에 둘 다 막히면 진다).
+    if (versus.cpu.state.over && !game.state.over) events.push(...game.finishAs(WIN));
+  }
   const extra = finesse?.frame(held, pressed, hadActive, events) ?? 0;
   if (extra > 0 && mode.finesse) announceText([t("피네스 +{n}", { n: extra })]);
   if (mode.splits) splits = advanceSplits(mode.splits, splits, game.state.stats.lines, game.state.frame);
@@ -1099,6 +1215,7 @@ const loop = now => {
   }
   renderer.draw(game);
   if (race && screen !== "replay" && raceBoardVisible.matches) raceRenderer.draw(race.player.game);
+  if (versus && raceBoardVisible.matches) cpuRenderer.draw(versus.cpu);
   updateHud();
   requestAnimationFrame(loop);
 };

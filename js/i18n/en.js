@@ -102,6 +102,33 @@ export const EN = {
   성공: "Success",
   다시: "Again",
 
+  // ---- CPU 대전 ----
+  "CPU 대전": "CPU battle",
+  "CPU 대전 · {level}": "CPU battle · {level}",
+  "CPU와 쓰레기 줄을 주고받기 · 먼저 막히면 패배": "Trade garbage with the CPU · first to top out loses",
+  쉬움: "Easy",
+  보통: "Normal",
+  어려움: "Hard",
+  최강: "Master",
+  "승리!": "You win!",
+  패배: "You lose",
+  "보낸 줄": "Lines sent",
+  "막은 쓰레기": "Garbage blocked",
+  "받은 쓰레기": "Garbage received",
+  "CPU가 보낸 줄": "CPU lines sent",
+  "CPU가 받을 쓰레기": "CPU incoming",
+  "CPU 상황": "CPU status",
+  "CPU 보드": "CPU board",
+  "CPU · {level}": "CPU · {level}",
+  전적: "Record",
+  "{win}승 {loss}패": "{win}W {loss}L",
+  "{n}승": "{n} wins",
+  "초당 {pps}피스 · {hold}": "{pps} pieces/s · {hold}",
+  "홀드 사용": "uses hold",
+  "홀드 안 씀": "no hold",
+  "같은 블록 순서로 동시에 시작해요. 줄을 지우면 상대에게 쓰레기 줄을 보내요.":
+    "You both start with the same pieces. Clearing lines sends garbage to the other side.",
+
   // ---- 결과 ----
   "새 기록": "New record",
   "최고 기록": "Best",

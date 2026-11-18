@@ -4,6 +4,10 @@ import { MODERN } from "../rules/presets.js";
 import { GARBAGE } from "../core/pieces.js";
 import { get, set } from "../core/board.js";
 import { findPractice } from "./practice.js";
+import { raiseGarbage, receiveGarbage } from "./garbage.js";
+import { findVersus } from "./versus.js";
+
+export { raiseGarbage, receiveGarbage };
 import { formatScore, formatTime } from "./format.js";
 import { t } from "../i18n/index.js";
 
@@ -278,20 +282,6 @@ export const SURVIVAL_LEVEL_FRAMES = 30 * 60;
 export const survivalInterval = level => Math.max(60, 300 - (level - 1) * 20);
 /** 줄을 지웠을 때 막는 쓰레기 줄 수 */
 export const survivalBlock = lockEvent => lockEvent.lines * (lockEvent.tspin === "full" ? 2 : 1);
-/** 같은 구멍이 이어질 확률(%) — 구멍이 한 열에 모여 있어야 파낼 수 있다 */
-const SAME_HOLE = 70;
-
-/** 보드를 n줄 밀어 올리고 아래에 구멍 하나짜리 쓰레기 줄을 넣는다. */
-export const raiseGarbage = (board, n, nextHole) => {
-  const w = board.width;
-  board.cells.copyWithin(0, n * w);
-  for (let i = 0; i < n; i++) {
-    const y = board.height - n + i;
-    const hole = nextHole();
-    for (let x = 0; x < w; x++) set(board, x, y, x === hole ? 0 : GARBAGE);
-  }
-};
-
 /** @type {Mode} */
 export const SURVIVAL = Object.freeze({
   id: "survival",
@@ -320,18 +310,7 @@ export const SURVIVAL = Object.freeze({
       g.blocked += blocked;
       return false;
     }
-    if (!g.pending) return false;
-    const n = Math.min(g.pending, 12);
-    raiseGarbage(state.board, n, () => {
-      if (g.rng.int(100) >= SAME_HOLE) {
-        const h = g.rng.int(state.board.width - 1);
-        g.hole = h >= g.hole ? h + 1 : h;
-      }
-      return g.hole;
-    });
-    g.received += n;
-    g.pending -= n;
-    events.push({ type: "garbage", rows: n });
+    receiveGarbage(state, events);
     return false;
   },
   check: () => null,
@@ -362,4 +341,4 @@ export const ZEN = Object.freeze({
 export const MODES = Object.freeze([SPRINT_40, MARATHON, ULTRA, MASTER, DIG, SURVIVAL, ZEN]);
 /** "내 기록과 달리기"를 할 수 있는 모드 */
 export const RACE_MODES = Object.freeze(MODES.filter(m => m.race));
-export const findMode = id => MODES.find(m => m.id === id) ?? findPractice(id) ?? SPRINT_40;
+export const findMode = id => MODES.find(m => m.id === id) ?? findPractice(id) ?? findVersus(id) ?? SPRINT_40;

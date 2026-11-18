@@ -237,7 +237,7 @@ test("설정: 슬라이더 값과 키 변경이 저장되고 새로고침 후에
 
 test("Ultra: 남은 시간이 줄어들고 하드 드롭으로 점수가 오른다, 메뉴에 일곱 모드", async () => {
   const { context, page, errors } = await openPage();
-  assert.equal(await page.locator("#mode-list .menu-row").count(), 7);
+  assert.equal(await page.locator("#mode-list .menu-row").count(), 8);
   await startMode(page, "ultra");
   assert.equal(await text(page, "hud-time-label"), "남은 시간");
   await page.waitForTimeout(300);
@@ -1073,6 +1073,44 @@ test("드롭다운: 키보드로 열고 고르며, Esc는 목록만 닫고 대�
   await page.click("#records-mode");
   await page.mouse.click(5, 5);
   assert.equal(await page.locator("#records-mode-list").count(), 0, "바깥을 누르면 닫힌다");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("CPU 대전: 난이도를 골라 시작하면 CPU 보드가 함께 움직이고, 막히면 패배와 전적이 남는다", async () => {
+  const { context, page, errors } = await openPage();
+  await page.click('[data-mode="versus"]');
+  assert.equal(await page.locator("#versus .menu-row").count(), 4);
+  await page.click('#versus [data-level="master"]');
+  await page.waitForFunction(() => document.body.dataset.screen === "play", null, { timeout: 3000 });
+  assert.equal(await visible(page, "versus-panel"), true);
+  assert.equal(await visible(page, "cpu-board"), true);
+  assert.equal(await text(page, "versus-name"), "CPU · 최강");
+  assert.equal(await text(page, "hud-lines-label"), "받을 쓰레기");
+  // CPU가 피스를 놓는다(보드에 블록이 생긴다)
+  await page.waitForFunction(
+    () => {
+      const c = /** @type {HTMLCanvasElement} */ (document.getElementById("cpu-board"));
+      const d = c.getContext("2d").getImageData(0, Math.floor(c.height * 0.9), c.width, 4).data;
+      let lit = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 300) lit++;
+      return lit > 10;
+    },
+    null,
+    { timeout: 5000 }
+  );
+  for (let i = 0; i < 60 && !(await visible(page, "results")); i++) await page.keyboard.press("Space");
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 5000 });
+  assert.equal(await text(page, "results-title"), "패배");
+  assert.match(await page.locator("#results-stats").textContent(), /전적0승 1패/);
+  assert.equal(
+    await page.locator('#results [data-action="watch"]').isDisabled(),
+    true,
+    "대전은 리플레이를 남기지 않는다"
+  );
+  await page.keyboard.press("Escape");
+  await page.click('[data-mode="versus"]');
+  assert.equal(await page.locator('#versus [data-level="master"] .mode-best').textContent(), "0승 1패");
   assert.deepEqual(errors, []);
   await context.close();
 });

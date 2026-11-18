@@ -113,6 +113,7 @@
             <div data-hud="pps"><dt>PPS</dt><dd id="hud-pps">0.00</dd></div>
             <div data-hud="streak" class="is-off"><dt>연속 / 최고</dt><dd id="hud-streak">0 / 0</dd></div>
             <div data-hud="split"><dt>PB 대비</dt><dd id="hud-split" class="hud-split">—</dd></div>
+            <div data-hud="attack" class="is-off"><dt>보낸 줄</dt><dd id="hud-attack">0</dd></div>
             <div data-hud="finesse" class="is-off"><dt>피네스 실수</dt><dd id="hud-finesse">0 / 0</dd></div>
           </dl>
           <aside id="race-panel" class="race-panel" aria-label="내 최고 기록 진행 상황" hidden>
@@ -122,6 +123,16 @@
             </div>
             <progress id="race-progress" aria-label="최고 기록 진행" value="0" max="40"></progress>
             <canvas id="race-board" class="race-board" aria-label="최고 기록 보드"></canvas>
+          </aside>
+          <aside id="versus-panel" class="race-panel versus-panel" aria-label="CPU 상황" hidden>
+            <div class="race-panel-head">
+              <strong id="versus-name">CPU</strong>
+            </div>
+            <canvas id="cpu-board" class="race-board cpu-board" aria-label="CPU 보드"></canvas>
+            <dl class="versus-stats">
+              <div><dt>CPU가 보낸 줄</dt><dd id="versus-cpu-sent" class="num">0</dd></div>
+              <div><dt>CPU가 받을 쓰레기</dt><dd id="versus-cpu-incoming" class="num">0</dd></div>
+            </dl>
           </aside>
         </div>
 
@@ -225,6 +236,7 @@
     <dialog id="records" class="dialog dialog-wide" aria-label="기록"></dialog>
     <dialog id="stats" class="dialog dialog-wide" aria-label="이번 판 통계"></dialog>
     <dialog id="practice" class="dialog" aria-label="연습"></dialog>
+    <dialog id="versus" class="dialog" aria-label="CPU 대전"></dialog>
     <!-- ES Modules: 개발용 실행은 http://localhost를 사용한다. -->
     <script type="module" src="./js/main.js"></script>
   </body>

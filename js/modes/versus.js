@@ -1,0 +1,110 @@
+// CPU 대전: 나와 CPU가 같은 블록 순서로 동시에 두고, 줄을 지우면 상대에게 쓰레기 줄을 보낸다.
+// 보낸 줄은 먼저 내게 쌓인 쓰레기를 상쇄하고, 남는 만큼 상대의 "받을 쓰레기"가 된다.
+// 받을 쓰레기는 줄을 지우지 못하고 고정할 때 아래에서 올라온다(Survival과 같은 방식). 먼저 막히는 쪽이 진다.
+// 모드는 한 판의 규칙만 정하고, 두 엔진 사이에 줄을 옮기는 일은 게임 루프(main.js)가 한다.
+import { MODERN } from "../rules/presets.js";
+import { receiveGarbage } from "./garbage.js";
+import { formatTime } from "./format.js";
+import { t } from "../i18n/index.js";
+
+/** 줄 삭제 종류별 공격 줄 수: [T-spin 종류][지운 줄 수] */
+export const ATTACK = Object.freeze({
+  none: Object.freeze([0, 0, 1, 2, 4]),
+  mini: Object.freeze([0, 0, 1, 2]),
+  full: Object.freeze([0, 2, 4, 6]),
+});
+/** 콤보(연속으로 줄을 지운 고정 수 − 1)에 따른 추가 공격 */
+export const COMBO_ATTACK = Object.freeze([0, 0, 1, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5]);
+export const PERFECT_ATTACK = 10;
+
+/** 고정 이벤트 하나가 보내는 줄 수 */
+export const attackFor = ev => {
+  if (!ev.lines) return 0;
+  const table = ATTACK[ev.tspin] ?? ATTACK.none;
+  const base = table[Math.min(ev.lines, table.length - 1)] ?? 0;
+  const combo = ev.combo >= 0 ? COMBO_ATTACK[Math.min(ev.combo, COMBO_ATTACK.length - 1)] : 0;
+  return base + (ev.b2b ? 1 : 0) + combo + (ev.perfect ? PERFECT_ATTACK : 0);
+};
+
+/**
+ * 난이도: pps = CPU가 1초에 놓는 피스 수, mistake = 가장 좋은 자리 대신 차선을 고를 확률(%),
+ * hold = 홀드를 쓰는지.
+ */
+export const LEVELS = Object.freeze([
+  Object.freeze({ id: "easy", name: t("쉬움"), pps: 0.7, mistake: 20, hold: false }),
+  Object.freeze({ id: "normal", name: t("보통"), pps: 1.2, mistake: 12, hold: true }),
+  Object.freeze({ id: "hard", name: t("어려움"), pps: 2, mistake: 3, hold: true }),
+  Object.freeze({ id: "master", name: t("최강"), pps: 3.2, mistake: 0, hold: true }),
+]);
+
+/** 대전에서 상대를 이겼을 때 엔진에 넣는 결과 */
+export const WIN = "win";
+
+const cache = new Map();
+
+/** 난이도 → 모드 객체(같은 난이도는 같은 객체). 나와 CPU가 같은 모드 객체를 쓰고 상태만 따로 가진다. */
+export const versusMode = level => {
+  if (cache.has(level.id)) return cache.get(level.id);
+  const mode = Object.freeze({
+    id: `versus-${level.id}`,
+    name: t("CPU 대전 · {level}", { level: level.name }),
+    description: t("CPU와 쓰레기 줄을 주고받기 · 먼저 막히면 패배"),
+    rules: MODERN,
+    versus: level,
+    hud: Object.freeze(["time", "attack", "lines", "pieces", "pps"]),
+    setup: (state, rng) => {
+      state.garbage = { pending: 0, received: 0, blocked: 0, sent: 0, outgoing: 0, hole: rng.int(10), rng };
+    },
+    onLock: (state, ev, events) => {
+      const g = state.garbage;
+      if (ev.lines > 0) {
+        let attack = attackFor(ev);
+        const blocked = Math.min(g.pending, attack);
+        g.pending -= blocked;
+        g.blocked += blocked;
+        attack -= blocked;
+        if (attack > 0) {
+          g.sent += attack;
+          g.outgoing += attack;
+          events.push({ type: "attack", lines: attack });
+        }
+        return false;
+      }
+      receiveGarbage(state, events);
+      return false;
+    },
+    check: () => null,
+    hudLines: state => ({ label: t("받을 쓰레기"), value: String(state.garbage.pending) }),
+    hudTime: state => ({ label: t("시간"), frames: state.frame }),
+    summary: state => ({
+      title: state.over === WIN ? t("승리!") : t("패배"),
+      main: formatTime(state.frame),
+    }),
+    record: Object.freeze({ metric: "frames", order: "asc" }),
+    formatRecord: e => formatTime(e.frames),
+    // 상대(CPU)와 함께 돌아야 같은 결과가 나오므로 기록·리플레이는 남기지 않는다.
+    isRecordable: () => false,
+    noReplay: true,
+  });
+  cache.set(level.id, mode);
+  return mode;
+};
+
+export const findVersus = id => {
+  const level = LEVELS.find(l => `versus-${l.id}` === id);
+  return level ? versusMode(level) : null;
+};
+
+/** 한 프레임 뒤: 서로 보낸 줄을 상대의 받을 쓰레기로 옮긴다. */
+export const exchangeGarbage = (a, b) => {
+  const ga = a.state.garbage;
+  const gb = b.state.garbage;
+  if (ga.outgoing) {
+    gb.pending += ga.outgoing;
+    ga.outgoing = 0;
+  }
+  if (gb.outgoing) {
+    ga.pending += gb.outgoing;
+    gb.outgoing = 0;
+  }
+};

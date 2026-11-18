@@ -893,3 +893,33 @@ body[data-screen="replay"] .touchpad {
     animation-timing-function: steps(1, end);
   }
 }
+
+/* ---- CPU 대전: 정보 칸 아래 CPU 보드와 숫자 ---- */
+.cpu-board {
+  width: min(140px, max(80px, calc((100dvh - 520px) * 10 / 22)));
+}
+
+.versus-stats {
+  display: grid;
+  width: 100%;
+  margin: 0;
+  font-size: var(--text-s);
+}
+
+.versus-stats > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 3px 0;
+  border-bottom: var(--border-w) solid var(--border);
+}
+
+.versus-stats dt {
+  color: var(--text-dim);
+}
+
+.versus-stats dd {
+  margin: 0;
+  font-family: var(--font-num);
+  font-weight: 700;
+}
