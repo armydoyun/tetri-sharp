@@ -545,6 +545,7 @@ let replayReturn = /** @type {{ screen: string, game: any, mode: any, rules: any
 const SPEEDS = [1, 2, 4];
 const replayBar = $("replay-bar");
 const replayStatus = $("replay-status");
+const replayNote = $("replay-note");
 const menuNotice = $("menu-notice");
 
 const updateReplayBar = () => {
@@ -558,7 +559,7 @@ const updateReplayBar = () => {
   replayStatus.textContent = player?.done ? "끝" : "";
 };
 
-const startReplay = (replay, returnTo = screen) => {
+const startReplay = (replay, returnTo = screen, note = "") => {
   if (screen !== "replay") replayReturn = { screen: returnTo, game, mode, rules };
   playing = replay;
   player = createPlayer(replay, findMode);
@@ -573,11 +574,12 @@ const startReplay = (replay, returnTo = screen) => {
   showPanel(null);
   setScreen("replay");
   replayBar.hidden = false;
+  replayNote.textContent = note;
   $("replay-title").textContent = `${mode.name} · ${rules.name}`;
   updateReplayBar();
 };
 
-const restartReplay = () => playing && startReplay(playing);
+const restartReplay = () => playing && startReplay(playing, screen, replayNote.textContent);
 
 const stopReplay = () => {
   if (screen !== "replay") return;
@@ -666,8 +668,9 @@ const openReplayText = text => {
     return false;
   }
   const check = verifyReplay(replay, findMode);
-  showMenuNotice(check.ok ? "" : "이 리플레이는 기록된 결과와 다르게 재생돼요(다른 버전에서 만든 파일일 수 있어요).");
-  startReplay(replay, "menu");
+  showMenuNotice("");
+  const note = check.ok ? "" : "저장된 결과와 재생 결과가 달라요. 다른 버전의 파일일 수 있어요.";
+  startReplay(replay, "menu", note);
   return true;
 };
 
@@ -677,10 +680,21 @@ $("watch-last").addEventListener("click", () => {
 });
 const fileInput = /** @type {HTMLInputElement} */ ($("replay-file"));
 $("open-replay").addEventListener("click", () => fileInput.click());
+let replayFileRequest = 0;
 fileInput.addEventListener("change", async () => {
   const file = fileInput.files?.[0];
   fileInput.value = "";
-  if (file) openReplayText(await file.text());
+  if (!file) return;
+
+  const request = ++replayFileRequest;
+  let text;
+  try {
+    text = await file.text();
+  } catch {
+    if (request === replayFileRequest && screen === "menu") showMenuNotice("파일을 읽지 못했어요. 다시 선택해 주세요.");
+    return;
+  }
+  if (request === replayFileRequest && screen === "menu") openReplayText(text);
 });
 
 // ---- 루프 ----

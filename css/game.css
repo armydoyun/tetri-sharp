@@ -378,30 +378,90 @@ body[data-screen="menu"] .stage {
   font-variant-numeric: tabular-nums;
 }
 
-.home-actions {
+.home-tools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--space-6);
+}
+
+.tool-group {
+  display: grid;
+  align-content: start;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-strong);
+}
+
+.tool-group .section-title {
+  padding-bottom: var(--space-2);
+}
+
+.tool-row {
+  appearance: none;
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur) var(--ease);
 }
 
-.home-actions .btn {
-  gap: 7px;
-  padding-inline: 14px;
+.tool-row:enabled:hover {
+  background: var(--surface-2);
 }
 
-.home-actions .icon {
-  width: 20px;
-  height: 20px;
-  margin-inline-start: -3px; /* SVG 격자 자체의 빈 여백 보정 */
+.tool-row > .icon,
+.tool-row:disabled,
+.tool-row > small {
+  color: var(--text-dim);
+}
+
+.tool-row > small {
+  font-size: var(--text-s);
+  font-weight: 400;
+}
+
+.tool-row:enabled > small,
+.tool-row:disabled > .icon {
+  display: none;
+}
+
+.tool-row:disabled {
+  cursor: default;
 }
 
 .menu-notice {
-  margin-top: calc(-1 * var(--space-2));
+  grid-column: 1 / -1;
+  padding-top: var(--space-1);
+}
+
+@media (max-width: 600px) {
+  .home-tools {
+    grid-template-columns: 1fr;
+    row-gap: var(--space-3);
+  }
 }
 
 .help-card {
-  display: grid;
-  gap: var(--space-3);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.help-card summary {
+  padding: var(--space-3) 0;
+  cursor: pointer;
+}
+
+.help-card .keys {
+  padding-bottom: var(--space-4);
 }
 
 /* 터치 버튼을 쓸 때는 키보드 조작법을 숨긴다(설정으로만 바뀐다) */
@@ -504,6 +564,10 @@ body.touch-on {
 
 body[data-screen="replay"] {
   --under-h: 64px;
+}
+
+body[data-screen="replay"]:has(.replay-note:not(:empty)) {
+  --under-h: 112px;
 }
 
 .board {
@@ -711,6 +775,18 @@ body[data-screen="replay"] {
   min-width: 3em;
   text-align: right;
   color: var(--text-dim);
+}
+
+.replay-note {
+  margin: 0;
+  padding-left: var(--space-2);
+  border-left: 2px solid var(--border-strong);
+  color: var(--text-dim);
+  font-size: var(--text-m);
+}
+
+.replay-note:empty {
+  display: none;
 }
 
 .replay-buttons {

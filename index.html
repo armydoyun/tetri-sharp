@@ -28,8 +28,8 @@
       <section id="menu" class="home" aria-label="첫 화면" hidden>
         <section class="home-intro surface-game" aria-labelledby="intro-title">
           <div class="intro-copy">
-            <h2 id="intro-title">블록 퍼즐</h2>
-            <p>회전과 낙하 규칙을 직접 바꿀 수 있어요.</p>
+            <h2 id="intro-title">오프라인 테트리스</h2>
+            <p>다양한 규칙들을 직접 선택해 자신만의 테트리스를 플레이 해보세요.</p>
           </div>
           <div class="intro-art" aria-hidden="true">
             <div class="intro-grid">
@@ -59,20 +59,25 @@
           <div id="mode-list" class="mode-grid"></div>
         </section>
 
-        <div class="home-actions">
-          <button id="open-records" type="button" class="btn"><span data-icon="trophy"></span>기록</button>
-          <button id="open-practice" type="button" class="btn"><span data-icon="target"></span>연습</button>
-          <button id="watch-last" type="button" class="btn" title="아직 끝낸 판이 없으면 비어 있어요"><span data-icon="play"></span>마지막 판 리플레이</button>
-          <button id="open-replay" type="button" class="btn"><span data-icon="folder"></span>리플레이 파일 열기</button>
-          <input id="replay-file" type="file" accept=".json,application/json" hidden />
-        </div>
-        <p id="menu-notice" class="notice-slot menu-notice" role="status"></p>
-
-        <!-- 키보드 조작법: 터치 버튼을 쓸 때는 숨긴다 -->
-        <section class="card help-card" aria-labelledby="help-title">
-          <h2 id="help-title" class="section-title">조작법</h2>
-          <p id="key-help" class="keys" aria-label="조작 안내"></p>
+        <section class="home-tools" aria-label="플레이 도구">
+          <section class="tool-group" aria-labelledby="training-tools-title">
+            <h2 id="training-tools-title" class="section-title">연습과 기록</h2>
+            <button id="open-practice" class="tool-row" type="button">연습<span data-icon="arrow-right"></span></button>
+            <button id="open-records" class="tool-row" type="button">기록<span data-icon="arrow-right"></span></button>
+          </section>
+          <section class="tool-group" aria-labelledby="replay-tools-title">
+            <h2 id="replay-tools-title" class="section-title">리플레이</h2>
+            <button id="watch-last" class="tool-row" type="button" disabled>마지막 판 다시 보기<span data-icon="arrow-right"></span><small>저장된 판 없음</small></button>
+            <button id="open-replay" class="tool-row" type="button">파일 열기<span data-icon="arrow-right"></span></button>
+            <input id="replay-file" type="file" accept=".json,application/json" hidden />
+          </section>
+          <p id="menu-notice" class="notice-slot menu-notice" role="status"></p>
         </section>
+
+        <details class="help-card">
+          <summary id="help-title" class="section-title">조작법</summary>
+          <p id="key-help" class="keys" aria-label="조작 안내"></p>
+        </details>
       </section>
 
       <!-- 게임 화면: 첫 화면에서는 숨긴다 -->
@@ -135,6 +140,7 @@
             <span id="replay-title" class="replay-title"></span>
             <span id="replay-status" class="replay-status"></span>
           </div>
+          <p id="replay-note" class="replay-note" role="status"></p>
           <div class="replay-buttons">
             <button type="button" class="btn" data-replay="toggle"><span class="replay-toggle-icon"><span data-icon="pause"></span></span><span class="replay-toggle-text">일시정지</span></button>
             <button type="button" class="btn num" data-replay="speed" aria-label="재생 속도 바꾸기"><span data-icon="forward"></span><span class="replay-speed">1x</span></button>

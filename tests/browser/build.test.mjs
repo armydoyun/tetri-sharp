@@ -297,9 +297,22 @@ test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파�
   assert.equal(await page.locator("#watch-last").isEnabled(), true);
   await page.locator("#replay-file").setInputFiles(file);
   await page.waitForFunction(() => !document.getElementById("replay-bar")?.hidden, null, { timeout: 5000 });
-  assert.equal(await text(page, "menu-notice"), "", "검증 통과 → 경고 없음");
+  assert.equal(await text(page, "replay-note"), "", "검증 통과 → 경고 없음");
   await page.keyboard.press("Escape");
   assert.equal(await visible(page, "menu"), true);
+
+  // 파일 구조가 유효하지만 결과가 다르면 재생 화면에서 알린다.
+  saved.result.score += 1;
+  await page.locator("#replay-file").setInputFiles({
+    name: "different-result.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(saved)),
+  });
+  await page.waitForFunction(() => !document.getElementById("replay-bar")?.hidden);
+  assert.match(await text(page, "replay-note"), /저장된 결과와 재생 결과가 달라요/);
+  await page.click('[data-replay="restart"]');
+  assert.equal(await visible(page, "replay-note"), true);
+  await page.keyboard.press("Escape");
 
   // 망가진 파일
   await page
