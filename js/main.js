@@ -40,7 +40,7 @@ const records = createRecords(store);
 let settings = loadSettings(store);
 let bindings = compileKeymap(settings.keymap);
 
-const renderer = createRenderer(canvas);
+const renderer = createRenderer(canvas, { getVisual: () => settings.visual });
 
 /** @type {"menu" | "countdown" | "play" | "paused" | "results"} */
 let screen = "menu";
@@ -178,6 +178,7 @@ const start = m => {
   goTimer = 0;
   showPanel(null);
   actionEl.classList.remove("is-shown");
+  renderer.clearEffects();
   setScreen("countdown");
   countdownEl.hidden = false;
   countdownEl.textContent = "READY";
@@ -360,6 +361,7 @@ const tick = () => {
   if (goTimer > 0 && --goTimer === 0) countdownEl.hidden = true;
   const events = game.step({ held: keyboard.held, pressed: keyboard.takePressed() });
   for (const e of events) announce(e);
+  renderer.addEvents(events);
   if (events.some(e => e.type === "gameOver" || e.type === "finish")) finish();
 };
 

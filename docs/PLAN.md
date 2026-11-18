@@ -273,7 +273,7 @@ export default {
 | **M4 점수 & Marathon/Ultra** ✅ | T-spin, B2B, 콤보, PC, 레벨 곡선 | |
 | **M5 규칙 샌드박스** ✅ | 전략 모듈 추가(ARS, Classic, 생성기들, lock 타입), 프리셋, 규칙 편집 UI, 기록 분리 | Modern/Retro/Arcade 전환 |
 | **M6 고속 플레이** ✅ | ARE, IRS/IHS, 20G, Master 모드 | |
-| **M7 연출 & 사운드** | 이펙트, 효과음, 스킨 | |
+| **M7 연출** ✅ (사운드는 제외) | 이펙트, 효과음, 스킨 | |
 | **M8 리플레이 & 부가** | 리플레이 저장/재생, Zen, Dig, 게임패드 | |
 
 ---

@@ -219,6 +219,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
     events.push({
       type: "lock",
       piece: a.type,
+      cells: shape.map(([cx, cy]) => [a.x + cx, a.y + cy]),
       lines,
       rows: cleared,
       tspin,
@@ -433,7 +434,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
       let distance = 0;
       while (dropOne(a)) distance += 1;
       state.score += distance * scoring.HARD_DROP_POINTS;
-      events.push({ type: "hardDrop", distance });
+      events.push({ type: "hardDrop", distance, cells: cells(a).map(([cx, cy]) => [a.x + cx, a.y + cy]) });
       lockPiece();
       return events;
     }

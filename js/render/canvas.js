@@ -3,6 +3,8 @@
 import { VISIBLE_ROWS, createBoard, get } from "../core/board.js";
 import { CELL_ID } from "../core/pieces.js";
 import { VISIBLE_TOP } from "../core/engine.js";
+import { createEffects } from "./effects.js";
+import { PALETTES, drawBlock } from "./skins.js";
 
 const COLOR_VARS = [
   "",
@@ -22,14 +24,25 @@ const COLS = 10;
 export const LAYOUT = Object.freeze({ cols: SIDE + COLS + SIDE, rows: VISIBLE_ROWS + MARGIN_TOP, cssCell: 28 });
 
 /**
+ * @typedef {{ effects: "full" | "reduced" | "off", skin: "flat" | "bevel" | "outline", palette: "default" | "contrast" }} Visual
  * @param {HTMLCanvasElement} canvas
+ * @param {{ getVisual: () => Visual }} options
  */
-export const createRenderer = canvas => {
+export const createRenderer = (canvas, { getVisual }) => {
   const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext("2d"));
   const css = getComputedStyle(document.documentElement);
   const v = name => css.getPropertyValue(name).trim();
-  const palette = COLOR_VARS.map(name => (name ? v(name) : ""));
-  const colors = { grid: v("--grid"), board: v("--surface"), text: v("--text-dim"), bg: v("--bg") };
+  const basePalette = COLOR_VARS.map(name => (name ? v(name) : ""));
+  const colors = {
+    grid: v("--grid"),
+    board: v("--surface"),
+    text: v("--text-dim"),
+    bg: v("--bg"),
+    accent: v("--accent"),
+  };
+  const effects = createEffects();
+  let palette = basePalette;
+  let skin = /** @type {Visual["skin"]} */ ("flat");
 
   let cell = 0;
   /** devicePixelRatio를 반영해 캔버스 해상도를 정하고 셀 크기를 정수로 맞춘다(번짐 방지). */
@@ -43,10 +56,7 @@ export const createRenderer = canvas => {
     canvas.style.aspectRatio = `${LAYOUT.cols} / ${LAYOUT.rows}`;
   };
 
-  const block = (px, py, color, size = cell) => {
-    ctx.fillStyle = color;
-    ctx.fillRect(px + 1, py + 1, size - 2, size - 2);
-  };
+  const block = (px, py, color, size = cell) => drawBlock(ctx, skin, px, py, size, color);
 
   /** 미리보기 상자(4×2칸) 가운데에 피스를 그린다. */
   const preview = (game, type, left, top, size, dim = false) => {
@@ -72,8 +82,11 @@ export const createRenderer = canvas => {
   const emptyBoard = createBoard();
 
   /** @param {ReturnType<typeof import("../core/engine.js").createGame> | null} game  null이면 빈 보드만 */
-  const draw = game => {
+  const draw = (game, now = performance.now()) => {
     fit();
+    const visual = getVisual();
+    palette = PALETTES[visual.palette] ?? basePalette;
+    skin = visual.skin;
     const { board, active, hold, holdUsed, queue } = game
       ? game.state
       : { board: emptyBoard, active: null, hold: null, holdUsed: false, queue: [] };
@@ -81,7 +94,10 @@ export const createRenderer = canvas => {
     const by = MARGIN_TOP * cell;
     const toY = y => by + (y - VISIBLE_TOP) * cell;
 
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const { dx, dy } = effects.shake(now, cell / 10);
+    ctx.translate(dx, dy);
 
     // 보드 바탕과 격자
     ctx.fillStyle = colors.board;
@@ -125,6 +141,8 @@ export const createRenderer = canvas => {
       ctx.globalAlpha = 1;
     }
 
+    effects.draw(ctx, { bx, cell, toY, cols: COLS }, now, colors.accent);
+
     if (!game) return;
 
     // 홀드
@@ -145,5 +163,10 @@ export const createRenderer = canvas => {
     }
   };
 
-  return { draw };
+  return {
+    draw,
+    /** 엔진 이벤트로 효과를 만든다 */
+    addEvents: (events, now = performance.now()) => effects.add(events, getVisual().effects, now),
+    clearEffects: () => effects.clear(),
+  };
 };

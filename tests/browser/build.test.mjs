@@ -145,6 +145,7 @@ test("설정: 슬라이더 값과 키 변경이 저장되고 새로고침 후에
   assert.equal(await page.locator("#settings").isVisible(), true);
 
   await page.locator("#set-das").fill("100");
+  await page.locator("#set-skin").selectOption("outline");
   // 하드 드롭 첫 칸을 W로 바꾼다.
   await page.click('.key-slot[data-action="HARD"][data-slot="0"]');
   assert.equal(await page.locator(".key-slot.is-waiting").count(), 1);
@@ -161,6 +162,7 @@ test("설정: 슬라이더 값과 키 변경이 저장되고 새로고침 후에
   await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
   await page.click("#open-settings");
   assert.equal(await page.locator("#set-das").inputValue(), "100");
+  assert.equal(await page.locator("#set-skin").inputValue(), "outline");
   assert.equal(await page.locator('.key-slot[data-action="HARD"][data-slot="0"]').textContent(), "W");
   await page.keyboard.press("Escape");
 

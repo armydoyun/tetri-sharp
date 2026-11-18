@@ -1,6 +1,6 @@
 // 설정 대화상자: 조작감(DAS·ARR·SDF)과 키 배치. 바꾸는 즉시 저장하고 onChange로 알린다.
 import { ACTIONS, DEFAULT_KEYMAP, SLOTS, assignKey, clearKey, keyLabel } from "../input/keymap.js";
-import { DEFAULT_SETTINGS, HANDLING_LIMITS, SDF_INFINITE } from "../storage/settings.js";
+import { DEFAULT_SETTINGS, HANDLING_LIMITS, SDF_INFINITE, defaultVisual } from "../storage/settings.js";
 
 const HANDLING_ROWS = [
   { key: "das", label: "DAS", hint: "누른 채로 자동 이동이 시작되기까지", unit: "ms" },
@@ -74,6 +74,58 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
     return el("section", { class: "settings-section" }, el("h3", { text: "조작감" }), ...rows);
   };
 
+  const VISUAL_ROWS = [
+    {
+      key: "effects",
+      label: "화면 효과",
+      hint: "줄 삭제 섬광·파편·흔들림",
+      options: [
+        ["full", "전체"],
+        ["reduced", "줄임 (움직임 없이)"],
+        ["off", "끄기"],
+      ],
+    },
+    {
+      key: "skin",
+      label: "블록 모양",
+      options: [
+        ["flat", "평면"],
+        ["bevel", "입체"],
+        ["outline", "윤곽선"],
+      ],
+    },
+    {
+      key: "palette",
+      label: "블록 색",
+      options: [
+        ["default", "기본"],
+        ["contrast", "색각 친화"],
+      ],
+    },
+  ];
+
+  const visualSection = () => {
+    const rows = VISUAL_ROWS.map(({ key, label, hint, options }) => {
+      const select = el("select", { id: `set-${key}`, class: "rule-select" });
+      for (const [value, text] of options) {
+        select.append(el("option", { value, text, selected: getSettings().visual[key] === value }));
+      }
+      select.addEventListener("change", () => update({ visual: { ...getSettings().visual, [key]: select.value } }));
+      return el(
+        "div",
+        { class: "settings-row rule-row" },
+        el(
+          "label",
+          { htmlFor: `set-${key}`, class: "settings-label" },
+          el("strong", { text: label }),
+          ...(hint ? [el("small", { text: hint })] : [])
+        ),
+        select
+      );
+    });
+    return el("section", { class: "settings-section" }, el("h3", { text: "화면" }), ...rows);
+  };
+
   const keysSection = () => {
     const { keymap } = getSettings();
     const rows = ACTIONS.map(action => {
@@ -111,13 +163,18 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
     const reset = el("button", { type: "button", class: "btn", text: "기본값으로" });
     reset.addEventListener("click", () => {
       capture = null;
-      onChange({ ...getSettings(), handling: { ...DEFAULT_SETTINGS.handling }, keymap: { ...DEFAULT_KEYMAP } });
+      onChange({
+        ...getSettings(),
+        handling: { ...DEFAULT_SETTINGS.handling },
+        keymap: { ...DEFAULT_KEYMAP },
+        visual: defaultVisual(),
+      });
       notice.textContent = "기본값으로 되돌렸어요.";
       render();
     });
     const close = el("button", { type: "button", class: "btn btn-primary", text: "닫기", id: "settings-close" });
     close.addEventListener("click", () => dialog.close());
-    const body = el("div", { class: "settings-body" }, handlingSection(), keysSection());
+    const body = el("div", { class: "settings-body" }, handlingSection(), visualSection(), keysSection());
     dialog.replaceChildren(
       el("h2", { class: "settings-title", text: "설정" }),
       body,
