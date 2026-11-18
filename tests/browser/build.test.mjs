@@ -185,9 +185,9 @@ test("설정: 슬라이더 값과 키 변경이 저장되고 새로고침 후에
   await context.close();
 });
 
-test("Ultra: 남은 시간이 줄어들고 하드 드롭으로 점수가 오른다, 메뉴에 여섯 모드", async () => {
+test("Ultra: 남은 시간이 줄어들고 하드 드롭으로 점수가 오른다, 메뉴에 일곱 모드", async () => {
   const { context, page, errors } = await openPage();
-  assert.equal(await page.locator(".mode-card").count(), 6);
+  assert.equal(await page.locator(".mode-card").count(), 7);
   await startMode(page, "ultra");
   assert.equal(await text(page, "hud-time-label"), "남은 시간");
   await page.waitForTimeout(300);
@@ -597,9 +597,10 @@ test("Sprint 최고 기록과 달리기: 같은 규칙에서 시작하고 상대
     localStorage.setItem("tetrisharp:replay:best", JSON.stringify({ [key]: replay }));
   }, fixture);
   await page.click('[data-rules="retro"]');
-  assert.equal(await page.locator("#start-pb-race").isDisabled(), true);
+  assert.equal(await page.locator('[data-race="sprint40"]').isDisabled(), true);
   await page.click('[data-rules="modern"]');
-  await page.click("#start-pb-race");
+  assert.equal(await page.locator('[data-race="ultra"]').isDisabled(), true, "Ultra 최고 기록은 없다");
+  await page.click('[data-race="sprint40"]');
   assert.equal(await visible(page, "race-board"), true);
   await page.waitForFunction(() => document.getElementById("race-progress").value > 0);
   await page.click("#pause-game");
@@ -618,7 +619,7 @@ test("Sprint 최고 기록과 달리기: 같은 규칙에서 시작하고 상대
     await page.keyboard.press("Space");
     await page.waitForTimeout(25);
   }
-  assert.match(await text(page, "race-result"), /완주하지 못했어요/);
+  assert.match(await text(page, "race-result"), /끝까지 가지 못했어요/);
   await page.keyboard.press("Escape");
   assert.equal(await visible(page, "race-panel"), false);
   assert.deepEqual(errors, []);

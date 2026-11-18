@@ -24,6 +24,8 @@ import { formatScore, formatTime } from "./format.js";
  * @property {readonly string[]} [hud]  정보 칸에 보일 항목(time·score·level·lines·pieces·pps·split)
  * @property {(entry: any) => string} formatRecord
  * @property {(state: any) => boolean} isRecordable  이번 판을 기록에 남길지
+ * @property {{ finish: string, progress: (state: any) => { value: number, max: number, text: string } }} [race]
+ *   "내 기록과 달리기"를 할 수 있는 모드: 최고 기록 리플레이가 끝나야 하는 결과와 진행 막대
  */
 
 // ---- 레벨·중력 ----
@@ -69,6 +71,13 @@ export const SPRINT_40 = Object.freeze({
   record: Object.freeze({ metric: "frames", order: "asc" }),
   formatRecord: recordTime,
   isRecordable: state => state.over === "clear",
+  race: Object.freeze({
+    finish: "clear",
+    progress: state => {
+      const lines = Math.min(SPRINT_GOAL, state.stats.lines);
+      return { value: lines, max: SPRINT_GOAL, text: `${lines} / ${SPRINT_GOAL}줄` };
+    },
+  }),
 });
 
 const MARATHON_GOAL = 150;
@@ -115,6 +124,14 @@ export const ULTRA = Object.freeze({
   record: Object.freeze({ metric: "score", order: "desc" }),
   formatRecord: recordScore,
   isRecordable: state => state.score > 0,
+  race: Object.freeze({
+    finish: "timeUp",
+    progress: state => ({
+      value: Math.min(ULTRA_FRAMES, state.frame),
+      max: ULTRA_FRAMES,
+      text: `${formatScore(state.score)}점`,
+    }),
+  }),
 });
 
 // ---- Master: 레벨 0 → 999. 고정할 때마다 +1(구간 끝 x99에서는 멈춤), 줄을 지우면 지운 줄 수만큼 +.
@@ -240,6 +257,86 @@ export const DIG = Object.freeze({
   record: Object.freeze({ metric: "frames", order: "asc" }),
   formatRecord: recordTime,
   isRecordable: state => state.over === "clear",
+  race: Object.freeze({
+    finish: "clear",
+    progress: state => {
+      const dug = DIG_ROWS - garbageRows(state.board);
+      return { value: dug, max: DIG_ROWS, text: `${dug} / ${DIG_ROWS}줄` };
+    },
+  }),
+});
+
+// ---- Survival: 시간이 갈수록 쓰레기 줄이 쌓여 대기한다. 줄을 지우면 대기 중인 줄을 막고(T-spin은 두 배),
+// 줄을 못 지우고 고정하면 대기 중인 줄이 한꺼번에 아래에서 올라온다. 막힐 때까지 버틴 시간이 기록. ----
+
+export const SURVIVAL_LEVEL_FRAMES = 30 * 60;
+/** 쓰레기 한 줄이 쌓이기까지의 프레임(레벨이 오를수록 짧다) */
+export const survivalInterval = level => Math.max(60, 300 - (level - 1) * 20);
+/** 줄을 지웠을 때 막는 쓰레기 줄 수 */
+export const survivalBlock = lockEvent => lockEvent.lines * (lockEvent.tspin === "full" ? 2 : 1);
+/** 같은 구멍이 이어질 확률(%) — 구멍이 한 열에 모여 있어야 파낼 수 있다 */
+const SAME_HOLE = 70;
+
+/** 보드를 n줄 밀어 올리고 아래에 구멍 하나짜리 쓰레기 줄을 넣는다. */
+export const raiseGarbage = (board, n, nextHole) => {
+  const w = board.width;
+  board.cells.copyWithin(0, n * w);
+  for (let i = 0; i < n; i++) {
+    const y = board.height - n + i;
+    const hole = nextHole();
+    for (let x = 0; x < w; x++) set(board, x, y, x === hole ? 0 : GARBAGE);
+  }
+};
+
+/** @type {Mode} */
+export const SURVIVAL = Object.freeze({
+  id: "survival",
+  hud: Object.freeze(["time", "level", "lines", "pieces", "pps"]),
+  name: "Survival",
+  description: "올라오는 쓰레기 줄 버티기 · 줄을 지우면 막아요",
+  rules: MODERN,
+  setup: (state, rng) => {
+    state.garbage = { pending: 0, timer: 0, hole: rng.int(10), received: 0, blocked: 0, rng };
+  },
+  levelFor: state => Math.min(MAX_LEVEL, 1 + Math.floor(state.frame / SURVIVAL_LEVEL_FRAMES)),
+  gravityFor: state => guidelineGravity(Math.min(state.level, 10)),
+  onFrame: (state, events) => {
+    const g = state.garbage;
+    g.timer += 1;
+    if (g.timer < survivalInterval(state.level)) return;
+    g.timer = 0;
+    g.pending += 1;
+    events.push({ type: "garbagePending", pending: g.pending });
+  },
+  onLock: (state, ev, events) => {
+    const g = state.garbage;
+    if (ev.lines > 0) {
+      const blocked = Math.min(g.pending, survivalBlock(ev));
+      g.pending -= blocked;
+      g.blocked += blocked;
+      return false;
+    }
+    if (!g.pending) return false;
+    const n = Math.min(g.pending, 12);
+    raiseGarbage(state.board, n, () => {
+      if (g.rng.int(100) >= SAME_HOLE) {
+        const h = g.rng.int(state.board.width - 1);
+        g.hole = h >= g.hole ? h + 1 : h;
+      }
+      return g.hole;
+    });
+    g.received += n;
+    g.pending -= n;
+    events.push({ type: "garbage", rows: n });
+    return false;
+  },
+  check: () => null,
+  hudLines: state => ({ label: "받을 쓰레기", value: String(state.garbage.pending) }),
+  hudTime: elapsed,
+  summary: state => ({ title: "게임 오버", main: formatTime(state.frame) }),
+  record: Object.freeze({ metric: "frames", order: "desc" }),
+  formatRecord: recordTime,
+  isRecordable: state => state.stats.pieces > 0,
 });
 
 /** @type {Mode} */
@@ -258,5 +355,7 @@ export const ZEN = Object.freeze({
   isRecordable: state => state.stats.lines > 0,
 });
 
-export const MODES = Object.freeze([SPRINT_40, MARATHON, ULTRA, MASTER, DIG, ZEN]);
+export const MODES = Object.freeze([SPRINT_40, MARATHON, ULTRA, MASTER, DIG, SURVIVAL, ZEN]);
+/** "내 기록과 달리기"를 할 수 있는 모드 */
+export const RACE_MODES = Object.freeze(MODES.filter(m => m.race));
 export const findMode = id => MODES.find(m => m.id === id) ?? findPractice(id) ?? SPRINT_40;

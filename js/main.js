@@ -6,7 +6,7 @@ import { createKeyboard } from "./input/keyboard.js";
 import { createTouch, touchVisible } from "./input/touch.js";
 import { PAD_ICONS, compilePadmap, createGamepad, padButtonName } from "./input/gamepad.js";
 import { ACTIONS, compileKeymap } from "./input/keymap.js";
-import { MODES, SPRINT_40, findMode } from "./modes/index.js";
+import { MODES, RACE_MODES, findMode } from "./modes/index.js";
 import { formatScore, formatTime } from "./modes/format.js";
 import { clearName } from "./rules/scoring/guideline.js";
 import { createStore } from "./storage/store.js";
@@ -23,6 +23,7 @@ import { hydrateIcons, icon } from "./ui/icons.js";
 import { keycap } from "./ui/keycap.js";
 import {
   MAX_RANKED,
+  replayMatches,
   createPlayer,
   createRecorder,
   createReplayStore,
@@ -69,7 +70,6 @@ const sfx = createSfx({ getVolume: () => settings.volume });
 const racePanel = $("race-panel");
 const raceProgress = /** @type {HTMLProgressElement} */ ($("race-progress"));
 const raceLabel = $("race-progress-label");
-const raceEntry = /** @type {HTMLButtonElement} */ ($("start-pb-race"));
 const raceBoard = /** @type {HTMLCanvasElement} */ ($("race-board"));
 const raceBoardVisible = window.matchMedia("(width > 720px)");
 const raceRenderer = createRenderer(raceBoard, {
@@ -209,19 +209,18 @@ const renderRuleTabs = () => {
       : `${RULE_DESCRIPTIONS[ruleChoice]} 바꾸고 싶으면 Custom을 골라 편집하세요.`;
 };
 
-const raceTargetFor = ruleSet => {
-  const best = records.best(SPRINT_40, ruleSet);
+/** 이 모드·규칙의 최고 기록과 그 리플레이(둘이 같은 판이고, 끝까지 간 판일 때만) */
+const raceTargetFor = (m, ruleSet) => {
+  if (!m.race) return null;
+  const best = records.best(m, ruleSet);
   if (!best) return null;
-  const replay = replays.best(recordKey(SPRINT_40, ruleSet));
+  const replay = replays.best(recordKey(m, ruleSet));
   if (
     !replay ||
-    replay.mode !== SPRINT_40.id ||
+    replay.mode !== m.id ||
     replay.rules.id !== ruleSet.id ||
-    replay.result.over !== "clear" ||
-    replay.result.lines < SPRINT_40.goal ||
-    replay.result.frames !== best.frames ||
-    replay.result.lines !== best.lines ||
-    replay.result.pieces !== best.pieces
+    replay.result.over !== m.race.finish ||
+    !replayMatches(replay, best)
   )
     return null;
   return { replay, best };
@@ -229,19 +228,53 @@ const raceTargetFor = ruleSet => {
 
 const updateRaceProgress = () => {
   if (!race) return;
-  const lines = Math.min(SPRINT_40.goal, race.player.game.state.stats.lines);
-  raceProgress.value = lines;
-  raceLabel.textContent = race.player.done ? formatTime(race.target.best.frames) : `${lines} / ${SPRINT_40.goal}줄`;
+  const p = mode.race.progress(race.player.game.state);
+  raceProgress.max = p.max;
+  raceProgress.value = p.value;
+  raceLabel.textContent = race.player.done ? mode.formatRecord(race.target.best) : p.text;
+};
+
+const startRace = m => {
+  const selected = currentRules();
+  const target = raceTargetFor(m, selected);
+  if (!target) return;
+  let targetSplits = [];
+  const verified = verifyReplay(target.replay, findMode, state => {
+    if (m.splits) targetSplits = advanceSplits(m.splits, targetSplits, state.stats.lines, state.frame);
+  });
+  if (!verified.ok || verified.actual.over !== m.race.finish) {
+    showMenuNotice("이 최고 기록은 현재 버전에서 재현할 수 없어요. 새 최고 기록이 필요해요.");
+    return;
+  }
+  start(m, selected, { ...target, splits: targetSplits });
+};
+
+const renderRaceModes = ruleSet => {
+  $("race-modes").replaceChildren(
+    ...RACE_MODES.map(m => {
+      const target = raceTargetFor(m, ruleSet);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "tool-row race-mode";
+      btn.dataset.race = m.id;
+      btn.disabled = !target;
+      const name = document.createElement("strong");
+      name.textContent = m.name;
+      const info = document.createElement("small");
+      info.textContent = target ? m.formatRecord(target.best) : "끝까지 간 리플레이 필요";
+      const body = document.createElement("span");
+      body.append(name, info);
+      btn.append(body, icon("arrow-right"));
+      btn.addEventListener("click", () => startRace(m));
+      return btn;
+    })
+  );
 };
 
 const renderMenu = () => {
   renderRuleTabs();
   const ruleSet = currentRules();
-  const target = raceTargetFor(ruleSet);
-  raceEntry.disabled = !target;
-  $("race-availability").textContent = target
-    ? `Sprint 40L · ${formatTime(target.best.frames)}`
-    : "Sprint 40L 완주 리플레이 필요";
+  renderRaceModes(ruleSet);
   const list = $("mode-list");
   list.replaceChildren(
     ...MODES.map(m => {
@@ -348,21 +381,6 @@ const start = (m, selectedRules = currentRules(), target = null) => {
   sfx.play("ready");
 };
 
-raceEntry.addEventListener("click", () => {
-  const selected = currentRules();
-  const target = raceTargetFor(selected);
-  if (!target) return;
-  let targetSplits = [];
-  const verified = verifyReplay(target.replay, findMode, state => {
-    targetSplits = advanceSplits(SPRINT_40.splits, targetSplits, state.stats.lines, state.frame);
-  });
-  if (!verified.ok || verified.actual.over !== "clear") {
-    showMenuNotice("이 최고 기록은 현재 버전에서 재현할 수 없어요. 새 최고 기록이 필요해요.");
-    return;
-  }
-  start(SPRINT_40, selected, { ...target, splits: targetSplits });
-});
-
 let pausedFrom = /** @type {"play" | "countdown"} */ ("play");
 
 const pause = () => {
@@ -409,6 +427,21 @@ const renderResultSplits = () => {
     : "구간 기록";
 };
 
+/** 달리기 결과 한 줄: 시간 기록 모드는 시간 차, 점수 모드는 점수 차 */
+const raceResultText = (state, best) => {
+  if (state.over !== mode.race.finish) return `끝까지 가지 못했어요 · 상대 기록 ${mode.formatRecord(best)}`;
+  if (mode.record.metric === "score") {
+    const diff = state.score - (best.score ?? 0);
+    return diff === 0
+      ? "내 최고 기록과 같은 점수예요."
+      : `이전 최고 기록보다 ${formatScore(Math.abs(diff))}점 ${diff > 0 ? "높아요" : "낮아요"}.`;
+  }
+  const delta = state.frame - best.frames;
+  return delta === 0
+    ? "내 최고 기록과 같은 시간이에요."
+    : `이전 최고 기록보다 ${(Math.abs(delta) / 60).toFixed(2)}초 ${delta < 0 ? "빨라요" : "느려요"}.`;
+};
+
 const finish = () => {
   if (!game) return;
   const state = game.state;
@@ -444,14 +477,7 @@ const finish = () => {
   $("results-main").textContent = summary.main;
   $("results-badge").classList.toggle("is-invisible", !outcome?.isBest);
 
-  const delta = race && state.over === "clear" ? state.frame - race.target.best.frames : null;
-  $("race-result").textContent = !race
-    ? ""
-    : delta === null
-      ? `완주하지 못했어요 · 상대 기록 ${formatTime(race.target.best.frames)}`
-      : delta === 0
-        ? "내 최고 기록과 같은 시간이에요."
-        : `이전 최고 기록보다 ${(Math.abs(delta) / 60).toFixed(2)}초 ${delta < 0 ? "빨라요" : "느려요"}.`;
+  $("race-result").textContent = race ? raceResultText(state, race.target.best) : "";
 
   const seconds = state.frame / 60;
   const rows = [
