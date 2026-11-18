@@ -1,4 +1,5 @@
-// 설정 대화상자: 조작감(DAS·ARR·SDF), 화면, 키 배치. 바꾸는 즉시 저장하고 onChange로 알린다.
+// 설정 대화상자: 탭 네 개(조작 · 화면 · 키보드 · 게임패드). 바꾸는 즉시 저장하고 onChange로 알린다.
+// 대화상자 높이는 고정이라 탭을 바꿔도 창 크기가 그대로다(원칙 2).
 import { ACTIONS, DEFAULT_KEYMAP, SLOTS, assignKey, clearKey, keyLabel } from "../input/keymap.js";
 import {
   DEFAULT_PADMAP,
@@ -11,45 +12,45 @@ import {
 } from "../input/gamepad.js";
 import { icon } from "./icons.js";
 import { DEFAULT_SETTINGS, HANDLING_LIMITS, SDF_INFINITE, defaultVisual } from "../storage/settings.js";
-import { button, el, fieldRow, fillDialog } from "./dom.js";
+import { button, choice, choiceCards, el, fieldRow, fillDialog, tabBar } from "./dom.js";
 import { THEMES, THEME_IDS } from "../render/themes.js";
 import { keycap } from "./keycap.js";
 
 const HANDLING_ROWS = [
-  { key: "das", label: "DAS", hint: "누른 채로 자동 이동이 시작되기까지" },
-  { key: "arr", label: "ARR", hint: "자동 이동 한 칸 간격 (0 = 즉시 벽까지)" },
-  { key: "sdf", label: "SDF", hint: "소프트 드롭 속도 배율 (맨 끝 = 즉시)" },
+  { key: "das", label: "DAS (자동 이동 시작)", hint: "방향키를 누른 채로 있을 때 자동 이동이 시작되기까지의 시간" },
+  { key: "arr", label: "ARR (자동 이동 간격)", hint: "자동 이동 중 한 칸씩 움직이는 간격. 0이면 바로 벽까지" },
+  { key: "sdf", label: "SDF (소프트 드롭 속도)", hint: "아래 키를 누를 때 떨어지는 속도 배율. 맨 끝은 즉시 바닥까지" },
+];
+
+const TABS = [
+  ["control", "조작"],
+  ["visual", "화면"],
+  ["keys", "키보드"],
+  ["pad", "게임패드"],
 ];
 
 const formatValue = (key, v) => (key === "sdf" ? (v >= SDF_INFINITE ? "즉시" : `${v}배`) : `${v} ms`);
 
-const VISUAL_ROWS = [
-  {
-    key: "theme",
-    label: "게임 테마",
-    hint: "블록 모양·격자·움직임·연출",
-    options: THEME_IDS.map(id => [id, `${THEMES[id].name} · ${THEMES[id].description}`]),
-  },
-  {
-    key: "effects",
-    label: "화면 효과",
-    hint: "모든 테마에 적용 · 줄임은 움직임 없이",
-    options: [
-      ["full", "전체"],
-      ["reduced", "줄임 (움직임 없이)"],
-      ["off", "끄기"],
-    ],
-  },
-  {
-    key: "palette",
-    label: "블록 색",
-    hint: "모든 테마에 적용",
-    options: [
-      ["theme", "테마 색"],
-      ["contrast", "색각 친화"],
-    ],
-  },
+const EFFECT_OPTIONS = [
+  ["full", "전체"],
+  ["reduced", "줄임"],
+  ["off", "끄기"],
 ];
+const EFFECT_HINTS = {
+  full: "테마가 정한 연출을 모두 보여요(섬광·파편·흔들림·미끄러짐)",
+  reduced: "움직이는 연출 없이 섬광·반짝임만 보여요",
+  off: "연출을 모두 꺼요",
+};
+const TOUCH_OPTIONS = [
+  ["auto", "자동"],
+  ["on", "켜기"],
+  ["off", "끄기"],
+];
+const TOUCH_HINTS = {
+  auto: "터치 화면이면 보드 아래에 조작 버튼을 보여요",
+  on: "늘 보드 아래에 조작 버튼을 보여요",
+  off: "조작 버튼을 숨겨요",
+};
 
 /**
  * @param {{
@@ -70,7 +71,6 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
     el(
       "section",
       { class: "field-section" },
-      el("h3", { text: "조작감" }),
       ...HANDLING_ROWS.map(({ key, label, hint }) => {
         const limits = HANDLING_LIMITS[key];
         const value = getSettings().handling[key];
@@ -91,34 +91,75 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
         });
         return fieldRow({ id, label, hint, control: el("span", { class: "range" }, input, output) });
       }),
-      (() => {
-        const select = el("select", { id: "set-touch", class: "select" });
-        for (const [value, text] of [
-          ["auto", "자동 (터치 화면이면 보이기)"],
-          ["on", "켜기"],
-          ["off", "끄기"],
-        ])
-          select.append(el("option", { value, text, selected: getSettings().touch === value }));
-        select.addEventListener("change", () => update({ touch: select.value }));
-        return fieldRow({ id: "set-touch", label: "터치 버튼", hint: "보드 아래 조작 버튼", control: select });
-      })()
-    );
-
-  const visualSection = () =>
-    el(
-      "section",
-      { class: "field-section" },
-      el("h3", { text: "화면" }),
-      ...VISUAL_ROWS.map(({ key, label, hint, options }) => {
-        const id = `set-${key}`;
-        const select = el("select", { id, class: "select" });
-        for (const [value, text] of options) {
-          select.append(el("option", { value, text, selected: getSettings().visual[key] === value }));
-        }
-        select.addEventListener("change", () => update({ visual: { ...getSettings().visual, [key]: select.value } }));
-        return fieldRow({ id, label, hint, control: select });
+      fieldRow({
+        id: "set-touch",
+        label: "터치 버튼",
+        hint: TOUCH_HINTS[getSettings().touch],
+        control: choice({
+          id: "set-touch",
+          label: "터치 버튼",
+          options: TOUCH_OPTIONS,
+          value: getSettings().touch,
+          onChange: v => {
+            update({ touch: v });
+            render();
+          },
+        }),
       })
     );
+
+  const setVisual = (key, v) => {
+    update({ visual: { ...getSettings().visual, [key]: v } });
+    render();
+  };
+
+  const visualSection = () => {
+    const visual = getSettings().visual;
+    return el(
+      "section",
+      { class: "field-section" },
+      fieldRow({
+        id: "set-theme",
+        label: "게임 테마",
+        hint: "보드의 블록 모양·색·격자·움직임·연출이 바뀌어요. 메뉴와 설정 화면은 그대로예요",
+        className: "is-wide",
+        control: choiceCards({
+          id: "set-theme",
+          label: "게임 테마",
+          options: THEME_IDS.map(id => ({ value: id, title: THEMES[id].name, desc: THEMES[id].description })),
+          value: visual.theme,
+          onChange: v => setVisual("theme", v),
+        }),
+      }),
+      fieldRow({
+        id: "set-effects",
+        label: "화면 효과",
+        hint: EFFECT_HINTS[visual.effects],
+        control: choice({
+          id: "set-effects",
+          label: "화면 효과",
+          options: EFFECT_OPTIONS,
+          value: visual.effects,
+          onChange: v => setVisual("effects", v),
+        }),
+      }),
+      fieldRow({
+        id: "set-palette",
+        label: "블록 색",
+        hint: visual.palette === "contrast" ? "색을 구분하기 쉬운 색 조합을 써요" : "고른 테마의 색을 써요",
+        control: choice({
+          id: "set-palette",
+          label: "블록 색",
+          options: [
+            ["theme", "테마 색"],
+            ["contrast", "색각 친화"],
+          ],
+          value: visual.palette,
+          onChange: v => setVisual("palette", v),
+        }),
+      })
+    );
+  };
 
   /** 게임패드 버튼 하나를 키캡 모양으로(십자키는 화살표 아이콘) */
   const padCap = i => {
@@ -138,7 +179,6 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
     return el(
       "section",
       { class: "field-section" },
-      el("h3", { text: kind === "key" ? "키 배치" : "게임패드 버튼" }),
       el("p", {
         class: "field-help",
         text:
@@ -176,6 +216,14 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
     );
   };
 
+  let tab = "control";
+  const sectionFor = t =>
+    t === "control"
+      ? handlingSection()
+      : t === "visual"
+        ? visualSection()
+        : bindingSection(t === "keys" ? "key" : "pad");
+
   const render = () => {
     const scroll = dialog.querySelector(".dialog-body")?.scrollTop ?? 0;
     const reset = button({ text: "기본값으로", iconName: "reset", id: "settings-reset" });
@@ -189,11 +237,23 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
         touch: "auto",
         visual: defaultVisual(),
       });
-      notice.textContent = "기본값으로 되돌렸어요.";
+      notice.textContent = "모든 설정을 기본값으로 되돌렸어요.";
       render();
     });
-    const body = el("div", {}, handlingSection(), visualSection(), bindingSection("key"), bindingSection("pad"));
-    fillDialog(dialog, { title: "설정", body, notice, actions: [reset], closeId: "settings-close" });
+    const tabs = tabBar({
+      tabs: TABS,
+      active: tab,
+      onSelect: t => {
+        tab = t;
+        capture = null;
+        render();
+        const b = dialog.querySelector(".dialog-body");
+        if (b) b.scrollTop = 0;
+        /** @type {HTMLElement | null} */ (dialog.querySelector(`.dialog-tabs [data-value="${t}"]`))?.focus();
+      },
+    });
+    const body = el("div", {}, sectionFor(tab));
+    fillDialog(dialog, { title: "설정", body, notice, actions: [reset], closeId: "settings-close", tabs });
     body.scrollTop = scroll;
   };
 
@@ -275,8 +335,10 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
   });
 
   return {
-    open() {
+    /** @param {string} [startTab] 처음 보여 줄 탭(control · visual · keys · pad) */
+    open(startTab) {
       capture = null;
+      if (startTab) tab = startTab;
       render();
       dialog.showModal();
       /** @type {HTMLElement | null} */ (dialog.querySelector("#settings-close"))?.focus();

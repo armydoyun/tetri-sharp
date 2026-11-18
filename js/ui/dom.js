@@ -29,14 +29,16 @@ export const button = ({ text, iconName, className = "btn", ...attrs }) =>
  * @param {HTMLDialogElement} dialog
  * @param {{ title: string, body: HTMLElement, notice: HTMLElement, actions: HTMLElement[], closeId: string }} parts
  */
-export const fillDialog = (dialog, { title, body, notice, actions, closeId }) => {
+export const fillDialog = (dialog, { title, body, notice, actions, closeId, tabs = null }) => {
   const close = el("button", { type: "button", class: "btn btn-ghost btn-small", "aria-label": "닫기" }, icon("close"));
   close.addEventListener("click", () => dialog.close());
   const done = button({ text: "닫기", className: "btn btn-primary", id: closeId });
   done.addEventListener("click", () => dialog.close());
   body.classList.add("dialog-body");
+  dialog.classList.toggle("dialog-tabbed", Boolean(tabs));
   dialog.replaceChildren(
     el("header", { class: "dialog-head" }, el("h2", { class: "dialog-title", text: title }), close),
+    ...(tabs ? [el("div", { class: "dialog-tabs" }, tabs)] : []),
     body,
     el("footer", { class: "dialog-foot" }, notice, ...actions, done)
   );
@@ -59,3 +61,40 @@ export const fieldRow = ({ id, label, hint, control, disabled = false, className
     ),
     control
   );
+
+/**
+ * 세그먼트 선택(짧은 선택지 2~4개). 칸 폭이 같고 고른 칸은 색만 바뀐다.
+ * @param {{ id: string, label: string, options: ReadonlyArray<[string, string]>, value: string, onChange: (v: string) => void, className?: string }} o
+ */
+export const choice = ({ id, label, options, value, onChange, className = "choice" }) => {
+  const group = el("div", { class: className, role: "group", id, "aria-label": label });
+  for (const [v, text] of options) {
+    const b = el("button", { type: "button", text, "data-value": v, "aria-pressed": String(v === value) });
+    b.addEventListener("click", () => onChange(v));
+    group.append(b);
+  }
+  return group;
+};
+
+/**
+ * 카드형 선택(이름 + 설명이 긴 선택지). 설명은 잘리지 않고 줄바꿈한다.
+ * @param {{ id: string, label: string, options: ReadonlyArray<{ value: string, title: string, desc: string }>, value: string, onChange: (v: string) => void }} o
+ */
+export const choiceCards = ({ id, label, options, value, onChange }) => {
+  const group = el("div", { class: "choice-cards", role: "group", id, "aria-label": label });
+  for (const o of options) {
+    const b = el(
+      "button",
+      { type: "button", class: "choice-card", "data-value": o.value, "aria-pressed": String(o.value === value) },
+      el("strong", { text: o.title }),
+      el("small", { text: o.desc })
+    );
+    b.addEventListener("click", () => onChange(o.value));
+    group.append(b);
+  }
+  return group;
+};
+
+/** 대화상자 탭 줄 */
+export const tabBar = ({ tabs, active, onSelect }) =>
+  choice({ id: "dialog-tab", label: "구역", options: tabs, value: active, onChange: onSelect, className: "segmented" });

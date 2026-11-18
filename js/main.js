@@ -109,7 +109,10 @@ const padCap = i => {
 /** 안내 한 칸: 동작 이름 + 키캡들 */
 const helpItem = (label, caps) => {
   const span = document.createElement("span");
-  span.append(label, ...caps);
+  const name = document.createElement("span");
+  name.className = "keys-label";
+  name.textContent = label;
+  span.append(name, ...caps);
   return span;
 };
 
@@ -148,6 +151,13 @@ const renderKeyHelp = () => {
   }
 };
 
+/** 프리셋 한 줄 설명(첫 화면 규칙 카드) */
+const RULE_DESCRIPTIONS = {
+  modern: "요즘 표준: SRS 회전, 7-Bag, 홀드·하드 드롭·고스트, 넥스트 5개, T-spin 점수.",
+  retro: "옛날 가정용 게임 느낌: 벽차기·홀드·하드 드롭·고스트 없음, 닿으면 바로 고정, 조작감 고정.",
+  arcade: "아케이드 느낌: ARS 회전, 최근 4개를 피하는 생성기, 생성·줄 삭제 지연, 미리 회전(IRS).",
+};
+
 const renderRuleTabs = () => {
   const tabs = $("rule-tabs");
   tabs.replaceChildren(
@@ -168,8 +178,12 @@ const renderRuleTabs = () => {
       return b;
     })
   );
-  // 편집 버튼은 늘 같은 자리에 있다. Custom이 아닐 때는 비활성(원칙 2).
+  // 편집 버튼은 늘 같은 자리에 있다. Custom이 아닐 때는 비활성(원칙 2) — 이유는 설명 줄에.
   /** @type {HTMLButtonElement} */ ($("edit-rules")).disabled = ruleChoice !== "custom";
+  $("rule-desc").textContent =
+    ruleChoice === "custom"
+      ? `직접 조합한 규칙이에요. "편집"으로 바꿀 수 있고, 조합마다 기록이 따로 쌓여요 (기록표 ${makeCustomRules(customBody).id}).`
+      : `${RULE_DESCRIPTIONS[ruleChoice]} 바꾸고 싶으면 Custom을 골라 편집하세요.`;
 };
 
 const renderMenu = () => {
@@ -220,6 +234,7 @@ const updateHud = () => {
 
 const setScreen = next => {
   screen = next;
+  document.body.dataset.screen = next;
   keyboard.setEnabled(next === "play" || next === "countdown");
   touch.setEnabled(next === "play" || next === "countdown");
 };
@@ -244,6 +259,11 @@ const start = m => {
   game = createGame({ rules, handling: toEngineHandling(settings.handling), seed, mode: m });
   recorder = createRecorder({ seed, mode: m, rules, handling: game.handling });
   splits = [];
+  // 정보 칸: 이 모드에 필요한 칸만(게임 중에는 바뀌지 않는다)
+  const items = m.hud ?? ["time", "score", "level", "lines", "pieces", "pps"];
+  for (const cell of document.querySelectorAll(".hud [data-hud]")) {
+    cell.classList.toggle("is-off", !items.includes(cell.getAttribute("data-hud")));
+  }
   pbSplits = records.best(m, rules)?.splits;
   acc = 0;
   countdown = READY_FRAMES;
@@ -449,10 +469,14 @@ const keyboard = createKeyboard({ getBindings: () => bindings, onSystem: handleS
 const touch = createTouch({ root: $("touchpad"), onSystem: handleSystem });
 
 /** 터치 버튼 보이기: 설정 + 기기(굵은 포인터). 설정을 바꿀 때만 바뀐다(원칙 2). */
+// 터치 화면 판정: 굵은 포인터이거나, 마우스 올리기가 없는 화면에서 터치를 지원할 때(iPhone 등)
 const coarse = typeof matchMedia === "function" ? matchMedia("(pointer: coarse)") : null;
-const applyTouch = () =>
-  document.body.classList.toggle("touch-on", touchVisible(settings.touch, Boolean(coarse?.matches)));
+const noHover = typeof matchMedia === "function" ? matchMedia("(hover: none)") : null;
+const isTouchScreen = () =>
+  Boolean(coarse?.matches) || (Boolean(noHover?.matches) && (navigator.maxTouchPoints ?? 0) > 0);
+const applyTouch = () => document.body.classList.toggle("touch-on", touchVisible(settings.touch, isTouchScreen()));
 coarse?.addEventListener?.("change", applyTouch);
+noHover?.addEventListener?.("change", applyTouch);
 
 /** 메뉴·결과·일시정지 화면에서 게임패드로 버튼 사이를 옮겨 다니고 누른다. */
 const handlePadMenu = action => {
@@ -517,9 +541,12 @@ const replayStatus = $("replay-status");
 const menuNotice = $("menu-notice");
 
 const updateReplayBar = () => {
-  const toggle = /** @type {HTMLElement} */ (replayBar.querySelector('[data-replay="toggle"]'));
-  toggle.replaceChildren(icon(replayPaused ? "play" : "pause"));
-  toggle.setAttribute("aria-label", replayPaused ? "재생" : "일시정지");
+  /** @type {HTMLElement} */ (replayBar.querySelector(".replay-toggle-icon")).replaceChildren(
+    icon(replayPaused ? "play" : "pause")
+  );
+  /** @type {HTMLElement} */ (replayBar.querySelector(".replay-toggle-text")).textContent = replayPaused
+    ? "재생"
+    : "일시정지";
   /** @type {HTMLElement} */ (replayBar.querySelector(".replay-speed")).textContent = `${replaySpeed}x`;
   replayStatus.textContent = player?.done ? "끝" : "";
 };

@@ -21,6 +21,7 @@ import { formatScore, formatTime } from "./format.js";
  * @property {{ metric: "frames" | "lines" | "score" | "level", order: "asc" | "desc" }} record  순위 기준
  * @property {(state: any) => string} [hudLevel]  HUD 레벨 칸 (기본: 레벨 숫자)
  * @property {readonly number[]} [splits]  구간 기록을 남길 줄 수
+ * @property {readonly string[]} [hud]  정보 칸에 보일 항목(time·score·level·lines·pieces·pps·split)
  * @property {(entry: any) => string} formatRecord
  * @property {(state: any) => boolean} isRecordable  이번 판을 기록에 남길지
  */
@@ -57,6 +58,7 @@ export const SPRINT_40 = Object.freeze({
   goal: SPRINT_GOAL,
   /** 구간 기록: 이 줄 수에 닿은 시각을 남겨 최고 기록과 비교한다 */
   splits: Object.freeze([10, 20, 30, 40]),
+  hud: Object.freeze(["time", "lines", "pieces", "pps", "split"]),
   check: state => (state.stats.lines >= SPRINT_GOAL ? { result: "clear" } : null),
   hudLines: state => ({ label: "남은 줄", value: String(Math.max(0, SPRINT_GOAL - state.stats.lines)) }),
   hudTime: elapsed,
@@ -74,6 +76,7 @@ const MARATHON_GOAL = 150;
 /** @type {Mode} */
 export const MARATHON = Object.freeze({
   id: "marathon",
+  hud: Object.freeze(["time", "score", "level", "lines", "pieces", "pps"]),
   name: "Marathon",
   description: "150줄 · 10줄마다 빨라진다",
   rules: MODERN,
@@ -97,6 +100,7 @@ const ULTRA_FRAMES = 2 * 60 * 60;
 /** @type {Mode} */
 export const ULTRA = Object.freeze({
   id: "ultra",
+  hud: Object.freeze(["time", "score", "lines", "pieces", "pps"]),
   name: "Ultra",
   description: "2분 동안 최고 점수",
   rules: MODERN,
@@ -161,6 +165,7 @@ const MASTER_MAX = 999;
 /** @type {Mode} */
 export const MASTER = Object.freeze({
   id: "master",
+  hud: Object.freeze(["time", "level", "lines", "pieces", "pps"]),
   name: "Master",
   description: "레벨 999까지 · 500부터 20G",
   rules: MODERN,
@@ -208,6 +213,7 @@ export const garbageRows = board => {
 /** @type {Mode} */
 export const DIG = Object.freeze({
   id: "dig",
+  hud: Object.freeze(["time", "lines", "pieces", "pps"]),
   name: "Dig",
   description: `쓰레기 ${DIG_ROWS}줄을 가장 빨리 파내기`,
   rules: MODERN,
@@ -239,6 +245,7 @@ export const DIG = Object.freeze({
 /** @type {Mode} */
 export const ZEN = Object.freeze({
   id: "zen",
+  hud: Object.freeze(["time", "score", "lines", "pieces", "pps"]),
   name: "Endless",
   description: "막힐 때까지 끝없이",
   rules: MODERN,

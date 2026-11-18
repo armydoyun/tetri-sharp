@@ -72,6 +72,7 @@ export const practiceMode = drill => {
     description: drill.description,
     rules: MODERN,
     practice: true,
+    hud: Object.freeze(["time", "lines", "pieces"]),
     ...(drill.sequence ? { sequence: drill.sequence } : {}),
     setup: (state, rng) => {
       state.practice = { tries: 0, success: 0, rng };

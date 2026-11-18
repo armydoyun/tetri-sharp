@@ -146,7 +146,9 @@ test("설정: 슬라이더 값과 키 변경이 저장되고 새로고침 후에
   assert.equal(await page.locator("#settings").isVisible(), true);
 
   await page.locator("#set-das").fill("100");
-  await page.locator("#set-theme").selectOption("retro");
+  await page.click('.dialog-tabs [data-value="visual"]');
+  await page.click('#set-theme [data-value="retro"]');
+  await page.click('.dialog-tabs [data-value="keys"]');
   // 하드 드롭 첫 칸을 W로 바꾼다.
   await page.click('.key-slot[data-kind="key"][data-action="HARD"][data-slot="0"]');
   assert.equal(await page.locator(".key-slot.is-waiting").count(), 1);
@@ -162,8 +164,11 @@ test("설정: 슬라이더 값과 키 변경이 저장되고 새로고침 후에
   await page.reload();
   await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
   await page.click("#open-settings");
+  await page.click('.dialog-tabs [data-value="control"]');
   assert.equal(await page.locator("#set-das").inputValue(), "100");
-  assert.equal(await page.locator("#set-theme").inputValue(), "retro");
+  await page.click('.dialog-tabs [data-value="visual"]');
+  assert.equal(await page.locator('#set-theme [data-value="retro"]').getAttribute("aria-pressed"), "true");
+  await page.click('.dialog-tabs [data-value="keys"]');
   assert.equal(await page.locator('.key-slot[data-kind="key"][data-action="HARD"][data-slot="0"]').textContent(), "W");
   await page.keyboard.press("Escape");
 
@@ -238,9 +243,11 @@ test("Custom 규칙: 편집 내용이 저장되고 기록표 id가 바뀌며, �
   assert.notEqual(after, before, "조합이 바뀌면 기록표도 바뀐다");
   // 프리셋 버튼으로 채우면 해당 값으로 바뀐다
   await page.click('[data-preset="arcade"]');
-  assert.equal(
-    await page.locator("#rule-rotation option:checked").textContent(),
-    "ARS — 좌우 1칸만, 중앙열 규칙 (아케이드)"
+  assert.equal(await page.locator("#rule-rotation option:checked").textContent(), "ARS");
+  assert.match(
+    await page.locator('label[for="rule-rotation"] small').textContent(),
+    /중앙열/,
+    "고른 선택지의 설명은 아래 줄에"
   );
   await page.locator("#rule-hardDrop").uncheck();
   await page.click("#rules-close");
@@ -392,19 +399,34 @@ test("레이아웃 고정: 규칙 탭을 바꾸거나 메뉴 알림이 생겨도
   await context.close();
 });
 
-test("레이아웃 고정: 규칙 편집에서 조건 항목이 비활성이 돼도 줄이 움직이지 않는다", async () => {
+test("레이아웃 고정: 규칙 편집에서 조건 항목이 비활성이 돼도 줄이 움직이지 않고, 탭을 바꿔도 창 크기가 그대로", async () => {
   const { context, page, errors } = await openPage();
   await page.click('[data-rules="custom"]');
   await page.click("#edit-rules");
+  const size = () =>
+    page.evaluate(() => {
+      const r = document.getElementById("rules-editor").getBoundingClientRect();
+      return [Math.round(r.width), Math.round(r.height)];
+    });
+  const dialogSize = await size();
   const rows = () =>
     page.evaluate(() => [...document.querySelectorAll("#rules-editor .field-row")].map(r => Math.round(r.offsetTop)));
-  const before = await rows();
+
+  await page.click('.dialog-tabs [data-value="고정·낙하"]');
+  const lockRows = await rows();
   await page.selectOption("#rule-lock-type", { label: "닿으면 다음 낙하 때 즉시 고정" });
   assert.equal(await page.locator("#rule-lock-delay").isDisabled(), true, "고정 지연은 비활성");
-  await page.locator("#rule-hold-enabled").uncheck();
-  await page.locator("#rule-fixedHandlingOn").check();
-  assert.deepEqual(await rows(), before);
+  assert.deepEqual(await rows(), lockRows);
   assert.match(await page.locator('label[for="rule-lock-delay"] small').textContent(), /즉시 고정/, "이유가 보인다");
+
+  await page.click('.dialog-tabs [data-value="조작"]');
+  const controlRows = await rows();
+  await page.locator("#rule-fixedHandlingOn").check();
+  assert.deepEqual(await rows(), controlRows);
+  for (const t of ["피스", "점수", "공유", "고정·낙하"]) {
+    await page.click(`.dialog-tabs [data-value="${t}"]`);
+    assert.deepEqual(await size(), dialogSize, `${t} 탭에서도 같은 크기`);
+  }
   assert.deepEqual(errors, []);
   await context.close();
 });
@@ -424,7 +446,8 @@ test("레이아웃 고정: 게임 중 점수·시간이 길어져도 보드와 �
 test("레이아웃 고정: 설정 알림이 생겨도 버튼이 움직이지 않고, 결과 화면의 배지·순위 자리는 늘 있다", async () => {
   const { context, page, errors } = await openPage();
   await page.click("#open-settings");
-  const sels = ["#settings-reset", "#settings-close", "#settings-notice"];
+  await page.click('.dialog-tabs [data-value="keys"]');
+  const sels = ["#settings-reset", "#settings-close", "#settings-notice", "#settings"];
   const before = await rects(page, sels);
   await page.click('.key-slot[data-kind="key"][data-action="HOLD"][data-slot="1"]');
   await page.keyboard.press("KeyX");
@@ -442,7 +465,7 @@ test("레이아웃 고정: 설정 알림이 생겨도 버튼이 움직이지 않
   await context.close();
 });
 
-test("테마: 라이트에서 UI는 밝고 게임 화면은 어둡다, 다크에서는 둘 다 어둡다", async () => {
+test("테마: 라이트에서 UI는 밝고 게임 화면(보드)은 어둡다, 다크에서는 둘 다 어둡다", async () => {
   const lum = rgb => {
     const [r, g, b] = rgb.match(/\d+/g).map(Number);
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -458,7 +481,9 @@ test("테마: 라이트에서 UI는 밝고 게임 화면은 어둡다, 다크에
       card: getComputedStyle(document.querySelector(".mode-card")).backgroundColor,
     }));
     assert.ok(lum(colors.game) < 40, `${scheme}: 게임 화면은 어둡다`);
-    assert.ok(lum(colors.card) < 60, `${scheme}: 보드 위 카드도 어둡다`);
+    // 첫 화면의 카드는 보드 위가 아니라 페이지에 있으므로 테마를 따른다
+    if (scheme === "light") assert.ok(lum(colors.card) > 200, "라이트: 첫 화면 카드는 밝다");
+    else assert.ok(lum(colors.card) < 60, "다크: 첫 화면 카드는 어둡다");
     if (scheme === "light") assert.ok(lum(colors.body) > 200, "라이트: 페이지는 밝다");
     else assert.ok(lum(colors.body) < 40, "다크: 페이지도 어둡다");
     await context.close();
@@ -496,7 +521,8 @@ test("게임 테마: 세 테마가 서로 다르게 그려지고, 설정에서 �
   const seen = new Set();
   for (const theme of ["retro", "minimal", "modern"]) {
     await page.click("#open-settings");
-    await page.locator("#set-theme").selectOption(theme);
+    await page.click('.dialog-tabs [data-value="visual"]');
+    await page.click(`#set-theme [data-value="${theme}"]`);
     await page.click("#settings-close");
     await page.waitForTimeout(100);
     seen.add(await snapshot());
@@ -565,6 +591,7 @@ test("게임패드 버튼 바꾸기: 설정에서 칸을 누르고 패드 버튼
     await page.waitForTimeout(80);
   };
   await page.click("#open-settings");
+  await page.click('.dialog-tabs [data-value="pad"]');
   // 하드 드롭 첫 칸을 RB(5)로
   await page.click('.key-slot[data-kind="pad"][data-action="HARD"][data-slot="0"]');
   await tap(5);
@@ -604,13 +631,16 @@ test("규칙 공유: 편집기에서 코드를 붙여 넣으면 불러오고, #r
   await page.click('[data-rules="custom"]');
   await page.click("#edit-rules");
   await page.click('[data-preset="retro"]');
+  await page.click('.dialog-tabs [data-value="공유"]');
   const code = await page.locator("#rule-share-code").inputValue();
   assert.match(code, /^TS1-/);
   await page.click('[data-preset="modern"]');
   await page.locator("#rule-share-paste").fill(code);
   await page.click("#rule-share-load");
   assert.match(await text(page, "rules-record"), /불러왔어요/);
+  await page.click('.dialog-tabs [data-value="피스"]');
   assert.match(await page.locator("#rule-rotation option:checked").textContent(), /킥 없음/);
+  await page.click('.dialog-tabs [data-value="공유"]');
   await page.locator("#rule-share-paste").fill("엉터리");
   await page.click("#rule-share-load");
   assert.match(await text(page, "rules-record"), /읽을 수 없는/);
@@ -659,14 +689,18 @@ test("터치 버튼: 켜면 보드 아래에 보이고, 누르면 조작된다",
   page.on("pageerror", e => errors.push(e.message));
   await page.goto(url);
   await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
-  assert.equal(await page.locator("#touchpad").isVisible(), true);
   assert.equal(await page.locator("#key-help").isVisible(), false, "키보드 안내는 숨긴다");
-  const pad = await rects(page, ["#touchpad", "#board"]);
-  assert.ok(pad["#touchpad"][1] >= pad["#board"][1] + pad["#board"][3], "보드 아래");
   await page.tap('[data-mode="sprint40"]');
   await page.waitForFunction(() => document.getElementById("countdown")?.textContent === "GO!", null, {
     timeout: 3000,
   });
+  assert.equal(await page.locator("#touchpad").isVisible(), true);
+  const pad = await rects(page, ["#touchpad", "#board"]);
+  assert.ok(pad["#touchpad"][1] >= pad["#board"][1] + pad["#board"][3], "보드 아래");
+  assert.ok(
+    await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight),
+    "정보 칸·보드·터치 버튼이 한 화면에 들어간다"
+  );
   await page.tap('[data-touch="HARD"]');
   await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "1", null, {
     timeout: 3000,
@@ -675,4 +709,47 @@ test("터치 버튼: 켜면 보드 아래에 보이고, 누르면 조작된다",
   assert.equal(await visible(page, "pause"), true);
   assert.deepEqual(errors, []);
   await context.close();
+});
+
+test("글자 잘림 없음: 첫 화면·설정 모든 탭·규칙 편집 모든 탭·기록·연습에서 넘치는 글자가 없다(데스크톱·휴대폰)", async () => {
+  /** 글자가 칸보다 넓어 잘리거나(…) 넘치는 요소들 */
+  const overflowing = page =>
+    page.evaluate(() =>
+      [...document.querySelectorAll("button, label, small, strong, td, th, dd, dt, p, .keys-label, option")]
+        .filter(el => el.offsetParent !== null && el.scrollWidth > el.clientWidth + 1)
+        .filter(el => getComputedStyle(el).overflowX !== "visible" || getComputedStyle(el).textOverflow === "ellipsis")
+        .map(el => `${el.tagName}.${el.className}: ${el.textContent.trim().slice(0, 30)}`)
+    );
+  for (const viewport of [
+    { width: 1280, height: 800 },
+    { width: 390, height: 844 },
+  ]) {
+    const context = await browser.newContext({ viewport });
+    const page = await context.newPage();
+    await page.goto(url);
+    await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+    const found = [];
+    const check = async where => found.push(...(await overflowing(page)).map(x => `[${viewport.width}] ${where} ${x}`));
+    await check("첫 화면");
+    await page.click("#open-settings");
+    for (const t of ["control", "visual", "keys", "pad"]) {
+      await page.click(`.dialog-tabs [data-value="${t}"]`);
+      await check(`설정/${t}`);
+    }
+    await page.click("#settings-close");
+    await page.click('[data-rules="custom"]');
+    await page.click("#edit-rules");
+    for (const t of ["피스", "고정·낙하", "점수", "조작", "공유"]) {
+      await page.click(`.dialog-tabs [data-value="${t}"]`);
+      await check(`규칙/${t}`);
+    }
+    await page.click("#rules-close");
+    await page.click("#open-records");
+    await check("기록");
+    await page.click("#records-close");
+    await page.click("#open-practice");
+    await check("연습");
+    assert.deepEqual(found, []);
+    await context.close();
+  }
 });

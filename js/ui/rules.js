@@ -1,7 +1,7 @@
 // Custom 규칙 편집 대화상자. 바꿀 때마다 onChange(규칙 내용)를 부르고, 저장·적용은 호출한 쪽이 한다.
 import { PRESET_LIST } from "../rules/presets.js";
 import { GRAVITY_OPTIONS, LIMITS, makeCustomRules, sanitizeRuleBody } from "../rules/sanitize.js";
-import { button, el, fieldRow, fillDialog } from "./dom.js";
+import { button, el, fieldRow, fillDialog, tabBar } from "./dom.js";
 import { decodeRules, encodeRules, rulesLink } from "../rules/share.js";
 
 const ms = frames => `${Math.round((frames * 1000) / 60)}ms`;
@@ -38,12 +38,19 @@ const FIELDS = [
       ["history4", "이력 4개 — 최근 4개를 피함"],
     ],
   },
-  { path: "previewCount", label: "넥스트 미리보기", type: "number", range: LIMITS.previewCount, unit: v => `${v}개` },
-  { path: "hold.enabled", label: "홀드", type: "toggle" },
-  { path: "ghost", label: "고스트(착지 위치 표시)", type: "toggle" },
-  { path: "hardDrop", label: "하드 드롭", type: "toggle" },
+  {
+    path: "previewCount",
+    label: "넥스트 미리보기",
+    hint: "다음에 나올 피스를 몇 개까지 미리 보여 줄지",
+    type: "number",
+    range: LIMITS.previewCount,
+    unit: v => `${v}개`,
+  },
+  { path: "hold.enabled", label: "홀드", hint: "피스 하나를 맡겨 두었다가 바꿔 쓰기", type: "toggle" },
+  { path: "ghost", label: "고스트", hint: "피스가 떨어질 자리를 흐리게 보여 줘요", type: "toggle" },
+  { path: "hardDrop", label: "하드 드롭", hint: "한 번에 바닥까지 떨어뜨리고 바로 고정", type: "toggle" },
 
-  { section: "고정과 낙하" },
+  { section: "고정·낙하" },
   {
     path: "lock.type",
     label: "고정 방식",
@@ -103,7 +110,7 @@ const FIELDS = [
     ],
   },
 
-  { section: "조작감" },
+  { section: "조작" },
   { path: "irs", label: "미리 회전 (IRS)", hint: "생성 순간 회전 키를 누르고 있으면 돌린 채로 나온다", type: "toggle" },
   {
     path: "ihs",
@@ -164,6 +171,23 @@ const setPath = (obj, path, value) => {
   return next;
 };
 
+/** "SRS — 벽차기 5단계 (현대 표준)" → ["SRS", "벽차기 5단계 (현대 표준)"] */
+const splitOption = label => {
+  const at = label.indexOf(" — ");
+  return at < 0 ? [label, ""] : [label.slice(0, at), label.slice(at + 3)];
+};
+
+/** 고른 선택지의 설명(있으면) */
+const selectedDescription = (field, rules) => {
+  if (field.type !== "select") return "";
+  const value = getPath(rules, field.path) ?? field.fallback;
+  const found = field.options.find(([v]) => v === value);
+  return found ? splitOption(found[1])[1] : "";
+};
+
+/** 탭: FIELDS의 구역 이름 + 공유 */
+const TABS = [...FIELDS.filter(f => f.section).map(f => [f.section, f.section]), ["공유", "공유"]];
+
 /**
  * @param {{ dialog: HTMLDialogElement, getRules: () => any, onChange: (body: any) => void, onClose?: () => void }} options
  */
@@ -178,7 +202,8 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
     if (field.type === "select") {
       const select = el("select", { id, class: "select", disabled });
       field.options.forEach(([v, label], i) => {
-        select.append(el("option", { value: String(i), text: label, selected: v === value }));
+        // 선택 상자에는 짧은 이름만(긴 설명은 잘리므로 아래 설명 줄에 보여 준다)
+        select.append(el("option", { value: String(i), text: splitOption(label)[0], selected: v === value }));
       });
       select.addEventListener("change", () => commit(field.options[Number(select.value)][0]));
       return select;
@@ -273,7 +298,6 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
     return el(
       "section",
       { class: "field-section" },
-      el("h3", { text: "공유" }),
       fieldRow({
         id: "rule-share-code",
         label: "규칙 코드",
@@ -295,52 +319,68 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
     );
   };
 
+  let tab = TABS[0][0];
+
   /** @param {string} [focusId] 다시 그린 뒤 포커스를 돌려줄 컨트롤 */
-  const render = focusId => {
+  const render = (focusId, keepScroll = true) => {
     const rules = getRules();
-    const scroll = dialog.querySelector(".dialog-body")?.scrollTop ?? 0;
+    const scroll = keepScroll ? (dialog.querySelector(".dialog-body")?.scrollTop ?? 0) : 0;
     const body = el("div", {});
 
-    body.append(
-      el(
-        "div",
-        { class: "rule-presets" },
-        el("span", { class: "field-help", text: "프리셋에서 시작" }),
-        ...PRESET_LIST.map(p => {
-          const b = button({ text: p.name, className: "btn btn-small", "data-preset": p.id });
-          b.addEventListener("click", () => {
-            onChange(sanitizeRuleBody(p));
-            render();
-          });
-          return b;
-        })
-      )
+    // 프리셋 줄과 탭은 몸통 위에 고정(어느 탭에서든 보인다)
+    const presets = el(
+      "div",
+      { class: "rule-presets" },
+      el("span", { class: "field-help", text: "프리셋에서 시작" }),
+      ...PRESET_LIST.map(p => {
+        const b = button({ text: p.name, className: "btn btn-small", "data-preset": p.id });
+        b.addEventListener("click", () => {
+          onChange(sanitizeRuleBody(p));
+          message = `${p.name} 값으로 채웠어요 · 기록표 ${makeCustomRules(p).id}`;
+          render();
+        });
+        return b;
+      })
     );
+    const tabs = tabBar({
+      tabs: TABS,
+      active: tab,
+      onSelect: t => {
+        tab = t;
+        render(undefined, false);
+        /** @type {HTMLElement | null} */ (dialog.querySelector(`.dialog-tabs [data-value="${t}"]`))?.focus();
+      },
+    });
 
-    let section = null;
-    for (const field of FIELDS) {
-      if (!field.path) {
-        section = el("section", { class: "field-section" }, el("h3", { text: field.section }));
-        body.append(section);
-        continue;
+    if (tab === "공유") {
+      body.append(shareSection(rules));
+    } else {
+      const section = el("section", { class: "field-section" });
+      let current = null;
+      for (const field of FIELDS) {
+        if (!field.path) {
+          current = field.section;
+          continue;
+        }
+        if (current !== tab) continue;
+        const disabled = Boolean(field.when && !field.when(rules));
+        const id = `rule-${field.path.replace(/\./g, "-")}`;
+        const hint = disabled ? field.off : selectedDescription(field, rules) || field.hint;
+        section.append(fieldRow({ id, label: field.label, hint, control: control(field, rules, disabled), disabled }));
       }
-      const disabled = Boolean(field.when && !field.when(rules));
-      const id = `rule-${field.path.replace(/\./g, "-")}`;
-      section.append(
-        fieldRow({
-          id,
-          label: field.label,
-          hint: disabled ? field.off : field.hint,
-          control: control(field, rules, disabled),
-          disabled,
-        })
-      );
+      body.append(section);
     }
 
-    body.append(shareSection(rules));
     notice.textContent = message || `기록표 ${makeCustomRules(rules).id} · 조합마다 기록이 따로 쌓여요`;
     message = "";
-    fillDialog(dialog, { title: "Custom 규칙", body, notice, actions: [], closeId: "rules-close" });
+    fillDialog(dialog, {
+      title: "Custom 규칙",
+      body,
+      notice,
+      actions: [],
+      closeId: "rules-close",
+      tabs: el("div", { class: "rule-tabs-head" }, presets, tabs),
+    });
     body.scrollTop = scroll;
     if (focusId) /** @type {HTMLElement | null} */ (dialog.querySelector(`#${focusId}`))?.focus();
   };
