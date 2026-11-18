@@ -106,6 +106,19 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
     das: { dir: 0, charge: 0, arrAcc: 0 },
     prevHeld: 0,
     stats: { pieces: 0, lines: 0 },
+    /** 판 통계(리플레이에서도 똑같이 나온다) — 줄 삭제는 "종류-줄 수" 키로 센다(예: "none-4", "full-2") */
+    tally: {
+      inputs: 0,
+      moves: 0,
+      rotations: 0,
+      kicks: 0,
+      holds: 0,
+      /** @type {Record<string, number>} */
+      clears: {},
+      perfect: 0,
+      maxCombo: 0,
+      maxB2b: 0,
+    },
     /** 생성될 때마다 1씩 오르는 번호(화면 쪽에서 "새 피스"를 알아보는 데 쓴다) */
     pieceId: 0,
     score: 0,
@@ -199,6 +212,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
       state.hold = type;
       state.holdUsed = true;
       events.push({ type: "hold", piece: type, initial: true });
+      state.tally.holds += 1;
       type = held ?? takeNext();
     }
     spawn(type);
@@ -221,6 +235,11 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
     state.score += scored.points;
     state.b2b = scored.b2b;
     state.combo = scored.combo;
+    const t = state.tally;
+    if (lines > 0 || tspin !== "none") t.clears[`${tspin}-${lines}`] = (t.clears[`${tspin}-${lines}`] ?? 0) + 1;
+    if (perfect) t.perfect += 1;
+    t.maxCombo = Math.max(t.maxCombo, scored.combo);
+    t.maxB2b = Math.max(t.maxB2b, scored.b2b);
     state.stats.lines += lines;
     events.push({
       type: "lock",
@@ -281,6 +300,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
     if (!fits(a, dx, 0)) return false;
     a.x += dx;
     a.lastAction = "move";
+    state.tally.moves += 1;
     onShifted();
     return true;
   };
@@ -305,6 +325,8 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
         onShifted();
         onDescended(a);
         events.push({ type: "rotate", kick: i });
+        state.tally.rotations += 1;
+        if (i > 0) state.tally.kicks += 1;
         return true;
       }
     }
@@ -410,6 +432,8 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
     pressed |= held & ~state.prevHeld;
     state.prevHeld = held;
     pressed &= ~consumed;
+    // 새로 누른 버튼 수(키 입력 수)
+    for (let p = pressed; p; p &= p - 1) state.tally.inputs += 1;
 
     const move = updateDas(held, pressed);
 
@@ -425,6 +449,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
       state.hold = current;
       state.holdUsed = true;
       events.push({ type: "hold", piece: current });
+      state.tally.holds += 1;
       spawn(next);
       if (!state.active) return events;
     }

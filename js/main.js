@@ -14,6 +14,7 @@ import { createRecords } from "./storage/records.js";
 import { createSettingsUI } from "./ui/settings.js";
 import { createRulesUI } from "./ui/rules.js";
 import { createRecordsUI } from "./ui/records.js";
+import { createStatsUI } from "./ui/stats.js";
 import { advanceSplits, formatDelta, splitDelta } from "./modes/splits.js";
 import { hydrateIcons, icon } from "./ui/icons.js";
 import { keycap } from "./ui/keycap.js";
@@ -395,6 +396,12 @@ const rulesUI = createRulesUI({
 
 $("edit-rules").addEventListener("click", () => rulesUI.open());
 
+const statsUI = createStatsUI({ dialog: /** @type {HTMLDialogElement} */ ($("stats")) });
+$("stats").addEventListener("close", () => {
+  if (screen === "results")
+    /** @type {HTMLElement | null} */ (document.querySelector('[data-action="stats"]'))?.focus();
+});
+
 const recordsUI = createRecordsUI({
   dialog: /** @type {HTMLDialogElement} */ ($("records")),
   modes: MODES,
@@ -408,7 +415,7 @@ $("records").addEventListener("close", () => {
 });
 
 const handleSystem = action => {
-  if (settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen) return;
+  if (settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen || statsUI.isOpen) return;
   if (screen === "replay") {
     if (action === "restart") restartReplay();
     else stopReplay();
@@ -425,7 +432,7 @@ const keyboard = createKeyboard({ getBindings: () => bindings, onSystem: handleS
 
 /** 메뉴·결과·일시정지 화면에서 게임패드로 버튼 사이를 옮겨 다니고 누른다. */
 const handlePadMenu = action => {
-  if (settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen) return;
+  if (settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen || statsUI.isOpen) return;
   const panel = Object.values(panels).find(p => !p.hidden);
   if (!panel || screen === "play" || screen === "countdown" || screen === "replay") return;
   const buttons = /** @type {HTMLButtonElement[]} */ ([...panel.querySelectorAll("button")]).filter(
@@ -457,6 +464,7 @@ for (const btn of document.querySelectorAll("[data-action]")) {
     if (action === "retry") start(mode);
     if (action === "menu") toMenu();
     if (action === "watch" && lastReplay) startReplay(lastReplay);
+    if (action === "stats" && game) statsUI.open(game.state, `${mode.name} · ${rules.name}`);
     if (action === "export" && lastReplay) exportReplay(lastReplay);
   });
 }
@@ -551,7 +559,8 @@ for (const btn of replayBar.querySelectorAll("[data-replay]")) {
 
 // 리플레이 중 단축키: Space 일시정지, 1·2·4 속도 (Esc 닫기, R 처음부터는 시스템 키로 처리)
 window.addEventListener("keydown", e => {
-  if (screen !== "replay" || settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen || e.repeat) return;
+  if (screen !== "replay" || settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen || statsUI.isOpen || e.repeat)
+    return;
   if (e.code === "Space") replayPaused = !replayPaused;
   else if (["Digit1", "Digit2", "Digit4"].includes(e.code)) replaySpeed = Number(e.code.slice(5));
   else return;

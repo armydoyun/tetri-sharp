@@ -434,3 +434,37 @@
 .records-table tr.is-empty td {
   color: var(--text-faint);
 }
+
+/* 통계: 두 칸(좁으면 한 칸), 항목 이름 | 값 */
+.stat-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--space-5);
+}
+
+@media (max-width: 560px) {
+  .stat-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.stat-list {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  row-gap: var(--space-1);
+  font-size: var(--text-m);
+}
+
+.stat-list dt {
+  color: var(--text-dim);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.stat-list dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+}

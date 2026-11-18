@@ -581,3 +581,19 @@ test("게임패드 버튼 바꾸기: 설정에서 칸을 누르고 패드 버튼
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("통계: 결과 화면에서 열면 이번 판 통계가 보인다", async () => {
+  const { context, page, errors } = await openPage();
+  await startMode(page, "zen");
+  for (let i = 0; i < 40; i++) await page.keyboard.press("Space");
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  await page.click('[data-action="stats"]');
+  assert.equal(await page.locator("#stats").isVisible(), true);
+  const body = await page.locator("#stats").textContent();
+  assert.match(body, /T-SPIN DOUBLE/);
+  assert.match(body, /키 입력/);
+  await page.click("#stats-close");
+  assert.equal(await visible(page, "results"), true, "닫으면 결과 화면 그대로");
+  assert.deepEqual(errors, []);
+  await context.close();
+});

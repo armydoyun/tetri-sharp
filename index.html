@@ -66,8 +66,9 @@
               <button type="button" class="btn btn-primary" data-action="retry"><span data-icon="restart"></span>다시 하기 <kbd data-key="RESTART"></kbd></button>
               <button type="button" class="btn" data-action="menu"><span data-icon="menu"></span>메뉴로 <kbd><kbd class="keycap">Esc</kbd></kbd></button>
               <div class="actions-row">
+                <button type="button" class="btn btn-small" data-action="stats"><span data-icon="chart"></span>통계</button>
                 <button type="button" class="btn btn-small" data-action="watch"><span data-icon="play"></span>리플레이</button>
-                <button type="button" class="btn btn-small" data-action="export"><span data-icon="download"></span>파일로 저장</button>
+                <button type="button" class="btn btn-small" data-action="export"><span data-icon="download"></span>저장</button>
               </div>
             </div>
           </div>
@@ -99,6 +100,7 @@
     <dialog id="settings" class="dialog" aria-label="설정"></dialog>
     <dialog id="rules-editor" class="dialog" aria-label="Custom 규칙"></dialog>
     <dialog id="records" class="dialog dialog-wide" aria-label="기록"></dialog>
+    <dialog id="stats" class="dialog dialog-wide" aria-label="이번 판 통계"></dialog>
     <!-- ES Modules: 개발용 실행은 http://localhost를 사용한다. -->
     <script type="module" src="./js/main.js"></script>
   </body>

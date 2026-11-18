@@ -22,6 +22,7 @@ export const ICONS = Object.freeze({
   menu: [["path", { d: "M5 7h14M5 12h14M5 17h14" }]],
   download: [["path", { d: "M12 4v11M7 10l5 5 5-5M5 20h14" }]],
   folder: [["path", { d: "M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" }]],
+  chart: [["path", { d: "M5 19v-8M10 19V5M15 19v-6M20 19V9M3.5 19h17" }]],
   trophy: [
     [
       "path",
