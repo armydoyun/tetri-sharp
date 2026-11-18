@@ -203,8 +203,8 @@ const renderMenu = () => {
       desc.textContent = m.description;
       const pb = document.createElement("small");
       pb.className = "mode-best";
-      pb.textContent = best ? `최고 기록 ${m.formatRecord(best)}` : "기록 없음";
-      btn.append(name, desc, pb);
+      pb.textContent = best ? `최고 기록 ${m.formatRecord(best)}` : "";
+      btn.append(name, desc, pb, icon("arrow-right"));
       btn.addEventListener("click", () => start(m));
       return btn;
     })
@@ -237,9 +237,10 @@ const setScreen = next => {
   document.body.dataset.screen = next;
   keyboard.setEnabled(next === "play" || next === "countdown");
   touch.setEnabled(next === "play" || next === "countdown");
+  $("session-title").textContent = next === "menu" ? "" : mode.name;
 };
 
-const toMenu = () => {
+const toMenu = (initial = false) => {
   game = null;
   setScreen("menu");
   countdownEl.hidden = true;
@@ -247,7 +248,9 @@ const toMenu = () => {
   /** @type {HTMLButtonElement} */ ($("watch-last")).disabled = !replays.last();
   showPanel("menu");
   // 마지막으로 한 모드에 포커스를 둔다 → Enter로 바로 시작.
-  /** @type {HTMLElement | null} */ (panels.menu.querySelector(`[data-mode="${mode.id}"]`))?.focus();
+  /** @type {HTMLElement | null} */ (panels.menu.querySelector(`[data-mode="${mode.id}"]`))?.focus({
+    preventScroll: initial,
+  });
 };
 
 const start = m => {
@@ -273,8 +276,10 @@ const start = m => {
   renderer.clearEffects();
   renderKeyHelp();
   setScreen("countdown");
+  window.scrollTo(0, 0);
   countdownEl.hidden = false;
-  countdownEl.textContent = "READY";
+  countdownEl.dataset.phase = "ready";
+  $("countdown-label").textContent = "READY";
 };
 
 let pausedFrom = /** @type {"play" | "countdown"} */ ("play");
@@ -285,6 +290,8 @@ const pause = () => {
   setScreen("paused");
   showPanel("pause");
 };
+
+$("pause-game").addEventListener("click", pause);
 
 const resume = () => {
   if (screen !== "paused") return;
@@ -686,7 +693,8 @@ const tick = () => {
     if (countdown <= 0) {
       setScreen("play");
       goTimer = GO_FRAMES;
-      countdownEl.textContent = "GO!";
+      countdownEl.dataset.phase = "go";
+      $("countdown-label").textContent = "GO!";
     }
     return;
   }
@@ -749,7 +757,7 @@ applyTouch();
 renderKeyHelp();
 // 링크로 규칙을 받았으면 Custom 규칙 기준으로 키 안내를 다시 그린 뒤 메뉴를 연다.
 if (importRulesFromLink()) renderKeyHelp();
-toMenu();
+toMenu(true);
 requestAnimationFrame(loop);
 
 // 설치형 앱(GitHub Pages 배포본): 매니페스트가 걸려 있을 때만 서비스 워커를 등록한다.

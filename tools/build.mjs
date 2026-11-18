@@ -80,8 +80,8 @@ export const MANIFEST = Object.freeze({
   start_url: "./",
   scope: "./",
   display: "standalone",
-  background_color: "#101114",
-  theme_color: "#101114",
+  background_color: "#171a17",
+  theme_color: "#171a17",
   icons: [{ src: "icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }],
 });
 
