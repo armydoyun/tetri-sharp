@@ -148,12 +148,12 @@ test("설정: 슬라이더 값과 키 변경이 저장되고 새로고침 후에
   await page.locator("#set-das").fill("100");
   await page.locator("#set-theme").selectOption("retro");
   // 하드 드롭 첫 칸을 W로 바꾼다.
-  await page.click('.key-slot[data-action="HARD"][data-slot="0"]');
+  await page.click('.key-slot[data-kind="key"][data-action="HARD"][data-slot="0"]');
   assert.equal(await page.locator(".key-slot.is-waiting").count(), 1);
   await page.keyboard.press("KeyW");
-  assert.equal(await page.locator('.key-slot[data-action="HARD"][data-slot="0"]').textContent(), "W");
+  assert.equal(await page.locator('.key-slot[data-kind="key"][data-action="HARD"][data-slot="0"]').textContent(), "W");
   // 이미 쓰는 키(X: 시계 회전)를 홀드로 옮기면 알림이 뜬다.
-  await page.click('.key-slot[data-action="HOLD"][data-slot="1"]');
+  await page.click('.key-slot[data-kind="key"][data-action="HOLD"][data-slot="1"]');
   await page.keyboard.press("KeyX");
   assert.match(await page.locator("#settings-notice").textContent(), /시계 방향 회전/);
   await page.click("#settings-close");
@@ -164,7 +164,7 @@ test("설정: 슬라이더 값과 키 변경이 저장되고 새로고침 후에
   await page.click("#open-settings");
   assert.equal(await page.locator("#set-das").inputValue(), "100");
   assert.equal(await page.locator("#set-theme").inputValue(), "retro");
-  assert.equal(await page.locator('.key-slot[data-action="HARD"][data-slot="0"]').textContent(), "W");
+  assert.equal(await page.locator('.key-slot[data-kind="key"][data-action="HARD"][data-slot="0"]').textContent(), "W");
   await page.keyboard.press("Escape");
 
   // 바뀐 키로 실제 플레이: W = 하드 드롭, Space는 더 이상 하드 드롭이 아니다.
@@ -426,7 +426,7 @@ test("레이아웃 고정: 설정 알림이 생겨도 버튼이 움직이지 않
   await page.click("#open-settings");
   const sels = ["#settings-reset", "#settings-close", "#settings-notice"];
   const before = await rects(page, sels);
-  await page.click('.key-slot[data-action="HOLD"][data-slot="1"]');
+  await page.click('.key-slot[data-kind="key"][data-action="HOLD"][data-slot="1"]');
   await page.keyboard.press("KeyX");
   assert.notEqual(await page.locator("#settings-notice").textContent(), "");
   assert.deepEqual(await rects(page, sels), before);
@@ -538,6 +538,46 @@ test("기록 화면: 표는 늘 10줄, 조건을 바꿔도 크기가 그대로, 
   // 그 기록이 PB라 Sprint를 시작하면 PB 대비 칸이 준비된다(구간 전에는 —)
   await startMode(page, "sprint40");
   assert.equal(await text(page, "hud-split"), "—");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("게임패드 버튼 바꾸기: 설정에서 칸을 누르고 패드 버튼을 누르면 그 버튼으로 동작한다", async () => {
+  const { context, page, errors } = await openPage(() => {
+    window.__pad = { pressed: new Set() };
+    const make = () => ({
+      id: "test pad",
+      index: 0,
+      connected: true,
+      mapping: "standard",
+      axes: [0, 0, 0, 0],
+      buttons: Array.from({ length: 17 }, (_, i) => {
+        const on = window.__pad.pressed.has(i);
+        return { pressed: on, touched: on, value: on ? 1 : 0 };
+      }),
+    });
+    Object.defineProperty(navigator, "getGamepads", { value: () => [make()] });
+  });
+  const tap = async button => {
+    await page.evaluate(b => window.__pad.pressed.add(b), button);
+    await page.waitForTimeout(80);
+    await page.evaluate(b => window.__pad.pressed.delete(b), button);
+    await page.waitForTimeout(80);
+  };
+  await page.click("#open-settings");
+  // 하드 드롭 첫 칸을 RB(5)로
+  await page.click('.key-slot[data-kind="pad"][data-action="HARD"][data-slot="0"]');
+  await tap(5);
+  assert.equal(await page.locator('.key-slot[data-kind="pad"][data-action="HARD"][data-slot="0"]').textContent(), "RB");
+  assert.match(await text(page, "settings-notice"), /홀드/, "홀드에서 옮겼다고 알린다");
+  await page.click("#settings-close");
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  await startMode(page, "sprint40");
+  await tap(5);
+  await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "1", null, {
+    timeout: 3000,
+  });
   assert.deepEqual(errors, []);
   await context.close();
 });

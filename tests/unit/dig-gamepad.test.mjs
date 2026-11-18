@@ -63,3 +63,35 @@ test("게임패드 표준 배치 → 버튼 비트", () => {
   assert.deepEqual([...readPad(pad([0, 13])).menu].sort(), ["down", "select"]);
   assert.equal(readPad(null).held, 0);
 });
+
+import {
+  DEFAULT_PADMAP,
+  assignPadButton,
+  clearPadButton,
+  compilePadmap,
+  padButtonName,
+  sanitizePadmap,
+} from "../../js/input/gamepad.js";
+
+test("게임패드 배치: 기본값은 겹치지 않고, 잘못된 값·중복은 버린다", () => {
+  const map = sanitizePadmap(DEFAULT_PADMAP);
+  const all = Object.values(map).flat();
+  assert.equal(new Set(all).size, all.length);
+  const bad = sanitizePadmap({ HARD: [0, 0, 99, -1, "a"], CW: [0, 1] });
+  assert.deepEqual(bad.HARD, [0]);
+  assert.deepEqual(bad.CW, [1], "이미 쓴 0은 빠진다");
+  assert.deepEqual(bad.CCW, [2], "빠진 동작은 기본값 중 겹치지 않는 것만");
+});
+
+test("게임패드 배치: 옮기기·지우기·읽기용 변환", () => {
+  const { padmap, movedFrom } = assignPadButton(sanitizePadmap(DEFAULT_PADMAP), "HARD", 0, 0);
+  assert.equal(movedFrom, "CCW");
+  assert.deepEqual(padmap.HARD, [0]);
+  assert.deepEqual(padmap.CCW, [2]);
+  assert.deepEqual(clearPadButton(padmap, "HOLD", 0).HOLD, [5]);
+  const c = compilePadmap(padmap);
+  assert.equal(c.buttons[0], BTN.HARD);
+  assert.equal(c.system[9], "pause");
+  assert.equal(readPad(pad([0]), c).held, BTN.HARD, "바꾼 배치로 읽는다");
+  assert.equal(padButtonName(9), "Start");
+});

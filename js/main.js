@@ -3,7 +3,7 @@
 import { createGame } from "./core/engine.js";
 import { createRenderer } from "./render/canvas.js";
 import { createKeyboard } from "./input/keyboard.js";
-import { createGamepad } from "./input/gamepad.js";
+import { PAD_ICONS, compilePadmap, createGamepad, padButtonName } from "./input/gamepad.js";
 import { ACTIONS, compileKeymap } from "./input/keymap.js";
 import { MODES, findMode } from "./modes/index.js";
 import { formatScore, formatTime } from "./modes/format.js";
@@ -47,6 +47,7 @@ const store = createStore();
 const records = createRecords(store);
 let settings = loadSettings(store);
 let bindings = compileKeymap(settings.keymap);
+let padBindings = compilePadmap(settings.padmap);
 
 const renderer = createRenderer(canvas, { getVisual: () => settings.visual });
 
@@ -91,16 +92,14 @@ const keysOf = id => settings.keymap[id] ?? [];
 
 /** @type {ReturnType<typeof createGamepad> | null} 아래에서 만든 뒤 채운다 */
 let padRef = null;
-/** 게임패드 안내: [버튼 이름, 동작] — 버튼 이름은 패드에 적힌 글자 그대로 */
-const PAD_HELP = [
-  ["십자키", "이동·위 하드 드롭"],
-  ["B", "시계 회전"],
-  ["A/X", "반시계 회전"],
-  ["Y", "180° 회전"],
-  ["LB/RB", "홀드"],
-  ["Start", "일시정지"],
-  ["Back", "다시 시작"],
-];
+/** 게임패드 버튼 키캡(십자키는 화살표 아이콘) */
+const padCap = i => {
+  const kbd = document.createElement("kbd");
+  kbd.className = "keycap";
+  if (PAD_ICONS[i]) kbd.append(icon(PAD_ICONS[i], { label: padButtonName(i) }));
+  else kbd.textContent = padButtonName(i);
+  return kbd;
+};
 
 /** 안내 한 칸: 동작 이름 + 키캡들 */
 const helpItem = (label, caps) => {
@@ -130,7 +129,11 @@ const renderKeyHelp = () => {
     const br = document.createElement("span");
     br.className = "keys-break";
     items.push(br, icon("gamepad", { label: "게임패드" }));
-    for (const [cap, label] of PAD_HELP) items.push(helpItem(label, [textCap(cap)]));
+    for (const a of ACTIONS) {
+      const buttons = settings.padmap[a.id] ?? [];
+      if (unavailable.has(a.id) || !buttons.length) continue;
+      items.push(helpItem(a.label, buttons.map(padCap)));
+    }
   }
   $("key-help").replaceChildren(...items);
   // 버튼 안 단축키 표시는 첫 번째 키만
@@ -363,6 +366,7 @@ const settingsUI = createSettingsUI({
     settings = sanitizeSettings(next);
     saveSettings(store, settings);
     bindings = compileKeymap(settings.keymap);
+    padBindings = compilePadmap(settings.padmap);
     if (game && screen !== "replay") {
       game.setHandling(toEngineHandling(settings.handling));
       recorder?.handlingChanged(game.handling);
@@ -438,7 +442,7 @@ const handlePadMenu = action => {
   }
 };
 
-const pad = createGamepad({ onSystem: handleSystem, onMenu: handlePadMenu });
+const pad = createGamepad({ onSystem: handleSystem, onMenu: handlePadMenu, getMap: () => padBindings });
 padRef = pad;
 
 $("open-settings").addEventListener("click", () => {

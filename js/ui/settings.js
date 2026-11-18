@@ -1,5 +1,15 @@
 // 설정 대화상자: 조작감(DAS·ARR·SDF), 화면, 키 배치. 바꾸는 즉시 저장하고 onChange로 알린다.
 import { ACTIONS, DEFAULT_KEYMAP, SLOTS, assignKey, clearKey, keyLabel } from "../input/keymap.js";
+import {
+  DEFAULT_PADMAP,
+  PAD_ICONS,
+  assignPadButton,
+  clearPadButton,
+  connectedPads,
+  padButtonName,
+  pressedButtons,
+} from "../input/gamepad.js";
+import { icon } from "./icons.js";
 import { DEFAULT_SETTINGS, HANDLING_LIMITS, SDF_INFINITE, defaultVisual } from "../storage/settings.js";
 import { button, el, fieldRow, fillDialog } from "./dom.js";
 import { THEMES, THEME_IDS } from "../render/themes.js";
@@ -99,37 +109,58 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
       })
     );
 
-  const keysSection = () => {
-    const { keymap } = getSettings();
+  /** 게임패드 버튼 하나를 키캡 모양으로(십자키는 화살표 아이콘) */
+  const padCap = i => {
+    const kbd = el("kbd", { class: "keycap" });
+    if (PAD_ICONS[i]) kbd.append(icon(PAD_ICONS[i], { label: padButtonName(i) }));
+    else kbd.textContent = padButtonName(i);
+    return kbd;
+  };
+
+  /**
+   * 키보드·게임패드 배치 표. kind에 따라 저장 위치와 표시만 다르다.
+   * @param {"key" | "pad"} kind
+   */
+  const bindingSection = kind => {
+    const map = kind === "key" ? getSettings().keymap : getSettings().padmap;
+    const noun = kind === "key" ? "키" : "버튼";
     return el(
       "section",
       { class: "field-section" },
-      el("h3", { text: "키 배치" }),
-      el("p", { class: "field-help", text: "칸을 누르고 원하는 키를 누르세요. Backspace는 지우기, Esc는 취소." }),
+      el("h3", { text: kind === "key" ? "키 배치" : "게임패드 버튼" }),
+      el("p", {
+        class: "field-help",
+        text:
+          kind === "key"
+            ? "칸을 누르고 원하는 키를 누르세요. Backspace는 지우기, Esc는 취소."
+            : "칸을 누르고 패드의 원하는 버튼을 누르세요. 왼쪽 스틱과 메뉴 이동(A·십자키)은 고정이에요.",
+      }),
       ...ACTIONS.map(action => {
         const slots = Array.from({ length: SLOTS }, (_, slot) => {
-          const code = keymap[action.id]?.[slot];
-          const waiting = capture && capture.action === action.id && capture.slot === slot;
+          const value = map[action.id]?.[slot];
+          const has = value !== undefined;
+          const waiting = capture && capture.kind === kind && capture.action === action.id && capture.slot === slot;
+          const name = has ? (kind === "key" ? keyLabel(value) : padButtonName(value)) : "없음";
           const btn = el("button", {
             type: "button",
-            class: `key-slot${waiting ? " is-waiting" : ""}${code ? "" : " is-empty"}`,
+            class: `key-slot${waiting ? " is-waiting" : ""}${has ? "" : " is-empty"}`,
+            "data-kind": kind,
             "data-action": action.id,
             "data-slot": String(slot),
-            "aria-label": `${action.label} ${slot + 1}번 키: ${code ? keyLabel(code) : "없음"}`,
+            "aria-label": `${action.label} ${slot + 1}번 ${noun}: ${name}`,
           });
-          if (waiting) btn.textContent = "키를 누르세요";
-          else if (code) btn.append(keycap(code));
+          if (waiting) btn.textContent = `${noun}를 누르세요`;
+          else if (has) btn.append(kind === "key" ? keycap(value) : padCap(value));
           else btn.textContent = "없음";
-          btn.addEventListener("click", () => startCapture(action.id, slot));
+          btn.addEventListener("click", () => startCapture(kind, action.id, slot));
           return btn;
         });
-        const row = el(
+        return el(
           "div",
           { class: "field-row key-row" },
           el("span", { class: "field-label", text: action.label }),
           ...slots
         );
-        return row;
       })
     );
   };
@@ -143,31 +174,55 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
         ...getSettings(),
         handling: { ...DEFAULT_SETTINGS.handling },
         keymap: { ...DEFAULT_KEYMAP },
+        padmap: { ...DEFAULT_PADMAP },
         visual: defaultVisual(),
       });
       notice.textContent = "기본값으로 되돌렸어요.";
       render();
     });
-    const body = el("div", {}, handlingSection(), visualSection(), keysSection());
+    const body = el("div", {}, handlingSection(), visualSection(), bindingSection("key"), bindingSection("pad"));
     fillDialog(dialog, { title: "설정", body, notice, actions: [reset], closeId: "settings-close" });
     body.scrollTop = scroll;
   };
 
-  const startCapture = (action, slot) => {
-    capture = { action, slot };
-    notice.textContent = "";
+  const slotSelector = c => `.key-slot[data-kind="${c.kind}"][data-action="${c.action}"][data-slot="${c.slot}"]`;
+
+  /** 패드 버튼 기다리기: 시작할 때 이미 눌려 있던 버튼은 떼기 전까지 무시한다. */
+  let padBaseline = new Set();
+  const pollPad = () => {
+    if (!capture || capture.kind !== "pad" || !dialog.open) return;
+    const now = new Set(connectedPads().flatMap(pressedButtons));
+    for (const i of padBaseline) if (!now.has(i)) padBaseline.delete(i);
+    const fresh = [...now].find(i => !padBaseline.has(i));
+    if (fresh !== undefined) {
+      const { action, slot } = capture;
+      const result = assignPadButton(getSettings().padmap, action, slot, fresh);
+      update({ padmap: result.padmap });
+      const moved = result.movedFrom && ACTIONS.find(a => a.id === result.movedFrom);
+      notice.textContent = moved ? `‘${padButtonName(fresh)}’ 버튼을 ‘${moved.label}’에서 옮겼어요.` : "";
+      endCapture();
+      return;
+    }
+    requestAnimationFrame(pollPad);
+  };
+
+  const startCapture = (kind, action, slot) => {
+    capture = { kind, action, slot };
+    notice.textContent =
+      kind === "pad" && !connectedPads().length ? "게임패드가 연결돼 있지 않아요. 연결하고 버튼을 눌러 주세요." : "";
     render();
-    /** @type {HTMLElement | null} */ (dialog.querySelector(".key-slot.is-waiting"))?.focus();
+    /** @type {HTMLElement | null} */ (dialog.querySelector(slotSelector(capture)))?.focus();
+    if (kind === "pad") {
+      padBaseline = new Set(connectedPads().flatMap(pressedButtons));
+      requestAnimationFrame(pollPad);
+    }
   };
 
   const endCapture = () => {
     const last = capture;
     capture = null;
     render();
-    if (last)
-      /** @type {HTMLElement | null} */ (
-        dialog.querySelector(`.key-slot[data-action="${last.action}"][data-slot="${last.slot}"]`)
-      )?.focus();
+    if (last) /** @type {HTMLElement | null} */ (dialog.querySelector(slotSelector(last)))?.focus();
   };
 
   // 캡처 단계에서 먼저 받아 게임 키 처리(keyboard.js)로 넘어가지 않게 한다.
@@ -178,14 +233,16 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
       e.preventDefault();
       e.stopImmediatePropagation();
       if (e.repeat) return;
-      const { action, slot } = capture;
-      const { keymap } = getSettings();
+      const { kind, action, slot } = capture;
+      const { keymap, padmap } = getSettings();
       if (e.code === "Escape") return endCapture();
       if (e.code === "Backspace" || e.code === "Delete") {
-        update({ keymap: clearKey(keymap, action, slot) });
+        if (kind === "pad") update({ padmap: clearPadButton(padmap, action, slot) });
+        else update({ keymap: clearKey(keymap, action, slot) });
         notice.textContent = "";
         return endCapture();
       }
+      if (kind === "pad") return; // 패드 버튼을 기다리는 중에는 다른 키를 무시한다
       const result = assignKey(keymap, action, slot, e.code);
       update({ keymap: result.keymap });
       const moved = result.movedFrom && ACTIONS.find(a => a.id === result.movedFrom);

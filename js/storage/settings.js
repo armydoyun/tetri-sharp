@@ -1,6 +1,7 @@
 // 사용자 설정: 조작감(Handling, ms 단위)과 키 배치. 저장된 값은 항상 검증·보정해서 쓴다.
 import { msToFrames } from "../core/engine.js";
 import { DEFAULT_KEYMAP, sanitizeKeymap } from "../input/keymap.js";
+import { DEFAULT_PADMAP, sanitizePadmap } from "../input/gamepad.js";
 import { DEFAULT_THEME, THEME_IDS } from "../render/themes.js";
 
 export const SETTINGS_VERSION = 1;
@@ -40,6 +41,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   v: SETTINGS_VERSION,
   handling: Object.freeze({ das: 133, arr: 10, sdf: 20 }),
   keymap: DEFAULT_KEYMAP,
+  padmap: DEFAULT_PADMAP,
   visual: Object.freeze(defaultVisual()),
 });
 
@@ -75,6 +77,7 @@ export const sanitizeSettings = raw => {
     v: SETTINGS_VERSION,
     handling: sanitizeHandling(s.handling ?? DEFAULT_SETTINGS.handling),
     keymap: sanitizeKeymap(s.keymap ?? DEFAULT_KEYMAP),
+    padmap: sanitizePadmap(s.padmap ?? DEFAULT_PADMAP),
     visual: sanitizeVisual(s.visual),
   };
 };
