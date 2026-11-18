@@ -914,3 +914,81 @@ test("글자 잘림 없음(영어): 첫 화면·설정·기록·연습", async (
     await context.close();
   }
 });
+
+test("전체 흐름: Survival 한 판 → 결과·새 기록 → 기록표 리플레이 → 백업 저장 → 지우고 백업 불러오기", async () => {
+  const { context, page, errors } = await openPage();
+  await startMode(page, "survival");
+  assert.equal(await text(page, "hud-lines-label"), "받을 쓰레기");
+  for (let i = 0; i < 60 && !(await visible(page, "results")); i++) {
+    await page.keyboard.press("Space");
+    await page.waitForTimeout(20);
+  }
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 5000 });
+  assert.equal(await text(page, "results-title"), "게임 오버");
+  assert.equal(await page.locator("#results-badge").evaluate(e => e.classList.contains("is-invisible")), false);
+  assert.match(await page.locator("#results-stats").textContent(), /순위1위/);
+  await page.keyboard.press("Escape");
+
+  // 기록표: 1위 기록과 그 리플레이
+  await page.click("#open-records");
+  await page.locator("#records-mode").selectOption("survival");
+  assert.equal(await page.locator(".records-table tbody tr.is-empty").count(), 9);
+  assert.equal(await page.locator("#records-watch").isDisabled(), false);
+  await page.click("#records-watch");
+  assert.equal(await visible(page, "replay-bar"), true);
+  await page.click('[data-replay="exit"]');
+  assert.equal(await visible(page, "menu"), true);
+
+  // 백업 저장
+  const [download] = await Promise.all([page.waitForEvent("download"), page.click("#export-backup")]);
+  const file = path.join(dir, "backup.json");
+  await download.saveAs(file);
+  const backup = JSON.parse(fs.readFileSync(file, "utf8"));
+  assert.equal(backup.kind, "backup");
+  assert.equal(backup.data.records["survival|modern"].length, 1);
+
+  // 이 브라우저의 저장 데이터를 지우고 백업을 불러온다
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  assert.equal(await page.locator('[data-mode="survival"] .mode-best').textContent(), "");
+  page.once("dialog", dialog => dialog.accept());
+  await page.setInputFiles("#backup-file", file);
+  await page.waitForFunction(() => /백업을 불러왔어요/.test(document.getElementById("menu-notice")?.textContent ?? ""));
+  assert.match(await page.locator('[data-mode="survival"] .mode-best').textContent(), /최고 기록/);
+  assert.equal(await page.locator("#watch-last").isDisabled(), false, "마지막 판 리플레이도 돌아온다");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("효과음: 소리를 켜면 게임 중 오디오를 만들고, 끄면 만들지 않는다", async () => {
+  const count = () => page.evaluate(() => window.__audioContexts ?? 0);
+  const { context, page, errors } = await openPage(() => {
+    const Real = window.AudioContext;
+    window.AudioContext = class extends Real {
+      constructor(...args) {
+        super(...args);
+        window.__audioContexts = (window.__audioContexts ?? 0) + 1;
+      }
+    };
+  });
+  await page.click("#open-settings");
+  await page.click('.dialog-tabs [data-value="visual"]');
+  await page.locator("#set-volume").fill("0");
+  await page.click("#settings-close");
+  await startMode(page, "zen");
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(100);
+  assert.equal(await count(), 0, "끄면 오디오를 만들지 않는다");
+  await page.keyboard.press("Escape");
+  await page.click("#open-settings");
+  await page.click('.dialog-tabs [data-value="visual"]');
+  await page.locator("#set-volume").fill("60");
+  await page.click("#settings-close");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(100);
+  assert.equal(await count(), 1);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
