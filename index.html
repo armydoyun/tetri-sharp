@@ -205,7 +205,7 @@
                 <div class="actions-row actions-row-3">
                   <button type="button" class="btn btn-small" data-action="stats"><span data-icon="chart"></span>통계</button>
                   <button type="button" class="btn btn-small" data-action="watch"><span data-icon="play"></span>다시 보기</button>
-                  <button type="button" class="btn btn-small" data-action="export" aria-label="리플레이 파일로 저장" title="리플레이 파일로 저장"><span data-icon="download"></span>파일 저장</button>
+                  <button type="button" class="btn btn-small" data-action="export" aria-label="리플레이 공유" title="리플레이 공유(링크·파일)"><span data-icon="link"></span>공유</button>
                 </div>
               </div>
             </div>
@@ -241,6 +241,8 @@
             <button type="button" class="btn num" data-replay="step" aria-label="한 프레임 앞으로">+1F</button>
             <button type="button" class="btn num" data-replay="speed" aria-label="재생 속도 바꾸기"><span data-icon="forward"></span><span class="replay-speed">1x</span></button>
             <button type="button" class="btn" data-replay="restart"><span data-icon="restart"></span>처음부터</button>
+            <button type="button" class="btn" data-replay="share"><span data-icon="link"></span>공유</button>
+            <button type="button" class="btn" data-replay="race" hidden><span data-icon="play"></span>이 기록과 달리기</button>
             <button type="button" class="btn" data-replay="exit"><span data-icon="close"></span>닫기</button>
           </div>
         </div>
@@ -265,6 +267,7 @@
     <dialog id="practice" class="dialog" aria-label="연습"></dialog>
     <dialog id="puzzles" class="dialog dialog-wide" aria-label="퍼즐"></dialog>
     <dialog id="help" class="dialog" aria-label="도움말"></dialog>
+    <dialog id="share" class="dialog" aria-label="리플레이 공유"></dialog>
     <dialog id="versus" class="dialog" aria-label="CPU 대전"></dialog>
     <dialog id="daily" class="dialog" aria-label="오늘의 도전"></dialog>
     <!-- 화면 읽기 프로그램용 알림(보이지 않음): 줄 삭제·레벨업·결과 -->

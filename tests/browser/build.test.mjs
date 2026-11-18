@@ -350,7 +350,10 @@ test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파�
   assert.equal(await visible(page, "results"), true, "닫으면 결과 화면으로");
 
   // 파일로 저장
-  const [download] = await Promise.all([page.waitForEvent("download"), page.click('[data-action="export"]')]);
+  await page.click('[data-action="export"]');
+  await page.locator("#share-link").waitFor({ state: "visible" });
+  const [download] = await Promise.all([page.waitForEvent("download"), page.click("#share-file")]);
+  await page.click("#share-close");
   assert.match(download.suggestedFilename(), /^tetri-sharp-zen-.*\.json$/);
   const file = await download.path();
   const saved = JSON.parse(fs.readFileSync(file, "utf8"));
@@ -1439,6 +1442,28 @@ test("퍼즐: 단계를 풀면 성공·다음 단계로 이어지고, 첫 화면
   assert.equal(await page.locator('[data-action="next-puzzle"]').isVisible(), false);
   await page.keyboard.press("Escape");
   assert.equal(await text(page, "puzzle-progress"), `1 / ${PUZZLES.length}`);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("리플레이 링크: #replay= 로 열면 바로 재생하고, '이 기록과 달리기'로 같은 블록 순서로 달린다", async () => {
+  const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
+  const code = await encodeReplayCode(fixture.replay, "친구");
+  const context = await browser.newContext({ locale: "ko-KR", viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  const errors = [];
+  page.on("pageerror", e => errors.push(e.message));
+  await page.goto(`${url}#replay=${code}`);
+  await page.waitForFunction(() => document.body.dataset.screen === "replay", null, { timeout: 5000 });
+  assert.equal(await page.evaluate(() => location.hash), "", "주소의 해시는 지운다");
+  assert.match(await text(page, "replay-note"), /친구의 리플레이/);
+  assert.equal(await page.locator('[data-replay="race"]').isVisible(), true);
+  await page.click('[data-replay="race"]');
+  await page.waitForFunction(
+    () => document.body.dataset.screen === "countdown" || document.body.dataset.screen === "play"
+  );
+  assert.equal(await visible(page, "race-panel"), true);
+  assert.equal(await text(page, "race-label"), "친구의 기록");
   assert.deepEqual(errors, []);
   await context.close();
 });

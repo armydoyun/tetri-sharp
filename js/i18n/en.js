@@ -263,6 +263,21 @@ export const EN = {
   "판 비우기는 주어진 피스로 아래 두 줄을 모두 지우고, T-spin은 T 하나로 해내요.":
     "Clear the board: use the given pieces to clear the bottom two lines. T-spin stages: do it with a single T.",
 
+  // ---- 리플레이 공유 ----
+  "이 리플레이": "this replay",
+  "링크의 리플레이를 읽을 수 없었어요.": "Couldn't read the replay in the link.",
+  "{name}의 리플레이": "{name}'s replay",
+  "받은 리플레이": "A shared replay",
+  "링크를 복사했어요. 받은 사람이 열면 바로 재생하고 이 기록과 달릴 수 있어요":
+    "Copied the link. Whoever opens it can watch it and race this run",
+  "파일로 저장": "Save as file",
+  "리플레이 파일을 저장했어요": "Saved the replay file",
+  파일: "File",
+  "메신저로 보내거나 보관할 때": "To send by messenger or keep",
+  "리플레이 공유": "Share replay",
+  "리플레이 공유(링크·파일)": "Share replay (link or file)",
+  "이 기록과 달리기": "Race this run",
+
   // ---- 결과 ----
   "새 기록": "New record",
   "최고 기록": "Best",

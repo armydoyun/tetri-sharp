@@ -25,11 +25,11 @@ export const encodeReplayCode = async (replay, name = "") => {
   return PREFIX + toBase64Url(packed);
 };
 
-/** 코드나 링크(…#daily=코드) → 리플레이 원본 객체. 읽을 수 없으면 null(검증은 sanitizeReplay가 한다) */
+/** 코드나 링크(…#daily=코드 또는 #replay=코드) → 리플레이 원본 객체. 읽을 수 없으면 null(검증은 sanitizeReplay가 한다) */
 export const decodeReplayCode = async text => {
   try {
     const raw = String(text ?? "").trim();
-    const fromLink = /[#&]daily=([^&\s]+)/.exec(raw);
+    const fromLink = /[#&](?:daily|replay)=([^&\s]+)/.exec(raw);
     const code = fromLink ? decodeURIComponent(fromLink[1]) : raw;
     if (!code.startsWith(PREFIX) || code.length > MAX_CODE) return null;
     const bytes = await pipe(fromBase64Url(code.slice(PREFIX.length)), new DecompressionStream("deflate-raw"));
@@ -40,5 +40,5 @@ export const decodeReplayCode = async text => {
   }
 };
 
-/** 공유 링크: 지금 주소(해시 제외) + #daily=코드 */
-export const replayLink = (code, href) => `${String(href).split("#")[0]}#daily=${code}`;
+/** 공유 링크: 지금 주소(해시 제외) + #daily=코드(오늘의 도전) 또는 #replay=코드(그 밖의 리플레이) */
+export const replayLink = (code, href, key = "daily") => `${String(href).split("#")[0]}#${key}=${code}`;

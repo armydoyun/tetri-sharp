@@ -49,6 +49,7 @@ import { createUndo } from "./modes/undo.js";
 import { createHelpUI } from "./ui/help.js";
 import { PUZZLES, createPuzzleProgress, findPuzzle, puzzleMode } from "./modes/puzzles.js";
 import { createPuzzleUI } from "./ui/puzzles.js";
+import { createShareUI } from "./ui/share.js";
 import { createVersusUI } from "./ui/versus.js";
 import { lang, t, translateDom } from "./i18n/index.js";
 
@@ -637,7 +638,8 @@ $("go-home").addEventListener("click", () => {
     versusUI.isOpen ||
     dailyUI.isOpen ||
     helpUI.isOpen ||
-    puzzleUI.isOpen
+    puzzleUI.isOpen ||
+    shareUI.isOpen
   )
     return;
   if (screen === "menu") return window.scrollTo(0, 0);
@@ -960,7 +962,8 @@ const handleSystem = action => {
     versusUI.isOpen ||
     dailyUI.isOpen ||
     helpUI.isOpen ||
-    puzzleUI.isOpen
+    puzzleUI.isOpen ||
+    shareUI.isOpen
   )
     return;
   if (screen === "replay") {
@@ -1082,7 +1085,8 @@ const handlePadMenu = action => {
     versusUI.isOpen ||
     dailyUI.isOpen ||
     helpUI.isOpen ||
-    puzzleUI.isOpen
+    puzzleUI.isOpen ||
+    shareUI.isOpen
   )
     return;
   const panel = Object.values(panels).find(p => !p.hidden);
@@ -1150,7 +1154,7 @@ for (const btn of document.querySelectorAll("[data-action]")) {
     if (action === "menu") toMenu();
     if (action === "watch" && lastReplay) startReplay(lastReplay);
     if (action === "stats" && game) statsUI.open(game.state, `${mode.name} · ${rules.name}`);
-    if (action === "export" && lastReplay) exportReplay(lastReplay);
+    if (action === "export" && lastReplay) shareUI.open(lastReplay, `${mode.name} · ${rules.name}`);
   });
 }
 
@@ -1307,6 +1311,7 @@ const startReplay = (replay, returnTo = screen, note = "") => {
   replayNote.textContent = note;
   $("replay-title").textContent = `${mode.name} · ${rules.name}`;
   renderMarkers();
+  /** @type {HTMLButtonElement} */ (replayBar.querySelector('[data-replay="race"]')).hidden = !canRace(replay);
   updateReplayBar();
 };
 
@@ -1359,6 +1364,8 @@ for (const btn of replayBar.querySelectorAll("[data-replay]")) {
     if (action === "ahead") return seekReplay((player?.frame ?? 0) + 300);
     if (action === "prev-mark") return jumpMark(-1);
     if (action === "next-mark") return jumpMark(1);
+    if (action === "share" && playing) return shareUI.open(playing, `${mode.name} · ${rules.name}`);
+    if (action === "race" && playing) return raceReplay(playing);
     if (action === "restart") return restartReplay();
     if (action === "exit") return stopReplay();
     updateReplayBar();
@@ -1378,6 +1385,7 @@ window.addEventListener("keydown", e => {
     dailyUI.isOpen ||
     helpUI.isOpen ||
     puzzleUI.isOpen ||
+    shareUI.isOpen ||
     e.repeat
   )
     return;
@@ -1597,6 +1605,51 @@ const loop = now => {
 };
 
 /** 결과 링크(#daily=…)로 열었으면 오늘의 도전 창을 그 코드로 연다. 주소의 해시는 지운다. */
+// ---- 리플레이 공유 · 그 기록과 달리기 ----
+const shareUI = createShareUI({
+  dialog: /** @type {HTMLDialogElement} */ ($("share")),
+  makeCode: replay => encodeReplayCode(replay, replay.name || records.playerName),
+  makeLink: code => replayLink(code, location.href, "replay"),
+  onSaveFile: exportReplay,
+});
+
+/** 지금 보는 리플레이와 같은 블록 순서로 달린다(달리기가 되는 모드, 끝까지 간 판만) */
+const canRace = replay => {
+  const m = findMode(replay.mode);
+  return Boolean(m.race) && replay.result.over === m.race.finish;
+};
+const raceReplay = replay => {
+  if (!canRace(replay)) return;
+  const m = findMode(replay.mode);
+  let targetSplits = [];
+  verifyReplay(replay, findMode, state => {
+    if (m.splits) targetSplits = advanceSplits(m.splits, targetSplits, state.stats.lines, state.frame);
+  });
+  const r = replay.result;
+  const best = { frames: r.frames, lines: r.lines, pieces: r.pieces, score: r.score };
+  start(m, replay.rules, { replay, best, splits: targetSplits, friend: replay.name || t("이 리플레이") });
+};
+
+/** 리플레이 링크(#replay=…)로 열었으면 검증하고 바로 재생한다. 주소의 해시는 지운다. */
+const importReplayFromLink = async () => {
+  if (!/[#&]replay=/.test(location.hash)) return;
+  const hash = location.hash;
+  try {
+    history.replaceState(null, "", location.pathname + location.search);
+  } catch {
+    /* file:// 등에서 막혀도 괜찮다 */
+  }
+  const raw = await decodeReplayCode(hash);
+  const replay = raw && sanitizeReplay(raw, findMode);
+  if (!replay) {
+    showMenuNotice(t("링크의 리플레이를 읽을 수 없었어요."));
+    return;
+  }
+  const check = verifyReplay(replay, findMode);
+  const from = replay.name ? t("{name}의 리플레이", { name: replay.name }) : t("받은 리플레이");
+  startReplay(replay, "menu", check.ok ? from : t("저장된 결과와 재생 결과가 달라요. 다른 버전의 파일일 수 있어요."));
+};
+
 const importDailyFromLink = () => {
   if (!/[#&]daily=/.test(location.hash)) return;
   const pasted = location.hash.slice(1);
@@ -1641,6 +1694,7 @@ renderKeyHelp();
 if (importRulesFromLink()) renderKeyHelp();
 toMenu(true);
 importDailyFromLink();
+importReplayFromLink();
 requestAnimationFrame(loop);
 
 // 설치형 앱(GitHub Pages 배포본): 매니페스트가 걸려 있을 때만 서비스 워커를 등록한다.
