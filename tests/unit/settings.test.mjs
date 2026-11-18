@@ -53,3 +53,11 @@ test("엔진용 변환: ms → 프레임, SDF 맨 끝은 ∞", () => {
   assert.equal(h.sdf, Infinity);
   assert.equal(toEngineHandling({ das: 0, arr: 0, sdf: 20 }).sdf, 20);
 });
+
+test("화면 색 설정: 기본은 시스템, 라이트·다크만 받는다", async () => {
+  const { sanitizeSettings: clean } = await import("../../js/storage/settings.js");
+  assert.equal(clean({}).scheme, "system");
+  assert.equal(clean({ scheme: "dark" }).scheme, "dark");
+  assert.equal(clean({ scheme: "light" }).scheme, "light");
+  assert.equal(clean({ scheme: "blue" }).scheme, "system");
+});

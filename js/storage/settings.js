@@ -16,6 +16,7 @@ export const HANDLING_LIMITS = Object.freeze({
 });
 
 export const TOUCH_OPTIONS = Object.freeze(["auto", "on", "off"]);
+export const SCHEME_OPTIONS = Object.freeze(["system", "light", "dark"]);
 
 export const VISUAL_OPTIONS = Object.freeze({
   // 게임 테마(블록·격자·움직임·연출의 모습) — js/render/themes.js
@@ -52,6 +53,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
   volume: 50,
   /** 화면 언어: auto(브라우저 언어) · ko · en */
   lang: "auto",
+  /** 화면 색: system(기기 설정) · light · dark */
+  scheme: "system",
 });
 
 export const VOLUME_LIMITS = Object.freeze({ min: 0, max: 100, step: 5, default: 50 });
@@ -93,6 +96,7 @@ export const sanitizeSettings = raw => {
     visual: sanitizeVisual(s.visual),
     volume: clampNum(s.volume, VOLUME_LIMITS),
     lang: LANG_OPTIONS.includes(s.lang) ? s.lang : "auto",
+    scheme: SCHEME_OPTIONS.includes(s.scheme) ? s.scheme : "system",
   };
 };
 

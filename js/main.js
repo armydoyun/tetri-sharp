@@ -69,6 +69,13 @@ let settings = loadSettings(store);
 let bindings = compileKeymap(settings.keymap);
 let padBindings = compilePadmap(settings.padmap);
 
+/** 화면 색: 시스템이면 표시를 지워 미디어 쿼리를 따르고, 아니면 html[data-scheme]으로 덮는다 */
+const applyScheme = () => {
+  if (settings.scheme === "system") delete document.documentElement.dataset.scheme;
+  else document.documentElement.dataset.scheme = settings.scheme;
+};
+applyScheme();
+
 const renderer = createRenderer(canvas, { getVisual: () => settings.visual });
 const sfx = createSfx({ getVolume: () => settings.volume });
 const racePanel = $("race-panel");
@@ -642,6 +649,7 @@ const settingsUI = createSettingsUI({
     bindings = compileKeymap(settings.keymap);
     padBindings = compilePadmap(settings.padmap);
     applyTouch();
+    applyScheme();
     if (game && screen !== "replay") {
       game.setHandling(toEngineHandling(settings.handling));
       recorder?.handlingChanged(game.handling);
@@ -996,6 +1004,7 @@ const reloadFromStore = () => {
   bindings = compileKeymap(settings.keymap);
   padBindings = compilePadmap(settings.padmap);
   records.reload();
+  applyScheme();
   customBody = sanitizeRuleBody(store.get("customRules", MODERN) ?? MODERN);
   const last = store.get("lastRules", null);
   ruleChoice = RULE_CHOICES.includes(last) ? last : "modern";

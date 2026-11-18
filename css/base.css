@@ -16,6 +16,17 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* 스크롤바 자리를 늘 비워 둔다: 조작법을 펼치는 등 페이지 길이가 바뀌어 스크롤바가 생기거나 없어져도
+   화면 폭이 그대로라 가운데 정렬된 내용이 좌우로 움직이지 않는다. */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* 게임 화면은 body 전체가 다크 → 비워 둔 스크롤바 자리(html 배경)도 같은 색 */
+html:has(> body:not([data-screen="menu"])) {
+  background: var(--game-bg);
+}
+
 body {
   overscroll-behavior: none;
   transition: background-color 180ms var(--ease);

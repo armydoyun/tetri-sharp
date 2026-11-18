@@ -1076,3 +1076,56 @@ test("드롭다운: 키보드로 열고 고르며, Esc는 목록만 닫고 대�
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("조작법을 펼쳐 페이지가 길어져도(스크롤바가 생겨도) 첫 화면이 좌우로 움직이지 않는다", async () => {
+  // 헤드리스는 스크롤바를 겹쳐 그려 자리를 차지하지 않으므로, 폭을 차지하는 스크롤바를 켜서 연다.
+  const real = await chromium.launch({ ...launchOptions(chromium), ignoreDefaultArgs: ["--hide-scrollbars"] });
+  const page = await real.newPage({ locale: "ko-KR", viewport: { width: 1280, height: 900 } });
+  await page.goto(url);
+  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  const xs = () =>
+    page.evaluate(() =>
+      [".logo", ".home-main", ".home-side", "#mode-list"].map(s =>
+        Math.round(document.querySelector(s).getBoundingClientRect().x)
+      )
+    );
+  const closed = await xs();
+  await page.click("#help-title");
+  assert.ok(await page.evaluate(() => document.documentElement.scrollHeight > innerHeight), "펼치면 스크롤이 생긴다");
+  assert.deepEqual(await xs(), closed, "펼친 뒤");
+  await page.click("#help-title");
+  assert.deepEqual(await xs(), closed, "접은 뒤");
+  await real.close();
+});
+
+test("화면 색: 시스템이 라이트여도 다크를 고르면 첫 화면이 어두워지고, 새로고침 후에도 유지된다", async () => {
+  const context = await browser.newContext({
+    locale: "ko-KR",
+    colorScheme: "light",
+    viewport: { width: 1280, height: 900 },
+  });
+  const page = await context.newPage();
+  await page.goto(url);
+  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  // 배경색은 짧게 전환되므로 끝날 때까지 기다린 뒤 잰다.
+  const lum = async () => {
+    await page.waitForTimeout(300);
+    return page.evaluate(() => {
+      const [r, g, b] = getComputedStyle(document.body).backgroundColor.match(/\d+/g).map(Number);
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    });
+  };
+  assert.ok((await lum()) > 200, "시스템(라이트)");
+  await page.click("#open-settings");
+  await page.click('.dialog-tabs [data-value="visual"]');
+  await page.click('#set-scheme [data-value="dark"]');
+  assert.ok((await lum()) < 40, "다크를 고르면 바로 어두워진다");
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  assert.ok((await lum()) < 40, "새로고침 후에도 다크");
+  await page.click("#open-settings");
+  await page.click('.dialog-tabs [data-value="visual"]');
+  await page.click('#set-scheme [data-value="system"]');
+  assert.ok((await lum()) > 200, "시스템으로 돌리면 다시 라이트");
+  await context.close();
+});

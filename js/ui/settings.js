@@ -51,6 +51,11 @@ const EFFECT_HINTS = {
   reduced: t("줄이 삭제된 위치에 가는 선을 잠깐 표시해요"),
   off: t("연출을 모두 꺼요"),
 };
+const SCHEME_HINTS = {
+  system: "기기의 라이트·다크 설정을 따라요. 게임 화면은 늘 어두워요",
+  light: "첫 화면과 메뉴를 밝게 써요. 게임 화면은 늘 어두워요",
+  dark: "첫 화면과 메뉴도 어둡게 써요",
+};
 const TOUCH_OPTIONS = [
   ["auto", t("자동")],
   ["on", t("켜기")],
@@ -126,9 +131,29 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
 
   const visualSection = () => {
     const visual = getSettings().visual;
+    const scheme = getSettings().scheme;
     return el(
       "section",
       { class: "field-section" },
+      fieldRow({
+        id: "set-scheme",
+        label: t("화면 색"),
+        hint: t(SCHEME_HINTS[scheme]),
+        control: choice({
+          id: "set-scheme",
+          label: t("화면 색"),
+          options: [
+            ["system", t("시스템")],
+            ["light", t("라이트")],
+            ["dark", t("다크")],
+          ],
+          value: scheme,
+          onChange: v => {
+            update({ scheme: v });
+            render();
+          },
+        }),
+      }),
       fieldRow({
         id: "set-theme",
         label: t("게임 테마"),
@@ -307,6 +332,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
         touch: "auto",
         visual: defaultVisual(),
         volume: DEFAULT_SETTINGS.volume,
+        scheme: DEFAULT_SETTINGS.scheme,
       });
       notice.textContent = t("모든 설정을 기본값으로 되돌렸어요.");
       render();
