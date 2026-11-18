@@ -15,7 +15,8 @@ import { formatScore, formatTime } from "./format.js";
  * @property {(state: any) => { label: string, value: string }} hudLines
  * @property {(state: any) => { label: string, frames: number }} hudTime   경과 또는 남은 시간
  * @property {(state: any) => { title: string, main: string }} summary    결과 화면 제목·큰 글씨
- * @property {{ metric: "frames" | "lines" | "score", order: "asc" | "desc" }} record  순위 기준
+ * @property {{ metric: "frames" | "lines" | "score" | "level", order: "asc" | "desc" }} record  순위 기준
+ * @property {(state: any) => string} [hudLevel]  HUD 레벨 칸 (기본: 레벨 숫자)
  * @property {(entry: any) => string} formatRecord
  * @property {(state: any) => boolean} isRecordable  이번 판을 기록에 남길지
  */
@@ -106,6 +107,80 @@ export const ULTRA = Object.freeze({
   isRecordable: state => state.score > 0,
 });
 
+// ---- Master: 레벨 0 → 999. 고정할 때마다 +1(구간 끝 x99에서는 멈춤), 줄을 지우면 지운 줄 수만큼 +.
+// 레벨에 따라 중력이 오르다 200에서 한 번 늦춰지고, 500부터 20G. ----
+
+/** [시작 레벨, 중력(1/256 G 단위)] — 아케이드 게임의 고전적인 곡선을 따른다. */
+export const MASTER_GRAVITY = Object.freeze([
+  [0, 4],
+  [30, 6],
+  [35, 8],
+  [40, 10],
+  [50, 12],
+  [60, 16],
+  [70, 32],
+  [80, 48],
+  [90, 64],
+  [100, 80],
+  [120, 96],
+  [140, 112],
+  [160, 128],
+  [170, 144],
+  [200, 4],
+  [220, 32],
+  [230, 64],
+  [233, 96],
+  [236, 128],
+  [239, 160],
+  [243, 192],
+  [247, 224],
+  [251, 256],
+  [300, 512],
+  [330, 768],
+  [360, 1024],
+  [400, 1280],
+  [420, 1024],
+  [450, 768],
+  [500, 5120],
+]);
+
+export const masterGravity = level => {
+  let g = MASTER_GRAVITY[0][1];
+  for (const [from, value] of MASTER_GRAVITY) if (level >= from) g = value;
+  return g / 256;
+};
+
+const MASTER_MAX = 999;
+
+/** @type {Mode} */
+export const MASTER = Object.freeze({
+  id: "master",
+  name: "Master",
+  description: "레벨 999까지 — 500부터 20G (Arcade 규칙 추천)",
+  rules: MODERN,
+  initialLevel: 0,
+  levelStep: 100,
+  levelAfterLock: (state, lines) => {
+    const L = state.level;
+    if (lines > 0) return Math.min(MASTER_MAX, L + lines);
+    // 구간 끝(x99)과 998에서는 줄을 지워야만 넘어간다.
+    return L % 100 === 99 || L === MASTER_MAX - 1 ? L : L + 1;
+  },
+  gravityFor: state => masterGravity(state.level),
+  scoreLevel: state => 1 + Math.floor(state.level / 100),
+  check: state => (state.level >= MASTER_MAX ? { result: "clear" } : null),
+  hudLines: state => ({ label: "줄", value: String(state.stats.lines) }),
+  hudLevel: state => `${state.level} / ${Math.min(MASTER_MAX, (Math.floor(state.level / 100) + 1) * 100)}`,
+  hudTime: elapsed,
+  summary: state => ({
+    title: state.over === "clear" ? "완료!" : "게임 오버",
+    main: `레벨 ${state.level}`,
+  }),
+  record: Object.freeze({ metric: "level", order: "desc" }),
+  formatRecord: e => `레벨 ${e.level ?? 0}`,
+  isRecordable: state => state.level > 0,
+});
+
 /** @type {Mode} */
 export const ZEN = Object.freeze({
   id: "zen",
@@ -121,5 +196,5 @@ export const ZEN = Object.freeze({
   isRecordable: state => state.stats.lines > 0,
 });
 
-export const MODES = Object.freeze([SPRINT_40, MARATHON, ULTRA, ZEN]);
+export const MODES = Object.freeze([SPRINT_40, MARATHON, ULTRA, MASTER, ZEN]);
 export const findMode = id => MODES.find(m => m.id === id) ?? SPRINT_40;

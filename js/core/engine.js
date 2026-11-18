@@ -64,6 +64,10 @@ export const msToFrames = ms => (ms * 60) / 1000;
  * @property {(state: any, events: any[]) => null | { result: string }} [check]
  * @property {(state: any) => number} [levelFor]    줄 수 등에 따른 레벨 (없으면 1 고정)
  * @property {(state: any) => number} [gravityFor]  레벨 등에 따른 중력 (없으면 rules.gravity)
+ * @property {number} [initialLevel]                  시작 레벨 (기본 1)
+ * @property {(state: any, lines: number) => number} [levelAfterLock]  고정마다 레벨을 올리는 방식(levelFor 대신)
+ * @property {number} [levelStep]                     레벨업 알림 간격 (기본 1, Master는 100)
+ * @property {(state: any) => number} [scoreLevel]    점수에 곱할 레벨 (기본 state.level)
  */
 
 /**
@@ -111,7 +115,18 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
     over: null,
   };
 
+  state.level = mode?.initialLevel ?? 1;
   if (mode?.levelFor) state.level = mode.levelFor(state);
+
+  /** 이번 프레임에 누르고 있는 버튼 — 생성 순간의 IRS/IHS 판정에 쓴다 */
+  let currentHeld = 0;
+  /** 이번 프레임에 IRS로 이미 쓴 회전 버튼(같은 프레임에 한 번 더 돌지 않게) */
+  let consumed = 0;
+
+  const currentGravity = () => {
+    let g = mode?.gravityFor ? mode.gravityFor(state) : rules.gravity;
+    return g >= 20 ? Infinity : g;
+  };
 
   /** @type {any[]} 이번 프레임에 일어난 일 */
   let events = [];
@@ -142,6 +157,18 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
       lastAction: null,
       kick: 0,
     };
+    // IRS: 생성 순간 회전 버튼을 누르고 있으면 돌린 채로 나온다(돌린 모양이 들어갈 때만).
+    if (rules.irs) {
+      const bit = [BTN.CW, BTN.CCW, BTN.R180].find(b => currentHeld & b);
+      if (bit) {
+        const to = (a.rot + (bit === BTN.CW ? 1 : bit === BTN.CCW ? 3 : 2)) % 4;
+        if (fits(a, 0, 0, to)) {
+          a.rot = to;
+          consumed |= bit;
+          events.push({ type: "irs", piece: type });
+        }
+      }
+    }
     if (!fits(a, 0, 0)) {
       state.active = null;
       state.over = "blockOut";
@@ -150,10 +177,25 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
     }
     // 가이드라인: 생성 직후 한 칸 내려와 보이는 영역 맨 윗줄에 걸친다.
     if (fits(a, 0, 1)) a.y += 1;
+    // 20G: 생성되자마자 바닥까지.
+    if (currentGravity() === Infinity) while (fits(a, 0, 1)) a.y += 1;
     state.active = a;
     state.gravityAcc = 0;
     resetLock(a.y);
     events.push({ type: "spawn", piece: type });
+  };
+
+  /** 다음 피스를 꺼내 생성한다. IHS: 생성 순간 홀드를 누르고 있으면 바로 홀드한 피스와 바꾼다. */
+  const spawnNext = () => {
+    let type = takeNext();
+    if (rules.ihs && rules.hold.enabled && currentHeld & BTN.HOLD && !state.holdUsed) {
+      const held = state.hold;
+      state.hold = type;
+      state.holdUsed = true;
+      events.push({ type: "hold", piece: type, initial: true });
+      type = held ?? takeNext();
+    }
+    spawn(type);
   };
 
   const lockPiece = () => {
@@ -168,7 +210,8 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
     const cleared = clearLines(board);
     const lines = cleared.length;
     const perfect = lines > 0 && isEmpty(board);
-    const scored = scoring.scoreLock({ lines, tspin, b2b: state.b2b, combo: state.combo, perfect, level: state.level });
+    const scoreLevel = mode?.scoreLevel ? mode.scoreLevel(state) : state.level;
+    const scored = scoring.scoreLock({ lines, tspin, b2b: state.b2b, combo: state.combo, perfect, level: scoreLevel });
     state.score += scored.points;
     state.b2b = scored.b2b;
     state.combo = scored.combo;
@@ -186,11 +229,15 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
       level: state.level,
     });
 
-    if (mode?.levelFor) {
-      const level = mode.levelFor(state);
-      if (level > state.level) events.push({ type: "levelUp", level });
-      state.level = level;
-    }
+    const nextLevel = mode?.levelAfterLock
+      ? mode.levelAfterLock(state, lines)
+      : mode?.levelFor
+        ? mode.levelFor(state)
+        : state.level;
+    const levelStep = mode?.levelStep ?? 1;
+    if (Math.floor(nextLevel / levelStep) > Math.floor(state.level / levelStep))
+      events.push({ type: "levelUp", level: nextLevel });
+    state.level = nextLevel;
 
     // 줄이 지워지지 않았고 모든 칸이 보이는 영역 위에 있으면 Lock Out.
     if (!cleared.length && shape.every(([, cy]) => a.y + cy < VISIBLE_TOP)) {
@@ -199,7 +246,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
       return;
     }
     state.are = cleared.length ? rules.are.lineClear : rules.are.spawn;
-    if (state.are <= 0) spawn(takeNext());
+    if (state.are <= 0) spawnNext();
   };
 
   /** 이동·회전이 성공했을 때 고정 타이머를 규칙에 따라 되돌린다. */
@@ -301,7 +348,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
   };
 
   const applyGravity = (a, held) => {
-    let g = mode?.gravityFor ? mode.gravityFor(state) : rules.gravity;
+    let g = currentGravity();
     if (held & BTN.SOFT) g = handling.sdf === Infinity ? Infinity : Math.max(g * handling.sdf, g);
     if (g >= 20) g = Infinity;
     state.gravityAcc += g;
@@ -349,16 +396,19 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
   const advance = ({ held = 0, pressed = 0 } = {}) => {
     events = [];
     if (state.over) return events;
-    if (state.frame === 0 && !state.active) spawn(takeNext());
+    currentHeld = held;
+    consumed = 0;
+    if (state.frame === 0 && !state.active) spawnNext();
     state.frame += 1;
     pressed |= held & ~state.prevHeld;
     state.prevHeld = held;
+    pressed &= ~consumed;
 
     const move = updateDas(held, pressed);
 
     if (!state.active) {
       state.are -= 1;
-      if (state.are <= 0) spawn(takeNext());
+      if (state.are <= 0) spawnNext();
       return events;
     }
 

@@ -17,6 +17,8 @@
  * @property {"threeCorner" | "none"} tspin  T-spin 판정 방식
  * @property {"guideline" | "classic"} scoring  점수표
  * @property {null | { das: number, arr: number, sdf: number }} fixedHandling  개인 설정 대신 강제할 조작감(프레임)
+ * @property {boolean} irs   생성 순간 회전 버튼을 누르고 있으면 돌린 채로 생성
+ * @property {boolean} ihs   생성 순간 홀드 버튼을 누르고 있으면 바로 홀드
  */
 
 /** @type {RuleSet} */
@@ -35,6 +37,8 @@ export const MODERN = Object.freeze({
   tspin: "threeCorner",
   scoring: "guideline",
   fixedHandling: null,
+  irs: true,
+  ihs: true,
 });
 
 /** 옛날 가정용 게임 느낌: 킥·홀드·하드 드롭·고스트 없음, 넥스트 1개, 닿으면 바로 고정, 조작감 고정. */
@@ -55,6 +59,8 @@ export const RETRO = Object.freeze({
   scoring: "classic",
   // DAS 16프레임, ARR 6프레임, 소프트 드롭은 2프레임에 1칸 정도
   fixedHandling: Object.freeze({ das: 16, arr: 6, sdf: 30 }),
+  irs: false,
+  ihs: false,
 });
 
 /** 아케이드 느낌: ARS 회전, 이력 기반 생성기, 내려갈 때만 리셋되는 고정, 생성·삭제 지연. */
@@ -74,6 +80,8 @@ export const ARCADE = Object.freeze({
   tspin: "none",
   scoring: "guideline",
   fixedHandling: null,
+  irs: true,
+  ihs: false,
 });
 
 export const PRESETS = Object.freeze({ modern: MODERN, retro: RETRO, arcade: ARCADE });

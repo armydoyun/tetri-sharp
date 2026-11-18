@@ -177,9 +177,9 @@ test("설정: 슬라이더 값과 키 변경이 저장되고 새로고침 후에
   await context.close();
 });
 
-test("Ultra: 남은 시간이 줄어들고 하드 드롭으로 점수가 오른다, 메뉴에 네 모드", async () => {
+test("Ultra: 남은 시간이 줄어들고 하드 드롭으로 점수가 오른다, 메뉴에 다섯 모드", async () => {
   const { context, page, errors } = await openPage();
-  assert.equal(await page.locator(".mode-card").count(), 4);
+  assert.equal(await page.locator(".mode-card").count(), 5);
   await startMode(page, "ultra");
   assert.equal(await text(page, "hud-time-label"), "남은 시간");
   await page.waitForTimeout(300);

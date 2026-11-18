@@ -62,6 +62,8 @@ export const sanitizeRuleBody = raw => {
     gravity: nearestGravity(r.gravity),
     tspin: pick(r.tspin, TSPIN_TYPES, MODERN.tspin),
     scoring: pick(r.scoring, Object.keys(SCORINGS), MODERN.scoring),
+    irs: bool(r.irs, MODERN.irs),
+    ihs: bool(r.ihs, MODERN.ihs),
     fixedHandling: fixed
       ? {
           das: clampInt(fixed.das, LIMITS.das, 16),

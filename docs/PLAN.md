@@ -272,7 +272,7 @@ export default {
 | **M3 Sprint 40L** ✅ (+ Endless) | 모드 인터페이스, 타이머, 결과 화면, 개인 기록 | 첫 "완성된 게임" |
 | **M4 점수 & Marathon/Ultra** ✅ | T-spin, B2B, 콤보, PC, 레벨 곡선 | |
 | **M5 규칙 샌드박스** ✅ | 전략 모듈 추가(ARS, Classic, 생성기들, lock 타입), 프리셋, 규칙 편집 UI, 기록 분리 | Modern/Retro/Arcade 전환 |
-| **M6 고속 플레이** | ARE, IRS/IHS, 20G, Master 모드 | |
+| **M6 고속 플레이** ✅ | ARE, IRS/IHS, 20G, Master 모드 | |
 | **M7 연출 & 사운드** | 이펙트, 효과음, 스킨 | |
 | **M8 리플레이 & 부가** | 리플레이 저장/재생, Zen, Dig, 게임패드 | |
 

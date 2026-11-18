@@ -2,7 +2,7 @@
 // 프리셋은 이름(modern·retro·arcade), Custom은 내용 해시가 id라 조합마다 기록표가 따로 생긴다.
 const MAX_ENTRIES = 10;
 
-/** @typedef {{ frames: number, lines: number, pieces: number, score?: number, date: string }} RecordEntry */
+/** @typedef {{ frames: number, lines: number, pieces: number, score?: number, level?: number, date: string }} RecordEntry */
 
 /** @param {{ id: string }} rules */
 export const recordKey = (mode, rules) => `${mode.id}|${rules.id}`;
@@ -12,7 +12,8 @@ const isEntry = e =>
   e &&
   typeof e === "object" &&
   ["frames", "lines", "pieces"].every(k => nonNegative(e[k])) &&
-  (e.score === undefined || nonNegative(e.score));
+  (e.score === undefined || nonNegative(e.score)) &&
+  (e.level === undefined || nonNegative(e.level));
 
 /** @param {ReturnType<typeof import("./store.js").createStore>} store */
 export const createRecords = store => {
@@ -29,9 +30,9 @@ export const createRecords = store => {
 
   const compare = mode => {
     const { metric, order } = mode.record;
-    // 같은 값이면 먼저 세운 기록이 앞.
     const value = e => e[metric] ?? 0;
-    return (a, b) => (order === "asc" ? value(a) - value(b) : value(b) - value(a));
+    // 같은 값이면 더 빨리 세운 기록(프레임이 적은 쪽)이 앞, 그것도 같으면 먼저 세운 기록이 앞.
+    return (a, b) => (order === "asc" ? value(a) - value(b) : value(b) - value(a)) || a.frames - b.frames;
   };
 
   return {

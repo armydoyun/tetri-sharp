@@ -99,6 +99,14 @@ const FIELDS = [
   },
 
   { section: "조작감" },
+  { path: "irs", label: "미리 회전 (IRS)", hint: "생성 순간 회전 키를 누르고 있으면 돌린 채로 나온다", type: "toggle" },
+  {
+    path: "ihs",
+    label: "미리 홀드 (IHS)",
+    hint: "생성 순간 홀드 키를 누르고 있으면 바로 홀드",
+    type: "toggle",
+    when: r => r.hold.enabled,
+  },
   { path: "fixedHandlingOn", label: "조작감 고정", hint: "켜면 개인 설정 대신 아래 값으로 강제", type: "toggle" },
   {
     path: "fixedHandling.das",

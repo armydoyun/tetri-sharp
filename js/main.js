@@ -139,7 +139,7 @@ const updateHud = () => {
   hud.timeLabel.textContent = time.label;
   hud.time.textContent = formatTime(time.frames);
   hud.score.textContent = formatScore(game?.state.score ?? 0);
-  hud.level.textContent = String(game?.state.level ?? 1);
+  hud.level.textContent = game ? (mode.hudLevel?.(game.state) ?? String(game.state.level)) : "1";
   hud.linesLabel.textContent = lines.label;
   hud.lines.textContent = lines.value;
   hud.pieces.textContent = String(stats.pieces);
@@ -211,6 +211,7 @@ const finish = () => {
       lines: state.stats.lines,
       pieces: state.stats.pieces,
       score: state.score,
+      level: state.level,
       date: new Date().toISOString(),
     });
   }
