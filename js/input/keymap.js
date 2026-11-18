@@ -95,12 +95,12 @@ export const clearKey = (keymap, actionId, slot) => ({
 
 /**
  * 키 이벤트 처리용으로 바꾼다.
- * @returns {{ buttons: Record<string, number>, system: Record<string, "restart" | "pause"> }}
+ * @returns {{ buttons: Record<string, number>, system: Record<string, "restart" | "pause" | "undo"> }}
  */
 export const compileKeymap = keymap => {
   /** @type {Record<string, number>} */
   const buttons = {};
-  /** @type {Record<string, "restart" | "pause">} */
+  /** @type {Record<string, "restart" | "pause" | "undo">} */
   const system = { Escape: "pause" };
   for (const action of ACTIONS) {
     for (const code of keymap[action.id] ?? []) {

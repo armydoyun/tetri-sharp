@@ -123,17 +123,23 @@ const I_UP = {
   ],
 };
 
-/** @param {Record<string, Offset[]>} table */
+/** @param {Record<string, number[][]>} table @returns {Readonly<Record<string, Offset[]>>} */
 const toBoard = table =>
-  Object.freeze(Object.fromEntries(Object.entries(table).map(([k, list]) => [k, list.map(([x, y]) => [x, 0 - y])])));
+  Object.freeze(
+    Object.fromEntries(
+      Object.entries(table).map(([k, list]) => [k, list.map(([x, y]) => /** @type {Offset} */ ([x, 0 - y]))])
+    )
+  );
 
 const JLSTZ = toBoard(JLSTZ_UP);
 const I = toBoard(I_UP);
 // 표준 SRS에는 180° 회전이 없다. 제자리 회전만 허용하고, 막히면 한 칸 위로만 시도한다.
+/** @type {ReadonlyArray<Offset>} */
 const HALF = Object.freeze([
   [0, 0],
   [0, -1],
 ]);
+/** @type {ReadonlyArray<Offset>} */
 const NONE = Object.freeze([[0, 0]]);
 
 export default Object.freeze({

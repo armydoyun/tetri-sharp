@@ -41,6 +41,7 @@ const HANDLING_ROWS = [
   },
 ];
 
+/** @type {ReadonlyArray<[string, string]>} */
 const PRESET_OPTIONS = [
   ["relaxed", t("느긋하게")],
   ["standard", t("보통")],
@@ -68,6 +69,7 @@ const TABS = [
 
 const formatValue = (key, v) => (key === "sdf" ? (v >= SDF_INFINITE ? t("즉시") : t("{n}배", { n: v })) : `${v} ms`);
 
+/** @type {ReadonlyArray<[string, string]>} */
 const EFFECT_OPTIONS = [
   ["full", t("전체")],
   ["reduced", t("줄임")],
@@ -87,6 +89,7 @@ const GAME_SURFACE_HINTS = {
   dark: "게임 중에는 화면 색과 상관없이 어둡게 써요. 보드에 집중하기 좋아요",
   scheme: "게임 중에도 위의 화면 색을 그대로 써요",
 };
+/** @type {ReadonlyArray<[string, string]>} */
 const TOUCH_OPTIONS = [
   ["auto", t("자동")],
   ["on", t("켜기")],

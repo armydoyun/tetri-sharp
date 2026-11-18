@@ -1,0 +1,14 @@
+{
+  // 타입 검사 전용(빌드는 esbuild). 소스는 그대로 JS이고 JSDoc 주석으로 타입을 적는다.
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "target": "es2023",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "skipLibCheck": true
+  },
+  "include": ["js/**/*.js"]
+}

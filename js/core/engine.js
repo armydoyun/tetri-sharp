@@ -92,7 +92,9 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
   const randomizer = mode?.sequence?.length
     ? (() => {
         let i = 0;
-        return { next: () => mode.sequence[i++ % mode.sequence.length] };
+        return {
+          next: () => /** @type {import("./pieces.js").PieceType} */ (mode.sequence[i++ % mode.sequence.length]),
+        };
       })()
     : makeRandomizer(createRng(seed));
   const board = createBoard();

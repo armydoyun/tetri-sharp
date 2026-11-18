@@ -97,13 +97,17 @@ export const ICONS = Object.freeze({
   ],
 });
 
+/** @typedef {keyof typeof ICONS} IconName */
+
 /**
- * @param {keyof typeof ICONS} name
+ * @param {IconName} name
  * @param {{ label?: string, className?: string }} [options]  label이 있으면 화면 읽기 프로그램이 읽는다(없으면 장식)
  * @returns {SVGSVGElement}
  */
 export const icon = (name, { label, className } = {}) => {
-  const parts = ICONS[name];
+  const parts = /** @type {ReadonlyArray<[string, Record<string, string | number>]>} */ (
+    /** @type {unknown} */ (ICONS[name])
+  );
   if (!parts) throw new Error(`아이콘이 없습니다: ${name}`);
   const svg = document.createElementNS(SVG_NS, "svg");
   svg.setAttribute("viewBox", "0 0 24 24");

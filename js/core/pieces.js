@@ -22,22 +22,24 @@ const SPAWN = {
 };
 
 /** @param {string[]} rows @returns {Cell[]} */
-const parse = rows => rows.flatMap((row, y) => [...row].flatMap((ch, x) => (ch === "#" ? [[x, y]] : [])));
+const parse = rows =>
+  rows.flatMap((row, y) => [...row].flatMap((ch, x) => (ch === "#" ? [/** @type {Cell} */ ([x, y])] : [])));
 
-/** 상자 크기 n 안에서 시계 방향 90° 회전 */
+/** 상자 크기 n 안에서 시계 방향 90° 회전 @param {Cell[]} cells @param {number} n @returns {Cell[]} */
 const rotateCW = (cells, n) => cells.map(([x, y]) => [n - 1 - y, x]);
 
 const sortCells = cells => [...cells].sort((a, b) => a[1] - b[1] || a[0] - b[0]);
 
-/** @type {Record<PieceType, { size: number, states: Cell[][] }>} */
-export const PIECES = Object.freeze(
-  Object.fromEntries(
-    PIECE_TYPES.map(type => {
-      const size = SPAWN[type].length;
-      const states = [parse(SPAWN[type])];
-      for (let i = 1; i < 4; i++) states.push(rotateCW(states[i - 1], size));
-      return [type, Object.freeze({ size, states: states.map(sortCells) })];
-    })
+export const PIECES = /** @type {Readonly<Record<PieceType, { size: number, states: Cell[][] }>>} */ (
+  Object.freeze(
+    Object.fromEntries(
+      PIECE_TYPES.map(type => {
+        const size = SPAWN[type].length;
+        const states = [parse(SPAWN[type])];
+        for (let i = 1; i < 4; i++) states.push(rotateCW(states[i - 1], size));
+        return [type, Object.freeze({ size, states: states.map(sortCells) })];
+      })
+    )
   )
 );
 

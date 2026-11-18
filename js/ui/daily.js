@@ -10,8 +10,8 @@ import { t } from "../i18n/index.js";
  *   makeLink: (code: string) => string,
  *   formatRecord: (entry: any) => string,
  *   onStart: () => void,
- *   onRace: (text: string) => Promise<string | null>,  실패하면 알림 문구
- * }} options
+ *   onRace: (text: string) => Promise<string | null>,
+ * }} options  onRace는 실패하면 알림 문구를 돌려준다
  */
 export const createDailyUI = ({ dialog, getToday, makeCode, makeLink, formatRecord, onStart, onRace }) => {
   const notice = el("p", { class: "notice-slot", role: "status", id: "daily-notice" });

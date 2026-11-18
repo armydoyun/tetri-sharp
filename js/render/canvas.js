@@ -13,7 +13,7 @@ const ROWS = VISIBLE_ROWS + MARGIN_TOP;
 const CSS_CELL = 28;
 
 /**
- * @typedef {{ theme: string, effects: "full" | "reduced" | "off", palette: "theme" | "contrast" }} Visual
+ * @typedef {{ theme: string, effects: "full" | "reduced" | "off", palette: "theme" | "contrast" | "custom", pattern?: "on" | "off", ghost?: string, grid?: "on" | "off", colors?: Record<string, string> }} Visual
  * @param {HTMLCanvasElement} canvas
  * @param {{ getVisual: () => Visual, compact?: boolean }} options
  */

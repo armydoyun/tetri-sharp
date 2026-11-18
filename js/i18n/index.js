@@ -49,10 +49,13 @@ const fill = (text, params) =>
  */
 export const t = (ko, params) => fill(lang === "en" ? (EN[ko] ?? ko) : ko, params);
 
-/** 정적 HTML의 글자와 aria-label·title·placeholder를 번역한다. 사전에 있는 것만 바꾼다. */
+/**
+ * 정적 HTML의 글자와 aria-label·title·placeholder를 번역한다. 사전에 있는 것만 바꾼다.
+ * @param {Document | Element} [root]
+ */
 export const translateDom = (root = document) => {
   if (lang === "ko") return;
-  const doc = root.ownerDocument ?? root;
+  const doc = /** @type {Document} */ (root.ownerDocument ?? root);
   const walker = doc.createTreeWalker(root, 4 /* NodeFilter.SHOW_TEXT */);
   /** @type {Text[]} */
   const texts = [];

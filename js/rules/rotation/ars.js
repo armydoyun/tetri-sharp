@@ -3,8 +3,9 @@
 // 중앙열 규칙(단순화): J·L·T가 회전할 때, 돌린 모양이 처음 부딪히는 칸(위→아래, 왼→오 순)이 상자 가운데 열이면 킥하지 않는다.
 //   → 좁은 틈에서 엉뚱하게 옆으로 미끄러지는 것을 막는 규칙. 원본의 세부 예외는 생략했다.
 
-/** @param {string[]} rows */
-const parse = rows => rows.flatMap((row, y) => [...row].flatMap((ch, x) => (ch === "#" ? [[x, y]] : [])));
+/** @param {string[]} rows @returns {[number, number][]} */
+const parse = rows =>
+  rows.flatMap((row, y) => [...row].flatMap((ch, x) => (ch === "#" ? [/** @type {[number, number]} */ ([x, y])] : [])));
 
 const STATES = {
   I: [
@@ -55,8 +56,10 @@ const SHAPES = Object.freeze(
   Object.fromEntries(Object.entries(STATES).map(([type, states]) => [type, Object.freeze(states.map(parse))]))
 );
 
-const NONE = Object.freeze([Object.freeze([0, 0])]);
-const SIDE = Object.freeze([Object.freeze([0, 0]), Object.freeze([1, 0]), Object.freeze([-1, 0])]);
+const NONE = /** @type {ReadonlyArray<readonly [number, number]>} */ (Object.freeze([Object.freeze([0, 0])]));
+const SIDE = /** @type {ReadonlyArray<readonly [number, number]>} */ (
+  Object.freeze([Object.freeze([0, 0]), Object.freeze([1, 0]), Object.freeze([-1, 0])])
+);
 const CENTER_RULE = new Set(["J", "L", "T"]);
 
 /** @param {import("../../core/pieces.js").PieceType} type */

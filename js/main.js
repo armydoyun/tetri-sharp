@@ -204,6 +204,7 @@ const textCap = text => {
 const renderKeyHelp = () => {
   const r = game?.rules ?? currentRules();
   const unavailable = new Set([...(r.hardDrop ? [] : ["HARD"]), ...(r.hold.enabled ? [] : ["HOLD"])]);
+  /** @type {Element[]} */
   const items = [icon("keyboard", { label: t("키보드") })];
   for (const a of ACTIONS) {
     if (unavailable.has(a.id) || !keysOf(a.id).length) continue;
@@ -744,8 +745,8 @@ const finish = () => {
   const nextPuzzle = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="next-puzzle"]'));
   nextPuzzle.hidden = !(mode.puzzle && state.over === "clear" && mode.puzzle.number < PUZZLES.length);
   lastReplay = recorder ? recorder.finish(state) : null;
-  /** @type {HTMLButtonElement} */ for (const b of panels.results.querySelectorAll(
-    '[data-action="watch"], [data-action="export"]'
+  for (const b of /** @type {NodeListOf<HTMLButtonElement>} */ (
+    panels.results.querySelectorAll('[data-action="watch"], [data-action="export"]')
   ))
     b.disabled = !lastReplay;
   if (lastReplay) {
@@ -1206,7 +1207,7 @@ const replayStatus = $("replay-status");
 const replayNote = $("replay-note");
 const replayProgress = /** @type {HTMLInputElement} */ ($("replay-progress"));
 const replayMarkers = $("replay-markers");
-/** @type {ReturnType<typeof analyzeReplay> | null} 지금 보는 리플레이의 분석 */
+/** @type {(ReturnType<typeof analyzeReplay> & { for: any }) | null} 지금 보는 리플레이의 분석 */
 let analysis = null;
 const replayTime = $("replay-time");
 const replayStep = /** @type {HTMLButtonElement} */ (replayBar.querySelector('[data-replay="step"]'));
@@ -1262,8 +1263,8 @@ const renderMarkers = () => {
         ]
       : [])
   );
-  /** @type {HTMLButtonElement} */ for (const b of replayBar.querySelectorAll(
-    '[data-replay="prev-mark"], [data-replay="next-mark"]'
+  for (const b of /** @type {NodeListOf<HTMLButtonElement>} */ (
+    replayBar.querySelectorAll('[data-replay="prev-mark"], [data-replay="next-mark"]')
   ))
     b.disabled = !markers.length;
 };
@@ -1308,8 +1309,8 @@ const updateReplayBar = () => {
   replayStatus.textContent = player?.done ? t("끝") : "";
   replayStep.disabled = !player || player.done;
   replayToggle.disabled = replayStep.disabled;
-  /** @type {HTMLButtonElement} */ for (const b of replayBar.querySelectorAll(
-    '[data-replay="back"], [data-replay="step-back"]'
+  for (const b of /** @type {NodeListOf<HTMLButtonElement>} */ (
+    replayBar.querySelectorAll('[data-replay="back"], [data-replay="step-back"]')
   ))
     b.disabled = !player || player.frame === 0;
   updateReplayProgress();
