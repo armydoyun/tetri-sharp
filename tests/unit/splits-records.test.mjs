@@ -63,3 +63,24 @@ test("구간 분석: 누적 격차가 아니라 그 구간에서 가장 많이 �
     slowest: null,
   });
 });
+
+test("플레이어 이름은 새 기록마다 남고 이름을 바꿔도 예전 기록은 유지된다", () => {
+  const store = createStore(memoryBackend());
+  const records = createRecords(store);
+  const entry = { frames: 3600, lines: 40, pieces: 100, date: "2026-11-01T00:00:00.000Z" };
+  records.add(SPRINT_40, MODERN, entry);
+  records.setPlayerName("  첫 번째   사람  ");
+  records.add(SPRINT_40, MODERN, { ...entry, frames: 3500, playerName: records.playerName });
+  records.setPlayerName("두 번째 사람");
+
+  const reopened = createRecords(store);
+  assert.equal(reopened.playerName, "두 번째 사람");
+  assert.deepEqual(
+    reopened.list(SPRINT_40, MODERN).map(r => r.playerName),
+    ["첫 번째 사람", undefined]
+  );
+  reopened.setPlayerName("가".repeat(30));
+  assert.equal(reopened.playerName.length, 24);
+  reopened.setPlayerName("  ");
+  assert.equal(createRecords(store).playerName, "");
+});

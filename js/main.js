@@ -70,6 +70,7 @@ let customBody = sanitizeRuleBody(store.get("customRules", MODERN));
 const currentRules = () => (ruleChoice === "custom" ? makeCustomRules(customBody) : PRESETS[ruleChoice]);
 /** 이번 판에 쓰는 규칙(게임 중에 Custom을 고쳐도 이번 판 기록은 시작할 때 규칙으로 남는다) */
 let rules = currentRules();
+let runPlayerName = "";
 /** @type {ReturnType<typeof createGame> | null} */
 let game = null;
 let countdown = 0;
@@ -269,6 +270,7 @@ const start = (m, selectedRules = currentRules()) => {
   mode = m;
   if (!m.practice) store.set("lastMode", m.id);
   rules = selectedRules;
+  runPlayerName = records.playerName;
   const seed = (Math.random() * 2 ** 32) >>> 0;
   game = createGame({ rules, handling: toEngineHandling(settings.handling), seed, mode: m });
   recorder = createRecorder({ seed, mode: m, rules, handling: game.handling });
@@ -350,6 +352,7 @@ const finish = () => {
       score: state.score,
       level: state.level,
       ...(mode.splits ? { splits } : {}),
+      playerName: runPlayerName,
       date: new Date().toISOString(),
     });
   }

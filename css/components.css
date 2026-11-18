@@ -433,6 +433,18 @@
   margin: 0 var(--space-1) 0 0;
 }
 
+.record-name-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+}
+
+.records-table td.record-player {
+  padding-right: var(--space-2);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 /* 기록 표: 늘 10줄, 칸 폭 고정 */
 .records-table {
   width: 100%;
@@ -464,7 +476,16 @@
 
 .records-table th:nth-child(2),
 .records-table td:nth-child(2) {
-  width: 24%;
+  width: 20%;
+}
+
+.records-table th:nth-child(3),
+.records-table td:nth-child(3) {
+  width: 18%;
+}
+
+.records-table :is(th, td):nth-child(7) {
+  width: 86px;
 }
 
 .records-table th:last-child,
@@ -645,13 +666,18 @@
   font-weight: 500;
 }
 
-/* 기록 표: 좁은 화면에서는 피스·날짜 열을 뺀다 */
-@media (max-width: 560px) {
-  .records-table th:nth-child(4),
-  .records-table td:nth-child(4),
-  .records-table th:nth-child(6),
-  .records-table td:nth-child(6) {
+/* 좁은 화면에서는 이름과 기록을 위한 너비를 확보한다. */
+@media (max-width: 660px) {
+  .records-table :is(th, td):is(:nth-child(4), :nth-child(5), :nth-child(6), :nth-child(7)) {
     display: none;
+  }
+
+  .records-table :is(th, td):nth-child(2) {
+    width: auto;
+  }
+
+  .records-table :is(th, td):nth-child(3) {
+    width: 6em;
   }
 }
 

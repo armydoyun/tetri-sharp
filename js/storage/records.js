@@ -2,10 +2,13 @@
 // 프리셋은 이름(modern·retro·arcade), Custom은 내용 해시가 id라 조합마다 기록표가 따로 생긴다.
 const MAX_ENTRIES = 10;
 
-/** @typedef {{ frames: number, lines: number, pieces: number, score?: number, level?: number, splits?: number[], date: string }} RecordEntry */
+/** @typedef {{ frames: number, lines: number, pieces: number, score?: number, level?: number, splits?: number[], playerName?: string, date: string }} RecordEntry */
 
 /** @param {{ id: string }} rules */
 export const recordKey = (mode, rules) => `${mode.id}|${rules.id}`;
+
+const cleanName = value =>
+  typeof value === "string" ? [...value.replace(/\s+/gu, " ").trim()].slice(0, 24).join("").trimEnd() : "";
 
 const nonNegative = v => Number.isFinite(v) && v >= 0;
 const isEntry = e =>
@@ -17,18 +20,18 @@ const isEntry = e =>
 
 /** @param {ReturnType<typeof import("./store.js").createStore>} store */
 export const createRecords = store => {
+  let playerName = cleanName(store.get("playerName", ""));
   const readAll = () => {
     const raw = store.get("records", null);
     return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   };
 
-  /** 구간 기록(splits)은 숫자 배열일 때만 남긴다 */
   const clean = e => {
-    if (e.splits !== undefined && !(Array.isArray(e.splits) && e.splits.every(nonNegative))) {
-      const { splits: _drop, ...rest } = e;
-      return rest;
-    }
-    return e;
+    const { playerName: name, splits, ...entry } = e;
+    const normalizedName = cleanName(name);
+    if (normalizedName) entry.playerName = normalizedName;
+    if (Array.isArray(splits) && splits.every(nonNegative)) entry.splits = splits;
+    return entry;
   };
 
   /** @returns {RecordEntry[]} */
@@ -45,6 +48,13 @@ export const createRecords = store => {
   };
 
   return {
+    get playerName() {
+      return playerName;
+    },
+    setPlayerName(value) {
+      playerName = cleanName(value);
+      return store.set("playerName", playerName);
+    },
     list,
     /** 이 모드에 기록이 있는 규칙 id들(기록 화면의 규칙 고르기용) */
     rulesIdsFor: mode =>
@@ -59,8 +69,9 @@ export const createRecords = store => {
     add(mode, rules, entry) {
       const previous = list(mode, rules);
       const previousBest = previous[0] ?? null;
-      const next = [...previous, entry].sort(compare(mode));
-      const rank = next.indexOf(entry);
+      const saved = clean(entry);
+      const next = [...previous, saved].sort(compare(mode));
+      const rank = next.indexOf(saved);
       const all = readAll();
       all[recordKey(mode, rules)] = next.slice(0, MAX_ENTRIES);
       store.set("records", all);

@@ -587,6 +587,37 @@ test("기록 화면: 표는 늘 10줄, 조건을 바꿔도 크기가 그대로, 
   await context.close();
 });
 
+test("기록 이름을 저장하고 플레이하면 그 기록에 당시 이름이 남는다", async () => {
+  const { context, page, errors } = await openPage();
+  await page.click("#open-records");
+  await page.fill("#record-player-name", "  도윤  ");
+  await page.getByRole("button", { name: "플레이어 이름 저장" }).click();
+  assert.equal(await page.locator("#record-player-name").inputValue(), "도윤");
+  await page.click("#records-close");
+
+  await startMode(page, "ultra");
+  for (let i = 0; i < 25 && !(await visible(page, "results")); i++) {
+    await page.keyboard.press("Space");
+    await page.waitForTimeout(25);
+  }
+  assert.equal(await visible(page, "results"), true);
+  await page.keyboard.press("Escape");
+  await page.click("#open-records");
+  await page.locator("#records-mode").selectOption("ultra");
+  assert.equal(await page.locator(".record-player").first().textContent(), "도윤");
+
+  await page.fill("#record-player-name", "친구");
+  await page.locator("#record-player-name").press("Enter");
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  await page.click("#open-records");
+  await page.locator("#records-mode").selectOption("ultra");
+  assert.equal(await page.locator("#record-player-name").inputValue(), "친구");
+  assert.equal(await page.locator(".record-player").first().textContent(), "도윤");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
 test("게임패드 버튼 바꾸기: 설정에서 칸을 누르고 패드 버튼을 누르면 그 버튼으로 동작한다", async () => {
   const { context, page, errors } = await openPage(() => {
     window.__pad = { pressed: new Set() };
