@@ -186,3 +186,20 @@ test("피네스 판정: 하드 드롭한 피스마다 최소보다 더 누른 �
   assert.equal(game.state.finesse.judged, 2);
   assert.equal(game.state.finesse.faults, 1);
 });
+
+test("중력이 없는 연습에서도 소프트 드롭으로 내려 T-spin Double을 낼 수 있다", () => {
+  const { g } = start("tsd", 3);
+  const y0 = g.state.active.y;
+  for (let i = 0; i < 10; i++) g.step({ held: BTN.SOFT });
+  assert.ok(g.state.active.y > y0, "소프트 드롭으로 내려온다");
+});
+
+test("소프트 드롭 속도는 중력이 1칸/초 이상이면 예전과 같다(중력 × 배율)", () => {
+  const rules = { ...MODERN, gravity: 1 / 60 };
+  const a = createGame({ rules, seed: 2, handling: { das: 8, arr: 1, sdf: 6 } });
+  a.step();
+  const y0 = a.state.active.y;
+  for (let i = 0; i < 30; i++) a.step({ held: BTN.SOFT });
+  const fell = a.state.active.y - y0;
+  assert.ok(fell >= 2 && fell <= 3, `30프레임 × 6/60 ≈ 3칸 (실제 ${fell})`);
+});

@@ -447,7 +447,7 @@ body.touch-on {
 }
 
 body[data-screen="replay"] {
-  --replay-controls-h: 104px;
+  --replay-controls-h: 200px;
   --under-h: var(--replay-controls-h);
 }
 
@@ -457,7 +457,7 @@ body[data-screen="replay"]:has(.replay-note:not(:empty)) {
 
 @media (max-width: 720px) {
   body[data-screen="replay"] {
-    --replay-controls-h: 154px;
+    --replay-controls-h: 270px;
   }
 }
 
@@ -891,5 +891,194 @@ body[data-screen="replay"] .touchpad {
 @media (prefers-reduced-motion: reduce) {
   .action.is-shown {
     animation-timing-function: steps(1, end);
+  }
+}
+
+/* ---- CPU 대전: 정보 칸 아래 CPU 보드와 숫자 ---- */
+.cpu-board {
+  width: min(140px, max(80px, calc((100dvh - 520px) * 10 / 22)));
+}
+
+.versus-stats {
+  display: grid;
+  width: 100%;
+  margin: 0;
+  font-size: var(--text-s);
+}
+
+.versus-stats > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 3px 0;
+  border-bottom: var(--border-w) solid var(--border);
+}
+
+.versus-stats dt {
+  color: var(--text-dim);
+}
+
+.versus-stats dd {
+  margin: 0;
+  font-family: var(--font-num);
+  font-weight: 700;
+}
+
+/* ---- 리플레이 진행 막대(이동 가능) + 분석 표시 ---- */
+.replay-track {
+  display: block;
+  position: relative;
+  padding-top: 10px;
+}
+
+.replay-track input {
+  display: block;
+}
+
+/* 막대 위 표시: 누를 수 있는 작은 기둥. 색으로 종류를 나눈다 */
+.replay-markers {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 12px;
+  pointer-events: none;
+}
+
+.replay-mark {
+  appearance: none;
+  position: absolute;
+  top: 0;
+  width: 4px;
+  height: 12px;
+  margin-left: -2px;
+  padding: 0;
+  border: 0;
+  border-radius: 1px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* 누르기 쉽게 보이지 않는 여유를 둔다 */
+.replay-mark::before {
+  content: "";
+  position: absolute;
+  inset: -4px -5px;
+}
+
+.replay-mark:hover,
+.replay-mark:focus-visible {
+  height: 14px;
+  top: -2px;
+}
+
+.replay-mark.is-finesse,
+.replay-legend.is-finesse::before {
+  background: #f0a35e;
+}
+
+.replay-mark.is-slow,
+.replay-legend.is-slow::before {
+  background: #8fa6d8;
+}
+
+.replay-mark.is-highlight,
+.replay-legend.is-highlight::before {
+  background: var(--accent);
+}
+
+.replay-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 var(--space-2);
+  white-space: nowrap;
+}
+
+.replay-legend::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+}
+
+.replay-analysis {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.replay-summary {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--text-s);
+  text-align: center;
+}
+
+.replay-buttons .btn[data-replay="back"],
+.replay-buttons .btn[data-replay="ahead"],
+.replay-buttons .btn[data-replay="step-back"],
+.replay-buttons .btn[data-replay="step"] {
+  font-family: var(--font-num);
+}
+
+/* ---- 결과 카드: 보드 안에 스크롤 없이 들어가게 ----
+   숫자는 두 칸 격자, "새 기록" 배지는 카드 모서리에 띄워 줄을 차지하지 않는다, 보조 버튼은 한 줄에 셋.
+   화면이 낮으면 큰 숫자·여백을 줄인다. 그래도 넘치면(아주 낮은 화면) 패널이 스크롤한다. */
+.results-card {
+  position: relative;
+  width: min(380px, 100%);
+  padding: var(--space-4) var(--space-4) var(--space-4);
+  gap: var(--space-2);
+}
+
+.results-card #results-badge {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+}
+
+.results-card .panel-title {
+  font-size: var(--text-2xl);
+}
+
+.results-main {
+  font-size: clamp(28px, 5.2vh, 40px);
+}
+
+.results-stats {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  column-gap: var(--space-3);
+}
+
+.results-stats dt {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.results-splits summary {
+  padding-block: 6px;
+}
+
+.actions-row-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.actions-row-3 .btn {
+  padding-inline: var(--space-1);
+  gap: 4px;
+}
+
+@media (max-height: 760px), (max-width: 720px) {
+  .results-card {
+    padding: var(--space-3);
+    gap: 6px;
+  }
+
+  .results-stats :is(dt, dd) {
+    padding: 3px 0;
+  }
+
+  .results-card .btn:not(.btn-small) {
+    height: 34px;
   }
 }

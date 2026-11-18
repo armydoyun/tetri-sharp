@@ -6,7 +6,10 @@ import { createKeyboard } from "./input/keyboard.js";
 import { createTouch, touchVisible } from "./input/touch.js";
 import { PAD_ICONS, compilePadmap, createGamepad, padButtonName } from "./input/gamepad.js";
 import { ACTIONS, compileKeymap } from "./input/keymap.js";
-import { MODES, RACE_MODES, findMode } from "./modes/index.js";
+import { MODES, RACE_MODES, findMode as findBaseMode } from "./modes/index.js";
+import { dailyMode, dateKey, findDaily } from "./modes/daily.js";
+import { decodeReplayCode, encodeReplayCode, replayLink } from "./replay/share.js";
+import { createDailyUI } from "./ui/daily.js";
 import { formatScore, formatTime } from "./modes/format.js";
 import { clearName } from "./rules/scoring/guideline.js";
 import { createStore } from "./storage/store.js";
@@ -37,7 +40,11 @@ import { decodeRules } from "./rules/share.js";
 import { createSfx } from "./audio/sfx.js";
 import { createBackup, parseBackup, restoreBackup } from "./storage/backup.js";
 import { createFinesseTracker } from "./modes/finesse.js";
+import { analyzeReplay } from "./replay/analyze.js";
 import { ROTATIONS } from "./rules/rotation/index.js";
+import { WIN, exchangeGarbage, versusMode } from "./modes/versus.js";
+import { createBot } from "./ai/bot.js";
+import { createVersusUI } from "./ui/versus.js";
 import { lang, t, translateDom } from "./i18n/index.js";
 
 const FRAME_MS = 1000 / 60;
@@ -61,6 +68,7 @@ const hud = {
   split: $("hud-split"),
   streak: $("hud-streak"),
   finesse: $("hud-finesse"),
+  attack: $("hud-attack"),
 };
 
 const store = createStore();
@@ -89,8 +97,30 @@ const raceRenderer = createRenderer(raceBoard, {
 });
 let race = null;
 
+// ---- CPU 대전: 상대 엔진 + CPU 입력 ----
+const versusPanel = $("versus-panel");
+const cpuRenderer = createRenderer(/** @type {HTMLCanvasElement} */ ($("cpu-board")), {
+  compact: true,
+  getVisual: () => ({ ...settings.visual, effects: "off" }),
+});
+/** @type {null | { cpu: ReturnType<typeof createGame>, bot: ReturnType<typeof createBot> }} */
+let versus = null;
+/** 난이도별 전적 */
+const versusStats = () => {
+  const raw = store.get("versus:stats", {});
+  return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+};
+const addVersusResult = (levelId, won) => {
+  const all = versusStats();
+  const s = all[levelId] && typeof all[levelId] === "object" ? all[levelId] : { win: 0, loss: 0 };
+  all[levelId] = { win: (s.win | 0) + (won ? 1 : 0), loss: (s.loss | 0) + (won ? 0 : 1) };
+  store.set("versus:stats", all);
+};
+
 /** @type {"menu" | "countdown" | "play" | "paused" | "results" | "replay"} */
 let screen = "menu";
+/** 모드 찾기: 오늘의 도전(날짜별) + 나머지 */
+const findMode = id => findDaily(id) ?? findBaseMode(id);
 let mode = findMode(store.get("lastMode", null));
 
 // ---- 규칙 선택 (Modern / Retro / Arcade / Custom) ----
@@ -315,10 +345,101 @@ const renderMenu = () => {
       btn.append(index, text, pb, icon("chevron-right"));
       btn.addEventListener("click", () => start(m));
       return btn;
-    })
+    }),
+    versusRow(MODES.length + 1),
+    dailyRow(MODES.length + 2)
   );
 };
 
+/** 첫 화면 모드 목록 끝의 CPU 대전 줄: 누르면 난이도를 고른다 */
+const versusRow = n => {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "menu-row";
+  btn.dataset.mode = "versus";
+  const index = document.createElement("span");
+  index.className = "menu-index num";
+  index.textContent = String(n).padStart(2, "0");
+  const text = document.createElement("span");
+  text.className = "menu-text";
+  const name = document.createElement("strong");
+  name.textContent = t("CPU 대전");
+  const desc = document.createElement("small");
+  desc.textContent = t("CPU와 쓰레기 줄을 주고받기 · 먼저 막히면 패배");
+  text.append(name, desc);
+  const wins = Object.values(versusStats()).reduce((sum, s) => sum + (s?.win | 0), 0);
+  const pb = document.createElement("span");
+  pb.className = "mode-best num";
+  pb.textContent = wins ? t("{n}승", { n: wins }) : "";
+  btn.append(index, text, pb, icon("chevron-right"));
+  btn.addEventListener("click", () => versusUI.open());
+  return btn;
+};
+
+// ---- 오늘의 도전 ----
+
+const today = () => {
+  const key = dateKey();
+  const m = dailyMode(key);
+  return { key, mode: m, best: records.best(m, MODERN), replay: replays.best(recordKey(m, MODERN)) };
+};
+
+/** 첫 화면 모드 목록 끝의 오늘의 도전 줄 */
+const dailyRow = n => {
+  const { key, best, mode: m } = today();
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "menu-row";
+  btn.dataset.mode = "daily";
+  const index = document.createElement("span");
+  index.className = "menu-index num";
+  index.textContent = String(n).padStart(2, "0");
+  const text = document.createElement("span");
+  text.className = "menu-text";
+  const name = document.createElement("strong");
+  name.textContent = t("오늘의 도전");
+  const desc = document.createElement("small");
+  desc.textContent = `${key} · ${t("모두 같은 블록 순서로 40줄 · 결과를 공유해 겨루기")}`;
+  text.append(name, desc);
+  const pb = document.createElement("span");
+  pb.className = "mode-best num";
+  pb.textContent = best ? t("최고 기록 {record}", { record: m.formatRecord(best) }) : "";
+  btn.append(index, text, pb, icon("chevron-right"));
+  btn.addEventListener("click", () => dailyUI.open());
+  return btn;
+};
+
+/** 받은 코드로 겨루기. 문제가 있으면 알림 문구를 돌려준다 */
+const raceFromCode = async text => {
+  const raw = await decodeReplayCode(text);
+  const replay = raw && sanitizeReplay(raw, findMode);
+  if (!replay) return t("읽을 수 없는 코드예요");
+  const m = findDaily(replay.mode);
+  if (!m || replay.rules.id !== MODERN.id || replay.result.over !== "clear")
+    return t("오늘의 도전을 끝까지 간 결과 코드만 겨룰 수 있어요");
+  let targetSplits = [];
+  const verified = verifyReplay(replay, findMode, state => {
+    targetSplits = advanceSplits(m.splits, targetSplits, state.stats.lines, state.frame);
+  });
+  if (!verified.ok) return t("이 코드는 결과를 다시 만들 수 없어요. 다른 버전일 수 있어요");
+  const r = replay.result;
+  const best = { frames: r.frames, lines: r.lines, pieces: r.pieces, score: r.score };
+  start(m, MODERN, { replay, best, splits: targetSplits, friend: replay.name || t("상대") });
+  return null;
+};
+
+const dailyUI = createDailyUI({
+  dialog: /** @type {HTMLDialogElement} */ ($("daily")),
+  getToday: today,
+  makeCode: replay => encodeReplayCode(replay, records.playerName),
+  makeLink: code => replayLink(code, location.href),
+  formatRecord: e => today().mode.formatRecord(e),
+  onStart: () => start(today().mode, MODERN),
+  onRace: raceFromCode,
+});
+$("daily").addEventListener("close", () => {
+  if (screen === "menu") /** @type {HTMLElement | null} */ (document.querySelector('[data-mode="daily"]'))?.focus();
+});
 const updateHud = () => {
   const frame = game?.state.frame ?? 0;
   const stats = game?.state.stats ?? { pieces: 0, lines: 0 };
@@ -331,6 +452,11 @@ const updateHud = () => {
   hud.linesLabel.textContent = lines.label;
   hud.lines.textContent = lines.value;
   hud.pieces.textContent = String(stats.pieces);
+  hud.attack.textContent = String(game?.state.garbage?.sent ?? 0);
+  if (versus) {
+    $("versus-cpu-sent").textContent = String(versus.cpu.state.garbage.sent);
+    $("versus-cpu-incoming").textContent = String(versus.cpu.state.garbage.pending);
+  }
   const practice = game?.state.practice;
   hud.streak.textContent = practice ? `${practice.streak} / ${practice.bestStreak}` : "0 / 0";
   const fin = game?.state.finesse;
@@ -357,6 +483,8 @@ const toMenu = (initial = false) => {
   game = null;
   race = null;
   racePanel.hidden = true;
+  versus = null;
+  versusPanel.hidden = true;
   setScreen("menu");
   countdownEl.hidden = true;
   renderMenu();
@@ -383,12 +511,20 @@ const start = (m, selectedRules = currentRules(), target = null) => {
   if (!m.practice) store.set("lastMode", m.id);
   rules = selectedRules;
   runPlayerName = records.playerName;
-  const seed = target?.replay.seed ?? (Math.random() * 2 ** 32) >>> 0;
+  const seed = target?.replay.seed ?? m.fixedSeed ?? (Math.random() * 2 ** 32) >>> 0;
+  $("race-label").textContent = target?.friend ? t("{name}의 기록", { name: target.friend }) : t("내 최고 기록");
   race = target ? { target, player: createPlayer(target.replay, findMode) } : null;
   racePanel.hidden = !race;
   updateRaceProgress();
   game = createGame({ rules, handling: toEngineHandling(settings.handling), seed, mode: m });
-  recorder = createRecorder({ seed, mode: m, rules, handling: game.handling });
+  // 대전: CPU도 같은 시드(같은 블록 순서)로 시작한다. 상대와 함께라야 재현되므로 리플레이는 남기지 않는다.
+  if (m.versus) {
+    const cpu = createGame({ rules, seed, mode: m });
+    versus = { cpu, bot: createBot({ game: cpu, rotation: ROTATIONS[rules.rotation], level: m.versus, seed }) };
+    $("versus-name").textContent = t("CPU · {level}", { level: m.versus.name });
+  } else versus = null;
+  versusPanel.hidden = !versus;
+  recorder = m.noReplay ? null : createRecorder({ seed, mode: m, rules, handling: game.handling });
   finesse = createFinesseTracker(game, ROTATIONS[rules.rotation]);
   splits = [];
   showModeHud(m);
@@ -471,7 +607,16 @@ for (const btn of panels.confirm.querySelectorAll("[data-confirm]")) {
 
 /** 로고: 첫 화면으로. 게임 중이면 먼저 묻는다 */
 $("go-home").addEventListener("click", () => {
-  if (settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen || statsUI.isOpen || practiceUI.isOpen) return;
+  if (
+    settingsUI.isOpen ||
+    rulesUI.isOpen ||
+    recordsUI.isOpen ||
+    statsUI.isOpen ||
+    practiceUI.isOpen ||
+    versusUI.isOpen ||
+    dailyUI.isOpen
+  )
+    return;
   if (screen === "menu") return window.scrollTo(0, 0);
   if (inProgress()) return askConfirm("menu");
   if (screen === "replay") stopReplay();
@@ -516,7 +661,18 @@ const renderResultSplits = () => {
 };
 
 /** 달리기 결과 한 줄: 시간 기록 모드는 시간 차, 점수 모드는 점수 차 */
-const raceResultText = (state, best) => {
+const raceResultText = (state, best, friend = "") => {
+  if (friend) {
+    if (state.over !== mode.race.finish)
+      return t("끝까지 가지 못했어요 · {name} 기록 {record}", { name: friend, record: mode.formatRecord(best) });
+    const d = state.frame - best.frames;
+    return d === 0
+      ? t("{name}와(과) 같은 시간이에요.", { name: friend })
+      : t(d < 0 ? "{name}보다 {n}초 빨라요." : "{name}보다 {n}초 느려요.", {
+          name: friend,
+          n: (Math.abs(d) / 60).toFixed(2),
+        });
+  }
   if (state.over !== mode.race.finish)
     return t("끝까지 가지 못했어요 · 상대 기록 {record}", { record: mode.formatRecord(best) });
   if (mode.record.metric === "score") {
@@ -556,7 +712,12 @@ const finish = () => {
   }
   const best = records.best(mode, rules);
 
+  if (mode.versus) addVersusResult(mode.versus.id, state.over === WIN);
   lastReplay = recorder ? recorder.finish(state) : null;
+  /** @type {HTMLButtonElement} */ for (const b of panels.results.querySelectorAll(
+    '[data-action="watch"], [data-action="export"]'
+  ))
+    b.disabled = !lastReplay;
   if (lastReplay) {
     replays.saveLast(lastReplay);
     if (outcome && outcome.rank < MAX_RANKED)
@@ -570,9 +731,37 @@ const finish = () => {
   $("results-main").textContent = summary.main;
   $("results-badge").classList.toggle("is-invisible", !outcome?.isBest);
 
-  $("race-result").textContent = race ? raceResultText(state, race.target.best) : "";
+  $("race-result").textContent = race ? raceResultText(state, race.target.best, race.target.friend) : "";
 
   const seconds = state.frame / 60;
+  if (mode.versus && versus) {
+    const g = state.garbage;
+    const cg = versus.cpu.state.garbage;
+    const vrows = [
+      [t("시간"), formatTime(state.frame)],
+      [t("줄"), String(state.stats.lines)],
+      [t("피스"), String(state.stats.pieces)],
+      ["PPS", seconds ? (state.stats.pieces / seconds).toFixed(2) : "0.00"],
+      [t("보낸 줄"), String(g.sent)],
+      [t("막은 쓰레기"), String(g.blocked)],
+      [t("받은 쓰레기"), String(g.received)],
+      [t("CPU가 보낸 줄"), String(cg.sent)],
+    ];
+    const s = versusStats()[mode.versus.id];
+    vrows.push([t("전적"), s ? t("{win}승 {loss}패", { win: s.win, loss: s.loss }) : "—"]);
+    $("results-stats").replaceChildren(
+      ...vrows.flatMap(([k, v]) => {
+        const dt = document.createElement("dt");
+        dt.textContent = k;
+        const dd = document.createElement("dd");
+        dd.textContent = v;
+        return [dt, dd];
+      })
+    );
+    renderResultSplits();
+    showPanel("results");
+    return;
+  }
   const rows = [
     [t("시간"), formatTime(state.frame)],
     [t("점수"), formatScore(state.score)],
@@ -690,6 +879,15 @@ $("practice").addEventListener("close", () => {
   if (screen === "menu") /** @type {HTMLElement | null} */ ($("open-practice"))?.focus();
 });
 
+const versusUI = createVersusUI({
+  dialog: /** @type {HTMLDialogElement} */ ($("versus")),
+  getStats: versusStats,
+  onPick: level => start(versusMode(level)),
+});
+$("versus").addEventListener("close", () => {
+  if (screen === "menu") /** @type {HTMLElement | null} */ (document.querySelector('[data-mode="versus"]'))?.focus();
+});
+
 const statsUI = createStatsUI({ dialog: /** @type {HTMLDialogElement} */ ($("stats")) });
 $("stats").addEventListener("close", () => {
   if (screen === "results")
@@ -709,7 +907,16 @@ $("records").addEventListener("close", () => {
 });
 
 const handleSystem = action => {
-  if (settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen || statsUI.isOpen || practiceUI.isOpen) return;
+  if (
+    settingsUI.isOpen ||
+    rulesUI.isOpen ||
+    recordsUI.isOpen ||
+    statsUI.isOpen ||
+    practiceUI.isOpen ||
+    versusUI.isOpen ||
+    dailyUI.isOpen
+  )
+    return;
   if (screen === "replay") {
     if (action === "restart") restartReplay();
     else stopReplay();
@@ -745,7 +952,16 @@ noHover?.addEventListener?.("change", applyTouch);
 
 /** 메뉴·결과·일시정지 화면에서 게임패드로 버튼 사이를 옮겨 다니고 누른다. */
 const handlePadMenu = action => {
-  if (settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen || statsUI.isOpen || practiceUI.isOpen) return;
+  if (
+    settingsUI.isOpen ||
+    rulesUI.isOpen ||
+    recordsUI.isOpen ||
+    statsUI.isOpen ||
+    practiceUI.isOpen ||
+    versusUI.isOpen ||
+    dailyUI.isOpen
+  )
+    return;
   const panel = Object.values(panels).find(p => !p.hidden);
   if (!panel || screen === "play" || screen === "countdown" || screen === "replay") return;
   const buttons = /** @type {HTMLButtonElement[]} */ ([...panel.querySelectorAll("button")]).filter(
@@ -804,19 +1020,97 @@ const SPEEDS = [1, 2, 4];
 const replayBar = $("replay-bar");
 const replayStatus = $("replay-status");
 const replayNote = $("replay-note");
-const replayProgress = /** @type {HTMLProgressElement} */ ($("replay-progress"));
+const replayProgress = /** @type {HTMLInputElement} */ ($("replay-progress"));
+const replayMarkers = $("replay-markers");
+/** @type {ReturnType<typeof analyzeReplay> | null} 지금 보는 리플레이의 분석 */
+let analysis = null;
 const replayTime = $("replay-time");
 const replayStep = /** @type {HTMLButtonElement} */ (replayBar.querySelector('[data-replay="step"]'));
 const replayToggle = /** @type {HTMLButtonElement} */ (replayBar.querySelector('[data-replay="toggle"]'));
 
+const replayLength = () => playing?.result?.frames || analysis?.length || 0;
+
 const updateReplayProgress = () => {
   const frame = player?.frame ?? 0;
-  const length = playing?.result?.frames ?? 0;
-  replayProgress.max = length || 1;
-  if (length) replayProgress.value = Math.min(frame, length);
-  else replayProgress.removeAttribute("value");
+  const length = replayLength();
+  replayProgress.max = String(length || 1);
+  replayProgress.value = String(Math.min(frame, length || 1));
+  replayProgress.style.setProperty("--fill", `${length ? (Math.min(frame, length) / length) * 100 : 0}%`);
   replayTime.textContent = length ? `${formatTime(frame)} / ${formatTime(length)}` : formatTime(frame);
 };
+
+const MARK_LABELS = {
+  finesse: m => t("피네스 실수 +{n} · {piece}", { n: m.value, piece: m.label }),
+  slow: m => t("오래 고민한 피스 · {s}초", { s: (m.value / 60).toFixed(1) }),
+  highlight: m => m.label,
+};
+
+/** 진행 막대 위 표시. 누르면 그 장면 조금 앞(0.5초)으로 간다 */
+const renderMarkers = () => {
+  const length = replayLength();
+  const markers = analysis?.markers ?? [];
+  replayMarkers.replaceChildren(
+    ...markers.map(m => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = `replay-mark is-${m.kind}`;
+      b.style.left = `${length ? (m.frame / length) * 100 : 0}%`;
+      b.title = `${formatTime(m.frame)} · ${MARK_LABELS[m.kind](m)}`;
+      b.setAttribute("aria-label", b.title);
+      b.addEventListener("click", () => seekReplay(m.frame - 30, true));
+      return b;
+    })
+  );
+  const highlights = markers.filter(m => m.kind === "highlight").length;
+  // 요약: 표시 색과 같은 작은 칸 + 개수(범례 역할)
+  const part = (kind, text) => {
+    const span = document.createElement("span");
+    span.className = `replay-legend is-${kind}`;
+    span.textContent = text;
+    return span;
+  };
+  $("replay-summary").replaceChildren(
+    ...(analysis
+      ? [
+          part("finesse", t("피네스 실수 {n}", { n: analysis.finesse.faults })),
+          part("slow", t("오래 고민 {n}", { n: analysis.slow })),
+          part("highlight", t("주요 장면 {n}", { n: highlights })),
+        ]
+      : [])
+  );
+  /** @type {HTMLButtonElement} */ for (const b of replayBar.querySelectorAll(
+    '[data-replay="prev-mark"], [data-replay="next-mark"]'
+  ))
+    b.disabled = !markers.length;
+};
+
+/**
+ * 원하는 프레임으로 간다. 뒤로 갈 때는 처음부터 다시 돌려 그 프레임까지 빠르게 진행한다(엔진이 결정론적이라 같은 판).
+ * 이동한 뒤에는 멈춘다(pause = true)거나 재생 상태를 그대로 둔다.
+ */
+const seekReplay = (target, pause = false) => {
+  if (!playing || !player) return;
+  const to = Math.max(0, Math.min(Math.round(target), replayLength() || target));
+  if (to < player.frame) {
+    player = createPlayer(playing, findMode);
+    game = player.game;
+  }
+  while (player.frame < to && !player.done) player.step();
+  if (pause) replayPaused = true;
+  renderer.clearEffects();
+  actionEl.classList.remove("is-shown");
+  updateReplayBar();
+};
+
+/** 지금 위치 다음(또는 이전) 표시로 */
+const jumpMark = dir => {
+  const marks = analysis?.markers ?? [];
+  const here = (player?.frame ?? 0) + 30; // 표시로 갈 때 0.5초 앞에 서므로 그만큼 보정
+  const next = dir > 0 ? marks.find(m => m.frame > here) : [...marks].reverse().find(m => m.frame < here - 1);
+  if (next) seekReplay(next.frame - 30, true);
+};
+
+replayProgress.addEventListener("input", () => seekReplay(Number(replayProgress.value), true));
 const menuNotice = $("menu-notice");
 
 const updateReplayBar = () => {
@@ -830,6 +1124,10 @@ const updateReplayBar = () => {
   replayStatus.textContent = player?.done ? t("끝") : "";
   replayStep.disabled = !player || player.done;
   replayToggle.disabled = replayStep.disabled;
+  /** @type {HTMLButtonElement} */ for (const b of replayBar.querySelectorAll(
+    '[data-replay="back"], [data-replay="step-back"]'
+  ))
+    b.disabled = !player || player.frame === 0;
   updateReplayProgress();
 };
 
@@ -841,6 +1139,7 @@ const startReplay = (replay, returnTo = screen, note = "") => {
   mode = player.mode;
   rules = replay.rules;
   replayPaused = false;
+  if (analysis?.for !== replay) analysis = { ...analyzeReplay(replay, findMode), for: replay };
   acc = 0;
   renderer.clearEffects();
   actionEl.classList.remove("is-shown");
@@ -851,6 +1150,7 @@ const startReplay = (replay, returnTo = screen, note = "") => {
   replayBar.hidden = false;
   replayNote.textContent = note;
   $("replay-title").textContent = `${mode.name} · ${rules.name}`;
+  renderMarkers();
   updateReplayBar();
 };
 
@@ -898,6 +1198,11 @@ for (const btn of replayBar.querySelectorAll("[data-replay]")) {
       replayPaused = true;
       advanceReplay(1);
     }
+    if (action === "step-back") return seekReplay((player?.frame ?? 0) - 1, true);
+    if (action === "back") return seekReplay((player?.frame ?? 0) - 300);
+    if (action === "ahead") return seekReplay((player?.frame ?? 0) + 300);
+    if (action === "prev-mark") return jumpMark(-1);
+    if (action === "next-mark") return jumpMark(1);
     if (action === "restart") return restartReplay();
     if (action === "exit") return stopReplay();
     updateReplayBar();
@@ -913,12 +1218,23 @@ window.addEventListener("keydown", e => {
     recordsUI.isOpen ||
     statsUI.isOpen ||
     practiceUI.isOpen ||
+    versusUI.isOpen ||
+    dailyUI.isOpen ||
     e.repeat
   )
     return;
-  if (e.code === "Space" && !replayBar.contains(document.activeElement)) replayPaused = !replayPaused;
+  const inBar = replayBar.contains(document.activeElement);
+  if (e.code === "Space" && !inBar) replayPaused = !replayPaused;
   else if (["Digit1", "Digit2", "Digit4"].includes(e.code)) replaySpeed = Number(e.code.slice(5));
-  else return;
+  // ←→: 5초(Shift: 한 프레임), 막대에 포커스가 있으면 막대가 처리한다
+  else if (!inBar && (e.code === "ArrowLeft" || e.code === "ArrowRight")) {
+    const dir = e.code === "ArrowLeft" ? -1 : 1;
+    e.preventDefault();
+    return seekReplay((player?.frame ?? 0) + dir * (e.shiftKey ? 1 : 300), e.shiftKey);
+  } else if (!inBar && (e.code === "BracketLeft" || e.code === "BracketRight")) {
+    e.preventDefault();
+    return jumpMark(e.code === "BracketLeft" ? -1 : 1);
+  } else return;
   e.preventDefault();
   updateReplayBar();
 });
@@ -1078,6 +1394,12 @@ const tick = () => {
   recorder?.input(held, pressed);
   const hadActive = Boolean(game.state.active);
   const events = game.step({ held, pressed });
+  if (versus) {
+    versus.cpu.step(versus.bot.input());
+    exchangeGarbage(game, versus.cpu);
+    // CPU가 먼저 막히면 내가 이긴다(같은 프레임에 둘 다 막히면 진다).
+    if (versus.cpu.state.over && !game.state.over) events.push(...game.finishAs(WIN));
+  }
   const extra = finesse?.frame(held, pressed, hadActive, events) ?? 0;
   if (extra > 0 && mode.finesse) announceText([t("피네스 +{n}", { n: extra })]);
   if (mode.splits) splits = advanceSplits(mode.splits, splits, game.state.stats.lines, game.state.frame);
@@ -1108,8 +1430,24 @@ const loop = now => {
   }
   renderer.draw(game);
   if (race && screen !== "replay" && raceBoardVisible.matches) raceRenderer.draw(race.player.game);
+  if (versus && raceBoardVisible.matches) cpuRenderer.draw(versus.cpu);
   updateHud();
   requestAnimationFrame(loop);
+};
+
+/** 결과 링크(#daily=…)로 열었으면 오늘의 도전 창을 그 코드로 연다. 주소의 해시는 지운다. */
+const importDailyFromLink = () => {
+  if (!/[#&]daily=/.test(location.hash)) return;
+  const pasted = location.hash.slice(1);
+  try {
+    history.replaceState(null, "", location.pathname + location.search);
+  } catch {
+    /* file:// 등에서 막혀도 괜찮다 */
+  }
+  dailyUI.open({
+    pasted: `#${pasted}`,
+    message: t("받은 결과가 있어요. 겨루기를 누르면 같은 블록 순서로 함께 달려요"),
+  });
 };
 
 /** 공유 링크(#rules=…)로 열었으면 그 규칙을 Custom으로 들이고 알린다. 주소의 해시는 지운다. */
@@ -1141,6 +1479,7 @@ renderKeyHelp();
 // 링크로 규칙을 받았으면 Custom 규칙 기준으로 키 안내를 다시 그린 뒤 메뉴를 연다.
 if (importRulesFromLink()) renderKeyHelp();
 toMenu(true);
+importDailyFromLink();
 requestAnimationFrame(loop);
 
 // 설치형 앱(GitHub Pages 배포본): 매니페스트가 걸려 있을 때만 서비스 워커를 등록한다.

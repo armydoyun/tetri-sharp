@@ -113,15 +113,26 @@
             <div data-hud="pps"><dt>PPS</dt><dd id="hud-pps">0.00</dd></div>
             <div data-hud="streak" class="is-off"><dt>연속 / 최고</dt><dd id="hud-streak">0 / 0</dd></div>
             <div data-hud="split"><dt>PB 대비</dt><dd id="hud-split" class="hud-split">—</dd></div>
+            <div data-hud="attack" class="is-off"><dt>보낸 줄</dt><dd id="hud-attack">0</dd></div>
             <div data-hud="finesse" class="is-off"><dt>피네스 실수</dt><dd id="hud-finesse">0 / 0</dd></div>
           </dl>
           <aside id="race-panel" class="race-panel" aria-label="내 최고 기록 진행 상황" hidden>
             <div class="race-panel-head">
-              <strong>내 최고 기록</strong>
+              <strong id="race-label">내 최고 기록</strong>
               <span id="race-progress-label" class="num">0 / 40줄</span>
             </div>
             <progress id="race-progress" aria-label="최고 기록 진행" value="0" max="40"></progress>
             <canvas id="race-board" class="race-board" aria-label="최고 기록 보드"></canvas>
+          </aside>
+          <aside id="versus-panel" class="race-panel versus-panel" aria-label="CPU 상황" hidden>
+            <div class="race-panel-head">
+              <strong id="versus-name">CPU</strong>
+            </div>
+            <canvas id="cpu-board" class="race-board cpu-board" aria-label="CPU 보드"></canvas>
+            <dl class="versus-stats">
+              <div><dt>CPU가 보낸 줄</dt><dd id="versus-cpu-sent" class="num">0</dd></div>
+              <div><dt>CPU가 받을 쓰레기</dt><dd id="versus-cpu-incoming" class="num">0</dd></div>
+            </dl>
           </aside>
         </div>
 
@@ -176,11 +187,11 @@
                   <button type="button" class="btn btn-primary" data-action="retry"><span data-icon="restart"></span>다시 하기 <kbd data-key="RESTART"></kbd></button>
                   <button type="button" class="btn" data-action="menu"><span data-icon="menu"></span>첫 화면 <kbd><kbd class="keycap">Esc</kbd></kbd></button>
                 </div>
-                <div class="actions-row">
-                  <button type="button" class="btn" data-action="stats"><span data-icon="chart"></span>통계</button>
-                  <button type="button" class="btn" data-action="watch"><span data-icon="play"></span>다시 보기</button>
+                <div class="actions-row actions-row-3">
+                  <button type="button" class="btn btn-small" data-action="stats"><span data-icon="chart"></span>통계</button>
+                  <button type="button" class="btn btn-small" data-action="watch"><span data-icon="play"></span>다시 보기</button>
+                  <button type="button" class="btn btn-small" data-action="export" aria-label="리플레이 파일로 저장" title="리플레이 파일로 저장"><span data-icon="download"></span>파일 저장</button>
                 </div>
-                <button type="button" class="btn" data-action="export"><span data-icon="download"></span>리플레이 파일로 저장</button>
               </div>
             </div>
           </div>
@@ -194,14 +205,26 @@
             <span id="replay-status" class="replay-status"></span>
           </div>
           <p id="replay-note" class="replay-note" role="status"></p>
+          <!-- 진행 막대: 눌러서 원하는 시점으로. 위에는 분석 표시(피네스 실수·오래 고민한 피스·주요 장면) -->
           <div class="replay-timeline">
-            <progress id="replay-progress" aria-label="리플레이 진행률" value="0" max="1"></progress>
+            <div class="replay-track range">
+              <div id="replay-markers" class="replay-markers"></div>
+              <input id="replay-progress" type="range" min="0" max="1" step="1" value="0" aria-label="리플레이 위치" />
+            </div>
             <span id="replay-time" class="num"></span>
+          </div>
+          <div class="replay-analysis">
+            <button type="button" class="btn btn-small" data-replay="prev-mark" aria-label="이전 표시로"><span data-icon="arrow-left"></span>이전 표시</button>
+            <p id="replay-summary" class="replay-summary"></p>
+            <button type="button" class="btn btn-small" data-replay="next-mark" aria-label="다음 표시로">다음 표시<span data-icon="arrow-right"></span></button>
           </div>
           <div class="replay-buttons">
             <button type="button" class="btn" data-replay="toggle"><span class="replay-toggle-icon"><span data-icon="pause"></span></span><span class="replay-toggle-text">일시정지</span></button>
+            <button type="button" class="btn num" data-replay="back" aria-label="5초 뒤로">-5초</button>
+            <button type="button" class="btn num" data-replay="ahead" aria-label="5초 앞으로">+5초</button>
+            <button type="button" class="btn num" data-replay="step-back" aria-label="한 프레임 뒤로">-1F</button>
+            <button type="button" class="btn num" data-replay="step" aria-label="한 프레임 앞으로">+1F</button>
             <button type="button" class="btn num" data-replay="speed" aria-label="재생 속도 바꾸기"><span data-icon="forward"></span><span class="replay-speed">1x</span></button>
-            <button type="button" class="btn" data-replay="step" aria-label="한 프레임 앞으로">한 프레임</button>
             <button type="button" class="btn" data-replay="restart"><span data-icon="restart"></span>처음부터</button>
             <button type="button" class="btn" data-replay="exit"><span data-icon="close"></span>닫기</button>
           </div>
@@ -225,6 +248,8 @@
     <dialog id="records" class="dialog dialog-wide" aria-label="기록"></dialog>
     <dialog id="stats" class="dialog dialog-wide" aria-label="이번 판 통계"></dialog>
     <dialog id="practice" class="dialog" aria-label="연습"></dialog>
+    <dialog id="versus" class="dialog" aria-label="CPU 대전"></dialog>
+    <dialog id="daily" class="dialog" aria-label="오늘의 도전"></dialog>
     <!-- ES Modules: 개발용 실행은 http://localhost를 사용한다. -->
     <script type="module" src="./js/main.js"></script>
   </body>

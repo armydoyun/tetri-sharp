@@ -102,6 +102,67 @@ export const EN = {
   성공: "Success",
   다시: "Again",
 
+  // ---- CPU 대전 ----
+  "CPU 대전": "CPU battle",
+  "CPU 대전 · {level}": "CPU battle · {level}",
+  "CPU와 쓰레기 줄을 주고받기 · 먼저 막히면 패배": "Trade garbage with the CPU · first to top out loses",
+  쉬움: "Easy",
+  보통: "Normal",
+  어려움: "Hard",
+  최강: "Master",
+  "승리!": "You win!",
+  패배: "You lose",
+  "보낸 줄": "Lines sent",
+  "막은 쓰레기": "Garbage blocked",
+  "받은 쓰레기": "Garbage received",
+  "CPU가 보낸 줄": "CPU lines sent",
+  "CPU가 받을 쓰레기": "CPU incoming",
+  "CPU 상황": "CPU status",
+  "CPU 보드": "CPU board",
+  "CPU · {level}": "CPU · {level}",
+  전적: "Record",
+  "{win}승 {loss}패": "{win}W {loss}L",
+  "{n}승": "{n} wins",
+  "초당 {pps}피스 · {hold}": "{pps} pieces/s · {hold}",
+  "홀드 사용": "uses hold",
+  "홀드 안 씀": "no hold",
+  "같은 블록 순서로 동시에 시작해요. 줄을 지우면 상대에게 쓰레기 줄을 보내요.":
+    "You both start with the same pieces. Clearing lines sends garbage to the other side.",
+  // ---- 오늘의 도전 ----
+  "오늘의 도전": "Daily challenge",
+  "오늘의 도전 · {date}": "Daily challenge · {date}",
+  "날마다 바뀌는 같은 블록 순서로 40줄 · 결과를 공유해 겨루기":
+    "40 lines with a piece order that changes every day · share your result to compete",
+  "모두 같은 블록 순서로 40줄 · 결과를 공유해 겨루기":
+    "40 lines, same pieces for everyone · share your result to compete",
+  도전하기: "Play today's challenge",
+  "Sprint 40L · Modern · 모두 같은 블록 순서": "Sprint 40L · Modern · same pieces for everyone",
+  "오늘 최고 기록 {record}": "Today's best {record}",
+  "아직 오늘 기록이 없어요": "No result today yet",
+  "내 결과 공유": "Share my result",
+  "결과 코드": "Result code",
+  "오늘 최고 기록의 리플레이": "The replay of today's best",
+  "오늘 기록을 세우면 생겨요": "Appears after you finish today's challenge",
+  "결과 코드를 복사했어요. 친구에게 보내 보세요": "Copied the result code. Send it to a friend",
+  "링크를 복사했어요. 받은 사람이 열면 내 기록과 겨룰 수 있어요":
+    "Copied the link. Whoever opens it can race your result",
+  "받은 결과와 겨루기": "Race a result you received",
+  "받은 코드": "Received code",
+  "같은 날 같은 블록 순서로 상대 리플레이와 함께 달려요": "Race their replay with the same pieces",
+  "TD1-로 시작하는 코드나 링크": "A code starting with TD1- or a link",
+  겨루기: "Race",
+  상대: "Opponent",
+  "{name}의 기록": "{name}'s run",
+  "{name}와(과) 같은 시간이에요.": "Same time as {name}.",
+  "{name}보다 {n}초 빨라요.": "{n}s faster than {name}.",
+  "{name}보다 {n}초 느려요.": "{n}s slower than {name}.",
+  "끝까지 가지 못했어요 · {name} 기록 {record}": "Didn't finish · {name}'s time {record}",
+  "오늘의 도전을 끝까지 간 결과 코드만 겨룰 수 있어요": "Only finished daily challenge results can be raced",
+  "이 코드는 결과를 다시 만들 수 없어요. 다른 버전일 수 있어요":
+    "This result can't be reproduced. It may be from another version",
+  "받은 결과가 있어요. 겨루기를 누르면 같은 블록 순서로 함께 달려요":
+    "You received a result. Press Race to run against it with the same pieces",
+
   // ---- 결과 ----
   "새 기록": "New record",
   "최고 기록": "Best",
@@ -111,6 +172,7 @@ export const EN = {
   통계: "Stats",
   "다시 보기": "Watch replay",
   "리플레이 파일로 저장": "Save replay file",
+  "파일 저장": "Save file",
   "구간 기록": "Splits",
   "구간 기록 · {from}–{to}줄 확인": "Splits · check lines {from}–{to}",
   "누적 줄": "Lines",
@@ -140,6 +202,22 @@ export const EN = {
   "저장된 결과와 재생 결과가 달라요. 다른 버전의 파일일 수 있어요.":
     "The replay doesn't match its saved result. It may be from another version.",
   "파일을 읽지 못했어요. 다시 선택해 주세요.": "Couldn't read the file. Please pick it again.",
+
+  "리플레이 위치": "Replay position",
+  "이전 표시": "Previous mark",
+  "다음 표시": "Next mark",
+  "이전 표시로": "Go to previous mark",
+  "다음 표시로": "Go to next mark",
+  "5초 뒤로": "Back 5 seconds",
+  "5초 앞으로": "Forward 5 seconds",
+  "한 프레임 뒤로": "Step back one frame",
+  "-5초": "-5s",
+  "+5초": "+5s",
+  "피네스 실수 {n}": "{n} finesse faults",
+  "오래 고민 {n}": "{n} slow pieces",
+  "주요 장면 {n}": "{n} highlights",
+  "피네스 실수 +{n} · {piece}": "Finesse fault +{n} · {piece}",
+  "오래 고민한 피스 · {s}초": "Slow piece · {s}s",
 
   // ---- 백업 ----
   "설정·기록·리플레이를 백업 파일로 저장했어요.": "Saved settings, records and replays to a backup file.",
@@ -172,8 +250,8 @@ export const EN = {
   "아직 기록이 없어요": "No records yet",
 
   // ---- 연습 ----
-  "중력이 없고 기록은 남지 않아요. 지금 고른 규칙으로 연습해요.":
-    "No gravity and no records. You practice with the rules you picked.",
+  "중력이 없어요. 소프트 드롭으로 내려 자리에 맞춰 돌려 넣으세요. 기록은 남지 않아요.":
+    "No gravity. Soft drop to bring the piece down, then rotate it into place. No records are kept.",
   "좌우가 바뀌는 T-spin Double 자리에 T를 돌려 넣기": "Spin a T into a T-spin Double slot that switches sides",
   "지붕 아래로 T를 돌려 넣어 세 줄 지우기 · 좌우가 바뀌어요":
     "Spin a T under the overhang to clear three lines · switches sides",
