@@ -317,6 +317,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
     a.lastAction = "move";
     state.tally.moves += 1;
     onShifted();
+    events.push({ type: "move" });
     return true;
   };
 

@@ -11,7 +11,7 @@ import {
   pressedButtons,
 } from "../input/gamepad.js";
 import { icon } from "./icons.js";
-import { DEFAULT_SETTINGS, HANDLING_LIMITS, SDF_INFINITE, defaultVisual } from "../storage/settings.js";
+import { DEFAULT_SETTINGS, HANDLING_LIMITS, SDF_INFINITE, VOLUME_LIMITS, defaultVisual } from "../storage/settings.js";
 import { button, choice, choiceCards, el, fieldRow, fillDialog, tabBar } from "./dom.js";
 import { CONTRAST_PALETTE, THEMES, THEME_IDS } from "../render/themes.js";
 import { keycap } from "./keycap.js";
@@ -24,7 +24,7 @@ const HANDLING_ROWS = [
 
 const TABS = [
   ["control", "조작"],
-  ["visual", "화면"],
+  ["visual", "화면·소리"],
   ["keys", "키보드"],
   ["pad", "게임패드"],
 ];
@@ -58,9 +58,10 @@ const TOUCH_HINTS = {
  *   getSettings: () => any,
  *   onChange: (settings: any) => void,
  *   onClose?: () => void,
+ *   onPreviewSound?: () => void,
  * }} options
  */
-export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => {
+export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPreviewSound }) => {
   /** 키 입력을 기다리는 칸 */
   let capture = null;
   const notice = el("p", { class: "notice-slot", role: "status", id: "settings-notice" });
@@ -168,8 +169,36 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
           value: visual.palette,
           onChange: v => setVisual("palette", v),
         }),
-      })
+      }),
+      volumeRow()
     );
+  };
+
+  const formatVolume = v => (v <= 0 ? "끄기" : `${v}%`);
+  const volumeRow = () => {
+    const value = getSettings().volume;
+    const output = el("output", { text: formatVolume(value), htmlFor: "set-volume" });
+    const input = el("input", {
+      type: "range",
+      id: "set-volume",
+      min: String(VOLUME_LIMITS.min),
+      max: String(VOLUME_LIMITS.max),
+      step: String(VOLUME_LIMITS.step),
+      value: String(value),
+    });
+    input.addEventListener("input", () => {
+      const v = Number(input.value);
+      output.textContent = formatVolume(v);
+      update({ volume: v });
+    });
+    // 손을 뗄 때 한 번 들려준다(끄기면 조용).
+    input.addEventListener("change", () => onPreviewSound?.());
+    return fieldRow({
+      id: "set-volume",
+      label: "효과음",
+      hint: "블록 이동·회전·줄 삭제 소리의 크기. 맨 왼쪽은 끄기",
+      control: el("span", { class: "range" }, input, output),
+    });
   };
 
   /** 게임패드 버튼 하나를 키캡 모양으로(십자키는 화살표 아이콘) */
@@ -247,6 +276,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
         padmap: { ...DEFAULT_PADMAP },
         touch: "auto",
         visual: defaultVisual(),
+        volume: DEFAULT_SETTINGS.volume,
       });
       notice.textContent = "모든 설정을 기본값으로 되돌렸어요.";
       render();

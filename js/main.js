@@ -26,6 +26,7 @@ import { recordKey } from "./storage/records.js";
 import { MODERN, PRESETS, PRESET_LIST } from "./rules/presets.js";
 import { makeCustomRules, sanitizeRuleBody } from "./rules/sanitize.js";
 import { decodeRules } from "./rules/share.js";
+import { createSfx } from "./audio/sfx.js";
 
 const FRAME_MS = 1000 / 60;
 const MAX_CATCH_UP_MS = 250; // 시간이 크게 튀면(탭 복귀 등) 한꺼번에 따라잡지 않는다.
@@ -56,6 +57,7 @@ let bindings = compileKeymap(settings.keymap);
 let padBindings = compilePadmap(settings.padmap);
 
 const renderer = createRenderer(canvas, { getVisual: () => settings.visual });
+const sfx = createSfx({ getVolume: () => settings.volume });
 const racePanel = $("race-panel");
 const raceProgress = /** @type {HTMLProgressElement} */ ($("race-progress"));
 const raceLabel = $("race-progress-label");
@@ -335,6 +337,7 @@ const start = (m, selectedRules = currentRules(), target = null) => {
   countdownEl.hidden = false;
   countdownEl.dataset.phase = "ready";
   $("countdown-label").textContent = "READY";
+  sfx.play("ready");
 };
 
 raceEntry.addEventListener("click", () => {
@@ -519,6 +522,7 @@ const settingsUI = createSettingsUI({
     }
     renderKeyHelp();
   },
+  onPreviewSound: () => sfx.play("clear2"),
   onClose: () => {
     if (screen === "menu") toMenu();
     else if (screen === "paused") showPanel("pause");
@@ -730,6 +734,8 @@ const advanceReplay = count => {
     const events = player.step();
     for (const e of events) announce(e);
     renderer.addEvents(events);
+    // 빨리 감기 중에는 소리를 겹쳐 내지 않는다.
+    if (count === 1) sfx.events(events);
   }
   if (player.done) updateReplayBar();
   else updateReplayProgress();
@@ -846,6 +852,7 @@ const tick = () => {
       goTimer = GO_FRAMES;
       countdownEl.dataset.phase = "go";
       $("countdown-label").textContent = "GO!";
+      sfx.play("go");
     }
     return;
   }
@@ -863,6 +870,7 @@ const tick = () => {
   }
   for (const e of events) announce(e);
   renderer.addEvents(events);
+  sfx.events(events);
   if (events.some(e => e.type === "gameOver" || e.type === "finish")) finish();
 };
 
