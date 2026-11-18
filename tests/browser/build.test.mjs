@@ -39,7 +39,7 @@ test("결과는 파일 하나이고 바깥 파일을 참조하지 않는다", ()
 });
 
 const openPage = async () => {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true });
   const blocked = [];
   await context.route("**/*", route => {
     if (route.request().url() === url) return route.continue();
@@ -253,6 +253,51 @@ test("Custom 규칙: 편집 내용이 저장되고 기록표 id가 바뀌며, �
   await page.keyboard.press("Space");
   await page.waitForTimeout(150);
   assert.equal(await text(page, "hud-pieces"), "0", "Custom에서 끈 하드 드롭은 동작하지 않는다");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파일 저장 → 메뉴에서 열기", async () => {
+  const { context, page, errors } = await openPage();
+  await startMode(page, "zen");
+  for (let i = 0; i < 40; i++) await page.keyboard.press(i % 3 ? "Space" : "ArrowLeft");
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 5000 });
+  const pieces = await text(page, "hud-pieces");
+
+  // 보기: 4배속으로 끝까지
+  await page.click('[data-action="watch"]');
+  assert.equal(await visible(page, "replay-bar"), true);
+  await page.keyboard.press("Digit4");
+  await page.waitForFunction(() => document.getElementById("replay-status")?.textContent === "끝", null, {
+    timeout: 10000,
+  });
+  assert.equal(await text(page, "hud-pieces"), pieces, "원래 판과 같은 피스 수로 끝난다");
+  await page.keyboard.press("Escape");
+  assert.equal(await visible(page, "results"), true, "닫으면 결과 화면으로");
+
+  // 파일로 저장
+  const [download] = await Promise.all([page.waitForEvent("download"), page.click('[data-action="export"]')]);
+  assert.match(download.suggestedFilename(), /^tetri-sharp-zen-.*\.json$/);
+  const file = await download.path();
+  const saved = JSON.parse(fs.readFileSync(file, "utf8"));
+  assert.equal(saved.app, "tetri-sharp");
+  assert.equal(String(saved.result.pieces), pieces);
+
+  // 메뉴에서: 마지막 판 버튼이 켜져 있고, 파일 열기로 재생된다
+  await page.keyboard.press("Escape");
+  assert.equal(await page.locator("#watch-last").isEnabled(), true);
+  await page.locator("#replay-file").setInputFiles(file);
+  await page.waitForFunction(() => !document.getElementById("replay-bar")?.hidden, null, { timeout: 5000 });
+  assert.equal(await text(page, "menu-notice"), "", "검증 통과 → 경고 없음");
+  await page.keyboard.press("Escape");
+  assert.equal(await visible(page, "menu"), true);
+
+  // 망가진 파일
+  await page
+    .locator("#replay-file")
+    .setInputFiles({ name: "bad.json", mimeType: "application/json", buffer: Buffer.from("{oops") });
+  await page.waitForFunction(() => !document.getElementById("menu-notice")?.hidden, null, { timeout: 3000 });
+  assert.match(await text(page, "menu-notice"), /읽을 수 없는/);
   assert.deepEqual(errors, []);
   await context.close();
 });

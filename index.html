@@ -28,6 +28,12 @@
             </div>
             <h2 class="panel-title">모드 선택</h2>
             <div id="mode-list" class="mode-list"></div>
+            <div class="replay-actions">
+              <button id="watch-last" type="button" class="btn btn-small">마지막 판 리플레이</button>
+              <button id="open-replay" type="button" class="btn btn-small">리플레이 파일 열기</button>
+              <input id="replay-file" type="file" accept=".json,application/json" hidden />
+            </div>
+            <p id="menu-notice" class="menu-notice" role="status" hidden></p>
           </div>
 
           <div id="countdown" class="countdown" aria-live="assertive" hidden></div>
@@ -51,7 +57,23 @@
             <div class="actions">
               <button type="button" class="btn btn-primary" data-action="retry">다시 하기 <kbd data-key="RESTART"></kbd></button>
               <button type="button" class="btn" data-action="menu">메뉴로 <kbd>Esc</kbd></button>
+              <div class="actions-row">
+                <button type="button" class="btn btn-small" data-action="watch">리플레이 보기</button>
+                <button type="button" class="btn btn-small" data-action="export">파일로 저장</button>
+              </div>
             </div>
+          </div>
+
+          <div id="replay-bar" class="replay-bar" hidden>
+            <span class="replay-tag">REPLAY</span>
+            <span id="replay-title" class="replay-title"></span>
+            <span id="replay-status" class="replay-status"></span>
+            <span class="replay-buttons">
+              <button type="button" class="btn btn-small" data-replay="toggle">일시정지</button>
+              <button type="button" class="btn btn-small" data-replay="speed">×1</button>
+              <button type="button" class="btn btn-small" data-replay="restart">처음부터</button>
+              <button type="button" class="btn btn-small" data-replay="exit">닫기 <kbd>Esc</kbd></button>
+            </span>
           </div>
         </div>
         <dl class="hud">

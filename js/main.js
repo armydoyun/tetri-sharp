@@ -12,6 +12,8 @@ import { loadSettings, sanitizeSettings, saveSettings, toEngineHandling } from "
 import { createRecords } from "./storage/records.js";
 import { createSettingsUI } from "./ui/settings.js";
 import { createRulesUI } from "./ui/rules.js";
+import { createPlayer, createRecorder, createReplayStore, sanitizeReplay, verifyReplay } from "./replay/replay.js";
+import { recordKey } from "./storage/records.js";
 import { MODERN, PRESETS, PRESET_LIST } from "./rules/presets.js";
 import { makeCustomRules, sanitizeRuleBody } from "./rules/sanitize.js";
 
@@ -42,7 +44,7 @@ let bindings = compileKeymap(settings.keymap);
 
 const renderer = createRenderer(canvas, { getVisual: () => settings.visual });
 
-/** @type {"menu" | "countdown" | "play" | "paused" | "results"} */
+/** @type {"menu" | "countdown" | "play" | "paused" | "results" | "replay"} */
 let screen = "menu";
 let mode = findMode(store.get("lastMode", null));
 
@@ -158,21 +160,20 @@ const toMenu = () => {
   setScreen("menu");
   countdownEl.hidden = true;
   renderMenu();
+  /** @type {HTMLButtonElement} */ ($("watch-last")).disabled = !replays.last();
   showPanel("menu");
   // 마지막으로 한 모드에 포커스를 둔다 → Enter로 바로 시작.
   /** @type {HTMLElement | null} */ (panels.menu.querySelector(`[data-mode="${mode.id}"]`))?.focus();
 };
 
 const start = m => {
+  if (screen === "replay") stopReplay();
   mode = m;
   store.set("lastMode", m.id);
   rules = currentRules();
-  game = createGame({
-    rules,
-    handling: toEngineHandling(settings.handling),
-    seed: (Math.random() * 2 ** 32) >>> 0,
-    mode: m,
-  });
+  const seed = (Math.random() * 2 ** 32) >>> 0;
+  game = createGame({ rules, handling: toEngineHandling(settings.handling), seed, mode: m });
+  recorder = createRecorder({ seed, mode: m, rules, handling: game.handling });
   acc = 0;
   countdown = READY_FRAMES;
   goTimer = 0;
@@ -217,6 +218,13 @@ const finish = () => {
     });
   }
   const best = records.best(mode, rules);
+
+  lastReplay = recorder ? recorder.finish(state) : null;
+  if (lastReplay) {
+    replays.saveLast(lastReplay);
+    if (outcome?.isBest) replays.saveBest(recordKey(mode, rules), lastReplay);
+  }
+  recorder = null;
 
   $("results-mode").textContent = `${mode.name} · ${rules.name}`;
   const summary = mode.summary(state);
@@ -289,7 +297,10 @@ const settingsUI = createSettingsUI({
     settings = sanitizeSettings(next);
     saveSettings(store, settings);
     bindings = compileKeymap(settings.keymap);
-    game?.setHandling(toEngineHandling(settings.handling));
+    if (game && screen !== "replay") {
+      game.setHandling(toEngineHandling(settings.handling));
+      recorder?.handlingChanged(game.handling);
+    }
     renderKeyHelp();
   },
   onClose: () => {
@@ -318,6 +329,11 @@ const keyboard = createKeyboard({
   getBindings: () => bindings,
   onSystem: action => {
     if (settingsUI.isOpen || rulesUI.isOpen) return;
+    if (screen === "replay") {
+      if (action === "restart") restartReplay();
+      else stopReplay();
+      return;
+    }
     if (action === "restart" && screen !== "menu") return start(mode);
     if (action !== "pause") return;
     if (screen === "play" || screen === "countdown") pause();
@@ -337,12 +353,157 @@ for (const btn of document.querySelectorAll("[data-action]")) {
     if (action === "resume") resume();
     if (action === "retry") start(mode);
     if (action === "menu") toMenu();
+    if (action === "watch" && lastReplay) startReplay(lastReplay);
+    if (action === "export" && lastReplay) exportReplay(lastReplay);
   });
 }
 
 // 창이 포커스를 잃으면 keyup을 못 받는다 → 자동 일시정지.
 window.addEventListener("blur", pause);
 document.addEventListener("visibilitychange", () => document.hidden && pause());
+
+// ---- 리플레이 ----
+
+const replays = createReplayStore(store, findMode);
+/** @type {ReturnType<typeof createRecorder> | null} */
+let recorder = null;
+/** 방금 끝난 판의 리플레이 */
+let lastReplay = null;
+/** @type {ReturnType<typeof createPlayer> | null} */
+let player = null;
+let playing = null;
+let replayPaused = false;
+let replaySpeed = 1;
+/** 리플레이를 닫으면 돌아갈 곳 */
+let replayReturn = /** @type {{ screen: string, game: any, mode: any, rules: any }} */ ({});
+const SPEEDS = [1, 2, 4];
+const replayBar = $("replay-bar");
+const replayStatus = $("replay-status");
+const menuNotice = $("menu-notice");
+
+const updateReplayBar = () => {
+  /** @type {HTMLElement} */ (replayBar.querySelector('[data-replay="toggle"]')).textContent = replayPaused
+    ? "재생"
+    : "일시정지";
+  /** @type {HTMLElement} */ (replayBar.querySelector('[data-replay="speed"]')).textContent = `×${replaySpeed}`;
+  replayStatus.textContent = player?.done ? "끝" : "";
+};
+
+const startReplay = (replay, returnTo = screen) => {
+  if (screen !== "replay") replayReturn = { screen: returnTo, game, mode, rules };
+  playing = replay;
+  player = createPlayer(replay, findMode);
+  game = player.game;
+  mode = player.mode;
+  rules = replay.rules;
+  replayPaused = false;
+  acc = 0;
+  renderer.clearEffects();
+  actionEl.classList.remove("is-shown");
+  countdownEl.hidden = true;
+  showPanel(null);
+  setScreen("replay");
+  replayBar.hidden = false;
+  $("replay-title").textContent = `${mode.name} · ${rules.name}`;
+  updateReplayBar();
+};
+
+const restartReplay = () => playing && startReplay(playing);
+
+const stopReplay = () => {
+  if (screen !== "replay") return;
+  player = null;
+  playing = null;
+  replayBar.hidden = true;
+  renderer.clearEffects();
+  ({ game, mode, rules } = replayReturn);
+  if (replayReturn.screen === "results") {
+    setScreen("results");
+    showPanel("results");
+  } else {
+    toMenu();
+  }
+};
+
+const tickReplay = () => {
+  if (!player || replayPaused || player.done) return;
+  for (let i = 0; i < replaySpeed && !player.done; i++) {
+    const events = player.step();
+    for (const e of events) announce(e);
+    renderer.addEvents(events);
+  }
+  if (player.done) updateReplayBar();
+};
+
+for (const btn of replayBar.querySelectorAll("[data-replay]")) {
+  btn.addEventListener("click", () => {
+    const action = btn.getAttribute("data-replay");
+    if (action === "toggle") replayPaused = !replayPaused;
+    if (action === "speed") replaySpeed = SPEEDS[(SPEEDS.indexOf(replaySpeed) + 1) % SPEEDS.length];
+    if (action === "restart") return restartReplay();
+    if (action === "exit") return stopReplay();
+    updateReplayBar();
+  });
+}
+
+// 리플레이 중 단축키: Space 일시정지, 1·2·4 속도 (Esc 닫기, R 처음부터는 시스템 키로 처리)
+window.addEventListener("keydown", e => {
+  if (screen !== "replay" || settingsUI.isOpen || rulesUI.isOpen || e.repeat) return;
+  if (e.code === "Space") replayPaused = !replayPaused;
+  else if (["Digit1", "Digit2", "Digit4"].includes(e.code)) replaySpeed = Number(e.code.slice(5));
+  else return;
+  e.preventDefault();
+  updateReplayBar();
+});
+
+const exportReplay = replay => {
+  const blob = new Blob([JSON.stringify(replay)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const stamp = (replay.date || "").replace(/[-:]/g, "").slice(0, 15);
+  a.href = url;
+  a.download = `tetri-sharp-${replay.mode}-${stamp || "replay"}.json`;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+const showMenuNotice = text => {
+  menuNotice.textContent = text;
+  menuNotice.hidden = !text;
+};
+
+/** 불러온 파일을 검사하고 재생한다. 결과가 기록과 다르면 알리고 그래도 재생한다. */
+const openReplayText = text => {
+  let raw;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    raw = null;
+  }
+  const replay = sanitizeReplay(raw, findMode);
+  if (!replay) {
+    showMenuNotice("읽을 수 없는 리플레이 파일이에요.");
+    return false;
+  }
+  const check = verifyReplay(replay, findMode);
+  showMenuNotice(check.ok ? "" : "이 리플레이는 기록된 결과와 다르게 재생돼요(다른 버전에서 만든 파일일 수 있어요).");
+  startReplay(replay, "menu");
+  return true;
+};
+
+$("watch-last").addEventListener("click", () => {
+  const replay = replays.last();
+  if (replay) startReplay(replay, "menu");
+});
+const fileInput = /** @type {HTMLInputElement} */ ($("replay-file"));
+$("open-replay").addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", async () => {
+  const file = fileInput.files?.[0];
+  fileInput.value = "";
+  if (file) openReplayText(await file.text());
+});
 
 // ---- 루프 ----
 
@@ -357,9 +518,13 @@ const tick = () => {
     }
     return;
   }
+  if (screen === "replay") return tickReplay();
   if (screen !== "play" || !game) return;
   if (goTimer > 0 && --goTimer === 0) countdownEl.hidden = true;
-  const events = game.step({ held: keyboard.held, pressed: keyboard.takePressed() });
+  const held = keyboard.held;
+  const pressed = keyboard.takePressed();
+  recorder?.input(held, pressed);
+  const events = game.step({ held, pressed });
   for (const e of events) announce(e);
   renderer.addEvents(events);
   if (events.some(e => e.type === "gameOver" || e.type === "finish")) finish();
@@ -368,7 +533,7 @@ const tick = () => {
 const loop = now => {
   acc += Math.min(now - last, MAX_CATCH_UP_MS);
   last = now;
-  if (screen !== "play" && screen !== "countdown") acc = 0;
+  if (screen !== "play" && screen !== "countdown" && !(screen === "replay" && !replayPaused)) acc = 0;
   while (acc >= FRAME_MS) {
     tick();
     acc -= FRAME_MS;
