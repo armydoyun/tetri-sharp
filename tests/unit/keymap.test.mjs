@@ -68,6 +68,6 @@ test("compileKeymap: 게임 버튼 비트와 시스템 동작, Esc는 항상 일
 test("keyLabel", () => {
   assert.equal(keyLabel("KeyZ"), "Z");
   assert.equal(keyLabel("Digit3"), "3");
-  assert.equal(keyLabel("ArrowLeft"), "←");
+  assert.equal(keyLabel("ArrowLeft"), "왼쪽 화살표");
   assert.equal(keyLabel("ShiftLeft"), "L Shift");
 });

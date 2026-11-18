@@ -33,12 +33,13 @@ export const createRenderer = (canvas, { getVisual }) => {
   const css = getComputedStyle(document.documentElement);
   const v = name => css.getPropertyValue(name).trim();
   const basePalette = COLOR_VARS.map(name => (name ? v(name) : ""));
+  // 게임 화면은 테마와 무관하게 항상 다크 → --game-* 토큰만 읽는다.
   const colors = {
-    grid: v("--grid"),
-    board: v("--surface"),
-    text: v("--text-dim"),
-    bg: v("--bg"),
-    accent: v("--accent"),
+    grid: v("--game-grid"),
+    board: v("--game-board"),
+    text: v("--game-text-dim"),
+    bg: v("--game-bg"),
+    accent: v("--game-accent"),
   };
   const effects = createEffects();
   let palette = basePalette;
@@ -74,7 +75,7 @@ export const createRenderer = (canvas, { getVisual }) => {
 
   const label = (text, x, y) => {
     ctx.fillStyle = colors.text;
-    ctx.font = `600 ${Math.round(cell * 0.45)}px system-ui, sans-serif`;
+    ctx.font = `600 ${Math.round(cell * 0.45)}px "Space Grotesk", system-ui, sans-serif`;
     ctx.textBaseline = "top";
     ctx.fillText(text, x, y);
   };

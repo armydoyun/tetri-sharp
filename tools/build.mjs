@@ -23,11 +23,33 @@ export const JS_OPTIONS = Object.freeze({
 });
 export const CSS_OPTIONS = Object.freeze({ loader: "css", minify: true, charset: "utf8" });
 
-/** index.html의 <link> 순서대로 CSS를 이어 붙인다. */
+const MIME = { ".woff2": "font/woff2", ".svg": "image/svg+xml", ".png": "image/png" };
+
+/**
+ * CSS 안의 url("../assets/…")를 data: URI로 바꾼다(한 파일 배포본이 바깥 파일을 찾지 않게).
+ * 그 밖의 상대 경로 url()이 남아 있으면 빌드를 멈춘다.
+ * @param {string} css  css/ 폴더 기준 경로가 들어 있는 CSS
+ */
+export const inlineCssUrls = (css, root = ROOT) => {
+  const out = css.replace(/url\(\s*["']?\.\.\/(assets\/[\w./-]+)["']?\s*\)/g, (_, rel) => {
+    const file = path.join(root, rel);
+    const mime = MIME[path.extname(file)];
+    if (!mime) throw new Error(`인라인할 수 없는 형식: ${rel}`);
+    return `url("data:${mime};base64,${fs.readFileSync(file).toString("base64")}")`;
+  });
+  const left = /url\(\s*["']?(?!data:|#)[^)"']+/.exec(out);
+  if (left) throw new Error(`CSS가 아직 바깥 파일을 참조합니다: ${left[0]}`);
+  return out;
+};
+
+/** index.html의 <link> 순서대로 CSS를 이어 붙이고 바깥 파일을 인라인한다. */
 export const readCss = (root = ROOT) =>
-  cssHrefs(fs.readFileSync(path.join(root, "index.html"), "utf8"))
-    .map(name => fs.readFileSync(path.join(root, name), "utf8"))
-    .join("\n");
+  inlineCssUrls(
+    cssHrefs(fs.readFileSync(path.join(root, "index.html"), "utf8"))
+      .map(name => fs.readFileSync(path.join(root, name), "utf8"))
+      .join("\n"),
+    root
+  );
 
 export const build = async ({ outFile = path.join(DEPLOY, "index.html") } = {}) => {
   const bundle = await esbuild({

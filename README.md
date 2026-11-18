@@ -3,7 +3,7 @@
 규칙(회전 시스템, 미노 생성기, 고정 방식, 중력…)을 직접 조합할 수 있는 낙하 블록 퍼즐.
 HTML · CSS · JS로 만들고, 배포물은 **`index.html` 파일 하나**입니다.
 
-기획: [docs/PLAN.md](docs/PLAN.md)
+기획: [docs/PLAN.md](docs/PLAN.md) · 디자인 시스템: [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)
 
 ## 들어 있는 것
 

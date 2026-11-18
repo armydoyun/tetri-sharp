@@ -4,7 +4,7 @@ import { createGame } from "./core/engine.js";
 import { createRenderer } from "./render/canvas.js";
 import { createKeyboard } from "./input/keyboard.js";
 import { createGamepad } from "./input/gamepad.js";
-import { ACTIONS, compileKeymap, keyLabel } from "./input/keymap.js";
+import { ACTIONS, compileKeymap } from "./input/keymap.js";
 import { MODES, findMode } from "./modes/index.js";
 import { formatScore, formatTime } from "./modes/format.js";
 import { clearName } from "./rules/scoring/guideline.js";
@@ -13,6 +13,8 @@ import { loadSettings, sanitizeSettings, saveSettings, toEngineHandling } from "
 import { createRecords } from "./storage/records.js";
 import { createSettingsUI } from "./ui/settings.js";
 import { createRulesUI } from "./ui/rules.js";
+import { hydrateIcons, icon } from "./ui/icons.js";
+import { keycap } from "./ui/keycap.js";
 import { createPlayer, createRecorder, createReplayStore, sanitizeReplay, verifyReplay } from "./replay/replay.js";
 import { recordKey } from "./storage/records.js";
 import { MODERN, PRESETS, PRESET_LIST } from "./rules/presets.js";
@@ -79,24 +81,57 @@ const showPanel = name => {
   if (!name && document.activeElement instanceof HTMLElement) document.activeElement.blur();
 };
 
-const keysFor = id => (settings.keymap[id] ?? []).map(keyLabel).join("/");
+const keysOf = id => settings.keymap[id] ?? [];
 
 /** @type {ReturnType<typeof createGamepad> | null} 아래에서 만든 뒤 채운다 */
 let padRef = null;
-const PAD_HELP =
-  "게임패드: 십자키 이동·↑ 하드 드롭 · B 시계 · A/X 반시계 · Y 180° · LB/RB 홀드 · Start 일시정지 · Back 다시 시작";
+/** 게임패드 안내: [버튼 이름, 동작] — 버튼 이름은 패드에 적힌 글자 그대로 */
+const PAD_HELP = [
+  ["십자키", "이동·위 하드 드롭"],
+  ["B", "시계 회전"],
+  ["A/X", "반시계 회전"],
+  ["Y", "180° 회전"],
+  ["LB/RB", "홀드"],
+  ["Start", "일시정지"],
+  ["Back", "다시 시작"],
+];
 
-/** 키 안내. 지금 규칙에서 쓸 수 없는 동작(하드 드롭·홀드가 꺼진 규칙 등)은 뺀다. */
+/** 안내 한 칸: 동작 이름 + 키캡들 */
+const helpItem = (label, caps) => {
+  const span = document.createElement("span");
+  span.append(label, ...caps);
+  return span;
+};
+
+const textCap = text => {
+  const kbd = document.createElement("kbd");
+  kbd.className = "keycap";
+  kbd.textContent = text;
+  return kbd;
+};
+
+/** 키 안내. 지금 규칙에서 쓸 수 없는 동작(하드 드롭·홀드가 꺼진 규칙 등)은 뺀다. 키 이름은 키캡(화살표는 SVG). */
 const renderKeyHelp = () => {
   const r = game?.rules ?? currentRules();
   const unavailable = new Set([...(r.hardDrop ? [] : ["HARD"]), ...(r.hold.enabled ? [] : ["HOLD"])]);
-  const parts = ACTIONS.filter(a => !unavailable.has(a.id))
-    .map(a => (keysFor(a.id) ? `${a.label} ${keysFor(a.id)}` : null))
-    .filter(Boolean);
-  const lines = [[...parts, "메뉴·일시정지 Esc"].join(" · ")];
-  if (padRef?.connected) lines.push(PAD_HELP);
-  $("key-help").textContent = lines.join("\n");
-  for (const kbd of document.querySelectorAll("kbd[data-key]")) kbd.textContent = keysFor(kbd.getAttribute("data-key"));
+  const items = [icon("keyboard", { label: "키보드" })];
+  for (const a of ACTIONS) {
+    if (unavailable.has(a.id) || !keysOf(a.id).length) continue;
+    items.push(helpItem(a.label, keysOf(a.id).map(keycap)));
+  }
+  items.push(helpItem("메뉴·일시정지", [textCap("Esc")]));
+  if (padRef?.connected) {
+    const br = document.createElement("span");
+    br.className = "keys-break";
+    items.push(br, icon("gamepad", { label: "게임패드" }));
+    for (const [cap, label] of PAD_HELP) items.push(helpItem(label, [textCap(cap)]));
+  }
+  $("key-help").replaceChildren(...items);
+  // 버튼 안 단축키 표시는 첫 번째 키만
+  for (const kbd of document.querySelectorAll("kbd[data-key]")) {
+    const first = keysOf(kbd.getAttribute("data-key"))[0];
+    kbd.replaceChildren(...(first ? [keycap(first)] : []));
+  }
 };
 
 const renderRuleTabs = () => {
@@ -119,7 +154,8 @@ const renderRuleTabs = () => {
       return b;
     })
   );
-  $("edit-rules").hidden = ruleChoice !== "custom";
+  // 편집 버튼은 늘 같은 자리에 있다. Custom이 아닐 때는 비활성(원칙 2).
+  /** @type {HTMLButtonElement} */ ($("edit-rules")).disabled = ruleChoice !== "custom";
 };
 
 const renderMenu = () => {
@@ -245,7 +281,7 @@ const finish = () => {
   const summary = mode.summary(state);
   $("results-title").textContent = summary.title;
   $("results-main").textContent = summary.main;
-  $("results-badge").hidden = !outcome?.isBest;
+  $("results-badge").classList.toggle("is-invisible", !outcome?.isBest);
 
   const seconds = state.frame / 60;
   const rows = [
@@ -257,7 +293,8 @@ const finish = () => {
     ["PPS", seconds ? (state.stats.pieces / seconds).toFixed(2) : "0.00"],
     ["최고 기록", best ? mode.formatRecord(best) : "—"],
   ];
-  if (outcome && !outcome.isBest && outcome.rank < 10) rows.push(["순위", `${outcome.rank + 1}위`]);
+  // 순위 줄은 늘 둔다(없으면 —) → 결과 화면 높이가 판마다 같다.
+  rows.push(["순위", outcome && outcome.rank < 10 ? `${outcome.rank + 1}위` : "—"]);
   $("results-stats").replaceChildren(
     ...rows.flatMap(([k, v]) => {
       const dt = document.createElement("dt");
@@ -418,10 +455,10 @@ const replayStatus = $("replay-status");
 const menuNotice = $("menu-notice");
 
 const updateReplayBar = () => {
-  /** @type {HTMLElement} */ (replayBar.querySelector('[data-replay="toggle"]')).textContent = replayPaused
-    ? "재생"
-    : "일시정지";
-  /** @type {HTMLElement} */ (replayBar.querySelector('[data-replay="speed"]')).textContent = `×${replaySpeed}`;
+  const toggle = /** @type {HTMLElement} */ (replayBar.querySelector('[data-replay="toggle"]'));
+  toggle.replaceChildren(icon(replayPaused ? "play" : "pause"));
+  toggle.setAttribute("aria-label", replayPaused ? "재생" : "일시정지");
+  /** @type {HTMLElement} */ (replayBar.querySelector(".replay-speed")).textContent = `${replaySpeed}x`;
   replayStatus.textContent = player?.done ? "끝" : "";
 };
 
@@ -505,9 +542,9 @@ const exportReplay = replay => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
+/** 메뉴 알림 칸은 늘 자리를 차지한다(빈 글이면 비어 보일 뿐). */
 const showMenuNotice = text => {
   menuNotice.textContent = text;
-  menuNotice.hidden = !text;
 };
 
 /** 불러온 파일을 검사하고 재생한다. 결과가 기록과 다르면 알리고 그래도 재생한다. */
@@ -586,6 +623,7 @@ const loop = now => {
   requestAnimationFrame(loop);
 };
 
+hydrateIcons();
 renderKeyHelp();
 toMenu();
 requestAnimationFrame(loop);

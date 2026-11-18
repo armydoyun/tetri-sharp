@@ -1,26 +1,46 @@
-// 설정 대화상자: 조작감(DAS·ARR·SDF)과 키 배치. 바꾸는 즉시 저장하고 onChange로 알린다.
+// 설정 대화상자: 조작감(DAS·ARR·SDF), 화면, 키 배치. 바꾸는 즉시 저장하고 onChange로 알린다.
 import { ACTIONS, DEFAULT_KEYMAP, SLOTS, assignKey, clearKey, keyLabel } from "../input/keymap.js";
 import { DEFAULT_SETTINGS, HANDLING_LIMITS, SDF_INFINITE, defaultVisual } from "../storage/settings.js";
+import { button, el, fieldRow, fillDialog } from "./dom.js";
+import { keycap } from "./keycap.js";
 
 const HANDLING_ROWS = [
-  { key: "das", label: "DAS", hint: "누른 채로 자동 이동이 시작되기까지", unit: "ms" },
-  { key: "arr", label: "ARR", hint: "자동 이동 한 칸 간격 (0 = 즉시 벽까지)", unit: "ms" },
-  { key: "sdf", label: "SDF", hint: "소프트 드롭 속도 배율 (맨 끝 = 즉시)", unit: "×" },
+  { key: "das", label: "DAS", hint: "누른 채로 자동 이동이 시작되기까지" },
+  { key: "arr", label: "ARR", hint: "자동 이동 한 칸 간격 (0 = 즉시 벽까지)" },
+  { key: "sdf", label: "SDF", hint: "소프트 드롭 속도 배율 (맨 끝 = 즉시)" },
 ];
 
-const formatValue = (key, v) => (key === "sdf" ? (v >= SDF_INFINITE ? "∞" : `×${v}`) : `${v} ms`);
+const formatValue = (key, v) => (key === "sdf" ? (v >= SDF_INFINITE ? "즉시" : `${v}배`) : `${v} ms`);
 
-const el = (tag, attrs = {}, ...children) => {
-  const node = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (k === "class") node.className = v;
-    else if (k === "text") node.textContent = v;
-    else if (k.startsWith("data-")) node.setAttribute(k, v);
-    else node[k] = v;
-  }
-  node.append(...children);
-  return node;
-};
+const VISUAL_ROWS = [
+  {
+    key: "effects",
+    label: "화면 효과",
+    hint: "줄 삭제 섬광·파편·흔들림",
+    options: [
+      ["full", "전체"],
+      ["reduced", "줄임 (움직임 없이)"],
+      ["off", "끄기"],
+    ],
+  },
+  {
+    key: "skin",
+    label: "블록 모양",
+    options: [
+      ["flat", "평면"],
+      ["bevel", "입체"],
+      ["outline", "윤곽선"],
+    ],
+  },
+  {
+    key: "palette",
+    label: "블록 색",
+    options: [
+      ["default", "기본"],
+      ["contrast", "색각 친화"],
+    ],
+  },
+];
 
 /**
  * @param {{
@@ -33,134 +53,91 @@ const el = (tag, attrs = {}, ...children) => {
 export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => {
   /** 키 입력을 기다리는 칸 */
   let capture = null;
-  const notice = el("p", { class: "settings-notice", role: "status" });
+  const notice = el("p", { class: "notice-slot", role: "status", id: "settings-notice" });
 
-  const update = patch => {
-    onChange({ ...getSettings(), ...patch });
-  };
+  const update = patch => onChange({ ...getSettings(), ...patch });
 
-  const handlingSection = () => {
-    const rows = HANDLING_ROWS.map(({ key, label, hint }) => {
-      const limits = HANDLING_LIMITS[key];
-      const value = getSettings().handling[key];
-      const output = el("output", { class: "settings-value", text: formatValue(key, value) });
-      const input = el("input", {
-        type: "range",
-        min: String(limits.min),
-        max: String(limits.max),
-        step: String(limits.step),
-        value: String(value),
-        id: `set-${key}`,
-      });
-      input.setAttribute("aria-label", label);
-      input.addEventListener("input", () => {
-        const v = Number(input.value);
-        output.textContent = formatValue(key, v);
-        update({ handling: { ...getSettings().handling, [key]: v } });
-      });
-      return el(
-        "div",
-        { class: "settings-row" },
-        el(
-          "label",
-          { htmlFor: `set-${key}`, class: "settings-label" },
-          el("strong", { text: label }),
-          el("small", { text: hint })
-        ),
-        input,
-        output
-      );
-    });
-    return el("section", { class: "settings-section" }, el("h3", { text: "조작감" }), ...rows);
-  };
+  const handlingSection = () =>
+    el(
+      "section",
+      { class: "field-section" },
+      el("h3", { text: "조작감" }),
+      ...HANDLING_ROWS.map(({ key, label, hint }) => {
+        const limits = HANDLING_LIMITS[key];
+        const value = getSettings().handling[key];
+        const id = `set-${key}`;
+        const output = el("output", { text: formatValue(key, value), htmlFor: id });
+        const input = el("input", {
+          type: "range",
+          id,
+          min: String(limits.min),
+          max: String(limits.max),
+          step: String(limits.step),
+          value: String(value),
+        });
+        input.addEventListener("input", () => {
+          const v = Number(input.value);
+          output.textContent = formatValue(key, v);
+          update({ handling: { ...getSettings().handling, [key]: v } });
+        });
+        return fieldRow({ id, label, hint, control: el("span", { class: "range" }, input, output) });
+      })
+    );
 
-  const VISUAL_ROWS = [
-    {
-      key: "effects",
-      label: "화면 효과",
-      hint: "줄 삭제 섬광·파편·흔들림",
-      options: [
-        ["full", "전체"],
-        ["reduced", "줄임 (움직임 없이)"],
-        ["off", "끄기"],
-      ],
-    },
-    {
-      key: "skin",
-      label: "블록 모양",
-      options: [
-        ["flat", "평면"],
-        ["bevel", "입체"],
-        ["outline", "윤곽선"],
-      ],
-    },
-    {
-      key: "palette",
-      label: "블록 색",
-      options: [
-        ["default", "기본"],
-        ["contrast", "색각 친화"],
-      ],
-    },
-  ];
-
-  const visualSection = () => {
-    const rows = VISUAL_ROWS.map(({ key, label, hint, options }) => {
-      const select = el("select", { id: `set-${key}`, class: "rule-select" });
-      for (const [value, text] of options) {
-        select.append(el("option", { value, text, selected: getSettings().visual[key] === value }));
-      }
-      select.addEventListener("change", () => update({ visual: { ...getSettings().visual, [key]: select.value } }));
-      return el(
-        "div",
-        { class: "settings-row rule-row" },
-        el(
-          "label",
-          { htmlFor: `set-${key}`, class: "settings-label" },
-          el("strong", { text: label }),
-          ...(hint ? [el("small", { text: hint })] : [])
-        ),
-        select
-      );
-    });
-    return el("section", { class: "settings-section" }, el("h3", { text: "화면" }), ...rows);
-  };
+  const visualSection = () =>
+    el(
+      "section",
+      { class: "field-section" },
+      el("h3", { text: "화면" }),
+      ...VISUAL_ROWS.map(({ key, label, hint, options }) => {
+        const id = `set-${key}`;
+        const select = el("select", { id, class: "select" });
+        for (const [value, text] of options) {
+          select.append(el("option", { value, text, selected: getSettings().visual[key] === value }));
+        }
+        select.addEventListener("change", () => update({ visual: { ...getSettings().visual, [key]: select.value } }));
+        return fieldRow({ id, label, hint, control: select });
+      })
+    );
 
   const keysSection = () => {
     const { keymap } = getSettings();
-    const rows = ACTIONS.map(action => {
-      const slots = Array.from({ length: SLOTS }, (_, slot) => {
-        const code = keymap[action.id]?.[slot];
-        const waiting = capture && capture.action === action.id && capture.slot === slot;
-        const btn = el("button", {
-          type: "button",
-          class: `key-slot${waiting ? " is-waiting" : ""}${code ? "" : " is-empty"}`,
-          text: waiting ? "키를 누르세요…" : code ? keyLabel(code) : "—",
-          "data-action": action.id,
-          "data-slot": String(slot),
-        });
-        btn.addEventListener("click", () => startCapture(action.id, slot));
-        return btn;
-      });
-      return el(
-        "div",
-        { class: "settings-row keys-row" },
-        el("span", { class: "settings-label", text: action.label }),
-        ...slots
-      );
-    });
     return el(
       "section",
-      { class: "settings-section" },
+      { class: "field-section" },
       el("h3", { text: "키 배치" }),
-      el("p", { class: "settings-help", text: "칸을 누르고 원하는 키를 누르세요. Backspace는 지우기, Esc는 취소." }),
-      ...rows
+      el("p", { class: "field-help", text: "칸을 누르고 원하는 키를 누르세요. Backspace는 지우기, Esc는 취소." }),
+      ...ACTIONS.map(action => {
+        const slots = Array.from({ length: SLOTS }, (_, slot) => {
+          const code = keymap[action.id]?.[slot];
+          const waiting = capture && capture.action === action.id && capture.slot === slot;
+          const btn = el("button", {
+            type: "button",
+            class: `key-slot${waiting ? " is-waiting" : ""}${code ? "" : " is-empty"}`,
+            "data-action": action.id,
+            "data-slot": String(slot),
+            "aria-label": `${action.label} ${slot + 1}번 키: ${code ? keyLabel(code) : "없음"}`,
+          });
+          if (waiting) btn.textContent = "키를 누르세요";
+          else if (code) btn.append(keycap(code));
+          else btn.textContent = "없음";
+          btn.addEventListener("click", () => startCapture(action.id, slot));
+          return btn;
+        });
+        const row = el(
+          "div",
+          { class: "field-row key-row" },
+          el("span", { class: "field-label", text: action.label }),
+          ...slots
+        );
+        return row;
+      })
     );
   };
 
   const render = () => {
-    const scroll = dialog.querySelector(".settings-body")?.scrollTop ?? 0;
-    const reset = el("button", { type: "button", class: "btn", text: "기본값으로" });
+    const scroll = dialog.querySelector(".dialog-body")?.scrollTop ?? 0;
+    const reset = button({ text: "기본값으로", iconName: "reset", id: "settings-reset" });
     reset.addEventListener("click", () => {
       capture = null;
       onChange({
@@ -172,14 +149,8 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
       notice.textContent = "기본값으로 되돌렸어요.";
       render();
     });
-    const close = el("button", { type: "button", class: "btn btn-primary", text: "닫기", id: "settings-close" });
-    close.addEventListener("click", () => dialog.close());
-    const body = el("div", { class: "settings-body" }, handlingSection(), visualSection(), keysSection());
-    dialog.replaceChildren(
-      el("h2", { class: "settings-title", text: "설정" }),
-      body,
-      el("footer", { class: "settings-footer" }, notice, reset, close)
-    );
+    const body = el("div", {}, handlingSection(), visualSection(), keysSection());
+    fillDialog(dialog, { title: "설정", body, notice, actions: [reset], closeId: "settings-close" });
     body.scrollTop = scroll;
   };
 
@@ -187,12 +158,17 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
     capture = { action, slot };
     notice.textContent = "";
     render();
-    dialog.querySelector(".key-slot.is-waiting")?.focus();
+    /** @type {HTMLElement | null} */ (dialog.querySelector(".key-slot.is-waiting"))?.focus();
   };
 
   const endCapture = () => {
+    const last = capture;
     capture = null;
     render();
+    if (last)
+      /** @type {HTMLElement | null} */ (
+        dialog.querySelector(`.key-slot[data-action="${last.action}"][data-slot="${last.slot}"]`)
+      )?.focus();
   };
 
   // 캡처 단계에서 먼저 받아 게임 키 처리(keyboard.js)로 넘어가지 않게 한다.

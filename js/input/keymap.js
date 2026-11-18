@@ -108,11 +108,19 @@ export const compileKeymap = keymap => {
   return { buttons, system };
 };
 
+/** 화살표 키는 글자 기호 대신 SVG 아이콘으로 보여 준다(js/ui/keycap.js). 이름은 글로 쓸 때(알림 문구·화면 읽기)용. */
+export const KEY_ICONS = Object.freeze({
+  ArrowLeft: "arrow-left",
+  ArrowRight: "arrow-right",
+  ArrowUp: "arrow-up",
+  ArrowDown: "arrow-down",
+});
+
 const NAMED = {
-  ArrowLeft: "←",
-  ArrowRight: "→",
-  ArrowUp: "↑",
-  ArrowDown: "↓",
+  ArrowLeft: "왼쪽 화살표",
+  ArrowRight: "오른쪽 화살표",
+  ArrowUp: "위쪽 화살표",
+  ArrowDown: "아래쪽 화살표",
   Space: "Space",
   ShiftLeft: "L Shift",
   ShiftRight: "R Shift",

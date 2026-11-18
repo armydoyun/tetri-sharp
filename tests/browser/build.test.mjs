@@ -155,7 +155,7 @@ test("설정: 슬라이더 값과 키 변경이 저장되고 새로고침 후에
   // 이미 쓰는 키(X: 시계 회전)를 홀드로 옮기면 알림이 뜬다.
   await page.click('.key-slot[data-action="HOLD"][data-slot="1"]');
   await page.keyboard.press("KeyX");
-  assert.match(await page.locator(".settings-notice").textContent(), /시계 방향 회전/);
+  assert.match(await page.locator("#settings-notice").textContent(), /시계 방향 회전/);
   await page.click("#settings-close");
   assert.equal(await page.locator("#settings").isVisible(), false);
 
@@ -203,7 +203,8 @@ test("규칙 선택: Retro는 하드 드롭이 안 되고, 선택이 새로고�
   assert.equal(await pressed("modern"), "true");
   await page.click('[data-rules="retro"]');
   assert.equal(await pressed("retro"), "true");
-  assert.equal(await page.locator("#edit-rules").isVisible(), false, "프리셋에는 편집 버튼이 없다");
+  assert.equal(await page.locator("#edit-rules").isVisible(), true, "편집 버튼은 늘 같은 자리에 있다");
+  assert.equal(await page.locator("#edit-rules").isDisabled(), true, "프리셋에서는 비활성");
 
   await startMode(page, "sprint40");
   await page.keyboard.press("Space");
@@ -228,7 +229,7 @@ test("Custom 규칙: 편집 내용이 저장되고 기록표 id가 바뀌며, �
   await page.click('[data-rules="custom"]');
   await page.click("#edit-rules");
   assert.equal(await page.locator("#rules-editor").isVisible(), true);
-  const idText = () => page.locator("#rules-editor .settings-notice").textContent();
+  const idText = () => page.locator("#rules-record").textContent();
   const before = await idText();
 
   // 하드 드롭 끄기
@@ -297,7 +298,7 @@ test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파�
   await page
     .locator("#replay-file")
     .setInputFiles({ name: "bad.json", mimeType: "application/json", buffer: Buffer.from("{oops") });
-  await page.waitForFunction(() => !document.getElementById("menu-notice")?.hidden, null, { timeout: 3000 });
+  await page.waitForFunction(() => document.getElementById("menu-notice")?.textContent !== "", null, { timeout: 3000 });
   assert.match(await text(page, "menu-notice"), /읽을 수 없는/);
   assert.deepEqual(errors, []);
   await context.close();
@@ -341,7 +342,7 @@ test("게임패드: A로 메뉴 선택, 십자키 위로 하드 드롭, Start로
     await page.evaluate(b => window.__pad.pressed.delete(b), button);
     await page.waitForTimeout(80);
   };
-  assert.match(await text(page, "key-help"), /게임패드/, "연결되면 패드 안내가 보인다");
+  assert.equal(await page.locator('#key-help [aria-label="게임패드"]').count(), 1, "연결되면 패드 안내가 보인다");
   await tap(13); // 아래: Sprint → Marathon
   await tap(12); // 위: 다시 Sprint
   await tap(0); // A: 선택
@@ -355,6 +356,127 @@ test("게임패드: A로 메뉴 선택, 십자키 위로 하드 드롭, Start로
   });
   await tap(9);
   assert.equal(await visible(page, "pause"), true);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+// ---- 디자인 시스템: 원칙 2(레이아웃 고정)와 테마 — docs/DESIGN_SYSTEM.md ----
+
+/** 선택자마다 위치·크기(소수점 반올림) */
+const rects = (page, selectors) =>
+  page.evaluate(
+    sels =>
+      Object.fromEntries(
+        sels.map(sel => {
+          const r = document.querySelector(sel)?.getBoundingClientRect();
+          return [sel, r ? [r.x, r.y, r.width, r.height].map(Math.round) : null];
+        })
+      ),
+    selectors
+  );
+
+test("레이아웃 고정: 규칙 탭을 바꾸거나 메뉴 알림이 생겨도 메뉴 요소가 움직이지 않는다", async () => {
+  const { context, page, errors } = await openPage();
+  const sels = ["#rule-tabs", "#edit-rules", "#mode-list", ".mode-card", "#watch-last", "#menu-notice", "#board"];
+  const before = await rects(page, sels);
+  for (const id of ["retro", "arcade", "custom", "modern", "custom"]) {
+    await page.click(`[data-rules="${id}"]`);
+    assert.deepEqual(await rects(page, sels), before, `${id} 탭`);
+  }
+  await page
+    .locator("#replay-file")
+    .setInputFiles({ name: "x.json", mimeType: "application/json", buffer: Buffer.from("{") });
+  await page.waitForFunction(() => document.getElementById("menu-notice")?.textContent !== "");
+  assert.deepEqual(await rects(page, sels), before, "알림이 생긴 뒤");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("레이아웃 고정: 규칙 편집에서 조건 항목이 비활성이 돼도 줄이 움직이지 않는다", async () => {
+  const { context, page, errors } = await openPage();
+  await page.click('[data-rules="custom"]');
+  await page.click("#edit-rules");
+  const rows = () =>
+    page.evaluate(() => [...document.querySelectorAll("#rules-editor .field-row")].map(r => Math.round(r.offsetTop)));
+  const before = await rows();
+  await page.selectOption("#rule-lock-type", { label: "닿으면 다음 낙하 때 즉시 고정" });
+  assert.equal(await page.locator("#rule-lock-delay").isDisabled(), true, "고정 지연은 비활성");
+  await page.locator("#rule-hold-enabled").uncheck();
+  await page.locator("#rule-fixedHandlingOn").check();
+  assert.deepEqual(await rows(), before);
+  assert.match(await page.locator('label[for="rule-lock-delay"] small').textContent(), /즉시 고정/, "이유가 보인다");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("레이아웃 고정: 게임 중 점수·시간이 길어져도 보드와 정보 칸이 움직이지 않는다", async () => {
+  const { context, page, errors } = await openPage();
+  await startMode(page, "ultra");
+  const sels = ["#board", ".hud", "#hud-score"];
+  const before = await rects(page, sels);
+  for (let i = 0; i < 12; i++) await page.keyboard.press(i % 2 ? "Space" : "ArrowLeft");
+  await page.waitForFunction(() => Number(document.getElementById("hud-score")?.textContent.replace(/,/g, "")) > 0);
+  assert.deepEqual(await rects(page, sels), before);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("레이아웃 고정: 설정 알림이 생겨도 버튼이 움직이지 않고, 결과 화면의 배지·순위 자리는 늘 있다", async () => {
+  const { context, page, errors } = await openPage();
+  await page.click("#open-settings");
+  const sels = ["#settings-reset", "#settings-close", "#settings-notice"];
+  const before = await rects(page, sels);
+  await page.click('.key-slot[data-action="HOLD"][data-slot="1"]');
+  await page.keyboard.press("KeyX");
+  assert.notEqual(await page.locator("#settings-notice").textContent(), "");
+  assert.deepEqual(await rects(page, sels), before);
+  await page.click("#settings-close");
+
+  await startMode(page, "zen");
+  for (let i = 0; i < 40; i++) await page.keyboard.press("Space");
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  const badge = await rects(page, ["#results-badge"]);
+  assert.ok(badge["#results-badge"][3] > 0, "새 기록이 아니어도 배지 자리는 있다");
+  assert.match(await page.locator("#results-stats").textContent(), /순위/);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("테마: 라이트에서 UI는 밝고 게임 화면은 어둡다, 다크에서는 둘 다 어둡다", async () => {
+  const lum = rgb => {
+    const [r, g, b] = rgb.match(/\d+/g).map(Number);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  for (const scheme of ["light", "dark"]) {
+    const context = await browser.newContext({ colorScheme: scheme, viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    await page.goto(url);
+    await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+    const colors = await page.evaluate(() => ({
+      body: getComputedStyle(document.body).backgroundColor,
+      game: getComputedStyle(document.querySelector(".board-wrap")).backgroundColor,
+      card: getComputedStyle(document.querySelector(".mode-card")).backgroundColor,
+    }));
+    assert.ok(lum(colors.game) < 40, `${scheme}: 게임 화면은 어둡다`);
+    assert.ok(lum(colors.card) < 60, `${scheme}: 보드 위 카드도 어둡다`);
+    if (scheme === "light") assert.ok(lum(colors.body) > 200, "라이트: 페이지는 밝다");
+    else assert.ok(lum(colors.body) < 40, "다크: 페이지도 어둡다");
+    await context.close();
+  }
+});
+
+test("접근성: 모든 버튼에 읽을 수 있는 이름이 있고, 화면 글자에 이모지가 없다", async () => {
+  const { context, page, errors } = await openPage();
+  await page.click("#open-settings");
+  const result = await page.evaluate(() => {
+    const unnamed = [...document.querySelectorAll("button")]
+      .filter(b => !(b.getAttribute("aria-label") || b.textContent.trim()))
+      .map(b => b.outerHTML.slice(0, 80));
+    const emoji = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]|\u{FE0F}/u.test(document.body.innerText);
+    return { unnamed, emoji };
+  });
+  assert.deepEqual(result.unnamed, []);
+  assert.equal(result.emoji, false);
   assert.deepEqual(errors, []);
   await context.close();
 });

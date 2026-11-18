@@ -1,15 +1,17 @@
 // Custom 규칙 편집 대화상자. 바꿀 때마다 onChange(규칙 내용)를 부르고, 저장·적용은 호출한 쪽이 한다.
 import { PRESET_LIST } from "../rules/presets.js";
 import { GRAVITY_OPTIONS, LIMITS, makeCustomRules, sanitizeRuleBody } from "../rules/sanitize.js";
+import { button, el, fieldRow, fillDialog } from "./dom.js";
 
 const ms = frames => `${Math.round((frames * 1000) / 60)}ms`;
 
 const GRAVITY_LABELS = ["1칸/초", "1.25칸/초", "2칸/초", "6칸/초", "1G (60칸/초)", "20G (즉시 바닥)"];
 
 /**
- * 편집 항목. path는 규칙 객체 안의 위치, when은 이 항목을 보여 줄 조건.
+ * 편집 항목. path는 규칙 객체 안의 위치.
+ * when이 거짓이면 항목을 숨기지 않고 같은 자리에서 비활성으로 두며, 설명 줄에 off(쓸 수 없는 이유)를 보여 준다(원칙 2).
  * @type {ReadonlyArray<{ section?: string, path: string, label: string, hint?: string, type: "select" | "toggle" | "number",
- *   options?: ReadonlyArray<[any, string]>, range?: readonly number[], unit?: (v: number) => string, when?: (r: any) => boolean }>}
+ *   options?: ReadonlyArray<[any, string]>, range?: readonly number[], unit?: (v: number) => string, when?: (r: any) => boolean, off?: string, fallback?: any }>}
  */
 const FIELDS = [
   { section: "피스" },
@@ -59,6 +61,7 @@ const FIELDS = [
     range: LIMITS.lockDelay,
     unit: v => `${v}F · ${ms(v)}`,
     when: r => r.lock.type !== "none",
+    off: "고정 방식이 ‘즉시 고정’이라 쓰지 않아요",
   },
   {
     path: "lock.maxResets",
@@ -67,6 +70,7 @@ const FIELDS = [
     range: LIMITS.maxResets,
     unit: v => `${v}회`,
     when: r => r.lock.type === "moveReset",
+    off: "‘움직이면 리셋’ 방식에서만 써요",
   },
   {
     path: "gravity",
@@ -106,6 +110,7 @@ const FIELDS = [
     hint: "생성 순간 홀드 키를 누르고 있으면 바로 홀드",
     type: "toggle",
     when: r => r.hold.enabled,
+    off: "홀드가 꺼져 있어 쓰지 않아요",
   },
   { path: "fixedHandlingOn", label: "조작감 고정", hint: "켜면 개인 설정 대신 아래 값으로 강제", type: "toggle" },
   {
@@ -115,6 +120,8 @@ const FIELDS = [
     range: LIMITS.das,
     unit: v => `${v}F · ${ms(v)}`,
     when: r => r.fixedHandling,
+    off: "‘조작감 고정’을 켜면 쓸 수 있어요",
+    fallback: 16,
   },
   {
     path: "fixedHandling.arr",
@@ -123,14 +130,18 @@ const FIELDS = [
     range: LIMITS.arr,
     unit: v => `${v}F · ${ms(v)}`,
     when: r => r.fixedHandling,
+    off: "‘조작감 고정’을 켜면 쓸 수 있어요",
+    fallback: 6,
   },
   {
     path: "fixedHandling.sdf",
     label: "SDF",
     type: "number",
     range: LIMITS.sdf,
-    unit: v => `×${v}`,
+    unit: v => `${v}배`,
     when: r => r.fixedHandling,
+    off: "‘조작감 고정’을 켜면 쓸 수 있어요",
+    fallback: 30,
   },
 ];
 
@@ -152,31 +163,19 @@ const setPath = (obj, path, value) => {
   return next;
 };
 
-const el = (tag, attrs = {}, ...children) => {
-  const node = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (k === "class") node.className = v;
-    else if (k === "text") node.textContent = v;
-    else if (k.startsWith("data-") || k.startsWith("aria-")) node.setAttribute(k, v);
-    else node[k] = v;
-  }
-  node.append(...children);
-  return node;
-};
-
 /**
  * @param {{ dialog: HTMLDialogElement, getRules: () => any, onChange: (body: any) => void, onClose?: () => void }} options
  */
 export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
-  const control = (field, rules) => {
+  const control = (field, rules, disabled) => {
     const id = `rule-${field.path.replace(/\./g, "-")}`;
-    const value = getPath(rules, field.path);
+    const value = getPath(rules, field.path) ?? field.fallback;
     const commit = v => {
       onChange(sanitizeRuleBody(setPath(rules, field.path, v)));
       render(id);
     };
     if (field.type === "select") {
-      const select = el("select", { id, class: "rule-select" });
+      const select = el("select", { id, class: "select", disabled });
       field.options.forEach(([v, label], i) => {
         select.append(el("option", { value: String(i), text: label, selected: v === value }));
       });
@@ -184,12 +183,12 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
       return select;
     }
     if (field.type === "toggle") {
-      const input = el("input", { id, type: "checkbox", class: "rule-toggle", checked: Boolean(value) });
+      const input = el("input", { id, type: "checkbox", class: "toggle", checked: Boolean(value), disabled });
       input.addEventListener("change", () => commit(input.checked));
       return input;
     }
     const [min, max] = field.range;
-    const output = el("output", { class: "settings-value", text: field.unit(value) });
+    const output = el("output", { text: field.unit(value), htmlFor: id });
     const input = el("input", {
       id,
       type: "range",
@@ -197,70 +196,59 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
       max: String(max),
       step: "1",
       value: String(value),
+      disabled,
     });
     input.addEventListener("input", () => (output.textContent = field.unit(Number(input.value))));
     input.addEventListener("change", () => commit(Number(input.value)));
-    return el("span", { class: "rule-range" }, input, output);
+    return el("span", { class: "range" }, input, output);
   };
+
+  const notice = el("p", { class: "notice-slot", role: "status", id: "rules-record" });
 
   /** @param {string} [focusId] 다시 그린 뒤 포커스를 돌려줄 컨트롤 */
   const render = focusId => {
     const rules = getRules();
-    const scroll = dialog.querySelector(".settings-body")?.scrollTop ?? 0;
-    const body = el("div", { class: "settings-body" });
+    const scroll = dialog.querySelector(".dialog-body")?.scrollTop ?? 0;
+    const body = el("div", {});
 
-    const presets = el(
-      "div",
-      { class: "rule-presets" },
-      el("span", { class: "settings-help", text: "프리셋에서 시작:" }),
-      ...PRESET_LIST.map(p => {
-        const b = el("button", { type: "button", class: "btn btn-small", text: p.name, "data-preset": p.id });
-        b.addEventListener("click", () => {
-          onChange(sanitizeRuleBody(p));
-          render();
-        });
-        return b;
-      })
+    body.append(
+      el(
+        "div",
+        { class: "rule-presets" },
+        el("span", { class: "field-help", text: "프리셋에서 시작" }),
+        ...PRESET_LIST.map(p => {
+          const b = button({ text: p.name, className: "btn btn-small", "data-preset": p.id });
+          b.addEventListener("click", () => {
+            onChange(sanitizeRuleBody(p));
+            render();
+          });
+          return b;
+        })
+      )
     );
-    body.append(presets);
 
     let section = null;
     for (const field of FIELDS) {
       if (!field.path) {
-        section = el("section", { class: "settings-section" }, el("h3", { text: field.section }));
+        section = el("section", { class: "field-section" }, el("h3", { text: field.section }));
         body.append(section);
         continue;
       }
-      if (field.when && !field.when(rules)) continue;
+      const disabled = Boolean(field.when && !field.when(rules));
       const id = `rule-${field.path.replace(/\./g, "-")}`;
       section.append(
-        el(
-          "div",
-          { class: "settings-row rule-row" },
-          el(
-            "label",
-            { class: "settings-label", htmlFor: id },
-            el("strong", { text: field.label }),
-            ...(field.hint ? [el("small", { text: field.hint })] : [])
-          ),
-          control(field, rules)
-        )
+        fieldRow({
+          id,
+          label: field.label,
+          hint: disabled ? field.off : field.hint,
+          control: control(field, rules, disabled),
+          disabled,
+        })
       );
     }
 
-    const close = el("button", { type: "button", class: "btn btn-primary", text: "닫기", id: "rules-close" });
-    close.addEventListener("click", () => dialog.close());
-    const recordId = makeCustomRules(rules).id;
-    dialog.replaceChildren(
-      el("h2", { class: "settings-title", text: "Custom 규칙" }),
-      body,
-      el(
-        "footer",
-        { class: "settings-footer" },
-        el("p", { class: "settings-notice", text: `기록표 ${recordId} — 조합마다 기록이 따로 쌓인다` }),
-        close
-      )
-    );
+    notice.textContent = `기록표 ${makeCustomRules(rules).id} · 조합마다 기록이 따로 쌓여요`;
+    fillDialog(dialog, { title: "Custom 규칙", body, notice, actions: [], closeId: "rules-close" });
     body.scrollTop = scroll;
     if (focusId) /** @type {HTMLElement | null} */ (dialog.querySelector(`#${focusId}`))?.focus();
   };
