@@ -24,3 +24,22 @@ export const splitDelta = (current, best) => {
 
 /** "+1.23" / "-0.45" / "—" */
 export const formatDelta = delta => (delta === null ? "—" : `${delta < 0 ? "-" : "+"}${Math.abs(delta).toFixed(2)}`);
+
+/** 완료한 구간의 누적 시간과 직전 구간 이후의 차이를 정리한다. */
+export const analyzeSplits = (marks, current, best) => {
+  const rows = [];
+  let slowest = null;
+  for (let i = 0; i < Math.min(current.length, marks.length); i++) {
+    const from = i === 0 ? 0 : marks[i - 1];
+    const to = marks[i];
+    const frames = current[i];
+    const hasBest = best?.[i] !== undefined;
+    const delta = hasBest ? frames - best[i] : null;
+    rows.push({ to, frames, delta });
+    const priorDelta = i === 0 ? 0 : rows[i - 1].delta;
+    if (delta === null || priorDelta === null) continue;
+    const lost = delta - priorDelta;
+    if (lost > (slowest?.lost ?? 0)) slowest = { from, to, lost };
+  }
+  return { rows, slowest };
+};

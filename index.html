@@ -90,6 +90,7 @@
           <div data-hud="lines"><dt id="hud-lines-label">줄</dt><dd id="hud-lines">0</dd></div>
           <div data-hud="pieces"><dt>피스</dt><dd id="hud-pieces">0</dd></div>
           <div data-hud="pps"><dt>PPS</dt><dd id="hud-pps">0.00</dd></div>
+          <div data-hud="streak" class="is-off"><dt>연속 / 최고</dt><dd id="hud-streak">0 / 0</dd></div>
           <div data-hud="split"><dt>PB 대비</dt><dd id="hud-split" class="hud-split">—</dd></div>
         </dl>
 
@@ -118,6 +119,14 @@
               <!-- 새 기록일 때만 보이지만 자리는 늘 차지한다(원칙 2) -->
               <p id="results-badge" class="badge is-invisible"><span data-icon="star"></span>새 기록</p>
               <dl id="results-stats" class="results-stats"></dl>
+              <details id="results-splits" class="results-splits">
+                <summary>구간 기록</summary>
+                <table>
+                  <thead><tr><th scope="col">누적 줄</th><th scope="col">경과 시간</th><th scope="col">PB 대비</th></tr></thead>
+                  <tbody id="results-split-rows"></tbody>
+                </table>
+                <p id="results-split-note"></p>
+              </details>
               <div class="actions">
                 <div class="actions-row">
                   <button type="button" class="btn btn-primary" data-action="retry"><span data-icon="restart"></span>다시 하기 <kbd data-key="RESTART"></kbd></button>
@@ -141,9 +150,14 @@
             <span id="replay-status" class="replay-status"></span>
           </div>
           <p id="replay-note" class="replay-note" role="status"></p>
+          <div class="replay-timeline">
+            <progress id="replay-progress" aria-label="리플레이 진행률" value="0" max="1"></progress>
+            <span id="replay-time" class="num"></span>
+          </div>
           <div class="replay-buttons">
             <button type="button" class="btn" data-replay="toggle"><span class="replay-toggle-icon"><span data-icon="pause"></span></span><span class="replay-toggle-text">일시정지</span></button>
             <button type="button" class="btn num" data-replay="speed" aria-label="재생 속도 바꾸기"><span data-icon="forward"></span><span class="replay-speed">1x</span></button>
+            <button type="button" class="btn" data-replay="step" aria-label="한 프레임 앞으로">한 프레임</button>
             <button type="button" class="btn" data-replay="restart"><span data-icon="restart"></span>처음부터</button>
             <button type="button" class="btn" data-replay="exit"><span data-icon="close"></span>닫기</button>
           </div>

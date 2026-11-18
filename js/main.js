@@ -18,7 +18,7 @@ import { createRecordsUI } from "./ui/records.js";
 import { createStatsUI } from "./ui/stats.js";
 import { createPracticeUI } from "./ui/practice.js";
 import { practiceMode } from "./modes/practice.js";
-import { advanceSplits, formatDelta, splitDelta } from "./modes/splits.js";
+import { advanceSplits, analyzeSplits, formatDelta, splitDelta } from "./modes/splits.js";
 import { hydrateIcons, icon } from "./ui/icons.js";
 import { keycap } from "./ui/keycap.js";
 import { createPlayer, createRecorder, createReplayStore, sanitizeReplay, verifyReplay } from "./replay/replay.js";
@@ -46,6 +46,7 @@ const hud = {
   pieces: $("hud-pieces"),
   pps: $("hud-pps"),
   split: $("hud-split"),
+  streak: $("hud-streak"),
 };
 
 const store = createStore();
@@ -223,6 +224,8 @@ const updateHud = () => {
   hud.linesLabel.textContent = lines.label;
   hud.lines.textContent = lines.value;
   hud.pieces.textContent = String(stats.pieces);
+  const practice = game?.state.practice;
+  hud.streak.textContent = practice ? `${practice.streak} / ${practice.bestStreak}` : "0 / 0";
   hud.pps.textContent = frame ? (stats.pieces / (frame / 60)).toFixed(2) : "0.00";
   const delta = game && mode.splits ? splitDelta(splits, pbSplits) : null;
   hud.split.textContent = formatDelta(delta);
@@ -253,20 +256,24 @@ const toMenu = (initial = false) => {
   });
 };
 
-const start = m => {
+const showModeHud = (m, replay = false) => {
+  const items = m.hud ?? ["time", "score", "level", "lines", "pieces", "pps"];
+  for (const cell of document.querySelectorAll(".hud [data-hud]")) {
+    const item = cell.getAttribute("data-hud");
+    cell.classList.toggle("is-off", !items.includes(item) || (replay && item === "split"));
+  }
+};
+
+const start = (m, selectedRules = currentRules()) => {
   if (screen === "replay") stopReplay();
   mode = m;
   if (!m.practice) store.set("lastMode", m.id);
-  rules = currentRules();
+  rules = selectedRules;
   const seed = (Math.random() * 2 ** 32) >>> 0;
   game = createGame({ rules, handling: toEngineHandling(settings.handling), seed, mode: m });
   recorder = createRecorder({ seed, mode: m, rules, handling: game.handling });
   splits = [];
-  // 정보 칸: 이 모드에 필요한 칸만(게임 중에는 바뀌지 않는다)
-  const items = m.hud ?? ["time", "score", "level", "lines", "pieces", "pps"];
-  for (const cell of document.querySelectorAll(".hud [data-hud]")) {
-    cell.classList.toggle("is-off", !items.includes(cell.getAttribute("data-hud")));
-  }
+  showModeHud(m);
   pbSplits = records.best(m, rules)?.splits;
   acc = 0;
   countdown = READY_FRAMES;
@@ -297,6 +304,35 @@ const resume = () => {
   if (screen !== "paused") return;
   showPanel(null);
   setScreen(pausedFrom);
+};
+
+const renderResultSplits = () => {
+  const details = /** @type {HTMLDetailsElement} */ ($("results-splits"));
+  details.hidden = !mode.splits;
+  details.open = false;
+  if (!mode.splits) return;
+
+  const { rows, slowest } = analyzeSplits(mode.splits, splits, pbSplits);
+  $("results-split-rows").replaceChildren(
+    ...rows.map(({ to, frames, delta }) => {
+      const row = document.createElement("tr");
+      for (const value of [`${to}줄`, formatTime(frames), formatDelta(delta === null ? null : delta / 60)]) {
+        row.insertCell().textContent = value;
+      }
+      return row;
+    })
+  );
+  const note = slowest
+    ? `가장 많이 밀린 구간 ${slowest.from}–${slowest.to}줄 (${formatDelta(slowest.lost / 60)}초)`
+    : rows.length === 0
+      ? "10줄부터 구간 기록이 남아요."
+      : rows.every(row => row.delta === null)
+        ? "같은 규칙의 최고 기록이 쌓이면 비교할 수 있어요."
+        : "완료한 비교 구간에서 잃은 시간이 없어요.";
+  $("results-split-note").textContent = note;
+  details.querySelector("summary").textContent = slowest
+    ? `구간 기록 · ${slowest.from}–${slowest.to}줄 확인`
+    : "구간 기록";
 };
 
 const finish = () => {
@@ -354,6 +390,7 @@ const finish = () => {
       return [dt, dd];
     })
   );
+  renderResultSplits();
   showPanel("results");
 };
 
@@ -465,7 +502,7 @@ const handleSystem = action => {
     else stopReplay();
     return;
   }
-  if (action === "restart" && screen !== "menu") return start(mode);
+  if (action === "restart" && screen !== "menu") return start(mode, rules);
   if (action !== "pause") return;
   if (screen === "play" || screen === "countdown") pause();
   else if (screen === "paused") resume();
@@ -516,7 +553,7 @@ for (const btn of document.querySelectorAll("[data-action]")) {
   btn.addEventListener("click", () => {
     const action = btn.getAttribute("data-action");
     if (action === "resume") resume();
-    if (action === "retry") start(mode);
+    if (action === "retry") start(mode, rules);
     if (action === "menu") toMenu();
     if (action === "watch" && lastReplay) startReplay(lastReplay);
     if (action === "stats" && game) statsUI.open(game.state, `${mode.name} · ${rules.name}`);
@@ -546,6 +583,19 @@ const SPEEDS = [1, 2, 4];
 const replayBar = $("replay-bar");
 const replayStatus = $("replay-status");
 const replayNote = $("replay-note");
+const replayProgress = /** @type {HTMLProgressElement} */ ($("replay-progress"));
+const replayTime = $("replay-time");
+const replayStep = /** @type {HTMLButtonElement} */ (replayBar.querySelector('[data-replay="step"]'));
+const replayToggle = /** @type {HTMLButtonElement} */ (replayBar.querySelector('[data-replay="toggle"]'));
+
+const updateReplayProgress = () => {
+  const frame = player?.frame ?? 0;
+  const length = playing?.result?.frames ?? 0;
+  replayProgress.max = length || 1;
+  if (length) replayProgress.value = Math.min(frame, length);
+  else replayProgress.removeAttribute("value");
+  replayTime.textContent = length ? `${formatTime(frame)} / ${formatTime(length)}` : formatTime(frame);
+};
 const menuNotice = $("menu-notice");
 
 const updateReplayBar = () => {
@@ -557,6 +607,9 @@ const updateReplayBar = () => {
     : "일시정지";
   /** @type {HTMLElement} */ (replayBar.querySelector(".replay-speed")).textContent = `${replaySpeed}x`;
   replayStatus.textContent = player?.done ? "끝" : "";
+  replayStep.disabled = !player || player.done;
+  replayToggle.disabled = replayStep.disabled;
+  updateReplayProgress();
 };
 
 const startReplay = (replay, returnTo = screen, note = "") => {
@@ -573,6 +626,7 @@ const startReplay = (replay, returnTo = screen, note = "") => {
   countdownEl.hidden = true;
   showPanel(null);
   setScreen("replay");
+  showModeHud(mode, true);
   replayBar.hidden = false;
   replayNote.textContent = note;
   $("replay-title").textContent = `${mode.name} · ${rules.name}`;
@@ -589,6 +643,7 @@ const stopReplay = () => {
   renderer.clearEffects();
   ({ game, mode, rules } = replayReturn);
   if (replayReturn.screen === "results") {
+    showModeHud(mode);
     setScreen("results");
     showPanel("results");
   } else {
@@ -596,14 +651,19 @@ const stopReplay = () => {
   }
 };
 
-const tickReplay = () => {
-  if (!player || replayPaused || player.done) return;
-  for (let i = 0; i < replaySpeed && !player.done; i++) {
+const advanceReplay = count => {
+  if (!player || player.done) return;
+  for (let i = 0; i < count && !player.done; i++) {
     const events = player.step();
     for (const e of events) announce(e);
     renderer.addEvents(events);
   }
   if (player.done) updateReplayBar();
+  else updateReplayProgress();
+};
+
+const tickReplay = () => {
+  if (!replayPaused) advanceReplay(replaySpeed);
 };
 
 for (const btn of replayBar.querySelectorAll("[data-replay]")) {
@@ -611,6 +671,10 @@ for (const btn of replayBar.querySelectorAll("[data-replay]")) {
     const action = btn.getAttribute("data-replay");
     if (action === "toggle") replayPaused = !replayPaused;
     if (action === "speed") replaySpeed = SPEEDS[(SPEEDS.indexOf(replaySpeed) + 1) % SPEEDS.length];
+    if (action === "step") {
+      replayPaused = true;
+      advanceReplay(1);
+    }
     if (action === "restart") return restartReplay();
     if (action === "exit") return stopReplay();
     updateReplayBar();
@@ -629,7 +693,7 @@ window.addEventListener("keydown", e => {
     e.repeat
   )
     return;
-  if (e.code === "Space") replayPaused = !replayPaused;
+  if (e.code === "Space" && !replayBar.contains(document.activeElement)) replayPaused = !replayPaused;
   else if (["Digit1", "Digit2", "Digit4"].includes(e.code)) replaySpeed = Number(e.code.slice(5));
   else return;
   e.preventDefault();

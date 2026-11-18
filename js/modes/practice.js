@@ -27,6 +27,16 @@ export const buildWell = (board, column) => {
   for (let y = HEIGHT - 4; y < HEIGHT; y++) for (let x = 0; x < WIDTH; x++) if (x !== column) set(board, x, y, GARBAGE);
 };
 
+/** O 피스로 채우는 두 칸짜리 구멍. */
+export const buildDoubleWell = (board, column) => {
+  clear(board);
+  for (let y = HEIGHT - 2; y < HEIGHT; y++) {
+    for (let x = 0; x < WIDTH; x++) {
+      if (x < column || x > column + 1) set(board, x, y, GARBAGE);
+    }
+  }
+};
+
 /** 보이는 영역 위쪽 4줄 안에 블록이 있으면 "높다" */
 const tooHigh = board => {
   for (let y = HEIGHT - 20; y < HEIGHT - 16; y++)
@@ -52,6 +62,14 @@ export const DRILLS = Object.freeze([
     success: ev => ev.lines === 4,
   }),
   Object.freeze({
+    id: "double",
+    name: "2줄 우물",
+    description: "위치가 바뀌는 두 칸짜리 구멍에 O를 넣어 2줄 지우기",
+    sequence: Object.freeze(["O"]),
+    build: (board, rng) => buildDoubleWell(board, rng.int(WIDTH - 1)),
+    success: ev => ev.lines === 2,
+  }),
+  Object.freeze({
     id: "free",
     name: "자유 쌓기",
     description: "중력 없이 천천히 — 판이 높아지면 비워요",
@@ -72,10 +90,10 @@ export const practiceMode = drill => {
     description: drill.description,
     rules: MODERN,
     practice: true,
-    hud: Object.freeze(["time", "lines", "pieces"]),
+    hud: Object.freeze(drill.success ? ["time", "lines", "pieces", "streak"] : ["time", "lines", "pieces"]),
     ...(drill.sequence ? { sequence: drill.sequence } : {}),
     setup: (state, rng) => {
-      state.practice = { tries: 0, success: 0, rng };
+      state.practice = { tries: 0, success: 0, streak: 0, bestStreak: 0, rng };
       drill.build(state.board, rng);
     },
     gravityFor: () => 0,
@@ -89,7 +107,13 @@ export const practiceMode = drill => {
       }
       p.tries += 1;
       const ok = drill.success(ev);
-      if (ok) p.success += 1;
+      if (ok) {
+        p.success += 1;
+        p.streak += 1;
+        p.bestStreak = Math.max(p.streak, p.bestStreak);
+      } else {
+        p.streak = 0;
+      }
       events.push({ type: "practice", success: ok });
       drill.build(state.board, p.rng);
       return true;

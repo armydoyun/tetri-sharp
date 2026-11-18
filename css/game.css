@@ -563,11 +563,18 @@ body.touch-on {
 }
 
 body[data-screen="replay"] {
-  --under-h: 64px;
+  --replay-controls-h: 104px;
+  --under-h: var(--replay-controls-h);
 }
 
 body[data-screen="replay"]:has(.replay-note:not(:empty)) {
-  --under-h: 112px;
+  --under-h: calc(var(--replay-controls-h) + 48px);
+}
+
+@media (max-width: 720px) {
+  body[data-screen="replay"] {
+    --replay-controls-h: 154px;
+  }
 }
 
 .board {
@@ -745,6 +752,40 @@ body[data-screen="replay"]:has(.replay-note:not(:empty)) {
   font-variant-numeric: tabular-nums;
 }
 
+.results-splits {
+  width: 100%;
+  border-block: 1px solid var(--border);
+  font-size: var(--text-m);
+  text-align: left;
+}
+
+.results-splits summary {
+  padding-block: var(--space-2);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.results-splits table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.results-splits :is(th, td) {
+  padding: var(--space-1);
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+}
+
+.results-splits :is(th, td):first-child {
+  text-align: left;
+}
+
+.results-splits p {
+  margin-block: var(--space-2);
+  color: var(--text-dim);
+}
+
 /* ---- 리플레이 조작: 보드 아래, 글자 있는 버튼 ---- */
 .replay-bar {
   width: 100%;
@@ -789,9 +830,23 @@ body[data-screen="replay"]:has(.replay-note:not(:empty)) {
   display: none;
 }
 
+.replay-timeline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+  font-size: var(--text-s);
+}
+
+.replay-timeline progress {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--accent);
+}
+
 .replay-buttons {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(96px, 100%), 1fr));
   gap: var(--space-2);
 }
 

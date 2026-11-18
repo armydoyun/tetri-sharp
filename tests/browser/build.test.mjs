@@ -276,6 +276,12 @@ test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파�
   // 보기: 4배속으로 끝까지
   await page.click('[data-action="watch"]');
   assert.equal(await visible(page, "replay-bar"), true);
+  await page.click('[data-replay="step"]');
+  const stepFrame = await page.locator("#replay-progress").evaluate(progress => progress.value);
+  await page.click('[data-replay="step"]');
+  assert.equal(await page.locator("#replay-progress").evaluate(progress => progress.value), stepFrame + 1);
+  assert.match(await text(page, "replay-time"), / \/ /);
+  await page.click('[data-replay="toggle"]');
   await page.keyboard.press("Digit4");
   await page.waitForFunction(() => document.getElementById("replay-status")?.textContent === "끝", null, {
     timeout: 10000,
