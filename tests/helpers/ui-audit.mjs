@@ -16,6 +16,8 @@ export const auditInPage = () => {
     if (!(el instanceof HTMLElement || el instanceof SVGElement)) return false;
     // 접힌 <details> 안, visibility·opacity로 숨긴 것까지 걸러 낸다
     if (!el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) return false;
+    // 화면 읽기 프로그램 전용(보이지 않게 잘라 둔 것)은 검사하지 않는다
+    if (el.closest(".sr-only")) return false;
     const r = el.getBoundingClientRect();
     return r.width > 0 && r.height > 0;
   };

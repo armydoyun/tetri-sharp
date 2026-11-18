@@ -11,7 +11,16 @@ import {
   pressedButtons,
 } from "../input/gamepad.js";
 import { icon } from "./icons.js";
-import { DEFAULT_SETTINGS, HANDLING_LIMITS, SDF_INFINITE, VOLUME_LIMITS, defaultVisual } from "../storage/settings.js";
+import {
+  DEFAULT_SETTINGS,
+  HANDLING_LIMITS,
+  HANDLING_PRESETS,
+  SDF_INFINITE,
+  VOLUME_LIMITS,
+  defaultAccess,
+  defaultVisual,
+  handlingPresetOf,
+} from "../storage/settings.js";
 import { button, choice, choiceCards, el, fieldRow, fillDialog, rangeRow, slider, tabBar } from "./dom.js";
 import { CONTRAST_PALETTE, THEMES, THEME_IDS } from "../render/themes.js";
 import { keycap } from "./keycap.js";
@@ -32,9 +41,27 @@ const HANDLING_ROWS = [
   },
 ];
 
+const PRESET_OPTIONS = [
+  ["relaxed", t("느긋하게")],
+  ["standard", t("보통")],
+  ["fast", t("빠르게")],
+  ["instant", t("아주 빠르게")],
+];
+const PRESET_HINTS = {
+  relaxed: "처음 해 보는 분께: 천천히 움직이고 실수가 적어요",
+  standard: "대부분에게 맞는 기본값이에요",
+  fast: "익숙해지면: 누르고 있으면 바로 벽까지 가요",
+  instant: "숙련자용: 가장 빨리 반응하고 소프트 드롭은 즉시 바닥까지",
+};
+const TOUCH_MODE_HINTS = {
+  buttons: "보드 아래 버튼으로 조작해요",
+  gestures: "보드를 좌우로 밀어 이동, 두드려 회전(왼쪽 절반은 반대 방향), 아래로 튕겨 하드 드롭, 위로 밀어 홀드",
+};
+
 const TABS = [
   ["control", t("조작")],
   ["visual", t("화면·소리")],
+  ["access", t("접근성")],
   ["keys", t("키보드")],
   ["pad", t("게임패드")],
 ];
@@ -92,6 +119,24 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
     el(
       "section",
       { class: "field-section" },
+      fieldRow({
+        id: "set-handling-preset",
+        label: t("조작감"),
+        hint: (() => {
+          const p = handlingPresetOf(getSettings().handling);
+          return p ? t(PRESET_HINTS[p]) : t("아래에서 직접 조절한 값이에요");
+        })(),
+        control: choice({
+          id: "set-handling-preset",
+          label: t("조작감"),
+          options: PRESET_OPTIONS,
+          value: handlingPresetOf(getSettings().handling) ?? "",
+          onChange: v => {
+            update({ handling: { ...HANDLING_PRESETS[v] } });
+            render();
+          },
+        }),
+      }),
       ...HANDLING_ROWS.map(({ key, label, hint }) => {
         const limits = HANDLING_LIMITS[key];
         const value = getSettings().handling[key];
@@ -108,6 +153,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
           const v = Number(input.value);
           output.textContent = formatValue(key, v);
           update({ handling: { ...getSettings().handling, [key]: v } });
+          refreshPreset();
         });
         return fieldRow({ id, label, hint, control: rangeRow(input, output, v => formatValue(key, v)) });
       }),
@@ -125,8 +171,101 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
             render();
           },
         }),
+      }),
+      fieldRow({
+        id: "set-touch-mode",
+        label: t("터치 조작 방식"),
+        hint: t(TOUCH_MODE_HINTS[getSettings().touchMode]),
+        control: choice({
+          id: "set-touch-mode",
+          label: t("터치 조작 방식"),
+          options: [
+            ["buttons", t("버튼")],
+            ["gestures", t("제스처")],
+          ],
+          value: getSettings().touchMode,
+          onChange: v => {
+            update({ touchMode: v });
+            render();
+          },
+        }),
       })
     );
+
+  /** 슬라이더로 직접 바꾸면 프리셋 표시만 다시 맞춘다(다시 그리면 슬라이더 포커스를 잃는다) */
+  const refreshPreset = () => {
+    const p = handlingPresetOf(getSettings().handling);
+    for (const b of dialog.querySelectorAll("#set-handling-preset > button"))
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-value") === p));
+    const hint = dialog.querySelector('label[for="set-handling-preset"] small');
+    if (hint) hint.textContent = p ? t(PRESET_HINTS[p]) : t("아래에서 직접 조절한 값이에요");
+  };
+
+  const setAccess = (key, v) => {
+    update({ access: { ...getSettings().access, [key]: v } });
+    render();
+  };
+  const onOff = [
+    ["on", t("켜기")],
+    ["off", t("끄기")],
+  ];
+
+  /** 접근성 탭: 블록 무늬 · 화면 읽기 알림 · 진동 · 카운트다운 */
+  const accessSection = () => {
+    const a = getSettings().access;
+    const visual = getSettings().visual;
+    const row = (id, label, hint, options, value, onChange) =>
+      fieldRow({ id, label, hint, control: choice({ id, label, options, value, onChange }) });
+    return el(
+      "section",
+      { class: "field-section" },
+      row(
+        "set-pattern",
+        t("블록 무늬"),
+        visual.pattern === "on"
+          ? t("피스마다 다른 무늬를 그려요. 색을 구분하기 어려워도 알아볼 수 있어요")
+          : t("색만으로 피스를 구분해요"),
+        [
+          ["off", t("끄기")],
+          ["on", t("켜기")],
+        ],
+        visual.pattern,
+        v => setVisual("pattern", v)
+      ),
+      row(
+        "set-announce",
+        t("화면 읽기 알림"),
+        t("화면 읽기 프로그램이 줄 삭제·레벨업·결과를 읽어 줘요"),
+        onOff,
+        a.announce,
+        v => setAccess("announce", v)
+      ),
+      row(
+        "set-vibrate",
+        t("진동"),
+        t("휴대폰에서 고정·줄 삭제·게임 오버 때 짧게 진동해요(지원하는 기기만)"),
+        onOff,
+        a.vibrate,
+        v => setAccess("vibrate", v)
+      ),
+      row(
+        "set-countdown",
+        t("시작 카운트다운"),
+        a.countdown === "off" ? t("누르자마자 바로 시작해요") : t("시작 전에 READY를 보여 줘요"),
+        [
+          ["normal", t("보통")],
+          ["short", t("짧게")],
+          ["off", t("없음")],
+        ],
+        a.countdown,
+        v => setAccess("countdown", v)
+      ),
+      el("p", {
+        class: "field-help",
+        text: t("화면 효과 줄이기와 색각 친화 색은 화면·소리 탭에 있어요."),
+      })
+    );
+  };
 
   const setVisual = (key, v) => {
     update({ visual: { ...getSettings().visual, [key]: v } });
@@ -220,6 +359,37 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
           ],
           value: visual.palette,
           onChange: v => setVisual("palette", v),
+        }),
+      }),
+      fieldRow({
+        id: "set-ghost",
+        label: t("고스트"),
+        hint: t("피스가 떨어질 자리 표시의 진하기"),
+        control: choice({
+          id: "set-ghost",
+          label: t("고스트"),
+          options: [
+            ["faint", t("흐리게")],
+            ["normal", t("보통")],
+            ["strong", t("진하게")],
+          ],
+          value: visual.ghost,
+          onChange: v => setVisual("ghost", v),
+        }),
+      }),
+      fieldRow({
+        id: "set-grid",
+        label: t("격자 선"),
+        hint: visual.grid === "off" ? t("격자 선 없이 블록만 보여요") : t("보드에 칸을 나누는 선을 그려요"),
+        control: choice({
+          id: "set-grid",
+          label: t("격자 선"),
+          options: [
+            ["on", t("켜기")],
+            ["off", t("끄기")],
+          ],
+          value: visual.grid,
+          onChange: v => setVisual("grid", v),
         }),
       }),
       volumeRow(),
@@ -340,7 +510,9 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
       ? handlingSection()
       : t === "visual"
         ? visualSection()
-        : bindingSection(t === "keys" ? "key" : "pad");
+        : t === "access"
+          ? accessSection()
+          : bindingSection(t === "keys" ? "key" : "pad");
 
   const render = () => {
     const scroll = dialog.querySelector(".dialog-body")?.scrollTop ?? 0;
@@ -357,6 +529,8 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
         volume: DEFAULT_SETTINGS.volume,
         scheme: DEFAULT_SETTINGS.scheme,
         gameSurface: DEFAULT_SETTINGS.gameSurface,
+        access: defaultAccess(),
+        touchMode: DEFAULT_SETTINGS.touchMode,
       });
       notice.textContent = t("모든 설정을 기본값으로 되돌렸어요.");
       render();

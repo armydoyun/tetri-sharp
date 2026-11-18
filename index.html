@@ -23,13 +23,25 @@
         <p id="session-title" class="session-title"></p>
         <div class="header-actions">
           <button id="pause-game" class="btn btn-ghost" type="button" aria-label="일시정지"><span data-icon="pause"></span></button>
-          <button id="open-settings" class="btn btn-ghost" type="button"><span data-icon="sliders"></span>설정</button>
+          <button id="open-help" class="btn btn-ghost" type="button" aria-label="도움말"><span data-icon="help"></span><span class="header-label">도움말</span></button>
+          <button id="open-settings" class="btn btn-ghost" type="button" aria-label="설정"><span data-icon="sliders"></span><span class="header-label">설정</span></button>
         </div>
       </header>
       <!-- 첫 화면: 보드 위 덮개가 아닌 독립된 화면. 넓은 화면에서는 넓게 쓴다 -->
       <!-- 첫 화면: 게임 메뉴. 넓으면 [규칙·모드 | 도구] 두 칸, 좁으면 한 칸 -->
       <section id="menu" class="home" aria-label="첫 화면" hidden>
         <div class="home-main">
+          <!-- 처음 오신 분 안내: 닫으면 다시 뜨지 않는다(도움말은 머리글에서 언제든) -->
+          <section id="welcome" class="welcome" aria-labelledby="welcome-title" hidden>
+            <div class="welcome-text">
+              <h2 id="welcome-title">처음 오셨나요?</h2>
+              <p>조작법과 추천 순서, 편하게 하는 설정을 짧게 알려 드릴게요.</p>
+            </div>
+            <div class="welcome-actions">
+              <button id="welcome-open" class="btn btn-primary btn-small" type="button"><span data-icon="help"></span>안내 보기</button>
+              <button id="welcome-close" class="btn btn-ghost btn-small" type="button" aria-label="안내 닫기"><span data-icon="close"></span></button>
+            </div>
+          </section>
           <section class="home-block rule-card" aria-labelledby="rules-title">
             <div class="block-head">
               <h2 id="rules-title" class="section-title">규칙</h2>
@@ -124,6 +136,7 @@
             <progress id="race-progress" aria-label="최고 기록 진행" value="0" max="40"></progress>
             <canvas id="race-board" class="race-board" aria-label="최고 기록 보드"></canvas>
           </aside>
+          <button id="undo-piece" class="btn btn-small undo-piece" type="button" title="되돌리기 (연습)"><span data-icon="undo"></span>되돌리기 <kbd data-key="UNDO"></kbd></button>
           <aside id="versus-panel" class="race-panel versus-panel" aria-label="CPU 상황" hidden>
             <div class="race-panel-head">
               <strong id="versus-name">CPU</strong>
@@ -140,7 +153,7 @@
         <div class="board-wrap surface-game">
           <canvas id="board" class="board" aria-label="보드"></canvas>
           <div id="countdown" class="countdown" aria-live="assertive" hidden><span id="countdown-label"></span></div>
-          <div id="action" class="action" aria-live="polite"></div>
+          <div id="action" class="action" aria-hidden="true"></div>
 
           <div id="pause" class="panel" hidden>
             <div class="panel-card">
@@ -248,8 +261,11 @@
     <dialog id="records" class="dialog dialog-wide" aria-label="기록"></dialog>
     <dialog id="stats" class="dialog dialog-wide" aria-label="이번 판 통계"></dialog>
     <dialog id="practice" class="dialog" aria-label="연습"></dialog>
+    <dialog id="help" class="dialog" aria-label="도움말"></dialog>
     <dialog id="versus" class="dialog" aria-label="CPU 대전"></dialog>
     <dialog id="daily" class="dialog" aria-label="오늘의 도전"></dialog>
+    <!-- 화면 읽기 프로그램용 알림(보이지 않음): 줄 삭제·레벨업·결과 -->
+    <p id="sr-status" class="sr-only" role="status" aria-live="polite"></p>
     <!-- ES Modules: 개발용 실행은 http://localhost를 사용한다. -->
     <script type="module" src="./js/main.js"></script>
   </body>

@@ -668,6 +668,7 @@
    그래도 모자라면 두 줄로 꺾되, 한국어는 단어 중간에서 꺾지 않는다. */
 .dialog-tabs .segmented {
   display: flex;
+  flex-wrap: wrap;
 }
 
 .dialog-tabs .segmented > button {
@@ -682,7 +683,8 @@
 }
 
 @media (max-width: 420px) {
-  .dialog-tabs .segmented > button {
+  .dialog-tabs .segmented > button,
+  .choice > button {
     padding-inline: var(--space-1);
     font-size: var(--text-s);
   }
@@ -1171,4 +1173,73 @@ body.touch-on :is(.btn, .btn-small, .key-slot, .select, .text-input, .choice > b
   .daily-head {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* ---- 도움말 대화상자 ---- */
+.help-section h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-m);
+  font-weight: 800;
+}
+
+.help-section h3::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+}
+
+.help-steps,
+.help-tips {
+  margin: 0;
+  padding-left: 1.4em;
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-m);
+  line-height: 1.5;
+}
+
+.help-steps li::marker {
+  color: var(--accent);
+  font-family: var(--font-num);
+  font-weight: 800;
+}
+
+.help-keys {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin: 0;
+  font-size: var(--text-m);
+}
+
+.help-keys :is(dt, dd) {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  border-bottom: var(--border-w) solid var(--border);
+}
+
+.help-keys dt {
+  color: var(--text-dim);
+}
+
+.help-keys dd {
+  justify-content: flex-end;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.help-keys dd.help-touch {
+  justify-content: flex-start;
+  padding-left: var(--space-3);
+}
+
+.help-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }

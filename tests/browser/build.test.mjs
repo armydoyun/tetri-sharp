@@ -1317,3 +1317,96 @@ for (const [locale, width, height] of [
     await context.close();
   });
 }
+
+test("편의: 처음 안내 줄은 닫으면 다시 뜨지 않고, 도움말은 머리글에서 언제든 연다", async () => {
+  const { context, page, errors } = await openPage();
+  assert.equal(await visible(page, "welcome"), true, "처음에는 안내 줄");
+  await page.click("#welcome-open");
+  assert.equal(await page.locator("#help").isVisible(), true);
+  assert.match(await page.locator("#help").textContent(), /이렇게 시작해요/);
+  await page.click("#help-close");
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  assert.equal(await visible(page, "welcome"), false, "한 번 본 뒤에는 뜨지 않는다");
+  await page.click("#open-help");
+  assert.equal(await page.locator("#help").isVisible(), true);
+  await page.click("#help-to-access");
+  assert.equal(await page.locator("#settings").isVisible(), true);
+  assert.equal(await page.locator('.dialog-tabs [data-value="access"]').getAttribute("aria-pressed"), "true");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("편의: 조작감 프리셋을 누르면 DAS·ARR·SDF가 한 번에 바뀌고, 슬라이더를 움직이면 '직접 조절'이 된다", async () => {
+  const { context, page, errors } = await openPage();
+  await page.click("#open-settings");
+  assert.equal(await page.locator('#set-handling-preset [data-value="standard"]').getAttribute("aria-pressed"), "true");
+  await page.click('#set-handling-preset [data-value="relaxed"]');
+  assert.equal(await page.locator("#set-das").inputValue(), "200");
+  assert.equal(await page.locator("#set-arr").inputValue(), "50");
+  await page.locator("#set-das").fill("150");
+  assert.equal(await page.locator('#set-handling-preset [aria-pressed="true"]').count(), 0);
+  assert.match(await page.locator('label[for="set-handling-preset"] small').textContent(), /직접 조절/);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("편의: 카운트다운 '없음'이면 바로 시작하고, 연습에서는 되돌리기로 방금 놓은 피스를 취소한다", async () => {
+  const { context, page, errors } = await openPage(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  await page.click("#open-practice");
+  await page.click('[data-drill="free"]');
+  assert.equal(await page.evaluate(() => document.body.dataset.screen), "play", "바로 시작");
+  assert.equal(await visible(page, "undo-piece"), true, "연습에서는 되돌리기 버튼");
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "2");
+  await page.click("#undo-piece");
+  await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "1");
+  await page.keyboard.press("KeyU");
+  await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "0");
+  await page.keyboard.press("Escape");
+  await page.click('#pause [data-action="menu"]');
+  await page.click('[data-mode="zen"]');
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  assert.equal(await visible(page, "undo-piece"), false, "연습이 아니면 되돌리기 없음");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("편의: 제스처 방식이면 보드 아래 버튼 대신 보드를 튕겨 하드 드롭한다", async () => {
+  const context = await browser.newContext({ locale: "ko-KR", viewport: { width: 390, height: 844 }, hasTouch: true });
+  await context.addInitScript(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ touch: "on", touchMode: "gestures" }))
+  );
+  const page = await context.newPage();
+  await page.goto(url);
+  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  await startMode(page, "zen");
+  assert.equal(await visible(page, "touchpad"), false, "버튼은 감춘다");
+  // 아래로 빠르게 튕기기 → 하드 드롭
+  await page.evaluate(() => {
+    const wrap = document.querySelector(".board-wrap");
+    const r = wrap.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const fire = (type, y, t) =>
+      wrap.dispatchEvent(
+        new PointerEvent(type, {
+          pointerId: 7,
+          pointerType: "touch",
+          clientX: x,
+          clientY: y,
+          bubbles: true,
+          cancelable: true,
+          timeStamp: t,
+        })
+      );
+    const y0 = r.top + 100;
+    fire("pointerdown", y0);
+    for (let i = 1; i <= 4; i++) fire("pointermove", y0 + i * 40);
+    fire("pointerup", y0 + 200);
+  });
+  await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "1", null, { timeout: 2000 });
+  await context.close();
+});

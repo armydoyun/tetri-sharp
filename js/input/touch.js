@@ -10,9 +10,9 @@ const BIT = Object.fromEntries(ACTIONS.filter(a => a.bit).map(a => [a.id, a.bit]
 const SYSTEM = Object.fromEntries(ACTIONS.filter(a => a.system).map(a => [a.id, a.system]));
 
 /**
- * @param {{ root: HTMLElement, onSystem: (action: string) => void }} options
+ * @param {{ root: HTMLElement, onSystem: (action: string) => void, vibrate?: () => boolean }} options
  */
-export const createTouch = ({ root, onSystem }) => {
+export const createTouch = ({ root, onSystem, vibrate = () => true }) => {
   /** 손가락(pointerId) → 동작 id */
   const fingers = new Map();
   let held = 0;
@@ -45,7 +45,7 @@ export const createTouch = ({ root, onSystem }) => {
     button.classList.add("is-down");
     // 짧은 진동으로 눌렀다는 느낌을 준다(지원하는 기기만)
     try {
-      navigator.vibrate?.(8);
+      if (vibrate()) navigator.vibrate?.(8);
     } catch {
       /* 무시 */
     }
