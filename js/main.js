@@ -487,6 +487,7 @@ const toMenu = (initial = false) => {
   racePanel.hidden = true;
   versus = null;
   versusPanel.hidden = true;
+  document.body.classList.remove("is-versus");
   setScreen("menu");
   countdownEl.hidden = true;
   renderMenu();
@@ -526,6 +527,7 @@ const start = (m, selectedRules = currentRules(), target = null) => {
     $("versus-name").textContent = t("CPU · {level}", { level: m.versus.name });
   } else versus = null;
   versusPanel.hidden = !versus;
+  document.body.classList.toggle("is-versus", Boolean(versus));
   recorder = m.noReplay ? null : createRecorder({ seed, mode: m, rules, handling: game.handling });
   finesse = createFinesseTracker(game, ROTATIONS[rules.rotation]);
   splits = [];

@@ -98,7 +98,7 @@ export const MARATHON = Object.freeze({
   check: state => (state.stats.lines >= MARATHON_GOAL ? { result: "clear" } : null),
   levelFor: levelByLines,
   gravityFor: state => guidelineGravity(state.level),
-  hudLines: state => ({ label: t("줄"), value: `${state.stats.lines} / ${MARATHON_GOAL}` }),
+  hudLines: state => ({ label: t("줄"), value: `${state.stats.lines}/${MARATHON_GOAL}` }),
   hudTime: elapsed,
   summary: state => ({
     title: state.over === "clear" ? t("완료!") : t("게임 오버"),

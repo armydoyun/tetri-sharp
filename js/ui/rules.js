@@ -1,7 +1,7 @@
 // Custom 규칙 편집 대화상자. 바꿀 때마다 onChange(규칙 내용)를 부르고, 저장·적용은 호출한 쪽이 한다.
 import { PRESET_LIST } from "../rules/presets.js";
 import { GRAVITY_OPTIONS, LIMITS, makeCustomRules, sanitizeRuleBody } from "../rules/sanitize.js";
-import { button, el, fieldRow, fillDialog, slider, switchInput, tabBar } from "./dom.js";
+import { button, el, fieldRow, fillDialog, rangeRow, slider, switchInput, tabBar } from "./dom.js";
 import { dropdown } from "./select.js";
 import { decodeRules, encodeRules, rulesLink } from "../rules/share.js";
 import { t } from "../i18n/index.js";
@@ -237,7 +237,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
     });
     input.addEventListener("input", () => (output.textContent = field.unit(Number(input.value))));
     input.addEventListener("change", () => commit(Number(input.value)));
-    return el("span", { class: "range" }, input, output);
+    return rangeRow(input, output, field.unit);
   };
 
   const notice = el("p", { class: "notice-slot", role: "status", id: "rules-record" });
