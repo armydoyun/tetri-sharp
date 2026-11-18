@@ -2,7 +2,7 @@
 // 프리셋은 이름(modern·retro·arcade), Custom은 내용 해시가 id라 조합마다 기록표가 따로 생긴다.
 const MAX_ENTRIES = 10;
 
-/** @typedef {{ frames: number, lines: number, pieces: number, score?: number, level?: number, date: string }} RecordEntry */
+/** @typedef {{ frames: number, lines: number, pieces: number, score?: number, level?: number, splits?: number[], date: string }} RecordEntry */
 
 /** @param {{ id: string }} rules */
 export const recordKey = (mode, rules) => `${mode.id}|${rules.id}`;
@@ -22,10 +22,19 @@ export const createRecords = store => {
     return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   };
 
+  /** 구간 기록(splits)은 숫자 배열일 때만 남긴다 */
+  const clean = e => {
+    if (e.splits !== undefined && !(Array.isArray(e.splits) && e.splits.every(nonNegative))) {
+      const { splits: _drop, ...rest } = e;
+      return rest;
+    }
+    return e;
+  };
+
   /** @returns {RecordEntry[]} */
   const list = (mode, rules) => {
     const entries = readAll()[recordKey(mode, rules)];
-    return Array.isArray(entries) ? entries.filter(isEntry) : [];
+    return Array.isArray(entries) ? entries.filter(isEntry).map(clean) : [];
   };
 
   const compare = mode => {
@@ -37,6 +46,11 @@ export const createRecords = store => {
 
   return {
     list,
+    /** 이 모드에 기록이 있는 규칙 id들(기록 화면의 규칙 고르기용) */
+    rulesIdsFor: mode =>
+      Object.keys(readAll())
+        .filter(k => k.startsWith(`${mode.id}|`))
+        .map(k => k.slice(mode.id.length + 1)),
     best: (mode, rules) => list(mode, rules)[0] ?? null,
     /**
      * @param {RecordEntry} entry

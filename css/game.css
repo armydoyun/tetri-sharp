@@ -386,3 +386,12 @@
   width: 14px;
   height: 14px;
 }
+
+/* PB 대비: 앞서면 강조색, 뒤처지면 보조색(부호로도 구분된다) */
+.hud-split[data-ahead="true"] {
+  color: var(--accent);
+}
+
+.hud-split[data-ahead="false"] {
+  color: var(--text-dim);
+}

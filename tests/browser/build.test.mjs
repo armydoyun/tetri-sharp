@@ -505,3 +505,39 @@ test("게임 테마: 세 테마가 서로 다르게 그려지고, 설정에서 �
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("기록 화면: 표는 늘 10줄, 조건을 바꿔도 크기가 그대로, 저장된 기록이 1위에 보인다", async () => {
+  const { context, page, errors } = await openPage(() => {
+    const entry = {
+      frames: 3600,
+      lines: 40,
+      pieces: 101,
+      splits: [900, 1800, 2700, 3600],
+      date: "2026-11-01T00:00:00.000Z",
+    };
+    localStorage.setItem("tetrisharp:records", JSON.stringify({ "sprint40|modern": [entry] }));
+  });
+  await page.click("#open-records");
+  assert.equal(await page.locator("#records").isVisible(), true);
+  assert.equal(await page.locator(".records-table tbody tr").count(), 10);
+  const size = () =>
+    page.evaluate(() => {
+      const r = document.getElementById("records").getBoundingClientRect();
+      return [Math.round(r.width), Math.round(r.height)];
+    });
+  await page.locator("#records-mode").selectOption("sprint40");
+  await page.locator("#records-rules").selectOption("modern");
+  const before = await size();
+  assert.match(await page.locator(".records-table tbody tr").first().textContent(), /1:00\.00/);
+  assert.equal(await page.locator("#records-watch").isDisabled(), true, "리플레이가 없으면 비활성");
+  await page.locator("#records-mode").selectOption("marathon");
+  assert.deepEqual(await size(), before, "조건을 바꿔도 크기 그대로");
+  assert.equal(await page.locator(".records-table tbody tr.is-empty").count(), 10);
+  await page.click("#records-close");
+
+  // 그 기록이 PB라 Sprint를 시작하면 PB 대비 칸이 준비된다(구간 전에는 —)
+  await startMode(page, "sprint40");
+  assert.equal(await text(page, "hud-split"), "—");
+  assert.deepEqual(errors, []);
+  await context.close();
+});

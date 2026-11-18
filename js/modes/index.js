@@ -19,6 +19,7 @@ import { formatScore, formatTime } from "./format.js";
  * @property {(state: any) => { title: string, main: string }} summary    결과 화면 제목·큰 글씨
  * @property {{ metric: "frames" | "lines" | "score" | "level", order: "asc" | "desc" }} record  순위 기준
  * @property {(state: any) => string} [hudLevel]  HUD 레벨 칸 (기본: 레벨 숫자)
+ * @property {readonly number[]} [splits]  구간 기록을 남길 줄 수
  * @property {(entry: any) => string} formatRecord
  * @property {(state: any) => boolean} isRecordable  이번 판을 기록에 남길지
  */
@@ -53,6 +54,8 @@ export const SPRINT_40 = Object.freeze({
   description: "40줄을 가장 빨리 지우기",
   rules: MODERN,
   goal: SPRINT_GOAL,
+  /** 구간 기록: 이 줄 수에 닿은 시각을 남겨 최고 기록과 비교한다 */
+  splits: Object.freeze([10, 20, 30, 40]),
   check: state => (state.stats.lines >= SPRINT_GOAL ? { result: "clear" } : null),
   hudLines: state => ({ label: "남은 줄", value: String(Math.max(0, SPRINT_GOAL - state.stats.lines)) }),
   hudTime: elapsed,

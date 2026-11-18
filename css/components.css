@@ -188,6 +188,10 @@
   box-shadow: var(--shadow);
 }
 
+.dialog-wide {
+  width: min(680px, calc(100vw - 32px));
+}
+
 .dialog[open] {
   display: flex;
   flex-direction: column;
@@ -383,4 +387,50 @@
 
 .rule-presets .field-help {
   margin: 0 var(--space-1) 0 0;
+}
+
+/* 기록 표: 늘 10줄, 칸 폭 고정 */
+.records-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin-bottom: var(--space-4);
+  font-size: var(--text-m);
+}
+
+.records-table th {
+  height: 32px;
+  color: var(--text-dim);
+  font-size: var(--text-s);
+  font-weight: 600;
+  text-align: left;
+  border-bottom: var(--border-w) solid var(--border);
+}
+
+.records-table td {
+  height: 36px;
+  border-bottom: var(--border-w) solid var(--border);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.records-table th:nth-child(1),
+.records-table td:nth-child(1) {
+  width: 3em;
+}
+
+.records-table th:nth-child(2),
+.records-table td:nth-child(2) {
+  width: 24%;
+}
+
+.records-table th:last-child,
+.records-table td:last-child {
+  width: 76px;
+  text-align: right;
+}
+
+.records-table tr.is-empty td {
+  color: var(--text-faint);
 }

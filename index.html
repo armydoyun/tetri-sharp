@@ -35,8 +35,9 @@
             <h2 class="panel-title">모드 선택</h2>
             <div id="mode-list" class="mode-list"></div>
             <div class="replay-actions">
-              <button id="watch-last" type="button" class="btn btn-small"><span data-icon="play"></span>마지막 판 리플레이</button>
-              <button id="open-replay" type="button" class="btn btn-small"><span data-icon="folder"></span>리플레이 파일 열기</button>
+              <button id="open-records" type="button" class="btn btn-small"><span data-icon="trophy"></span>기록</button>
+              <button id="watch-last" type="button" class="btn btn-small"><span data-icon="play"></span>마지막 판</button>
+              <button id="open-replay" type="button" class="btn btn-small"><span data-icon="folder"></span>파일 열기</button>
               <input id="replay-file" type="file" accept=".json,application/json" hidden />
             </div>
             <p id="menu-notice" class="notice-slot menu-notice" role="status"></p>
@@ -90,12 +91,14 @@
           <div><dt id="hud-lines-label">줄</dt><dd id="hud-lines">0</dd></div>
           <div><dt>피스</dt><dd id="hud-pieces">0</dd></div>
           <div><dt>PPS</dt><dd id="hud-pps">0.00</dd></div>
+          <div><dt>PB 대비</dt><dd id="hud-split" class="hud-split">—</dd></div>
         </dl>
       </section>
       <p id="key-help" class="keys" aria-label="조작 안내"></p>
     </main>
     <dialog id="settings" class="dialog" aria-label="설정"></dialog>
     <dialog id="rules-editor" class="dialog" aria-label="Custom 규칙"></dialog>
+    <dialog id="records" class="dialog dialog-wide" aria-label="기록"></dialog>
     <!-- ES Modules: 개발용 실행은 http://localhost를 사용한다. -->
     <script type="module" src="./js/main.js"></script>
   </body>

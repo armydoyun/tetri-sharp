@@ -13,6 +13,8 @@ import { loadSettings, sanitizeSettings, saveSettings, toEngineHandling } from "
 import { createRecords } from "./storage/records.js";
 import { createSettingsUI } from "./ui/settings.js";
 import { createRulesUI } from "./ui/rules.js";
+import { createRecordsUI } from "./ui/records.js";
+import { advanceSplits, formatDelta, splitDelta } from "./modes/splits.js";
 import { hydrateIcons, icon } from "./ui/icons.js";
 import { keycap } from "./ui/keycap.js";
 import { createPlayer, createRecorder, createReplayStore, sanitizeReplay, verifyReplay } from "./replay/replay.js";
@@ -38,6 +40,7 @@ const hud = {
   lines: $("hud-lines"),
   pieces: $("hud-pieces"),
   pps: $("hud-pps"),
+  split: $("hud-split"),
 };
 
 const store = createStore();
@@ -63,6 +66,9 @@ let rules = currentRules();
 /** @type {ReturnType<typeof createGame> | null} */
 let game = null;
 let countdown = 0;
+/** 이번 판의 구간 기록(프레임)과 비교할 최고 기록의 구간 */
+let splits = [];
+let pbSplits = /** @type {number[] | undefined} */ (undefined);
 let goTimer = 0;
 let acc = 0;
 let last = performance.now();
@@ -196,6 +202,10 @@ const updateHud = () => {
   hud.lines.textContent = lines.value;
   hud.pieces.textContent = String(stats.pieces);
   hud.pps.textContent = frame ? (stats.pieces / (frame / 60)).toFixed(2) : "0.00";
+  const delta = game && mode.splits ? splitDelta(splits, pbSplits) : null;
+  hud.split.textContent = formatDelta(delta);
+  if (delta === null) delete hud.split.dataset.ahead;
+  else hud.split.dataset.ahead = String(delta < 0);
 };
 
 // ---- 화면 흐름 ----
@@ -224,6 +234,8 @@ const start = m => {
   const seed = (Math.random() * 2 ** 32) >>> 0;
   game = createGame({ rules, handling: toEngineHandling(settings.handling), seed, mode: m });
   recorder = createRecorder({ seed, mode: m, rules, handling: game.handling });
+  splits = [];
+  pbSplits = records.best(m, rules)?.splits;
   acc = 0;
   countdown = READY_FRAMES;
   goTimer = 0;
@@ -265,6 +277,7 @@ const finish = () => {
       pieces: state.stats.pieces,
       score: state.score,
       level: state.level,
+      ...(mode.splits ? { splits } : {}),
       date: new Date().toISOString(),
     });
   }
@@ -295,6 +308,7 @@ const finish = () => {
   ];
   // 순위 줄은 늘 둔다(없으면 —) → 결과 화면 높이가 판마다 같다.
   rows.push(["순위", outcome && outcome.rank < 10 ? `${outcome.rank + 1}위` : "—"]);
+  if (mode.splits) rows.push(["PB 대비", formatDelta(splitDelta(splits, pbSplits))]);
   $("results-stats").replaceChildren(
     ...rows.flatMap(([k, v]) => {
       const dt = document.createElement("dt");
@@ -377,8 +391,20 @@ const rulesUI = createRulesUI({
 
 $("edit-rules").addEventListener("click", () => rulesUI.open());
 
+const recordsUI = createRecordsUI({
+  dialog: /** @type {HTMLDialogElement} */ ($("records")),
+  modes: MODES,
+  records,
+  bestReplay: key => replays.best(key),
+  onWatch: replay => startReplay(replay, "menu"),
+});
+$("open-records").addEventListener("click", () => recordsUI.open({ modeId: mode.id, rulesId: currentRules().id }));
+$("records").addEventListener("close", () => {
+  if (screen === "menu") /** @type {HTMLElement | null} */ ($("open-records"))?.focus();
+});
+
 const handleSystem = action => {
-  if (settingsUI.isOpen || rulesUI.isOpen) return;
+  if (settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen) return;
   if (screen === "replay") {
     if (action === "restart") restartReplay();
     else stopReplay();
@@ -395,7 +421,7 @@ const keyboard = createKeyboard({ getBindings: () => bindings, onSystem: handleS
 
 /** 메뉴·결과·일시정지 화면에서 게임패드로 버튼 사이를 옮겨 다니고 누른다. */
 const handlePadMenu = action => {
-  if (settingsUI.isOpen || rulesUI.isOpen) return;
+  if (settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen) return;
   const panel = Object.values(panels).find(p => !p.hidden);
   if (!panel || screen === "play" || screen === "countdown" || screen === "replay") return;
   const buttons = /** @type {HTMLButtonElement[]} */ ([...panel.querySelectorAll("button")]).filter(
@@ -521,7 +547,7 @@ for (const btn of replayBar.querySelectorAll("[data-replay]")) {
 
 // 리플레이 중 단축키: Space 일시정지, 1·2·4 속도 (Esc 닫기, R 처음부터는 시스템 키로 처리)
 window.addEventListener("keydown", e => {
-  if (screen !== "replay" || settingsUI.isOpen || rulesUI.isOpen || e.repeat) return;
+  if (screen !== "replay" || settingsUI.isOpen || rulesUI.isOpen || recordsUI.isOpen || e.repeat) return;
   if (e.code === "Space") replayPaused = !replayPaused;
   else if (["Digit1", "Digit2", "Digit4"].includes(e.code)) replaySpeed = Number(e.code.slice(5));
   else return;
@@ -598,6 +624,7 @@ const tick = () => {
   const pressed = keyboard.takePressed();
   recorder?.input(held, pressed);
   const events = game.step({ held, pressed });
+  if (mode.splits) splits = advanceSplits(mode.splits, splits, game.state.stats.lines, game.state.frame);
   for (const e of events) announce(e);
   renderer.addEvents(events);
   if (events.some(e => e.type === "gameOver" || e.type === "finish")) finish();
