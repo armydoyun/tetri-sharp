@@ -34,6 +34,7 @@ export const statRows = state => {
       ["회전", String(t.rotations)],
       ["회전 보정(킥)", String(t.kicks)],
       ["홀드", String(t.holds)],
+      ["피네스 실수 (판정한 피스)", state.finesse ? `${state.finesse.faults} (${state.finesse.judged})` : "—"],
     ],
     clears: [
       ...CLEAR_ROWS.map(([key, label]) => [label, String(t.clears[key] ?? 0)]),

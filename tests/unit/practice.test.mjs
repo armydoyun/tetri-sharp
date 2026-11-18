@@ -95,3 +95,94 @@ test("2줄 우물: O로 두 번 성공하면 연속 기록이 쌓이고 실패�
   const { success, tries, streak, bestStreak } = g.state.practice;
   assert.deepEqual({ success, tries, streak, bestStreak }, { success: 2, tries: 3, streak: 0, bestStreak: 2 });
 });
+
+// ---- 새 연습: T-spin Triple · 퍼펙트 클리어 마무리 · 피네스 ----
+import { placements } from "../helpers/solver.mjs";
+import { buildPcFinish, buildTst } from "../../js/modes/practice.js";
+import { finesseCost, createFinesseTracker } from "../../js/modes/finesse.js";
+import { ROTATIONS } from "../../js/rules/rotation/index.js";
+import { clearLines as clearRows, createBoard as newBoard, place as placeCells } from "../../js/core/board.js";
+import { createRng as rngOf } from "../../js/core/rng.js";
+
+test("T-spin Triple 자리는 좌우·모든 위치에서 T로 T-spin Triple을 낼 수 있다", () => {
+  for (const right of [true, false]) {
+    for (let i = 0; i < 7; i++) {
+      const c = right ? 1 + i : 2 + i;
+      const board = newBoard();
+      buildTst(board, c, right);
+      assert.ok(
+        placements(board, "T").some(p => p.tspin === "full" && p.lines === 3),
+        `c=${c} right=${right}`
+      );
+    }
+  }
+});
+
+/** 피스들을 순서대로 놓아(중간에 줄이 지워져도 됨) 판을 비울 수 있는가 */
+const solvesPc = (board, pieces) => {
+  if (!pieces.length) return false;
+  const [type, ...rest] = pieces;
+  return placements(board, type).some(p => {
+    if (!rest.length) return p.perfect;
+    // 구멍은 아래 두 줄에만 있으니 그 위로 튀어나온 자리는 볼 필요가 없다.
+    if (ROTATIONS.srs.cells(type, p.rot).some(([, cy]) => p.y + cy < HEIGHT - 2)) return false;
+    const next = { ...board, cells: board.cells.slice() };
+    placeCells(next, ROTATIONS.srs.cells(type, p.rot), p.x, p.y, 1);
+    clearRows(next);
+    return solvesPc(next, rest);
+  });
+};
+
+test("퍼펙트 클리어 마무리: 다음 피스들을 순서대로 놓으면 판이 빈다", () => {
+  const types = ["I", "J", "L", "O", "S", "T", "Z"];
+  const rng = rngOf(42);
+  let pairs = 0;
+  for (const a of types) {
+    for (const b of types) {
+      const queue = [a, b, "T", "I"];
+      const board = newBoard();
+      const n = buildPcFinish(board, queue, rng);
+      assert.ok(n >= 1, `${a}${b}: 구멍을 만들었다`);
+      if (n === 2) pairs += 1;
+      assert.ok(solvesPc(board, queue.slice(0, n)), `${queue.slice(0, n).join(" → ")}`);
+    }
+  }
+  assert.ok(pairs >= 30, `대부분은 두 개로 만든다 (${pairs}/49)`);
+});
+
+test("피네스 최소 입력: 생성 자리 0, 벽까지 1, 회전 1, 한 칸 옆 회전 2", () => {
+  const srs = ROTATIONS.srs;
+  const cellsAt = (type, rot, x, y = 30) => srs.cells(type, rot).map(([cx, cy]) => [x + cx, y + cy]);
+  assert.equal(finesseCost(srs, "T", cellsAt("T", 0, 3)), 0);
+  assert.equal(finesseCost(srs, "T", cellsAt("T", 0, 0)), 1, "왼쪽 벽까지 DAS 한 번");
+  assert.equal(finesseCost(srs, "T", cellsAt("T", 1, 3)), 1);
+  assert.equal(finesseCost(srs, "T", cellsAt("T", 1, 4)), 2);
+  assert.equal(finesseCost(srs, "O", cellsAt("O", 0, 5)), 1);
+  // S는 0과 2가 같은 모양: 어느 쪽으로 판정해도 같은 최소값
+  assert.equal(finesseCost(srs, "S", cellsAt("S", 2, 3)), 0);
+});
+
+test("피네스 판정: 하드 드롭한 피스마다 최소보다 더 누른 입력을 센다", () => {
+  const game = createGame({ rules: MODERN, seed: 1 });
+  const tracker = createFinesseTracker(game, ROTATIONS.srs);
+  const run = (held, pressed) => {
+    const had = Boolean(game.state.active);
+    const events = game.step({ held, pressed });
+    return tracker.frame(held, pressed, had, events);
+  };
+  run(0, 0);
+  // 왼쪽으로 한 칸씩 다섯 번 → 벽에 닿는 데 4~5번(최소 1번)
+  for (let i = 0; i < 5; i++) {
+    run(BTN.LEFT, BTN.LEFT);
+    run(0, 0);
+  }
+  const extra = run(BTN.HARD, BTN.HARD);
+  assert.ok(extra >= 3, `초과 입력 ${extra}`);
+  assert.equal(game.state.finesse.judged, 1);
+  assert.equal(game.state.finesse.faults, 1);
+  run(0, 0);
+  // 다음 피스는 그대로 떨어뜨린다 → 실수 없음
+  assert.equal(run(BTN.HARD, BTN.HARD), 0);
+  assert.equal(game.state.finesse.judged, 2);
+  assert.equal(game.state.finesse.faults, 1);
+});

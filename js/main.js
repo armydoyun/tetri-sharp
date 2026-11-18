@@ -36,6 +36,8 @@ import { makeCustomRules, sanitizeRuleBody } from "./rules/sanitize.js";
 import { decodeRules } from "./rules/share.js";
 import { createSfx } from "./audio/sfx.js";
 import { createBackup, parseBackup, restoreBackup } from "./storage/backup.js";
+import { createFinesseTracker } from "./modes/finesse.js";
+import { ROTATIONS } from "./rules/rotation/index.js";
 
 const FRAME_MS = 1000 / 60;
 const MAX_CATCH_UP_MS = 250; // 시간이 크게 튀면(탭 복귀 등) 한꺼번에 따라잡지 않는다.
@@ -57,6 +59,7 @@ const hud = {
   pps: $("hud-pps"),
   split: $("hud-split"),
   streak: $("hud-streak"),
+  finesse: $("hud-finesse"),
 };
 
 const store = createStore();
@@ -99,6 +102,8 @@ let countdown = 0;
 let splits = [];
 let pbSplits = /** @type {number[] | undefined} */ (undefined);
 let goTimer = 0;
+/** @type {ReturnType<typeof createFinesseTracker> | null} 이번 판의 피네스 판정 */
+let finesse = null;
 let acc = 0;
 let last = performance.now();
 
@@ -311,6 +316,8 @@ const updateHud = () => {
   hud.pieces.textContent = String(stats.pieces);
   const practice = game?.state.practice;
   hud.streak.textContent = practice ? `${practice.streak} / ${practice.bestStreak}` : "0 / 0";
+  const fin = game?.state.finesse;
+  hud.finesse.textContent = fin ? `${fin.faults} / ${fin.judged}` : "0 / 0";
   hud.pps.textContent = frame ? (stats.pieces / (frame / 60)).toFixed(2) : "0.00";
   const delta = game && mode.splits ? splitDelta(splits, pbSplits) : null;
   hud.split.textContent = formatDelta(delta);
@@ -363,6 +370,7 @@ const start = (m, selectedRules = currentRules(), target = null) => {
   updateRaceProgress();
   game = createGame({ rules, handling: toEngineHandling(settings.handling), seed, mode: m });
   recorder = createRecorder({ seed, mode: m, rules, handling: game.handling });
+  finesse = createFinesseTracker(game, ROTATIONS[rules.rotation]);
   splits = [];
   showModeHud(m);
   pbSplits = target?.splits ?? records.best(m, rules)?.splits;
@@ -524,6 +532,11 @@ const announce = e => {
   } else if (e.type === "levelUp") {
     lines = [`LEVEL ${e.level}`];
   }
+  announceText(lines);
+};
+
+/** 보드 위에 큰 글씨로 잠깐 띄운다 */
+const announceText = lines => {
   if (!lines.length) return;
   actionEl.replaceChildren(
     ...lines.map((text, i) => {
@@ -959,7 +972,10 @@ const tick = () => {
   const held = keyboard.held | pad.held | touch.held;
   const pressed = keyboard.takePressed() | touch.takePressed();
   recorder?.input(held, pressed);
+  const hadActive = Boolean(game.state.active);
   const events = game.step({ held, pressed });
+  const extra = finesse?.frame(held, pressed, hadActive, events) ?? 0;
+  if (extra > 0 && mode.finesse) announceText([`피네스 +${extra}`]);
   if (mode.splits) splits = advanceSplits(mode.splits, splits, game.state.stats.lines, game.state.frame);
   if (race && !race.player.done) {
     race.player.step();

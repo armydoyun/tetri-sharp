@@ -1,7 +1,7 @@
 // 연습 모드: 정해진 자리를 깔아 두고 같은 동작을 반복한다. 중력 없음, 기록 없음.
 // 고정할 때마다 성공/시도를 세고 판을 다시 깐다(자유 쌓기는 판이 높아졌을 때만 비운다).
 import { HEIGHT, WIDTH, set } from "../core/board.js";
-import { GARBAGE } from "../core/pieces.js";
+import { GARBAGE, PIECES } from "../core/pieces.js";
 import { MODERN } from "../rules/presets.js";
 import { formatTime } from "./format.js";
 
@@ -19,6 +19,119 @@ export const buildTsd = (board, s, roofLeft) => {
     if (x !== s + 1) set(board, x, HEIGHT - 1, GARBAGE);
   }
   set(board, roofLeft ? s : s + 2, HEIGHT - 3, GARBAGE);
+};
+
+/**
+ * T-spin Triple 자리. 구멍은 c열(아래 세 줄)과 가운데 줄의 c+n열(n = 오른쪽 1, 왼쪽 -1).
+ * 반대쪽 c−n열은 두 줄 더 높고, 그 위에서 구멍 위로 지붕이 걸친다. T를 지붕 아래로 돌려 넣는다.
+ * @param {number} c  오른쪽이면 1~7, 왼쪽이면 2~8
+ */
+export const buildTst = (board, c, right) => {
+  clear(board);
+  const top = HEIGHT - 3;
+  const n = right ? 1 : -1;
+  for (let y = top; y < HEIGHT; y++) for (let x = 0; x < WIDTH; x++) set(board, x, y, GARBAGE);
+  for (const [x, y] of [
+    [c, top],
+    [c, top + 1],
+    [c + n, top + 1],
+    [c, top + 2],
+  ])
+    set(board, x, y, 0);
+  for (let x = 0; x < WIDTH; x++) if ((x - c) * n <= -1) set(board, x, top - 1, GARBAGE);
+  set(board, c - n, top - 2, GARBAGE);
+  set(board, c, top - 2, GARBAGE);
+};
+
+/** 피스의 서로 다른 모양(방향)들. 칸은 (0, 0)부터 시작하게 맞춘다. */
+const orientations = type => {
+  const seen = new Set();
+  const out = [];
+  for (const state of PIECES[type].states) {
+    const minX = Math.min(...state.map(c => c[0]));
+    const minY = Math.min(...state.map(c => c[1]));
+    const cells = state.map(([x, y]) => [x - minX, y - minY]);
+    const key = JSON.stringify([...cells].sort());
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(cells);
+    }
+  }
+  return out;
+};
+
+/** 아래 rows줄 안에 들어가는 이 피스의 모든 자리(칸 목록) */
+const slotsIn = (type, rows) =>
+  orientations(type).flatMap(cells => {
+    const w = Math.max(...cells.map(c => c[0])) + 1;
+    const h = Math.max(...cells.map(c => c[1])) + 1;
+    if (h > rows) return [];
+    const out = [];
+    for (let x = 0; x + w <= WIDTH; x++)
+      for (let y = HEIGHT - rows; y + h <= HEIGHT; y++) out.push(cells.map(([cx, cy]) => [x + cx, y + cy]));
+    return out;
+  });
+
+const PC_ROWS = 2;
+
+/**
+ * 퍼펙트 클리어 마무리: 아래 두 줄을 채우고, 다음에 올 피스들(pieces, 놓는 순서)이 정확히 들어갈 칸만 비운다.
+ * 각 피스는 그 순서로 하드 드롭만으로도 들어간다(마지막 피스부터 거꾸로 빼며 위가 뚫려 있는지 확인).
+ * S·Z는 어느 방향이든 처마가 있어 마지막 피스가 될 수 없다 → 두 개로 안 되면 하나, 셋, 넷 순서로 찾는다.
+ * @param {string[]} queue  다음에 올 피스들(놓는 순서)
+ * @returns {number} 쓴 피스 수(0이면 못 찾음)
+ */
+export const buildPcFinish = (board, queue, rng) => {
+  for (const n of [2, 1, 3, 4]) {
+    if (n > queue.length) continue;
+    const holes = findPcHoles(queue.slice(0, n), rng);
+    if (!holes) continue;
+    clear(board);
+    const empty = new Set(holes.flat().map(([x, y]) => y * WIDTH + x));
+    for (let y = HEIGHT - PC_ROWS; y < HEIGHT; y++)
+      for (let x = 0; x < WIDTH; x++) if (!empty.has(y * WIDTH + x)) set(board, x, y, GARBAGE);
+    return n;
+  }
+  clear(board);
+  return 0;
+};
+
+/** @returns {number[][][] | null} 피스마다 비울 칸(놓는 순서의 거꾸로) */
+const findPcHoles = (pieces, rng) => {
+  const top = HEIGHT - PC_ROWS;
+  const key = (x, y) => y * WIDTH + x;
+  /** 칸들이 위에서 곧장 들어갈 수 있는가: 같은 열에서 위쪽 칸은 모두 비어 있어야 한다 */
+  const open = (cells, empty) =>
+    cells.every(([x, y]) => {
+      for (let yy = top; yy < y; yy++) if (!empty.has(key(x, yy))) return false;
+      return true;
+    });
+  /** 하드 드롭이 정확히 이 자리에 멈추는가: 아래가 막힌 칸이 하나는 있어야 한다 */
+  const rests = (cells, empty) => cells.some(([x, y]) => y + 1 >= HEIGHT || !empty.has(key(x, y + 1)));
+  const order = [...pieces].reverse(); // 마지막에 놓는 피스부터 뺀다
+  /** @type {number[][][] | null} */
+  let found = null;
+  const search = (i, empty, chosen) => {
+    if (found) return;
+    if (i === order.length) {
+      found = chosen;
+      return;
+    }
+    const slots = slotsIn(order[i], PC_ROWS);
+    // 같은 결과가 나오게 시드 난수로 시작 위치만 돌린다.
+    const offset = slots.length ? rng.int(slots.length) : 0;
+    for (let k = 0; k < slots.length && !found; k++) {
+      const cells = slots[(k + offset) % slots.length];
+      if (cells.some(([x, y]) => empty.has(key(x, y)))) continue;
+      const next = new Set(empty);
+      for (const [x, y] of cells) next.add(key(x, y));
+      // 이 피스를 놓을 때는 이미 놓인 피스(앞 순서)가 아직 비어 있다 → 남은 피스 칸은 빈칸으로 보지 않는다.
+      if (!open(cells, next) || !rests(cells, empty)) continue;
+      search(i + 1, next, [...chosen, cells]);
+    }
+  };
+  search(0, new Set(), []);
+  return found;
 };
 
 /** 4줄 우물: 아래 네 줄을 한 열만 비우고 채운다 */
@@ -54,6 +167,33 @@ export const DRILLS = Object.freeze([
     success: ev => ev.tspin === "full" && ev.lines === 2,
   }),
   Object.freeze({
+    id: "tst",
+    name: "T-spin Triple",
+    description: "지붕 아래로 T를 돌려 넣어 세 줄 지우기 · 좌우가 바뀌어요",
+    sequence: Object.freeze(["T"]),
+    build: (board, rng) => {
+      const right = rng.int(2) === 0;
+      buildTst(board, right ? 1 + rng.int(7) : 2 + rng.int(7), right);
+    },
+    success: ev => ev.tspin === "full" && ev.lines === 3,
+  }),
+  Object.freeze({
+    id: "pc",
+    name: "퍼펙트 클리어 마무리",
+    description: "아래 두 줄의 구멍을 다음 피스들로 채워 판을 비우기 · 보통 두 개",
+    sequence: null,
+    build: (board, rng, state) => {
+      state.practice.need = buildPcFinish(board, state.queue, rng) || 1;
+      state.practice.placed = 0;
+    },
+    // 여러 피스로 한 번의 시도: 판을 비우면 성공, 필요한 수만큼 놓고도 못 비우면 실패
+    judge: (ev, p) => {
+      if (ev.perfect) return "success";
+      p.placed += 1;
+      return p.placed >= p.need ? "fail" : "continue";
+    },
+  }),
+  Object.freeze({
     id: "quad",
     name: "4줄 우물",
     description: "한쪽에 비워 둔 우물에 I를 세워 4줄 지우기",
@@ -77,6 +217,15 @@ export const DRILLS = Object.freeze([
     build: board => clear(board),
     success: null,
   }),
+  Object.freeze({
+    id: "finesse",
+    name: "피네스",
+    description: "가장 적은 키 입력으로 놓기 · 더 누르면 실수로 세요",
+    sequence: null,
+    build: board => clear(board),
+    success: null,
+    finesse: true,
+  }),
 ]);
 
 const cache = new Map();
@@ -90,23 +239,32 @@ export const practiceMode = drill => {
     description: drill.description,
     rules: MODERN,
     practice: true,
-    hud: Object.freeze(drill.success ? ["time", "lines", "pieces", "streak"] : ["time", "lines", "pieces"]),
+    finesse: Boolean(drill.finesse),
+    hud: Object.freeze(
+      drill.success || drill.judge
+        ? ["time", "lines", "pieces", "streak"]
+        : drill.finesse
+          ? ["time", "pieces", "pps", "finesse"]
+          : ["time", "lines", "pieces"]
+    ),
     ...(drill.sequence ? { sequence: drill.sequence } : {}),
     setup: (state, rng) => {
       state.practice = { tries: 0, success: 0, streak: 0, bestStreak: 0, rng };
-      drill.build(state.board, rng);
+      drill.build(state.board, rng, state);
     },
     gravityFor: () => 0,
     onLock: (state, ev, events) => {
       const p = state.practice;
-      if (!drill.success) {
+      if (!drill.success && !drill.judge) {
         if (!tooHigh(state.board)) return false;
         clear(state.board);
         events.push({ type: "practice", reset: true });
         return true;
       }
+      const verdict = drill.judge ? drill.judge(ev, p) : drill.success(ev) ? "success" : "fail";
+      if (verdict === "continue") return false;
       p.tries += 1;
-      const ok = drill.success(ev);
+      const ok = verdict === "success";
       if (ok) {
         p.success += 1;
         p.streak += 1;
@@ -115,18 +273,23 @@ export const practiceMode = drill => {
         p.streak = 0;
       }
       events.push({ type: "practice", success: ok });
-      drill.build(state.board, p.rng);
+      drill.build(state.board, p.rng, state);
       return true;
     },
     check: () => null,
     hudLines: state =>
-      drill.success
+      drill.success || drill.judge
         ? { label: "성공", value: `${state.practice.success} / ${state.practice.tries}` }
         : { label: "줄", value: String(state.stats.lines) },
     hudTime: state => ({ label: "시간", frames: state.frame }),
     summary: state => ({
       title: "연습 끝",
-      main: drill.success ? `${state.practice.success} / ${state.practice.tries}` : `${state.stats.lines}줄`,
+      main:
+        drill.success || drill.judge
+          ? `${state.practice.success} / ${state.practice.tries}`
+          : drill.finesse
+            ? `실수 ${state.finesse?.faults ?? 0} / ${state.finesse?.judged ?? 0}피스`
+            : `${state.stats.lines}줄`,
     }),
     record: Object.freeze({ metric: "frames", order: "asc" }),
     formatRecord: e => formatTime(e.frames),
