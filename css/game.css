@@ -13,24 +13,53 @@
 }
 
 .app-header {
-  width: min(1040px, 100%);
-  height: 48px;
-  display: flex;
+  width: min(1080px, 100%);
+  height: 52px;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.header-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.header-actions .btn {
+  padding-inline: var(--space-2);
+}
+
+.session-title {
+  margin: 0;
+  color: var(--text-dim);
+  font: 600 var(--text-m) var(--font-display);
+  text-align: center;
+}
+
+body:not([data-screen="play"], [data-screen="countdown"]) #pause-game {
+  display: none;
 }
 
 .logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   margin: 0;
   font-family: var(--font-display);
-  font-size: var(--text-4xl);
+  font-size: var(--text-3xl);
   font-weight: 700;
   letter-spacing: -0.01em;
   line-height: 1;
 }
 
-.logo-sharp {
-  color: var(--accent);
+.logo-mark {
+  width: 16px;
+  aspect-ratio: 1;
+  background: var(--accent);
+  clip-path: polygon(0 0, 100% 0, 100% 50%, 65% 50%, 65% 100%, 35% 100%, 35% 50%, 0 50%);
 }
 
 .section-title {
@@ -54,9 +83,9 @@ body[data-screen="menu"] .stage {
 /* ================= 첫 화면 ================= */
 
 .home {
-  width: min(1040px, 100%);
+  width: min(1080px, 100%);
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-5);
   align-content: start;
 }
 
@@ -64,9 +93,175 @@ body[data-screen="menu"] .stage {
   display: none;
 }
 
+.home-intro {
+  display: grid;
+  grid-template-columns: 1fr minmax(240px, 45%);
+  min-width: 0;
+  min-height: 276px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  background: var(--game-bg);
+  color: var(--game-text);
+}
+
+.intro-copy {
+  padding: clamp(24px, 5vw, 58px);
+  align-self: center;
+}
+
+.intro-copy h2 {
+  margin: 0;
+  font-size: clamp(32px, 5vw, 60px);
+  font-weight: 750;
+  letter-spacing: -0.065em;
+  line-height: 1.12;
+}
+
+.intro-copy p {
+  max-width: 30ch;
+  margin: var(--space-4) 0 0;
+  color: var(--text-dim);
+  font-size: var(--text-xl);
+  word-break: keep-all;
+}
+
+.intro-art {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: var(--space-4);
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.intro-grid {
+  --tile: clamp(17px, 3.3vw, 39px);
+  position: relative;
+  width: calc(9 * var(--tile));
+  height: calc(6 * var(--tile));
+  background-image: radial-gradient(circle, var(--border-strong) 1px, transparent 1px);
+  background-size: var(--tile) var(--tile);
+}
+
+.intro-piece,
+.intro-piece::before,
+.intro-piece::after {
+  position: absolute;
+  width: calc(var(--tile) - 3px);
+  height: calc(var(--tile) - 3px);
+  background: var(--piece);
+  border-radius: var(--radius-s);
+}
+
+.intro-piece::before,
+.intro-piece::after {
+  content: "";
+  inset: 0;
+}
+
+.intro-piece-t {
+  --piece: #d6ed84;
+  left: calc(2 * var(--tile));
+  top: var(--tile);
+  box-shadow: calc(2 * var(--tile)) 0 var(--piece);
+}
+
+.intro-piece-t::before { left: var(--tile); }
+.intro-piece-t::after { left: var(--tile); top: var(--tile); }
+
+.intro-piece-l {
+  --piece: #f5ab87;
+  left: calc(6 * var(--tile));
+  top: calc(2 * var(--tile));
+  box-shadow: 0 var(--tile) var(--piece);
+}
+
+.intro-piece-l::before { top: calc(2 * var(--tile)); }
+.intro-piece-l::after { left: var(--tile); top: calc(2 * var(--tile)); }
+
+.intro-piece-s {
+  --piece: #8ed6cd;
+  left: var(--tile);
+  top: calc(4 * var(--tile));
+  box-shadow: var(--tile) 0 var(--piece);
+}
+
+.intro-piece-s::before { left: calc(-1 * var(--tile)); top: var(--tile); }
+.intro-piece-s::after { top: var(--tile); }
+
+.intro-piece-o {
+  --piece: #c4a6ec;
+  left: calc(4 * var(--tile));
+  top: calc(4 * var(--tile));
+  box-shadow: var(--tile) 0 var(--piece);
+}
+
+.intro-piece-o::before { top: var(--tile); }
+.intro-piece-o::after { left: var(--tile); top: var(--tile); }
+
+.intro-piece-ghost {
+  --piece: transparent;
+  left: calc(7 * var(--tile));
+  top: calc(5 * var(--tile));
+  border: 1px solid var(--border-strong);
+}
+
+.intro-piece-ghost::before,
+.intro-piece-ghost::after {
+  content: none;
+}
+
+.home-modes {
+  display: grid;
+  gap: var(--space-3);
+}
+
+@media (max-width: 600px) {
+  .home-intro {
+    grid-template-columns: 1fr auto;
+    min-height: 184px;
+  }
+
+  .intro-copy {
+    padding: var(--space-4);
+  }
+
+  .intro-copy p {
+    font-size: var(--text-m);
+  }
+
+  .intro-art {
+    width: clamp(92px, 29vw, 160px);
+    padding: 0;
+  }
+
+  .intro-grid {
+    --tile: clamp(9px, 2.7vw, 16px);
+  }
+
+  .intro-piece,
+  .intro-piece::before,
+  .intro-piece::after {
+    border-radius: 3px;
+  }
+
+  .rule-card-head .segmented {
+    order: 1;
+    width: 100%;
+  }
+
+  .rule-card-head .segmented > button {
+    min-width: 0;
+    padding-inline: 2px;
+  }
+}
+
 .rule-card {
   display: grid;
   gap: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--space-3);
 }
 
 .rule-card-head {
@@ -102,7 +297,8 @@ body[data-screen="menu"] .stage {
   grid-template-rows: auto 1fr auto;
   gap: var(--space-1);
   min-width: 0;
-  min-height: 112px;
+  min-height: 108px;
+  position: relative;
   padding: var(--space-4);
   border: var(--border-w) solid var(--border);
   border-radius: var(--radius-m);
@@ -119,7 +315,47 @@ body[data-screen="menu"] .stage {
 .mode-card:focus-visible {
   border-color: var(--accent);
   background: var(--surface-2);
-  outline: none;
+}
+
+.mode-card[data-mode] {
+  padding-right: 46px;
+}
+
+.mode-card[data-mode] > .icon {
+  position: absolute;
+  right: var(--space-4);
+  top: var(--space-4);
+  color: var(--text-dim);
+}
+
+.mode-card[data-mode="sprint40"] {
+  background: var(--featured);
+  border-color: var(--border-strong);
+}
+
+.mode-card[data-mode="sprint40"]:hover {
+  border-color: var(--accent);
+}
+
+@media (360px <= width <= 600px) {
+  .home-modes .mode-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .mode-card[data-mode] {
+    padding: var(--space-3);
+  }
+
+  .mode-card[data-mode] > .icon {
+    top: auto;
+    bottom: var(--space-3);
+    right: var(--space-3);
+  }
+
+  .mode-card[data-mode] .mode-best {
+    padding-right: var(--space-4);
+  }
 }
 
 .mode-card strong {
@@ -166,7 +402,7 @@ body.touch-on .help-card {
 .keys {
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
   gap: var(--space-2) var(--space-5);
   font-size: var(--text-m);
   color: var(--text-dim);
@@ -236,17 +472,18 @@ body.touch-on .help-card {
 
 .board-wrap {
   position: relative;
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-l);
   background: var(--game-bg);
   color: var(--text);
   overflow: hidden;
 }
 
-/* 보드(캔버스 20×22칸): 머리·여백·아래 조작 줄만 빼고 화면 높이에 맞춘다 */
+/* 보드(캔버스 20×22칸, 좁은 화면 16×22칸): 머리·여백·아래 조작 줄만 빼고 화면 높이에 맞춘다 */
 :root {
-  /* 위 여백 16 + 머리 48 + 간격 16 + 아래 여백 16 + 보드 아래 간격 12 + 여유 */
-  --chrome-h: 116px;
+  /* 위 여백 16 + 머리 52 + 간격 16 + 아래 여백 16 + 보드 아래 간격 12 + 여유 */
+  --chrome-h: 120px;
   --under-h: 0px;
+  --board-ratio: calc(20 / 22);
 }
 
 body.touch-on {
@@ -260,13 +497,13 @@ body[data-screen="replay"] {
 
 .board {
   display: block;
-  width: min(640px, calc(100vw - 32px), calc((100vh - var(--chrome-h) - var(--under-h)) * 20 / 22));
+  width: min(640px, calc(100vw - 32px), calc((100vh - var(--chrome-h) - var(--under-h)) * var(--board-ratio)));
   height: auto;
 }
 
 @supports (height: 100dvh) {
   .board {
-    width: min(640px, calc(100vw - 32px), calc((100dvh - var(--chrome-h) - var(--under-h)) * 20 / 22));
+    width: min(640px, calc(100vw - 32px), calc((100dvh - var(--chrome-h) - var(--under-h)) * var(--board-ratio)));
   }
 }
 
@@ -274,6 +511,7 @@ body[data-screen="replay"] {
   :root {
     /* 휴대폰은 보드 위 정보 줄(약 54) + 간격까지 */
     --chrome-h: 176px;
+    --board-ratio: calc(16 / 22);
   }
 }
 
@@ -287,7 +525,7 @@ body[data-screen="replay"] {
   justify-content: safe center;
   padding: var(--space-4);
   overflow-y: auto;
-  background: rgb(10 11 14 / 0.72);
+  background: var(--scrim);
   text-align: center;
 }
 
@@ -304,12 +542,12 @@ body[data-screen="replay"] {
   border: var(--border-w) solid var(--border);
   border-radius: var(--radius-m);
   background: var(--surface);
-  box-shadow: var(--shadow);
 }
 
 .panel-title {
   margin: 0;
-  font-size: var(--text-2xl);
+  font-size: var(--text-3xl);
+  letter-spacing: -0.035em;
 }
 
 .actions {
@@ -334,9 +572,25 @@ body[data-screen="replay"] {
   font-family: var(--font-display);
   font-size: 48px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: -0.035em;
   pointer-events: none;
-  text-shadow: 0 2px 12px var(--game-bg);
+  color: var(--game-text);
+}
+
+.countdown[data-phase="ready"] {
+  background: var(--scrim);
+}
+
+.countdown > span {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--game-bg);
+  line-height: 1;
+}
+
+.countdown[data-phase="go"] > span {
+  color: var(--game-accent);
 }
 
 /* 액션 표시: 홀드 칸 아래에 잠깐 떴다 사라진다 */
@@ -364,15 +618,12 @@ body[data-screen="replay"] {
 }
 
 .action.is-shown {
-  animation: action-show 1.4s var(--ease) forwards;
+  animation: action-show 1.4s linear forwards;
 }
 
 /* 투명도만 바뀐다(자리 이동 없음) */
 @keyframes action-show {
-  0% {
-    opacity: 0;
-  }
-  8%,
+  0%,
   75% {
     opacity: 1;
   }
@@ -469,7 +720,7 @@ body[data-screen="replay"] {
   width: var(--hud-width);
   padding: var(--space-4);
   border: var(--border-w) solid var(--border);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-l);
   background: var(--surface);
 }
 
@@ -512,7 +763,7 @@ body[data-screen="replay"] {
   }
 
   .hud dd {
-    font-size: var(--text-xl);
+    font-size: clamp(11px, 3.5vw, 16px);
   }
 }
 
@@ -568,4 +819,10 @@ body[data-screen="replay"] .touchpad {
 
 .touchpad > .touch-system {
   color: var(--text-dim);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action.is-shown {
+    animation-timing-function: steps(1, end);
+  }
 }

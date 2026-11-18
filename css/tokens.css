@@ -1,6 +1,4 @@
-/* 디자인 토큰 — docs/DESIGN_SYSTEM.md
-   UI(머리·정보 칸·대화상자)는 시스템 설정을 따라 라이트/다크, 게임 화면(.surface-game: 보드와 그 위의 패널)은 항상 다크.
-   다크 값은 :root와 .surface-game이 함께 쓰고, 라이트 값은 미디어 쿼리 안의 :root만 덮어쓴다 → .surface-game은 늘 다크로 남는다. */
+/* 디자인 토큰. 사용 기준은 docs/DESIGN_SYSTEM.md에 기록한다. */
 
 @font-face {
   font-family: "Space Grotesk";
@@ -26,7 +24,6 @@
   --text-xl: 16px;
   --text-2xl: 20px;
   --text-3xl: 24px;
-  --text-4xl: 32px;
   --text-5xl: 40px;
 
   /* ---- 간격 (4px 단위) ---- */
@@ -38,8 +35,9 @@
   --space-6: 32px;
 
   /* ---- 모양 ---- */
-  --radius-s: 2px; /* 키캡·배지·작은 칸 */
-  --radius-m: 4px; /* 버튼·카드·입력·대화상자 */
+  --radius-s: 6px; /* 키캡·배지·작은 칸 */
+  --radius-m: 12px; /* 버튼·카드·입력·대화상자 */
+  --radius-l: 20px;
   --border-w: 1px;
   --icon-stroke: 1.75;
 
@@ -49,61 +47,59 @@
 
   /* ---- 고정 크기(내용이 바뀌어도 밀리지 않게) ---- */
   --hud-width: 148px;
-  --control-h: 36px;
-  --control-h-s: 28px;
+  --control-h: 38px;
+  --control-h-s: 32px;
 
   /* 블록 색은 게임 테마가 정한다 — js/render/themes.js */
 
   /* ---- 게임 화면 색(항상 다크) ---- */
-  --game-bg: #101114;
-  --game-board: #17191e;
-  --game-grid: #23262d;
-  --game-text: #e8e9ec;
-  --game-text-dim: #8b8f99;
-  --game-accent: #7c9cff;
+  --game-bg: #171a17;
+  --game-text: #f1f2e9;
+  --game-accent: #d6ed84;
 }
 
 /* ---- 색: 다크(기본) — UI와 게임 화면이 함께 쓴다 ---- */
 :root,
 .surface-game {
   color-scheme: dark;
-  --bg: #101114;
-  --surface: #17191e;
-  --surface-2: #1e2127;
-  --border: #2a2e36;
-  --border-strong: #3d424d;
-  --text: #e8e9ec;
-  --text-dim: #9a9fab;
-  --text-faint: #6b707b;
-  --accent: #7c9cff;
-  --accent-hover: #96b0ff;
-  --on-accent: #0b0d14;
-  --accent-soft: rgb(124 156 255 / 0.14);
-  --scrim: rgb(16 17 20 / 0.88);
+  --bg: #171a17;
+  --surface: #212521;
+  --surface-2: #292f28;
+  --border: #343b33;
+  --border-strong: #505b4d;
+  --text: #f1f2e9;
+  --text-dim: #b2baae;
+  --text-faint: #939e91;
+  --accent: #d6ed84;
+  --accent-hover: #e4f5ac;
+  --on-accent: #1b2411;
+  --featured: #303823;
+  --accent-soft: rgb(214 237 132 / 0.14);
+  --scrim: rgb(23 26 23 / 0.88);
   --backdrop: rgb(0 0 0 / 0.55);
-  --shadow: 0 8px 24px rgb(0 0 0 / 0.45);
+  --shadow: 0 12px 32px rgb(0 0 0 / 0.22);
 }
 
 /* ---- 색: 라이트 — UI만. 게임 화면은 위의 다크 값을 그대로 쓴다 ---- */
 @media (prefers-color-scheme: light) {
   :root {
     color-scheme: light;
-    --bg: #f3f4f6;
-    --surface: #ffffff;
-    --surface-2: #eceef2;
-    --border: #d8dbe1;
-    --border-strong: #b9bec8;
-    --text: #15171c;
-    --text-dim: #555b66;
-    --text-faint: #858b96;
-    /* 같은 파랑 계열을 흰 바탕 대비 4.5:1 이상으로 진하게 */
-    --accent: #3a5bd9;
-    --accent-hover: #2f4cc0;
-    --on-accent: #ffffff;
-    --accent-soft: rgb(58 91 217 / 0.1);
-    --scrim: rgb(243 244 246 / 0.9);
+    --bg: #f4f5ee;
+    --surface: #fffef9;
+    --surface-2: #edf0e6;
+    --border: #dce1d5;
+    --border-strong: #aeb9a8;
+    --text: #222820;
+    --text-dim: #535f51;
+    --text-faint: #667161;
+    --accent: #3f5b29;
+    --accent-hover: #304720;
+    --on-accent: #fffef9;
+    --featured: #e9eddc;
+    --accent-soft: rgb(63 91 41 / 0.1);
+    --scrim: rgb(244 245 238 / 0.9);
     --backdrop: rgb(20 22 28 / 0.35);
-    --shadow: 0 8px 24px rgb(20 22 28 / 0.14);
+    --shadow: 0 12px 32px rgb(20 30 18 / 0.10);
   }
 }
 

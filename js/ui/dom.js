@@ -78,7 +78,7 @@ export const choice = ({ id, label, options, value, onChange, className = "choic
 
 /**
  * 카드형 선택(이름 + 설명이 긴 선택지). 설명은 잘리지 않고 줄바꿈한다.
- * @param {{ id: string, label: string, options: ReadonlyArray<{ value: string, title: string, desc: string }>, value: string, onChange: (v: string) => void }} o
+ * @param {{ id: string, label: string, options: ReadonlyArray<{ value: string, title: string, desc: string, preview?: HTMLElement }>, value: string, onChange: (v: string) => void }} o
  */
 export const choiceCards = ({ id, label, options, value, onChange }) => {
   const group = el("div", { class: "choice-cards", role: "group", id, "aria-label": label });
@@ -86,6 +86,7 @@ export const choiceCards = ({ id, label, options, value, onChange }) => {
     const b = el(
       "button",
       { type: "button", class: "choice-card", "data-value": o.value, "aria-pressed": String(o.value === value) },
+      ...(o.preview ? [o.preview] : []),
       el("strong", { text: o.title }),
       el("small", { text: o.desc })
     );

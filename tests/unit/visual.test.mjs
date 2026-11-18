@@ -1,18 +1,32 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { CELL_ID } from "../../js/core/pieces.js";
 import { createEffects } from "../../js/render/effects.js";
 import { createSlide } from "../../js/render/motion.js";
 import { CONTRAST_PALETTE, DEFAULT_THEME, THEMES, THEME_IDS, findTheme } from "../../js/render/themes.js";
 import { sanitizeSettings, sanitizeVisual } from "../../js/storage/settings.js";
 
-const lockEvent = { type: "lock", lines: 2, rows: [38, 39], cells: [[0, 39]], tspin: "full", perfect: false };
-const dropEvent = { type: "hardDrop", distance: 10, cells: [[0, 39]] };
-/** 무엇이든 받아 주는 가짜 2D 컨텍스트(호출 기록) */
+const lockEvent = {
+  type: "lock",
+  piece: "L",
+  lines: 0,
+  rows: [],
+  cells: [
+    [0, 38],
+    [0, 39],
+    [1, 38],
+    [2, 38],
+  ],
+};
+const clearEvent = { ...lockEvent, lines: 1, rows: [39] };
 const fakeCtx = (calls = []) =>
   new Proxy(
     {},
     {
-      get: (_, k) => (k === "createLinearGradient" ? () => ({ addColorStop() {} }) : (...a) => calls.push([k, ...a])),
+      get:
+        (_, name) =>
+        (...args) =>
+          calls.push([name, ...args]),
       set: () => true,
     }
   );
@@ -35,48 +49,50 @@ test("테마마다 8색이 모두 다르고, 블록·고스트를 그린다", ()
   assert.equal(new Set(CONTRAST_PALETTE.slice(1)).size, 8);
 });
 
-test("테마 성격: 레트로는 칸 단위·깜빡임·네모 파편, 미니멀은 연출 최소, 모던은 미끄러짐·퍼지는 빛", () => {
-  assert.equal(THEMES.retro.slideMs, 0);
-  assert.equal(THEMES.retro.fx.flash, "blink");
-  assert.equal(THEMES.retro.fx.particles, "square");
-  assert.equal(THEMES.minimal.fx.particles, "none");
-  assert.equal(THEMES.minimal.fx.shake, false);
-  assert.equal(THEMES.minimal.board.grid, "dots");
-  assert.ok(THEMES.modern.slideMs > 0 && THEMES.modern.slideMs <= 80, "짧게");
-  assert.equal(THEMES.modern.fx.flash, "sweep");
+test("세 테마의 보드 색과 블록 모서리가 서로 다르다", () => {
+  const themes = Object.values(THEMES);
+  assert.equal(new Set(themes.map(theme => theme.board.bg)).size, 3);
+  assert.equal(new Set(themes.map(theme => theme.radius)).size, 3);
 });
 
-test("효과 수준: full은 테마 연출 전부, reduced는 움직임 없는 것만, off는 없음", () => {
-  const count = (level, theme) => {
-    const fx = createEffects();
-    fx.add([dropEvent, lockEvent], level, 0, theme);
-    return fx.count;
-  };
-  for (const theme of Object.values(THEMES)) assert.equal(count("off", theme), 0, theme.id);
-  assert.equal(count("reduced", THEMES.retro), 2, "고정 반짝임 + 줄 섬광");
-  assert.ok(count("full", THEMES.retro) > 20, "잔상 + 반짝임 + 섬광 + 파편");
-  assert.equal(count("full", THEMES.minimal), 1, "미니멀은 줄 섬광만");
+test("착지한 블록만 열 바닥을 기준으로 눌렸다가 원래 크기로 돌아온다", () => {
+  const fx = createEffects();
+  const value = CELL_ID.L;
+  fx.add([lockEvent], "full", 0);
+  assert.deepEqual(fx.landing(0, 38, value, 0), { floor: 40, scale: 1 });
+  assert.deepEqual(fx.landing(0, 39, value, 29), { floor: 40, scale: 0.88 });
+  assert.deepEqual(fx.landing(1, 38, value, 29), { floor: 39, scale: 0.88 });
+  assert.ok(fx.landing(0, 38, value, 85).scale > 0.88);
+  assert.equal(fx.landing(2, 39, value, 29), null);
+  assert.equal(fx.landing(0, 39, CELL_ID.O, 29), null);
+  assert.equal(fx.landing(0, 39, value, 145), null);
 });
 
-test("흔들림은 테마가 허락하고 효과가 전체일 때, 큰 클리어에서만", () => {
-  const shaken = (level, theme, ev = lockEvent) => {
-    const fx = createEffects();
-    fx.add([ev], level, 0, theme);
-    return Array.from({ length: 20 }, () => fx.shake(10, 3)).some(o => o.dx || o.dy);
-  };
-  assert.ok(shaken("full", THEMES.retro));
-  assert.equal(shaken("full", THEMES.minimal), false);
-  assert.equal(shaken("reduced", THEMES.modern), false);
-  assert.equal(shaken("full", THEMES.modern, { ...lockEvent, lines: 1, rows: [39], tspin: "none" }), false);
-});
-
-test("효과는 시간이 지나면 사라진다(모든 테마)", () => {
-  for (const theme of Object.values(THEMES)) {
-    const fx = createEffects();
-    fx.add([dropEvent, lockEvent], "full", 0, theme);
-    fx.draw(fakeCtx(), { bx: 0, cell: 10, toY: y => y * 10, cols: 10 }, 5000, theme);
-    assert.equal(fx.count, 0, theme.id);
+test("줄 삭제·연습 보드 교체·효과 줄임은 낡은 착지 좌표를 버린다", () => {
+  const fx = createEffects();
+  for (const event of [clearEvent, { type: "practice", success: false }]) {
+    fx.add([lockEvent], "full", 0);
+    fx.add([event], "full", 16);
+    assert.equal(fx.landing(0, 39, CELL_ID.L, 20), null);
   }
+  fx.add([lockEvent], "full", 0);
+  fx.prune(20, "reduced");
+  assert.equal(fx.landing(0, 39, CELL_ID.L, 20), null);
+});
+
+test("줄 삭제 표시가 차지하는 범위와 수명은 효과 수준에 따른다", () => {
+  const marks = (level, now) => {
+    const fx = createEffects();
+    const calls = [];
+    fx.add([clearEvent], level, 0);
+    fx.prune(now, level);
+    fx.draw(fakeCtx(calls), { bx: 0, cell: 10, toY: y => y * 10, cols: 10 }, now, "#fff", level);
+    return calls.filter(([name]) => name === "fillRect");
+  };
+  assert.ok(marks("full", 30)[0][4] > marks("reduced", 30)[0][4]);
+  assert.equal(marks("reduced", 30)[0][4], 1.2);
+  assert.deepEqual(marks("off", 30), []);
+  assert.deepEqual(marks("full", 175), []);
 });
 
 test("미끄러짐: 같은 피스는 짧게 따라가고, 새 피스나 0ms는 바로 그 자리", () => {

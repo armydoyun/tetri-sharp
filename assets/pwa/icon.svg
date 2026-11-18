@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <!-- Tetri# 앱 아이콘: 어두운 바탕 위의 T 블록. 둘레 여백은 안전 영역(maskable) -->
-  <rect width="512" height="512" rx="96" fill="#101114"/>
-  <g fill="#7c9cff">
+  <rect width="512" height="512" rx="96" fill="#171a17"/>
+  <g fill="#d6ed84">
     <rect x="112" y="168" width="88" height="88" rx="14"/>
     <rect x="212" y="168" width="88" height="88" rx="14"/>
     <rect x="312" y="168" width="88" height="88" rx="14"/>

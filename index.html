@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#f3f4f6" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#101114" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f4f5ee" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#171a17" media="(prefers-color-scheme: dark)" />
     <meta name="description" content="Tetri# — 규칙을 직접 조합하는 낙하 블록 퍼즐." />
     <title>Tetri#</title>
     <!-- 스타일시트: 위에서 아래 순서가 곧 우선순위. 빌드는 이 순서대로 이어 붙인다(tools/build.mjs). docs/DESIGN_SYSTEM.md -->
@@ -17,12 +17,32 @@
   <body>
     <main id="app" class="app">
       <header class="app-header">
-        <h1 class="logo">Tetri<span class="logo-sharp">#</span></h1>
-        <button id="open-settings" class="btn btn-ghost" type="button"><span data-icon="sliders"></span>설정</button>
+        <h1 class="logo"><span class="logo-mark" aria-hidden="true"></span>Tetri#</h1>
+        <p id="session-title" class="session-title"></p>
+        <div class="header-actions">
+          <button id="pause-game" class="btn btn-ghost" type="button" aria-label="일시정지"><span data-icon="pause"></span></button>
+          <button id="open-settings" class="btn btn-ghost" type="button"><span data-icon="sliders"></span>설정</button>
+        </div>
       </header>
       <!-- 첫 화면: 보드 위 덮개가 아닌 독립된 화면. 넓은 화면에서는 넓게 쓴다 -->
       <section id="menu" class="home" aria-label="첫 화면" hidden>
-        <div class="card rule-card">
+        <section class="home-intro surface-game" aria-labelledby="intro-title">
+          <div class="intro-copy">
+            <h2 id="intro-title">내 방식대로<br />쌓고 지우기.</h2>
+            <p>낙하 블록 퍼즐. 회전부터 중력까지, 내게 맞는 규칙으로 플레이하세요.</p>
+          </div>
+          <div class="intro-art" aria-hidden="true">
+            <div class="intro-grid">
+              <span class="intro-piece intro-piece-t"></span>
+              <span class="intro-piece intro-piece-l"></span>
+              <span class="intro-piece intro-piece-s"></span>
+              <span class="intro-piece intro-piece-o"></span>
+              <span class="intro-piece intro-piece-ghost"></span>
+            </div>
+          </div>
+        </section>
+
+        <div class="rule-card">
           <div class="rule-card-head">
             <h2 class="section-title">규칙</h2>
             <div id="rule-tabs" class="segmented" role="group" aria-label="규칙"></div>
@@ -34,8 +54,10 @@
           <p id="rule-desc" class="rule-desc"></p>
         </div>
 
-        <h2 class="section-title">모드</h2>
-        <div id="mode-list" class="mode-grid"></div>
+        <section class="home-modes" aria-labelledby="mode-title">
+          <h2 id="mode-title" class="section-title">플레이 모드</h2>
+          <div id="mode-list" class="mode-grid"></div>
+        </section>
 
         <div class="home-actions">
           <button id="open-records" type="button" class="btn"><span data-icon="trophy"></span>기록</button>
@@ -66,10 +88,10 @@
           <div data-hud="split"><dt>PB 대비</dt><dd id="hud-split" class="hud-split">—</dd></div>
         </dl>
 
-        <!-- 보드: 테마와 무관하게 항상 다크 -->
+        <!-- 보드 주변 UI는 다크 표면을 사용한다. 플레이 격자의 색은 테마가 정한다. -->
         <div class="board-wrap surface-game">
           <canvas id="board" class="board" aria-label="보드"></canvas>
-          <div id="countdown" class="countdown" aria-live="assertive" hidden></div>
+          <div id="countdown" class="countdown" aria-live="assertive" hidden><span id="countdown-label"></span></div>
           <div id="action" class="action" aria-live="polite"></div>
 
           <div id="pause" class="panel" hidden>
