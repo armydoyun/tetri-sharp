@@ -180,6 +180,66 @@ kbd:empty {
   text-shadow: 0 2px 12px var(--bg);
 }
 
+/* 액션 표시: 보드 왼쪽 아래(홀드 칸)에 잠깐 떴다 사라진다 */
+.action {
+  position: absolute;
+  left: 0;
+  width: 25%;
+  top: 40%;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  text-align: center;
+  font-size: clamp(10px, 1.6vw, 14px);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.action .action-main {
+  color: var(--accent);
+  font-size: 1.25em;
+}
+
+.action.is-shown {
+  animation: action-pop 1.4s ease-out forwards;
+}
+
+@keyframes action-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  10% {
+    opacity: 1;
+    transform: none;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action.is-shown {
+    animation-name: action-fade;
+  }
+  @keyframes action-fade {
+    0%,
+    75% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+}
+
 .results-mode {
   margin: 0;
   color: var(--text-dim);

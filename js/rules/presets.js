@@ -12,7 +12,9 @@
  * @property {boolean} hardDrop
  * @property {{ type: "moveReset" | "stepReset" | "infinite" | "none", delay: number, maxResets: number }} lock
  * @property {{ spawn: number, lineClear: number }} are   생성 지연 / 줄 삭제 후 지연
- * @property {number} gravity             프레임당 낙하 칸 수 (1/60 = 1초에 1칸, 20 이상 = 20G)
+ * @property {number} gravity             프레임당 낙하 칸 수 (1/60 = 1초에 1칸, 20 이상 = 20G). 모드가 레벨별 중력을 주면 그쪽이 우선
+ * @property {"threeCorner" | "none"} tspin  T-spin 판정 방식
+ * @property {"guideline"} scoring         점수표
  */
 
 /** @type {RuleSet} */
@@ -27,6 +29,8 @@ export const MODERN = Object.freeze({
   lock: Object.freeze({ type: "moveReset", delay: 30, maxResets: 15 }),
   are: Object.freeze({ spawn: 0, lineClear: 0 }),
   gravity: 1 / 60,
+  tspin: "threeCorner",
+  scoring: "guideline",
 });
 
 export const PRESETS = Object.freeze({ modern: MODERN });

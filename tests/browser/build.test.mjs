@@ -176,3 +176,20 @@ test("설정: 슬라이더 값과 키 변경이 저장되고 새로고침 후에
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("Ultra: 남은 시간이 줄어들고 하드 드롭으로 점수가 오른다, 메뉴에 네 모드", async () => {
+  const { context, page, errors } = await openPage();
+  assert.equal(await page.locator(".mode-card").count(), 4);
+  await startMode(page, "ultra");
+  assert.equal(await text(page, "hud-time-label"), "남은 시간");
+  await page.waitForTimeout(300);
+  assert.ok((await text(page, "hud-time")) < "2:00.00", "카운트다운이 아니라 남은 시간이 줄어든다");
+  assert.equal(await text(page, "hud-score"), "0");
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => Number(document.getElementById("hud-score")?.textContent) > 0, null, {
+    timeout: 3000,
+  });
+  assert.equal(await text(page, "hud-level"), "1");
+  assert.deepEqual(errors, []);
+  await context.close();
+});

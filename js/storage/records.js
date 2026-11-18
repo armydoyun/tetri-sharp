@@ -1,12 +1,16 @@
 // 개인 기록. 키 = "모드|규칙" → 같은 모드라도 규칙이 다르면 따로 센다(규칙 샌드박스 대비).
 const MAX_ENTRIES = 10;
 
-/** @typedef {{ frames: number, lines: number, pieces: number, date: string }} RecordEntry */
+/** @typedef {{ frames: number, lines: number, pieces: number, score?: number, date: string }} RecordEntry */
 
 export const recordKey = mode => `${mode.id}|${mode.rules.id}`;
 
+const nonNegative = v => Number.isFinite(v) && v >= 0;
 const isEntry = e =>
-  e && typeof e === "object" && ["frames", "lines", "pieces"].every(k => Number.isFinite(e[k]) && e[k] >= 0);
+  e &&
+  typeof e === "object" &&
+  ["frames", "lines", "pieces"].every(k => nonNegative(e[k])) &&
+  (e.score === undefined || nonNegative(e.score));
 
 /** @param {ReturnType<typeof import("./store.js").createStore>} store */
 export const createRecords = store => {
@@ -24,7 +28,8 @@ export const createRecords = store => {
   const compare = mode => {
     const { metric, order } = mode.record;
     // 같은 값이면 먼저 세운 기록이 앞.
-    return (a, b) => (order === "asc" ? a[metric] - b[metric] : b[metric] - a[metric]);
+    const value = e => e[metric] ?? 0;
+    return (a, b) => (order === "asc" ? value(a) - value(b) : value(b) - value(a));
   };
 
   return {

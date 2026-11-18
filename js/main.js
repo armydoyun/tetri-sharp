@@ -5,6 +5,8 @@ import { createRenderer } from "./render/canvas.js";
 import { createKeyboard } from "./input/keyboard.js";
 import { ACTIONS, compileKeymap, keyLabel } from "./input/keymap.js";
 import { MODES, findMode } from "./modes/index.js";
+import { formatScore, formatTime } from "./modes/format.js";
+import { clearName } from "./rules/scoring/guideline.js";
 import { createStore } from "./storage/store.js";
 import { loadSettings, sanitizeSettings, saveSettings, toEngineHandling } from "./storage/settings.js";
 import { createRecords } from "./storage/records.js";
@@ -20,7 +22,10 @@ const canvas = /** @type {HTMLCanvasElement} */ ($("board"));
 const panels = { menu: $("menu"), pause: $("pause"), results: $("results") };
 const countdownEl = $("countdown");
 const hud = {
+  timeLabel: $("hud-time-label"),
   time: $("hud-time"),
+  score: $("hud-score"),
+  level: $("hud-level"),
   linesLabel: $("hud-lines-label"),
   lines: $("hud-lines"),
   pieces: $("hud-pieces"),
@@ -45,14 +50,6 @@ let acc = 0;
 let last = performance.now();
 
 // ---- 표시 도우미 ----
-
-const formatTime = frames => {
-  const s = frames / 60;
-  const m = Math.floor(s / 60);
-  return `${m}:${(s - m * 60).toFixed(2).padStart(5, "0")}`;
-};
-
-const formatRecord = (m, entry) => (m.record.metric === "frames" ? formatTime(entry.frames) : `${entry.lines}줄`);
 
 const showPanel = name => {
   for (const [key, el] of Object.entries(panels)) el.hidden = key !== name;
@@ -89,7 +86,7 @@ const renderMenu = () => {
       desc.textContent = m.description;
       const pb = document.createElement("small");
       pb.className = "mode-best";
-      pb.textContent = best ? `최고 기록 ${formatRecord(m, best)}` : "기록 없음";
+      pb.textContent = best ? `최고 기록 ${m.formatRecord(best)}` : "기록 없음";
       btn.append(name, desc, pb);
       btn.addEventListener("click", () => start(m));
       return btn;
@@ -101,7 +98,11 @@ const updateHud = () => {
   const frame = game?.state.frame ?? 0;
   const stats = game?.state.stats ?? { pieces: 0, lines: 0 };
   const lines = game ? mode.hudLines(game.state) : { label: "줄", value: "0" };
-  hud.time.textContent = formatTime(frame);
+  const time = game ? mode.hudTime(game.state) : { label: "시간", frames: 0 };
+  hud.timeLabel.textContent = time.label;
+  hud.time.textContent = formatTime(time.frames);
+  hud.score.textContent = formatScore(game?.state.score ?? 0);
+  hud.level.textContent = String(game?.state.level ?? 1);
   hud.linesLabel.textContent = lines.label;
   hud.lines.textContent = lines.value;
   hud.pieces.textContent = String(stats.pieces);
@@ -138,6 +139,7 @@ const start = m => {
   countdown = READY_FRAMES;
   goTimer = 0;
   showPanel(null);
+  actionEl.classList.remove("is-shown");
   setScreen("countdown");
   countdownEl.hidden = false;
   countdownEl.textContent = "READY";
@@ -163,8 +165,6 @@ const finish = () => {
   const state = game.state;
   setScreen("results");
   countdownEl.hidden = true;
-  const cleared = state.over === "clear";
-  const isSprint = mode.record.metric === "frames";
 
   let outcome = null;
   if (mode.isRecordable(state)) {
@@ -172,27 +172,27 @@ const finish = () => {
       frames: state.frame,
       lines: state.stats.lines,
       pieces: state.stats.pieces,
+      score: state.score,
       date: new Date().toISOString(),
     });
   }
   const best = records.best(mode);
 
   $("results-mode").textContent = mode.name;
-  $("results-title").textContent = cleared ? "완료!" : "게임 오버";
-  $("results-main").textContent = isSprint
-    ? cleared
-      ? formatTime(state.frame)
-      : `${state.stats.lines} / ${mode.goal}줄`
-    : `${state.stats.lines}줄`;
+  const summary = mode.summary(state);
+  $("results-title").textContent = summary.title;
+  $("results-main").textContent = summary.main;
   $("results-badge").hidden = !outcome?.isBest;
 
   const seconds = state.frame / 60;
   const rows = [
     ["시간", formatTime(state.frame)],
+    ["점수", formatScore(state.score)],
+    ["레벨", String(state.level)],
     ["줄", String(state.stats.lines)],
     ["피스", String(state.stats.pieces)],
     ["PPS", seconds ? (state.stats.pieces / seconds).toFixed(2) : "0.00"],
-    ["최고 기록", best ? formatRecord(mode, best) : "—"],
+    ["최고 기록", best ? mode.formatRecord(best) : "—"],
   ];
   if (outcome && !outcome.isBest && outcome.rank < 10) rows.push(["순위", `${outcome.rank + 1}위`]);
   $("results-stats").replaceChildren(
@@ -205,6 +205,38 @@ const finish = () => {
     })
   );
   showPanel("results");
+};
+
+// ---- 액션 표시 (T-SPIN DOUBLE, B2B, 콤보, 퍼펙트 클리어, 레벨업) ----
+
+const actionEl = $("action");
+const announce = e => {
+  /** @type {string[]} */
+  let lines = [];
+  if (e.type === "lock") {
+    const name = clearName(e);
+    const showName = e.tspin !== "none" || e.lines >= 4;
+    if (e.perfect) lines.push("PERFECT CLEAR");
+    if (e.b2b) lines.push("BACK-TO-BACK");
+    if (showName && name) lines.push(name);
+    if (e.combo >= 1) lines.push(`${e.combo} COMBO`);
+    if (lines.length && e.points) lines.push(`+${formatScore(e.points)}`);
+  } else if (e.type === "levelUp") {
+    lines = [`LEVEL ${e.level}`];
+  }
+  if (!lines.length) return;
+  actionEl.replaceChildren(
+    ...lines.map((text, i) => {
+      const div = document.createElement("div");
+      div.textContent = text;
+      if (i === 0) div.className = "action-main";
+      return div;
+    })
+  );
+  // 애니메이션을 처음부터 다시 돌린다.
+  actionEl.classList.remove("is-shown");
+  void actionEl.offsetWidth;
+  actionEl.classList.add("is-shown");
 };
 
 // ---- 입력 ----
@@ -273,6 +305,7 @@ const tick = () => {
   if (screen !== "play" || !game) return;
   if (goTimer > 0 && --goTimer === 0) countdownEl.hidden = true;
   const events = game.step({ held: keyboard.held, pressed: keyboard.takePressed() });
+  for (const e of events) announce(e);
   if (events.some(e => e.type === "gameOver" || e.type === "finish")) finish();
 };
 

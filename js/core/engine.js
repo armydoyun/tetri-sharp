@@ -1,8 +1,10 @@
 // 게임 엔진. 한 번의 step()이 한 프레임(1/60초)을 진행한다. DOM·실시간 시계·Math.random을 쓰지 않으므로
 // 같은 (규칙, 조작 설정, 시드, 입력 기록)이면 언제 어디서 돌려도 결과가 같다 → 테스트·리플레이의 바탕.
-import { HEIGHT, VISIBLE_ROWS, WIDTH, clearLines, collides, createBoard, place } from "./board.js";
+import { HEIGHT, VISIBLE_ROWS, WIDTH, clearLines, collides, createBoard, isEmpty, place } from "./board.js";
 import { CELL_ID, PIECES } from "./pieces.js";
 import { createRng } from "./rng.js";
+import { detectTSpin } from "./tspin.js";
+import { HARD_DROP_POINTS, SOFT_DROP_POINTS, scoreLock } from "../rules/scoring/guideline.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
 import { RANDOMIZERS } from "../rules/randomizer/index.js";
 
@@ -46,8 +48,11 @@ export const msToFrames = ms => (ms * 60) / 1000;
  */
 
 /**
- * 모드: 목표·종료 조건. check()가 결과를 돌려주면 그 프레임에 게임이 끝난다.
- * @typedef {{ check?: (state: any, events: any[]) => null | { result: string } }} ModeHook
+ * 모드: 목표·종료 조건·레벨 진행. check()가 결과를 돌려주면 그 프레임에 게임이 끝난다.
+ * @typedef {Object} ModeHook
+ * @property {(state: any, events: any[]) => null | { result: string }} [check]
+ * @property {(state: any) => number} [levelFor]    줄 수 등에 따른 레벨 (없으면 1 고정)
+ * @property {(state: any) => number} [gravityFor]  레벨 등에 따른 중력 (없으면 rules.gravity)
  */
 
 /**
@@ -79,9 +84,17 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
     das: { dir: 0, charge: 0, arrAcc: 0 },
     prevHeld: 0,
     stats: { pieces: 0, lines: 0 },
+    score: 0,
+    level: 1,
+    /** 이어지고 있는 어려운 클리어 수(0 = B2B 없음) */
+    b2b: 0,
+    /** 연속으로 줄을 지운 고정 수 - 1 (-1 = 콤보 없음) */
+    combo: -1,
     /** @type {null | "blockOut" | "lockOut" | string} 끝난 이유(모드 목표 달성이면 모드가 정한 결과) */
     over: null,
   };
+
+  if (mode?.levelFor) state.level = mode.levelFor(state);
 
   /** @type {any[]} 이번 프레임에 일어난 일 */
   let events = [];
@@ -129,14 +142,38 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
   const lockPiece = () => {
     const a = /** @type {Active} */ (state.active);
     const shape = cells(a);
+    const tspin = rules.tspin === "threeCorner" ? detectTSpin(board, a) : "none";
     place(board, shape, a.x, a.y, CELL_ID[a.type]);
     state.active = null;
     state.holdUsed = false;
     state.stats.pieces += 1;
 
     const cleared = clearLines(board);
-    state.stats.lines += cleared.length;
-    events.push({ type: "lock", piece: a.type, lines: cleared.length, rows: cleared, lastAction: a.lastAction });
+    const lines = cleared.length;
+    const perfect = lines > 0 && isEmpty(board);
+    const scored = scoreLock({ lines, tspin, b2b: state.b2b, combo: state.combo, perfect, level: state.level });
+    state.score += scored.points;
+    state.b2b = scored.b2b;
+    state.combo = scored.combo;
+    state.stats.lines += lines;
+    events.push({
+      type: "lock",
+      piece: a.type,
+      lines,
+      rows: cleared,
+      tspin,
+      perfect,
+      points: scored.points,
+      b2b: scored.b2bApplied,
+      combo: scored.combo,
+      level: state.level,
+    });
+
+    if (mode?.levelFor) {
+      const level = mode.levelFor(state);
+      if (level > state.level) events.push({ type: "levelUp", level });
+      state.level = level;
+    }
 
     // 줄이 지워지지 않았고 모든 칸이 보이는 영역 위에 있으면 Lock Out.
     if (!cleared.length && shape.every(([, cy]) => a.y + cy < VISIBLE_TOP)) {
@@ -241,7 +278,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
   };
 
   const applyGravity = (a, held) => {
-    let g = rules.gravity;
+    let g = mode?.gravityFor ? mode.gravityFor(state) : rules.gravity;
     if (held & BTN.SOFT) g = handling.sdf === Infinity ? Infinity : Math.max(g * handling.sdf, g);
     if (g >= 20) g = Infinity;
     state.gravityAcc += g;
@@ -253,6 +290,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
         return;
       }
       state.gravityAcc -= 1;
+      if (held & BTN.SOFT) state.score += SOFT_DROP_POINTS;
     }
   };
 
@@ -321,6 +359,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
     if (pressed & BTN.HARD && rules.hardDrop) {
       let distance = 0;
       while (dropOne(a)) distance += 1;
+      state.score += distance * HARD_DROP_POINTS;
       events.push({ type: "hardDrop", distance });
       lockPiece();
       return events;

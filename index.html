@@ -27,6 +27,7 @@
           </div>
 
           <div id="countdown" class="countdown" aria-live="assertive" hidden></div>
+          <div id="action" class="action" aria-live="polite"></div>
 
           <div id="pause" class="panel" hidden>
             <h2 class="panel-title">일시정지</h2>
@@ -50,7 +51,9 @@
           </div>
         </div>
         <dl class="hud">
-          <div><dt>시간</dt><dd id="hud-time">0:00.00</dd></div>
+          <div><dt id="hud-time-label">시간</dt><dd id="hud-time">0:00.00</dd></div>
+          <div><dt>점수</dt><dd id="hud-score">0</dd></div>
+          <div><dt>레벨</dt><dd id="hud-level">1</dd></div>
           <div><dt id="hud-lines-label">줄</dt><dd id="hud-lines">0</dd></div>
           <div><dt>피스</dt><dd id="hud-pieces">0</dd></div>
           <div><dt>PPS</dt><dd id="hud-pps">0.00</dd></div>
