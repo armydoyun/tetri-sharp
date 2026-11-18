@@ -30,17 +30,36 @@
   color: var(--accent);
 }
 
-/* [보드 | 정보 칸] — 정보 칸 폭 고정 */
+/* [보드 | 정보 칸] (+ 보드 아래 터치 버튼) — 정보 칸 폭 고정 */
 .stage {
   display: grid;
   grid-template-columns: auto var(--hud-width);
+  grid-template-areas:
+    "board hud"
+    "touch hud";
   align-items: start;
   gap: var(--space-4);
+}
+
+.stage > .board-wrap {
+  grid-area: board;
+}
+
+.stage > .hud {
+  grid-area: hud;
+}
+
+.stage > .touchpad {
+  grid-area: touch;
 }
 
 @media (max-width: 720px) {
   .stage {
     grid-template-columns: auto;
+    grid-template-areas:
+      "board"
+      "touch"
+      "hud";
     justify-items: center;
   }
 }
@@ -57,8 +76,63 @@
 /* 캔버스는 20×22칸 비율. 화면 높이에 맞춰 줄어든다(해상도는 렌더러가 devicePixelRatio로 맞춘다). */
 .board {
   display: block;
-  width: min(560px, calc(100vw - 32px), calc((100vh - 200px) * 20 / 22));
+  width: min(560px, calc(100vw - 32px), calc((100vh - 200px - var(--touch-space)) * 20 / 22));
   height: auto;
+}
+
+@supports (height: 100dvh) {
+  .board {
+    width: min(560px, calc(100vw - 32px), calc((100dvh - 200px - var(--touch-space)) * 20 / 22));
+  }
+}
+
+/* ---- 터치 버튼: 5×2 고정 격자, 보드와 같은 폭 ---- */
+:root {
+  --touch-space: 0px;
+}
+
+body.touch-on {
+  --touch-btn: 56px;
+  --touch-space: calc(2 * var(--touch-btn) + var(--space-2) + var(--space-4));
+}
+
+.touchpad {
+  --touch-btn: 56px;
+  display: none;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-2);
+  width: 100%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+body.touch-on .touchpad {
+  display: grid;
+}
+
+.touchpad > button {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--touch-btn);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 22px;
+  transition: background-color var(--dur) var(--ease);
+}
+
+.touchpad > button.is-down {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.touchpad > .touch-system {
+  color: var(--text-dim);
 }
 
 /* 보드 위에 겹치는 화면(메뉴·일시정지·결과): 넘치면 패널 안에서 스크롤 */
@@ -394,4 +468,9 @@
 
 .hud-split[data-ahead="false"] {
   color: var(--text-dim);
+}
+
+/* 터치 버튼을 쓸 때는 키보드 안내를 숨긴다(설정으로만 바뀐다) */
+body.touch-on .keys {
+  display: none;
 }

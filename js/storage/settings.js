@@ -14,6 +14,8 @@ export const HANDLING_LIMITS = Object.freeze({
   sdf: Object.freeze({ min: 5, max: SDF_INFINITE, step: 1, default: 20 }),
 });
 
+export const TOUCH_OPTIONS = Object.freeze(["auto", "on", "off"]);
+
 export const VISUAL_OPTIONS = Object.freeze({
   // 게임 테마(블록·격자·움직임·연출의 모습) — js/render/themes.js
   theme: THEME_IDS,
@@ -42,6 +44,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
   handling: Object.freeze({ das: 133, arr: 10, sdf: 20 }),
   keymap: DEFAULT_KEYMAP,
   padmap: DEFAULT_PADMAP,
+  /** 터치 버튼: auto(터치 화면이면) · on · off */
+  touch: "auto",
   visual: Object.freeze(defaultVisual()),
 });
 
@@ -78,6 +82,7 @@ export const sanitizeSettings = raw => {
     handling: sanitizeHandling(s.handling ?? DEFAULT_SETTINGS.handling),
     keymap: sanitizeKeymap(s.keymap ?? DEFAULT_KEYMAP),
     padmap: sanitizePadmap(s.padmap ?? DEFAULT_PADMAP),
+    touch: TOUCH_OPTIONS.includes(s.touch) ? s.touch : "auto",
     visual: sanitizeVisual(s.visual),
   };
 };

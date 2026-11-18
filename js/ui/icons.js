@@ -22,6 +22,24 @@ export const ICONS = Object.freeze({
   menu: [["path", { d: "M5 7h14M5 12h14M5 17h14" }]],
   download: [["path", { d: "M12 4v11M7 10l5 5 5-5M5 20h14" }]],
   folder: [["path", { d: "M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" }]],
+  // 회전 아이콘은 가운데 작은 블록으로 "다시 시작"과 구분한다
+  "rotate-cw": [
+    ["path", { d: "M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4" }],
+    ["rect", { x: 9.5, y: 9.5, width: 5, height: 5, rx: 1 }],
+  ],
+  "rotate-ccw": [
+    ["path", { d: "M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v4h4" }],
+    ["rect", { x: 9.5, y: 9.5, width: 5, height: 5, rx: 1 }],
+  ],
+  "rotate-180": [
+    ["path", { d: "M5 19v-8a6 6 0 0 1 12 0v4M13.5 12.5 17 16l3.5-3.5" }],
+    ["rect", { x: 8.5, y: 10.5, width: 5, height: 5, rx: 1 }],
+  ],
+  hold: [
+    ["rect", { x: 3.5, y: 8.5, width: 10, height: 10, rx: 1.5 }],
+    ["path", { d: "M10.5 5.5h8.5a1.5 1.5 0 0 1 1.5 1.5v8.5" }],
+  ],
+  drop: [["path", { d: "M12 3.5v11M7.5 10l4.5 4.5 4.5-4.5M4.5 19.5h15" }]],
   target: [
     ["circle", { cx: 12, cy: 12, r: 8 }],
     ["circle", { cx: 12, cy: 12, r: 4 }],

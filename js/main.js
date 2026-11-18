@@ -3,6 +3,7 @@
 import { createGame } from "./core/engine.js";
 import { createRenderer } from "./render/canvas.js";
 import { createKeyboard } from "./input/keyboard.js";
+import { createTouch, touchVisible } from "./input/touch.js";
 import { PAD_ICONS, compilePadmap, createGamepad, padButtonName } from "./input/gamepad.js";
 import { ACTIONS, compileKeymap } from "./input/keymap.js";
 import { MODES, findMode } from "./modes/index.js";
@@ -220,6 +221,7 @@ const updateHud = () => {
 const setScreen = next => {
   screen = next;
   keyboard.setEnabled(next === "play" || next === "countdown");
+  touch.setEnabled(next === "play" || next === "countdown");
 };
 
 const toMenu = () => {
@@ -373,6 +375,7 @@ const settingsUI = createSettingsUI({
     saveSettings(store, settings);
     bindings = compileKeymap(settings.keymap);
     padBindings = compilePadmap(settings.padmap);
+    applyTouch();
     if (game && screen !== "replay") {
       game.setHandling(toEngineHandling(settings.handling));
       recorder?.handlingChanged(game.handling);
@@ -443,6 +446,13 @@ const handleSystem = action => {
 };
 
 const keyboard = createKeyboard({ getBindings: () => bindings, onSystem: handleSystem });
+const touch = createTouch({ root: $("touchpad"), onSystem: handleSystem });
+
+/** 터치 버튼 보이기: 설정 + 기기(굵은 포인터). 설정을 바꿀 때만 바뀐다(원칙 2). */
+const coarse = typeof matchMedia === "function" ? matchMedia("(pointer: coarse)") : null;
+const applyTouch = () =>
+  document.body.classList.toggle("touch-on", touchVisible(settings.touch, Boolean(coarse?.matches)));
+coarse?.addEventListener?.("change", applyTouch);
 
 /** 메뉴·결과·일시정지 화면에서 게임패드로 버튼 사이를 옮겨 다니고 누른다. */
 const handlePadMenu = action => {
@@ -644,6 +654,7 @@ fileInput.addEventListener("change", async () => {
 const tick = () => {
   if (screen === "countdown") {
     keyboard.takePressed(); // 카운트다운 중 누른 키는 버린다(누르고 있는 키는 시작하자마자 반영).
+    touch.takePressed();
     countdown -= 1;
     if (countdown <= 0) {
       setScreen("play");
@@ -655,8 +666,8 @@ const tick = () => {
   if (screen === "replay") return tickReplay();
   if (screen !== "play" || !game) return;
   if (goTimer > 0 && --goTimer === 0) countdownEl.hidden = true;
-  const held = keyboard.held | pad.held;
-  const pressed = keyboard.takePressed();
+  const held = keyboard.held | pad.held | touch.held;
+  const pressed = keyboard.takePressed() | touch.takePressed();
   recorder?.input(held, pressed);
   const events = game.step({ held, pressed });
   if (mode.splits) splits = advanceSplits(mode.splits, splits, game.state.stats.lines, game.state.frame);
@@ -707,6 +718,7 @@ const importRulesFromLink = () => {
 };
 
 hydrateIcons();
+applyTouch();
 renderKeyHelp();
 // 링크로 규칙을 받았으면 Custom 규칙 기준으로 키 안내를 다시 그린 뒤 메뉴를 연다.
 if (importRulesFromLink()) renderKeyHelp();

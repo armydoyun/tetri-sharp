@@ -95,3 +95,12 @@ test("게임패드 배치: 옮기기·지우기·읽기용 변환", () => {
   assert.equal(readPad(pad([0]), c).held, BTN.HARD, "바꾼 배치로 읽는다");
   assert.equal(padButtonName(9), "Start");
 });
+
+import { touchVisible } from "../../js/input/touch.js";
+
+test("터치 버튼 보이기: 자동이면 터치 화면에서만, 켜기·끄기는 그대로", () => {
+  assert.equal(touchVisible("auto", true), true);
+  assert.equal(touchVisible("auto", false), false);
+  assert.equal(touchVisible("on", false), true);
+  assert.equal(touchVisible("off", true), false);
+});

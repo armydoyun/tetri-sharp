@@ -650,3 +650,29 @@ test("연습: 메뉴에서 고르면 시작하고, 놓을 때마다 성공/시�
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("터치 버튼: 켜면 보드 아래에 보이고, 누르면 조작된다", async () => {
+  const context = await browser.newContext({ viewport: { width: 412, height: 860 }, hasTouch: true });
+  await context.addInitScript(() => localStorage.setItem("tetrisharp:settings", JSON.stringify({ touch: "on" })));
+  const page = await context.newPage();
+  const errors = [];
+  page.on("pageerror", e => errors.push(e.message));
+  await page.goto(url);
+  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  assert.equal(await page.locator("#touchpad").isVisible(), true);
+  assert.equal(await page.locator("#key-help").isVisible(), false, "키보드 안내는 숨긴다");
+  const pad = await rects(page, ["#touchpad", "#board"]);
+  assert.ok(pad["#touchpad"][1] >= pad["#board"][1] + pad["#board"][3], "보드 아래");
+  await page.tap('[data-mode="sprint40"]');
+  await page.waitForFunction(() => document.getElementById("countdown")?.textContent === "GO!", null, {
+    timeout: 3000,
+  });
+  await page.tap('[data-touch="HARD"]');
+  await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "1", null, {
+    timeout: 3000,
+  });
+  await page.tap('[data-touch="PAUSE"]');
+  assert.equal(await visible(page, "pause"), true);
+  assert.deepEqual(errors, []);
+  await context.close();
+});

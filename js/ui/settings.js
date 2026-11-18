@@ -90,7 +90,18 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
           update({ handling: { ...getSettings().handling, [key]: v } });
         });
         return fieldRow({ id, label, hint, control: el("span", { class: "range" }, input, output) });
-      })
+      }),
+      (() => {
+        const select = el("select", { id: "set-touch", class: "select" });
+        for (const [value, text] of [
+          ["auto", "자동 (터치 화면이면 보이기)"],
+          ["on", "켜기"],
+          ["off", "끄기"],
+        ])
+          select.append(el("option", { value, text, selected: getSettings().touch === value }));
+        select.addEventListener("change", () => update({ touch: select.value }));
+        return fieldRow({ id: "set-touch", label: "터치 버튼", hint: "보드 아래 조작 버튼", control: select });
+      })()
     );
 
   const visualSection = () =>
@@ -175,6 +186,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
         handling: { ...DEFAULT_SETTINGS.handling },
         keymap: { ...DEFAULT_KEYMAP },
         padmap: { ...DEFAULT_PADMAP },
+        touch: "auto",
         visual: defaultVisual(),
       });
       notice.textContent = "기본값으로 되돌렸어요.";
