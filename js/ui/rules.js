@@ -2,6 +2,7 @@
 import { PRESET_LIST } from "../rules/presets.js";
 import { GRAVITY_OPTIONS, LIMITS, makeCustomRules, sanitizeRuleBody } from "../rules/sanitize.js";
 import { button, el, fieldRow, fillDialog } from "./dom.js";
+import { decodeRules, encodeRules, rulesLink } from "../rules/share.js";
 
 const ms = frames => `${Math.round((frames * 1000) / 60)}ms`;
 
@@ -204,6 +205,95 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
   };
 
   const notice = el("p", { class: "notice-slot", role: "status", id: "rules-record" });
+  /** 잠깐 보여 줄 알림(다음 렌더 한 번만). 없으면 기록표 이름을 보여 준다. */
+  let message = "";
+
+  /** 클립보드에 복사. 막혀 있으면 입력칸을 선택해 둔다. */
+  const copy = async (text, input) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      input?.select();
+      try {
+        return document.execCommand("copy");
+      } catch {
+        return false;
+      }
+    }
+  };
+
+  const shareSection = rules => {
+    const code = encodeRules(rules);
+    const codeInput = el("input", {
+      id: "rule-share-code",
+      class: "text-input num",
+      type: "text",
+      value: code,
+      readOnly: true,
+    });
+    const copyCode = button({ text: "복사", iconName: "copy", className: "btn btn-small", id: "rule-share-copy" });
+    copyCode.addEventListener("click", async () => {
+      message = (await copy(code, codeInput))
+        ? "규칙 코드를 복사했어요"
+        : "복사하지 못했어요. 코드를 선택해 직접 복사해 주세요";
+      notice.textContent = message;
+    });
+    const link = rulesLink(rules, location.href);
+    const copyLink = button({ text: "링크 복사", iconName: "link", className: "btn btn-small", id: "rule-share-link" });
+    copyLink.addEventListener("click", async () => {
+      message = (await copy(link, null))
+        ? "링크를 복사했어요. 받은 사람이 열면 이 규칙이 Custom으로 들어가요"
+        : "복사하지 못했어요";
+      notice.textContent = message;
+    });
+    const pasteInput = el("input", {
+      id: "rule-share-paste",
+      class: "text-input num",
+      type: "text",
+      placeholder: "TS1-로 시작하는 코드나 링크",
+      autocomplete: "off",
+      spellcheck: false,
+    });
+    const load = button({ text: "불러오기", iconName: "folder", className: "btn btn-small", id: "rule-share-load" });
+    const doLoad = () => {
+      const body = decodeRules(pasteInput.value);
+      if (!body) {
+        notice.textContent = "읽을 수 없는 코드예요";
+        return;
+      }
+      onChange(body);
+      message = `불러왔어요 · 기록표 ${makeCustomRules(body).id}`;
+      render("rule-share-paste");
+    };
+    load.addEventListener("click", doLoad);
+    pasteInput.addEventListener("keydown", e => {
+      if (e.key === "Enter") doLoad();
+    });
+    return el(
+      "section",
+      { class: "field-section" },
+      el("h3", { text: "공유" }),
+      fieldRow({
+        id: "rule-share-code",
+        label: "규칙 코드",
+        hint: "지금 조합을 코드로",
+        control: el("span", { class: "inline-control" }, codeInput, copyCode),
+      }),
+      fieldRow({
+        id: "rule-share-link",
+        label: "공유 링크",
+        hint: "배포 주소에서 열었을 때 쓸모 있어요",
+        control: el("span", { class: "inline-control" }, copyLink),
+      }),
+      fieldRow({
+        id: "rule-share-paste",
+        label: "코드 불러오기",
+        hint: "받은 코드나 링크를 붙여 넣기",
+        control: el("span", { class: "inline-control" }, pasteInput, load),
+      })
+    );
+  };
 
   /** @param {string} [focusId] 다시 그린 뒤 포커스를 돌려줄 컨트롤 */
   const render = focusId => {
@@ -247,7 +337,9 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
       );
     }
 
-    notice.textContent = `기록표 ${makeCustomRules(rules).id} · 조합마다 기록이 따로 쌓여요`;
+    body.append(shareSection(rules));
+    notice.textContent = message || `기록표 ${makeCustomRules(rules).id} · 조합마다 기록이 따로 쌓여요`;
+    message = "";
     fillDialog(dialog, { title: "Custom 규칙", body, notice, actions: [], closeId: "rules-close" });
     body.scrollTop = scroll;
     if (focusId) /** @type {HTMLElement | null} */ (dialog.querySelector(`#${focusId}`))?.focus();

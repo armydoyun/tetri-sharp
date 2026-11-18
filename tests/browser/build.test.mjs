@@ -597,3 +597,38 @@ test("통계: 결과 화면에서 열면 이번 판 통계가 보인다", async 
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("규칙 공유: 편집기에서 코드를 붙여 넣으면 불러오고, #rules= 링크로 열면 Custom으로 들어온다", async () => {
+  const { context, page, errors } = await openPage();
+  // Retro 내용의 코드를 편집기에서 얻는다
+  await page.click('[data-rules="custom"]');
+  await page.click("#edit-rules");
+  await page.click('[data-preset="retro"]');
+  const code = await page.locator("#rule-share-code").inputValue();
+  assert.match(code, /^TS1-/);
+  await page.click('[data-preset="modern"]');
+  await page.locator("#rule-share-paste").fill(code);
+  await page.click("#rule-share-load");
+  assert.match(await text(page, "rules-record"), /불러왔어요/);
+  assert.match(await page.locator("#rule-rotation option:checked").textContent(), /킥 없음/);
+  await page.locator("#rule-share-paste").fill("엉터리");
+  await page.click("#rule-share-load");
+  assert.match(await text(page, "rules-record"), /읽을 수 없는/);
+  await page.click("#rules-close");
+  await context.close();
+
+  // 새 브라우저(저장소 비어 있음)에서 링크로 연다
+  const fresh = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const p2 = await fresh.newPage();
+  const errs2 = [];
+  p2.on("pageerror", e => errs2.push(e.message));
+  await p2.goto(`${url}#rules=${code.slice(4)}`);
+  await p2.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  assert.equal(await p2.locator('[data-rules="custom"]').getAttribute("aria-pressed"), "true");
+  assert.match(await p2.locator("#menu-notice").textContent(), /불러왔어요/);
+  assert.equal(new URL(p2.url()).hash, "", "주소의 해시는 지운다");
+  await p2.click("#edit-rules");
+  assert.match(await p2.locator("#rule-rotation option:checked").textContent(), /킥 없음/);
+  assert.deepEqual([...errors, ...errs2], []);
+  await fresh.close();
+});

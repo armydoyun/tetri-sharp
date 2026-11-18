@@ -22,6 +22,7 @@ import { createPlayer, createRecorder, createReplayStore, sanitizeReplay, verify
 import { recordKey } from "./storage/records.js";
 import { MODERN, PRESETS, PRESET_LIST } from "./rules/presets.js";
 import { makeCustomRules, sanitizeRuleBody } from "./rules/sanitize.js";
+import { decodeRules } from "./rules/share.js";
 
 const FRAME_MS = 1000 / 60;
 const MAX_CATCH_UP_MS = 250; // 시간이 크게 튀면(탭 복귀 등) 한꺼번에 따라잡지 않는다.
@@ -663,8 +664,31 @@ const loop = now => {
   requestAnimationFrame(loop);
 };
 
+/** 공유 링크(#rules=…)로 열었으면 그 규칙을 Custom으로 들이고 알린다. 주소의 해시는 지운다. */
+const importRulesFromLink = () => {
+  if (!/[#&]rules=/.test(location.hash)) return false;
+  const body = decodeRules(location.hash);
+  try {
+    history.replaceState(null, "", location.pathname + location.search);
+  } catch {
+    /* file:// 등에서 막혀도 괜찮다 */
+  }
+  if (!body) {
+    showMenuNotice("링크의 규칙 코드를 읽을 수 없었어요.");
+    return false;
+  }
+  customBody = body;
+  store.set("customRules", customBody);
+  ruleChoice = "custom";
+  store.set("lastRules", "custom");
+  showMenuNotice(`링크로 받은 규칙을 Custom에 불러왔어요 · 기록표 ${makeCustomRules(body).id}`);
+  return true;
+};
+
 hydrateIcons();
 renderKeyHelp();
+// 링크로 규칙을 받았으면 Custom 규칙 기준으로 키 안내를 다시 그린 뒤 메뉴를 연다.
+if (importRulesFromLink()) renderKeyHelp();
 toMenu();
 requestAnimationFrame(loop);
 

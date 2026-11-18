@@ -468,3 +468,31 @@
   text-align: right;
   font-weight: 600;
 }
+
+/* 한 줄 입력 + 버튼 */
+.inline-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.inline-control > .btn:only-child {
+  justify-self: start;
+}
+
+.text-input {
+  width: 100%;
+  min-width: 0;
+  height: var(--control-h-s);
+  padding: 0 var(--space-2);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-s);
+}
+
+.text-input[readonly] {
+  color: var(--text-dim);
+}

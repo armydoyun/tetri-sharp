@@ -22,6 +22,16 @@ export const ICONS = Object.freeze({
   menu: [["path", { d: "M5 7h14M5 12h14M5 17h14" }]],
   download: [["path", { d: "M12 4v11M7 10l5 5 5-5M5 20h14" }]],
   folder: [["path", { d: "M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" }]],
+  copy: [
+    ["rect", { x: 8.5, y: 8.5, width: 11, height: 11, rx: 2 }],
+    ["path", { d: "M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2" }],
+  ],
+  link: [
+    [
+      "path",
+      { d: "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" },
+    ],
+  ],
   chart: [["path", { d: "M5 19v-8M10 19V5M15 19v-6M20 19V9M3.5 19h17" }]],
   trophy: [
     [
