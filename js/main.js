@@ -4,14 +4,13 @@ import { createGame } from "./core/engine.js";
 import { createRenderer } from "./render/canvas.js";
 import { createKeyboard } from "./input/keyboard.js";
 import { createTouch, touchVisible } from "./input/touch.js";
-import { PAD_ICONS, compilePadmap, createGamepad, padButtonName } from "./input/gamepad.js";
-import { ACTIONS, compileKeymap } from "./input/keymap.js";
+import { compilePadmap, createGamepad } from "./input/gamepad.js";
+import { compileKeymap } from "./input/keymap.js";
 import { MODES, RACE_MODES, findMode as findBaseMode } from "./modes/index.js";
 import { dailyMode, dateKey, findDaily } from "./modes/daily.js";
 import { decodeReplayCode, encodeReplayCode, replayLink } from "./replay/share.js";
 import { createDailyUI } from "./ui/daily.js";
 import { formatScore, formatTime } from "./modes/format.js";
-import { clearName } from "./rules/scoring/guideline.js";
 import { createStore } from "./storage/store.js";
 import { loadSettings, sanitizeSettings, saveSettings, toEngineHandling } from "./storage/settings.js";
 import { createRecords } from "./storage/records.js";
@@ -38,7 +37,6 @@ import { MODERN, PRESETS, PRESET_LIST } from "./rules/presets.js";
 import { makeCustomRules, sanitizeRuleBody } from "./rules/sanitize.js";
 import { decodeRules } from "./rules/share.js";
 import { createSfx } from "./audio/sfx.js";
-import { createBackup, parseBackup, restoreBackup } from "./storage/backup.js";
 import { createFinesseTracker } from "./modes/finesse.js";
 import { analyzeReplay } from "./replay/analyze.js";
 import { ROTATIONS } from "./rules/rotation/index.js";
@@ -52,6 +50,12 @@ import { createPuzzleUI } from "./ui/puzzles.js";
 import { createShareUI } from "./ui/share.js";
 import { createVersusUI } from "./ui/versus.js";
 import { lang, t, translateDom } from "./i18n/index.js";
+import { createFeedback } from "./app/feedback.js";
+import { createInputDisplay } from "./app/input-display.js";
+import { createKeyHelp } from "./app/key-help.js";
+import { setupBackup } from "./app/backup.js";
+import { downloadJson } from "./app/download.js";
+import { takeLinkHash } from "./app/links.js";
 
 const FRAME_MS = 1000 / 60;
 const MAX_CATCH_UP_MS = 250; // 시간이 크게 튀면(탭 복귀 등) 한꺼번에 따라잡지 않는다.
@@ -170,64 +174,16 @@ const showPanel = name => {
   if (!name && document.activeElement instanceof HTMLElement) document.activeElement.blur();
 };
 
-const keysOf = id => settings.keymap[id] ?? [];
-
 /** @type {ReturnType<typeof createGamepad> | null} 아래에서 만든 뒤 채운다 */
 let padRef = null;
-/** 게임패드 버튼 키캡(십자키는 화살표 아이콘) */
-const padCap = i => {
-  const kbd = document.createElement("kbd");
-  kbd.className = "keycap";
-  if (PAD_ICONS[i]) kbd.append(icon(PAD_ICONS[i], { label: padButtonName(i) }));
-  else kbd.textContent = padButtonName(i);
-  return kbd;
-};
-
-/** 안내 한 칸: 동작 이름 + 키캡들 */
-const helpItem = (label, caps) => {
-  const span = document.createElement("span");
-  const name = document.createElement("span");
-  name.className = "keys-label";
-  name.textContent = label;
-  span.append(name, ...caps);
-  return span;
-};
-
-const textCap = text => {
-  const kbd = document.createElement("kbd");
-  kbd.className = "keycap";
-  kbd.textContent = text;
-  return kbd;
-};
-
-/** 키 안내. 지금 규칙에서 쓸 수 없는 동작(하드 드롭·홀드가 꺼진 규칙 등)은 뺀다. 키 이름은 키캡(화살표는 SVG). */
-const renderKeyHelp = () => {
-  const r = game?.rules ?? currentRules();
-  const unavailable = new Set([...(r.hardDrop ? [] : ["HARD"]), ...(r.hold.enabled ? [] : ["HOLD"])]);
-  /** @type {Element[]} */
-  const items = [icon("keyboard", { label: t("키보드") })];
-  for (const a of ACTIONS) {
-    if (unavailable.has(a.id) || !keysOf(a.id).length) continue;
-    items.push(helpItem(a.label, keysOf(a.id).map(keycap)));
-  }
-  items.push(helpItem(t("메뉴·일시정지"), [textCap("Esc")]));
-  if (padRef?.connected) {
-    const br = document.createElement("span");
-    br.className = "keys-break";
-    items.push(br, icon("gamepad", { label: t("게임패드") }));
-    for (const a of ACTIONS) {
-      const buttons = settings.padmap[a.id] ?? [];
-      if (unavailable.has(a.id) || !buttons.length) continue;
-      items.push(helpItem(a.label, buttons.map(padCap)));
-    }
-  }
-  $("key-help").replaceChildren(...items);
-  // 버튼 안 단축키 표시는 첫 번째 키만
-  for (const kbd of document.querySelectorAll("kbd[data-key]")) {
-    const first = keysOf(kbd.getAttribute("data-key"))[0];
-    kbd.replaceChildren(...(first ? [keycap(first)] : []));
-  }
-};
+const keyHelp = createKeyHelp({
+  target: $("key-help"),
+  getSettings: () => settings,
+  getRules: () => game?.rules ?? currentRules(),
+  padConnected: () => Boolean(padRef?.connected),
+});
+const keysOf = keyHelp.keysOf;
+const renderKeyHelp = keyHelp.render;
 
 /** 프리셋 한 줄 설명(첫 화면 규칙 카드) */
 const RULE_DESCRIPTIONS = {
@@ -551,7 +507,7 @@ const start = (m, selectedRules = currentRules(), target = null) => {
   goTimer = 0;
   undo.reset();
   showPanel(null);
-  actionEl.classList.remove("is-shown");
+  fb.clearAction();
   renderer.clearEffects();
   renderKeyHelp();
   setScreen("countdown");
@@ -819,44 +775,15 @@ const finish = () => {
   showPanel("results");
 };
 
-// ---- 액션 표시 (T-SPIN DOUBLE, B2B, 콤보, 퍼펙트 클리어, 레벨업) ----
-
-const actionEl = $("action");
-const announce = e => {
-  /** @type {string[]} */
-  let lines = [];
-  if (e.type === "lock") {
-    const name = clearName(e);
-    const showName = e.tspin !== "none" || e.lines >= 4;
-    if (e.perfect) lines.push("PERFECT CLEAR");
-    if (e.b2b) lines.push("BACK-TO-BACK");
-    if (showName && name) lines.push(name);
-    if (e.combo >= 1) lines.push(`${e.combo} COMBO`);
-    if (lines.length && e.points) lines.push(`+${formatScore(e.points)}`);
-  } else if (e.type === "practice" && !e.reset) {
-    lines = [e.success ? t("성공") : t("다시")];
-  } else if (e.type === "levelUp") {
-    lines = [`LEVEL ${e.level}`];
-  }
-  announceText(lines);
-};
-
-/** 보드 위에 큰 글씨로 잠깐 띄운다 */
-const announceText = lines => {
-  if (!lines.length) return;
-  actionEl.replaceChildren(
-    ...lines.map((text, i) => {
-      const div = document.createElement("div");
-      div.textContent = text;
-      if (i === 0) div.className = "action-main";
-      return div;
-    })
-  );
-  // 애니메이션을 처음부터 다시 돌린다.
-  actionEl.classList.remove("is-shown");
-  void actionEl.offsetWidth;
-  actionEl.classList.add("is-shown");
-};
+// ---- 반응: 액션 표시(보드 위 큰 글씨) · 진동 · 화면 읽기 알림 ----
+const fb = createFeedback({
+  actionEl: $("action"),
+  srStatus: $("sr-status"),
+  getSettings: () => settings,
+  describeLeft: () => (game ? mode.hudLines(game.state) : null),
+});
+const { announce, announceText, say } = fb;
+const feedback = fb.react;
 
 // ---- 입력 ----
 
@@ -1014,24 +941,8 @@ const gesturesOn = () => settings.touchMode === "gestures" && touchVisible(setti
 const undo = createUndo();
 
 // ---- 키 입력 표시 ----
-const inputCells = [...document.querySelectorAll("#input-display [data-bit]")].map(el => ({
-  el,
-  bit: Number(el.getAttribute("data-bit")),
-}));
-/** 누른 순간은 짧게 남겨 둔다(한 프레임만 눌린 탭도 보이게) */
-let inputFlash = [];
-let inputHeld = 0;
-const showInputs = (held, pressed) => {
-  inputHeld = held;
-  if (pressed) inputFlash.push({ bits: pressed, until: performance.now() + 110 });
-};
-const paintInputs = () => {
-  if (settings.visual.inputs !== "on") return;
-  const now = performance.now();
-  inputFlash = inputFlash.filter(f => f.until > now);
-  const lit = inputFlash.reduce((b, f) => b | f.bits, inputHeld);
-  for (const c of inputCells) c.el.classList.toggle("is-on", Boolean(lit & c.bit));
-};
+const inputDisplay = createInputDisplay({ root: $("input-display"), isOn: () => settings.visual.inputs === "on" });
+
 /** 연습 모드에서 바로 앞 피스로 되돌린다 */
 const undoPiece = () => {
   if (!game || !mode.practice || (screen !== "play" && screen !== "paused")) return;
@@ -1044,45 +955,6 @@ const undoPiece = () => {
   say(t("한 피스 되돌렸어요"));
 };
 $("undo-piece").addEventListener("click", undoPiece);
-
-/** 진동(설정이 켜져 있고 지원하는 기기만) */
-const buzz = pattern => {
-  if (settings.access.vibrate !== "on") return;
-  try {
-    navigator.vibrate?.(pattern);
-  } catch {
-    /* 무시 */
-  }
-};
-
-/** 화면 읽기 프로그램에 알린다(설정이 켜져 있을 때). 같은 글을 연달아 보내도 읽도록 비웠다가 넣는다 */
-const srStatus = $("sr-status");
-const say = text => {
-  if (settings.access.announce !== "on" || !text) return;
-  srStatus.textContent = "";
-  requestAnimationFrame(() => (srStatus.textContent = text));
-};
-
-/** 이벤트 → 진동·읽기 */
-const feedback = events => {
-  for (const e of events) {
-    if (e.type === "lock") {
-      if (e.lines > 0) {
-        buzz(e.lines >= 4 || e.tspin !== "none" ? [25, 30, 25] : 15);
-        const name = clearName(e);
-        const left = game ? mode.hudLines(game.state) : null;
-        say(
-          [name || t("{n}줄 지움", { n: e.lines }), left ? `${left.label} ${left.value}` : ""]
-            .filter(Boolean)
-            .join(" · ")
-        );
-      } else buzz(6);
-    } else if (e.type === "levelUp") say(t("레벨 {n}", { n: e.level }));
-    else if (e.type === "garbage") buzz(20);
-    else if (e.type === "gameOver") buzz([60, 40, 90]);
-    else if (e.type === "finish") buzz([30, 30, 30]);
-  }
-};
 
 /** 터치 버튼 보이기: 설정 + 기기(굵은 포인터). 설정을 바꿀 때만 바뀐다(원칙 2). */
 // 터치 화면 판정: 굵은 포인터이거나, 마우스 올리기가 없는 화면에서 터치를 지원할 때(iPhone 등)
@@ -1283,7 +1155,7 @@ const seekReplay = (target, pause = false) => {
   while (player.frame < to && !player.done) player.step();
   if (pause) replayPaused = true;
   renderer.clearEffects();
-  actionEl.classList.remove("is-shown");
+  fb.clearAction();
   updateReplayBar();
 };
 
@@ -1327,7 +1199,7 @@ const startReplay = (replay, returnTo = screen, note = "") => {
   if (analysis?.for !== replay) analysis = { ...analyzeReplay(replay, findMode), for: replay };
   acc = 0;
   renderer.clearEffects();
-  actionEl.classList.remove("is-shown");
+  fb.clearAction();
   countdownEl.hidden = true;
   showPanel(null);
   setScreen("replay");
@@ -1362,7 +1234,7 @@ const advanceReplay = count => {
   if (!player || player.done) return;
   for (let i = 0; i < count && !player.done; i++) {
     const events = player.step();
-    showInputs(player.input.held, player.input.pressed);
+    inputDisplay.show(player.input.held, player.input.pressed);
     for (const e of events) announce(e);
     renderer.addEvents(events);
     // 빨리 감기 중에는 소리를 겹쳐 내지 않는다.
@@ -1432,18 +1304,6 @@ window.addEventListener("keydown", e => {
 });
 
 /** JSON 값을 파일로 내려받게 한다 */
-const downloadJson = (value, filename) => {
-  const blob = new Blob([JSON.stringify(value)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-};
-
 const exportReplay = replay => {
   const stamp = (replay.date || "").replace(/[-:]/g, "").slice(0, 15);
   downloadJson(replay, `tetri-sharp-${replay.mode}-${stamp || "replay"}.json`);
@@ -1500,12 +1360,6 @@ fileInput.addEventListener("change", async () => {
 
 // ---- 저장 데이터 백업 ----
 
-$("export-backup").addEventListener("click", () => {
-  const backup = createBackup(store);
-  downloadJson(backup, `tetri-sharp-backup-${backup.date.slice(0, 10).replace(/-/g, "")}.json`);
-  showMenuNotice(t("설정·기록·리플레이를 백업 파일로 저장했어요."));
-});
-
 /** 백업을 들인 뒤 메모리에 들고 있던 값들을 저장소에서 다시 읽는다. */
 const reloadFromStore = () => {
   settings = loadSettings(store);
@@ -1523,43 +1377,16 @@ const reloadFromStore = () => {
   toMenu();
 };
 
-const backupInput = /** @type {HTMLInputElement} */ ($("backup-file"));
-$("import-backup").addEventListener("click", () => backupInput.click());
-backupInput.addEventListener("change", async () => {
-  const file = backupInput.files?.[0];
-  backupInput.value = "";
-  if (!file || screen !== "menu") return;
-  let parsed = null;
-  try {
-    parsed = parseBackup(JSON.parse(await file.text()), findMode);
-  } catch {
-    parsed = null;
-  }
-  if (!parsed) {
-    showMenuNotice(t("읽을 수 없는 백업 파일이에요."));
-    return;
-  }
-  const { records: count, replays: replayCount } = parsed.summary;
-  const when = parsed.date ? ` (${parsed.date.slice(0, 10)})` : "";
-  if (
-    !window.confirm(
-      t("백업{when}에는 기록 {records}개, 리플레이 {replays}개가 있어요.", {
-        when,
-        records: count,
-        replays: replayCount,
-      }) +
-        "\n" +
-        t("지금 이 브라우저의 설정·기록·리플레이를 백업 내용으로 바꿀까요?")
-    )
-  )
-    return;
-  const ok = restoreBackup(store, parsed);
-  reloadFromStore();
-  showMenuNotice(
-    ok
-      ? t("백업을 불러왔어요 · 기록 {records}개, 리플레이 {replays}개", { records: count, replays: replayCount })
-      : t("일부를 저장하지 못했어요. 저장 공간을 확인해 주세요.")
-  );
+setupBackup({
+  store,
+  findMode,
+  exportButton: $("export-backup"),
+  importButton: $("import-backup"),
+  fileInput: /** @type {HTMLInputElement} */ ($("backup-file")),
+  canImport: () => screen === "menu",
+  confirmImport: message => window.confirm(message),
+  notify: text => showMenuNotice(text),
+  onRestored: reloadFromStore,
 });
 
 // ---- 루프 ----
@@ -1585,7 +1412,7 @@ const tick = () => {
   const held = keyboard.held | pad.held | touch.held | gestures.held;
   const pressed = keyboard.takePressed() | touch.takePressed() | gestures.takePressed();
   if (mode.practice) undo.track(game.state);
-  showInputs(held, pressed);
+  inputDisplay.show(held, pressed);
   recorder?.input(held, pressed);
   const hadActive = Boolean(game.state.active);
   const events = game.step({ held, pressed });
@@ -1628,7 +1455,7 @@ const loop = now => {
   if (race && screen !== "replay" && raceBoardVisible.matches) raceRenderer.draw(race.player.game);
   if (versus && raceBoardVisible.matches) cpuRenderer.draw(versus.cpu);
   updateHud();
-  paintInputs();
+  inputDisplay.paint();
   requestAnimationFrame(loop);
 };
 
@@ -1660,13 +1487,8 @@ const raceReplay = replay => {
 
 /** 리플레이 링크(#replay=…)로 열었으면 검증하고 바로 재생한다. 주소의 해시는 지운다. */
 const importReplayFromLink = async () => {
-  if (!/[#&]replay=/.test(location.hash)) return;
-  const hash = location.hash;
-  try {
-    history.replaceState(null, "", location.pathname + location.search);
-  } catch {
-    /* file:// 등에서 막혀도 괜찮다 */
-  }
+  const hash = takeLinkHash("replay");
+  if (!hash) return;
   const raw = await decodeReplayCode(hash);
   const replay = raw && sanitizeReplay(raw, findMode);
   if (!replay) {
@@ -1679,28 +1501,19 @@ const importReplayFromLink = async () => {
 };
 
 const importDailyFromLink = () => {
-  if (!/[#&]daily=/.test(location.hash)) return;
-  const pasted = location.hash.slice(1);
-  try {
-    history.replaceState(null, "", location.pathname + location.search);
-  } catch {
-    /* file:// 등에서 막혀도 괜찮다 */
-  }
+  const pasted = takeLinkHash("daily");
+  if (!pasted) return;
   dailyUI.open({
-    pasted: `#${pasted}`,
+    pasted,
     message: t("받은 결과가 있어요. 겨루기를 누르면 같은 블록 순서로 함께 달려요"),
   });
 };
 
 /** 공유 링크(#rules=…)로 열었으면 그 규칙을 Custom으로 들이고 알린다. 주소의 해시는 지운다. */
 const importRulesFromLink = () => {
-  if (!/[#&]rules=/.test(location.hash)) return false;
-  const body = decodeRules(location.hash);
-  try {
-    history.replaceState(null, "", location.pathname + location.search);
-  } catch {
-    /* file:// 등에서 막혀도 괜찮다 */
-  }
+  const hash = takeLinkHash("rules");
+  if (!hash) return false;
+  const body = decodeRules(hash);
   if (!body) {
     showMenuNotice(t("링크의 규칙 코드를 읽을 수 없었어요."));
     return false;
