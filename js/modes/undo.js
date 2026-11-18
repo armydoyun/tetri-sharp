@@ -33,18 +33,28 @@ export const createUndo = () => {
     reset() {
       stack = [];
     },
-    /** 매 프레임 step() 전에: 새 피스가 나왔으면 찍어 둔다 */
+    /**
+     * 매 프레임 step() 전에: 새 피스가 나왔으면 찍어 둔다.
+     * 첫 피스가 나오기 전의 빈 판도 찍는다 — 첫 프레임에 나온 피스가 그 프레임 안에 바로 놓여도(느린 기기에서 미리 누른 키)
+     * 그 피스를 되돌릴 수 있게.
+     */
     track(state) {
-      if (!state.active || state.over) return;
-      if (stack.at(-1)?.pieceId === state.pieceId) return;
+      if (state.over) return;
+      if (!state.active && stack.length) return;
+      if (stack.length && stack.at(-1).pieceId === state.pieceId) return;
       stack.push({ pieceId: state.pieceId, snap: snapshotState(state) });
       if (stack.length > MAX) stack.shift();
     },
     /** 바로 앞 피스가 나온 순간으로. 되돌렸으면 true */
     undo(state) {
-      if (stack.at(-1)?.pieceId === state.pieceId) stack.pop();
-      const prev = stack.at(-1);
+      // 지금 피스가 움직이는 중이면 맨 위 기록은 "지금"과 같으니 그 아래로 간다.
+      // 방금 놓고 다음 피스가 아직 안 나온 순간(active 없음)에는 맨 위 기록이 바로 놓은 피스다.
+      const skipTop = Boolean(state.active) && stack.at(-1)?.pieceId === state.pieceId;
+      const prev = stack.at(skipTop ? -2 : -1);
       if (!prev) return false;
+      // 첫 피스 전 빈 판으로 가는데 아직 놓은 피스가 없으면 되돌릴 것이 없다
+      if (!prev.snap.active && state.stats.pieces === 0) return false;
+      if (skipTop) stack.pop();
       restoreState(state, prev.snap);
       return true;
     },

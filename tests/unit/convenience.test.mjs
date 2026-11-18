@@ -38,6 +38,29 @@ test("되돌리기: 놓은 피스를 취소하면 그 피스가 나온 순간의
   assert.equal(undo.undo(game.state), false);
 });
 
+test("되돌리기: 첫 프레임에 나온 피스가 그 프레임에 바로 놓여도(미리 누른 키) 그 피스를 되돌린다", () => {
+  const mode = practiceMode(DRILLS.find(d => d.id === "free"));
+  const game = createGame({ rules: MODERN, seed: 4, mode });
+  const undo = createUndo();
+  const step = input => {
+    undo.track(game.state);
+    game.step(input);
+  };
+  step({ pressed: BTN.HARD }); // 첫 피스가 나오자마자 하드 드롭
+  step({ pressed: BTN.HARD });
+  step();
+  assert.equal(game.state.stats.pieces, 2);
+  assert.equal(undo.undo(game.state), true);
+  assert.equal(game.state.stats.pieces, 1);
+  step();
+  assert.equal(undo.undo(game.state), true);
+  assert.equal(game.state.stats.pieces, 0);
+  assert.ok(!game.state.board.cells.some(v => v), "보드가 비었다");
+  step();
+  assert.ok(game.state.active, "첫 피스가 다시 나온다");
+  assert.equal(undo.undo(game.state), false, "놓은 피스가 없으면 더 못 간다");
+});
+
 test("되돌리기는 연습의 난수 같은 함수 객체를 그대로 두고 값만 되돌린다", () => {
   const mode = practiceMode(DRILLS.find(d => d.id === "tsd"));
   const game = createGame({ rules: MODERN, seed: 4, mode });
