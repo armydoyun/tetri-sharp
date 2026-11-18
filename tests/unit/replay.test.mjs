@@ -132,3 +132,58 @@ test("저장소: 마지막 판과 기록별 최고 리플레이", () => {
   assert.equal(replays.best("marathon|modern").seed, replay.seed);
   assert.equal(replays.best("sprint40|modern"), null);
 });
+
+test("저장소: 상위 3개 기록의 리플레이를 기록 순서대로 남기고, 예전 형식도 읽는다", () => {
+  const store = createStore(memoryBackend());
+  const replays = createReplayStore(store, findMode);
+  const runs = [120, 200, 260, 330].map(frames => playRandom({ frames }).replay);
+  const entry = r => ({
+    frames: r.result.frames,
+    lines: r.result.lines,
+    pieces: r.result.pieces,
+    score: r.result.score,
+  });
+  // 예전 형식: 기록표마다 리플레이 하나
+  store.set("replay:best", { "zen|modern": runs[0] });
+  assert.equal(replays.ranked("zen|modern").length, 1);
+
+  const top = [];
+  for (const r of runs) {
+    top.push(entry(r));
+    top.sort((a, b) => b.frames - a.frames);
+    replays.saveRanked("zen|modern", r, top);
+  }
+  const kept = replays.ranked("zen|modern");
+  assert.deepEqual(
+    kept.map(r => r.result.frames),
+    top.slice(0, 3).map(e => e.frames)
+  );
+  assert.equal(replays.forEntry("zen|modern", top[1]).result.frames, top[1].frames);
+  assert.equal(replays.forEntry("zen|modern", top[3]), null, "4위는 리플레이가 없다");
+  assert.equal(replays.best("zen|modern").result.frames, top[0].frames);
+});
+
+test("저장소: 공간이 모자라면 다른 기록표의 2·3위 리플레이부터 지운다", () => {
+  const backend = memoryBackend();
+  const store = createStore(backend);
+  const replays = createReplayStore(store, findMode);
+  const runs = [100, 150, 200].map(frames => playRandom({ frames }).replay);
+  const entries = runs.map(r => ({
+    frames: r.result.frames,
+    lines: r.result.lines,
+    pieces: r.result.pieces,
+    score: r.result.score,
+  }));
+  for (const r of runs) replays.saveRanked("zen|modern", r, entries);
+  assert.equal(replays.ranked("zen|modern").length, 3);
+  const limit = backend.map.get("tetrisharp:replay:best").length + 200;
+  const setItem = backend.setItem;
+  backend.setItem = (k, v) => {
+    if (v.length > limit) throw new Error("QuotaExceededError");
+    setItem(k, v);
+  };
+  const extra = playRandom({ frames: 140 }).replay;
+  assert.equal(replays.saveRanked("sprint40|modern", extra, [extra.result]), true);
+  assert.equal(replays.ranked("zen|modern").length, 1);
+  assert.equal(replays.best("sprint40|modern").result.frames, extra.result.frames);
+});

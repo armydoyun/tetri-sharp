@@ -11,7 +11,7 @@ const cleanName = value =>
   typeof value === "string" ? [...value.replace(/\s+/gu, " ").trim()].slice(0, 24).join("").trimEnd() : "";
 
 const nonNegative = v => Number.isFinite(v) && v >= 0;
-const isEntry = e =>
+export const isEntry = e =>
   e &&
   typeof e === "object" &&
   ["frames", "lines", "pieces"].every(k => nonNegative(e[k])) &&
@@ -50,6 +50,10 @@ export const createRecords = store => {
   return {
     get playerName() {
       return playerName;
+    },
+    /** 저장소를 바깥에서 바꿨을 때(백업 불러오기) 이름을 다시 읽는다 */
+    reload() {
+      playerName = cleanName(store.get("playerName", ""));
     },
     setPlayerName(value) {
       playerName = cleanName(value);

@@ -21,12 +21,20 @@ import { practiceMode } from "./modes/practice.js";
 import { advanceSplits, analyzeSplits, formatDelta, splitDelta } from "./modes/splits.js";
 import { hydrateIcons, icon } from "./ui/icons.js";
 import { keycap } from "./ui/keycap.js";
-import { createPlayer, createRecorder, createReplayStore, sanitizeReplay, verifyReplay } from "./replay/replay.js";
+import {
+  MAX_RANKED,
+  createPlayer,
+  createRecorder,
+  createReplayStore,
+  sanitizeReplay,
+  verifyReplay,
+} from "./replay/replay.js";
 import { recordKey } from "./storage/records.js";
 import { MODERN, PRESETS, PRESET_LIST } from "./rules/presets.js";
 import { makeCustomRules, sanitizeRuleBody } from "./rules/sanitize.js";
 import { decodeRules } from "./rules/share.js";
 import { createSfx } from "./audio/sfx.js";
+import { createBackup, parseBackup, restoreBackup } from "./storage/backup.js";
 
 const FRAME_MS = 1000 / 60;
 const MAX_CATCH_UP_MS = 250; // 시간이 크게 튀면(탭 복귀 등) 한꺼번에 따라잡지 않는다.
@@ -425,7 +433,8 @@ const finish = () => {
   lastReplay = recorder ? recorder.finish(state) : null;
   if (lastReplay) {
     replays.saveLast(lastReplay);
-    if (outcome?.isBest) replays.saveBest(recordKey(mode, rules), lastReplay);
+    if (outcome && outcome.rank < MAX_RANKED)
+      replays.saveRanked(recordKey(mode, rules), lastReplay, records.list(mode, rules));
   }
   recorder = null;
 
@@ -564,7 +573,7 @@ const recordsUI = createRecordsUI({
   dialog: /** @type {HTMLDialogElement} */ ($("records")),
   modes: MODES,
   records,
-  bestReplay: key => replays.best(key),
+  replayFor: (key, entry) => replays.forEntry(key, entry),
   onWatch: replay => startReplay(replay, "menu"),
 });
 $("open-records").addEventListener("click", () => recordsUI.open({ modeId: mode.id, rulesId: currentRules().id }));
@@ -779,17 +788,22 @@ window.addEventListener("keydown", e => {
   updateReplayBar();
 });
 
-const exportReplay = replay => {
-  const blob = new Blob([JSON.stringify(replay)], { type: "application/json" });
+/** JSON 값을 파일로 내려받게 한다 */
+const downloadJson = (value, filename) => {
+  const blob = new Blob([JSON.stringify(value)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  const stamp = (replay.date || "").replace(/[-:]/g, "").slice(0, 15);
   a.href = url;
-  a.download = `tetri-sharp-${replay.mode}-${stamp || "replay"}.json`;
+  a.download = filename;
   document.body.append(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+const exportReplay = replay => {
+  const stamp = (replay.date || "").replace(/[-:]/g, "").slice(0, 15);
+  downloadJson(replay, `tetri-sharp-${replay.mode}-${stamp || "replay"}.json`);
 };
 
 /** 메뉴 알림 칸은 늘 자리를 차지한다(빈 글이면 비어 보일 뿐). */
@@ -838,6 +852,63 @@ fileInput.addEventListener("change", async () => {
     return;
   }
   if (request === replayFileRequest && screen === "menu") openReplayText(text);
+});
+
+// ---- 저장 데이터 백업 ----
+
+$("export-backup").addEventListener("click", () => {
+  const backup = createBackup(store);
+  downloadJson(backup, `tetri-sharp-backup-${backup.date.slice(0, 10).replace(/-/g, "")}.json`);
+  showMenuNotice("설정·기록·리플레이를 백업 파일로 저장했어요.");
+});
+
+/** 백업을 들인 뒤 메모리에 들고 있던 값들을 저장소에서 다시 읽는다. */
+const reloadFromStore = () => {
+  settings = loadSettings(store);
+  bindings = compileKeymap(settings.keymap);
+  padBindings = compilePadmap(settings.padmap);
+  records.reload();
+  customBody = sanitizeRuleBody(store.get("customRules", MODERN) ?? MODERN);
+  const last = store.get("lastRules", null);
+  ruleChoice = RULE_CHOICES.includes(last) ? last : "modern";
+  mode = findMode(store.get("lastMode", null));
+  lastReplay = null;
+  applyTouch();
+  renderKeyHelp();
+  toMenu();
+};
+
+const backupInput = /** @type {HTMLInputElement} */ ($("backup-file"));
+$("import-backup").addEventListener("click", () => backupInput.click());
+backupInput.addEventListener("change", async () => {
+  const file = backupInput.files?.[0];
+  backupInput.value = "";
+  if (!file || screen !== "menu") return;
+  let parsed = null;
+  try {
+    parsed = parseBackup(JSON.parse(await file.text()), findMode);
+  } catch {
+    parsed = null;
+  }
+  if (!parsed) {
+    showMenuNotice("읽을 수 없는 백업 파일이에요.");
+    return;
+  }
+  const { records: count, replays: replayCount } = parsed.summary;
+  const when = parsed.date ? ` (${parsed.date.slice(0, 10)})` : "";
+  if (
+    !window.confirm(
+      `백업${when}에는 기록 ${count}개, 리플레이 ${replayCount}개가 있어요.\n지금 이 브라우저의 설정·기록·리플레이를 백업 내용으로 바꿀까요?`
+    )
+  )
+    return;
+  const ok = restoreBackup(store, parsed);
+  reloadFromStore();
+  showMenuNotice(
+    ok
+      ? `백업을 불러왔어요 · 기록 ${count}개, 리플레이 ${replayCount}개`
+      : "일부를 저장하지 못했어요. 저장 공간을 확인해 주세요."
+  );
 });
 
 // ---- 루프 ----
