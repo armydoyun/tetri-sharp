@@ -1,10 +1,21 @@
 // 게임 엔진. 한 번의 step()이 한 프레임(1/60초)을 진행한다. DOM·실시간 시계·Math.random을 쓰지 않으므로
 // 같은 (규칙, 조작 설정, 시드, 입력 기록)이면 언제 어디서 돌려도 결과가 같다 → 테스트·리플레이의 바탕.
-import { HEIGHT, VISIBLE_ROWS, WIDTH, clearLines, collides, createBoard, isEmpty, place } from "./board.js";
+import {
+  HEIGHT,
+  VISIBLE_ROWS,
+  WIDTH,
+  clearLines,
+  collides,
+  createBoard,
+  get,
+  inBounds,
+  isEmpty,
+  place,
+} from "./board.js";
 import { CELL_ID, PIECES } from "./pieces.js";
 import { createRng } from "./rng.js";
 import { detectTSpin } from "./tspin.js";
-import { HARD_DROP_POINTS, SOFT_DROP_POINTS, scoreLock } from "../rules/scoring/guideline.js";
+import { SCORINGS } from "../rules/scoring/index.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
 import { RANDOMIZERS } from "../rules/randomizer/index.js";
 
@@ -63,6 +74,12 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
   if (!rotation) throw new Error(`알 수 없는 회전 시스템: ${rules.rotation}`);
   const makeRandomizer = RANDOMIZERS[rules.randomizer];
   if (!makeRandomizer) throw new Error(`알 수 없는 생성기: ${rules.randomizer}`);
+
+  const scoring = SCORINGS[rules.scoring ?? "guideline"];
+  if (!scoring) throw new Error(`알 수 없는 점수표: ${rules.scoring}`);
+  // 규칙이 조작감을 고정하면(예: Retro) 개인 설정 대신 그 값을 쓴다.
+  const withRules = h => (rules.fixedHandling ? { ...h, ...rules.fixedHandling } : h);
+  handling = withRules(handling);
 
   const randomizer = makeRandomizer(createRng(seed));
   const board = createBoard();
@@ -151,7 +168,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
     const cleared = clearLines(board);
     const lines = cleared.length;
     const perfect = lines > 0 && isEmpty(board);
-    const scored = scoreLock({ lines, tspin, b2b: state.b2b, combo: state.combo, perfect, level: state.level });
+    const scored = scoring.scoreLock({ lines, tspin, b2b: state.b2b, combo: state.combo, perfect, level: state.level });
     state.score += scored.points;
     state.b2b = scored.b2b;
     state.combo = scored.combo;
@@ -216,7 +233,13 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
 
   const rotate = (a, delta) => {
     const to = (((a.rot + delta) % 4) + 4) % 4;
-    const kicks = rotation.kicks(a.type, a.rot, to);
+    // 회전 시스템이 "어느 칸이 막혔는지"를 보고 킥을 정할 수 있게(ARS 중앙열 규칙) 조회 함수를 넘긴다.
+    const blocked = (cx, cy) => {
+      const x = a.x + cx;
+      const y = a.y + cy;
+      return !inBounds(board, x, y) || get(board, x, y) !== 0;
+    };
+    const kicks = rotation.kicks(a.type, a.rot, to, blocked);
     for (let i = 0; i < kicks.length; i++) {
       const [dx, dy] = kicks[i];
       if (fits(a, dx, dy, to)) {
@@ -290,7 +313,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
         return;
       }
       state.gravityAcc -= 1;
-      if (held & BTN.SOFT) state.score += SOFT_DROP_POINTS;
+      if (held & BTN.SOFT) state.score += scoring.SOFT_DROP_POINTS;
     }
   };
 
@@ -359,7 +382,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
     if (pressed & BTN.HARD && rules.hardDrop) {
       let distance = 0;
       while (dropOne(a)) distance += 1;
-      state.score += distance * HARD_DROP_POINTS;
+      state.score += distance * scoring.HARD_DROP_POINTS;
       events.push({ type: "hardDrop", distance });
       lockPiece();
       return events;
@@ -388,7 +411,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
     },
     /** 조작 설정을 바꾼다(설정 화면에서 바로 반영). DAS 충전 상태는 그대로 둔다. */
     setHandling(next) {
-      handling = next;
+      handling = withRules(next);
     },
     ghostY,
     /** 현재 피스의 칸 좌표(보드 기준) */

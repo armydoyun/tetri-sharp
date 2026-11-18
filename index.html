@@ -22,6 +22,10 @@
           <canvas id="board" class="board" aria-label="보드"></canvas>
 
           <div id="menu" class="panel" hidden>
+            <div class="rule-bar">
+              <div id="rule-tabs" class="rule-tabs" role="group" aria-label="규칙"></div>
+              <button id="edit-rules" type="button" class="btn btn-small" hidden>규칙 편집</button>
+            </div>
             <h2 class="panel-title">모드 선택</h2>
             <div id="mode-list" class="mode-list"></div>
           </div>
@@ -62,6 +66,7 @@
       <p id="key-help" class="keys"></p>
     </main>
     <dialog id="settings" class="settings" aria-label="설정"></dialog>
+    <dialog id="rules-editor" class="settings" aria-label="Custom 규칙"></dialog>
     <!-- ES Modules: 개발용 실행은 http://localhost를 사용한다. -->
     <script type="module" src="./js/main.js"></script>
   </body>

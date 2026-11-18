@@ -1,9 +1,11 @@
-// 개인 기록. 키 = "모드|규칙" → 같은 모드라도 규칙이 다르면 따로 센다(규칙 샌드박스 대비).
+// 개인 기록. 키 = "모드|규칙 id" → 같은 모드라도 규칙이 다르면 따로 센다.
+// 프리셋은 이름(modern·retro·arcade), Custom은 내용 해시가 id라 조합마다 기록표가 따로 생긴다.
 const MAX_ENTRIES = 10;
 
 /** @typedef {{ frames: number, lines: number, pieces: number, score?: number, date: string }} RecordEntry */
 
-export const recordKey = mode => `${mode.id}|${mode.rules.id}`;
+/** @param {{ id: string }} rules */
+export const recordKey = (mode, rules) => `${mode.id}|${rules.id}`;
 
 const nonNegative = v => Number.isFinite(v) && v >= 0;
 const isEntry = e =>
@@ -20,8 +22,8 @@ export const createRecords = store => {
   };
 
   /** @returns {RecordEntry[]} */
-  const list = mode => {
-    const entries = readAll()[recordKey(mode)];
+  const list = (mode, rules) => {
+    const entries = readAll()[recordKey(mode, rules)];
     return Array.isArray(entries) ? entries.filter(isEntry) : [];
   };
 
@@ -34,18 +36,18 @@ export const createRecords = store => {
 
   return {
     list,
-    best: mode => list(mode)[0] ?? null,
+    best: (mode, rules) => list(mode, rules)[0] ?? null,
     /**
      * @param {RecordEntry} entry
      * @returns {{ rank: number, isBest: boolean, previousBest: RecordEntry | null }}
      */
-    add(mode, entry) {
-      const previous = list(mode);
+    add(mode, rules, entry) {
+      const previous = list(mode, rules);
       const previousBest = previous[0] ?? null;
       const next = [...previous, entry].sort(compare(mode));
       const rank = next.indexOf(entry);
       const all = readAll();
-      all[recordKey(mode)] = next.slice(0, MAX_ENTRIES);
+      all[recordKey(mode, rules)] = next.slice(0, MAX_ENTRIES);
       store.set("records", all);
       return { rank, isBest: rank === 0, previousBest };
     },

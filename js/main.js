@@ -11,6 +11,9 @@ import { createStore } from "./storage/store.js";
 import { loadSettings, sanitizeSettings, saveSettings, toEngineHandling } from "./storage/settings.js";
 import { createRecords } from "./storage/records.js";
 import { createSettingsUI } from "./ui/settings.js";
+import { createRulesUI } from "./ui/rules.js";
+import { MODERN, PRESETS, PRESET_LIST } from "./rules/presets.js";
+import { makeCustomRules, sanitizeRuleBody } from "./rules/sanitize.js";
 
 const FRAME_MS = 1000 / 60;
 const MAX_CATCH_UP_MS = 250; // 시간이 크게 튀면(탭 복귀 등) 한꺼번에 따라잡지 않는다.
@@ -42,6 +45,16 @@ const renderer = createRenderer(canvas);
 /** @type {"menu" | "countdown" | "play" | "paused" | "results"} */
 let screen = "menu";
 let mode = findMode(store.get("lastMode", null));
+
+// ---- 규칙 선택 (Modern / Retro / Arcade / Custom) ----
+
+const RULE_CHOICES = [...PRESET_LIST.map(p => p.id), "custom"];
+let ruleChoice = RULE_CHOICES.includes(store.get("lastRules", null)) ? store.get("lastRules", null) : "modern";
+let customBody = sanitizeRuleBody(store.get("customRules", MODERN));
+/** 지금 고른 규칙 */
+const currentRules = () => (ruleChoice === "custom" ? makeCustomRules(customBody) : PRESETS[ruleChoice]);
+/** 이번 판에 쓰는 규칙(게임 중에 Custom을 고쳐도 이번 판 기록은 시작할 때 규칙으로 남는다) */
+let rules = currentRules();
 /** @type {ReturnType<typeof createGame> | null} */
 let game = null;
 let countdown = 0;
@@ -71,11 +84,35 @@ const renderKeyHelp = () => {
   for (const kbd of document.querySelectorAll("kbd[data-key]")) kbd.textContent = keysFor(kbd.getAttribute("data-key"));
 };
 
+const renderRuleTabs = () => {
+  const tabs = $("rule-tabs");
+  tabs.replaceChildren(
+    ...RULE_CHOICES.map(id => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "rule-tab";
+      b.dataset.rules = id;
+      b.textContent = id === "custom" ? "Custom" : PRESETS[id].name;
+      b.setAttribute("aria-pressed", String(id === ruleChoice));
+      b.addEventListener("click", () => {
+        ruleChoice = id;
+        store.set("lastRules", id);
+        renderMenu();
+        /** @type {HTMLElement | null} */ (tabs.querySelector(`[data-rules="${id}"]`))?.focus();
+      });
+      return b;
+    })
+  );
+  $("edit-rules").hidden = ruleChoice !== "custom";
+};
+
 const renderMenu = () => {
+  renderRuleTabs();
+  const ruleSet = currentRules();
   const list = $("mode-list");
   list.replaceChildren(
     ...MODES.map(m => {
-      const best = records.best(m);
+      const best = records.best(m, ruleSet);
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "mode-card";
@@ -129,8 +166,9 @@ const toMenu = () => {
 const start = m => {
   mode = m;
   store.set("lastMode", m.id);
+  rules = currentRules();
   game = createGame({
-    rules: m.rules,
+    rules,
     handling: toEngineHandling(settings.handling),
     seed: (Math.random() * 2 ** 32) >>> 0,
     mode: m,
@@ -168,7 +206,7 @@ const finish = () => {
 
   let outcome = null;
   if (mode.isRecordable(state)) {
-    outcome = records.add(mode, {
+    outcome = records.add(mode, rules, {
       frames: state.frame,
       lines: state.stats.lines,
       pieces: state.stats.pieces,
@@ -176,9 +214,9 @@ const finish = () => {
       date: new Date().toISOString(),
     });
   }
-  const best = records.best(mode);
+  const best = records.best(mode, rules);
 
-  $("results-mode").textContent = mode.name;
+  $("results-mode").textContent = `${mode.name} · ${rules.name}`;
   const summary = mode.summary(state);
   $("results-title").textContent = summary.title;
   $("results-main").textContent = summary.main;
@@ -259,10 +297,25 @@ const settingsUI = createSettingsUI({
   },
 });
 
+const rulesUI = createRulesUI({
+  dialog: /** @type {HTMLDialogElement} */ ($("rules-editor")),
+  getRules: () => customBody,
+  onChange: body => {
+    customBody = sanitizeRuleBody(body);
+    store.set("customRules", customBody);
+  },
+  onClose: () => {
+    renderMenu();
+    /** @type {HTMLElement | null} */ ($("edit-rules"))?.focus();
+  },
+});
+
+$("edit-rules").addEventListener("click", () => rulesUI.open());
+
 const keyboard = createKeyboard({
   getBindings: () => bindings,
   onSystem: action => {
-    if (settingsUI.isOpen) return;
+    if (settingsUI.isOpen || rulesUI.isOpen) return;
     if (action === "restart" && screen !== "menu") return start(mode);
     if (action !== "pause") return;
     if (screen === "play" || screen === "countdown") pause();

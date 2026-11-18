@@ -193,3 +193,64 @@ test("Ultra: 남은 시간이 줄어들고 하드 드롭으로 점수가 오른�
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("규칙 선택: Retro는 하드 드롭이 안 되고, 선택이 새로고침 후에도 남는다", async () => {
+  const { context, page, errors } = await openPage();
+  const pressed = id => page.locator(`[data-rules="${id}"]`).getAttribute("aria-pressed");
+  assert.equal(await pressed("modern"), "true");
+  await page.click('[data-rules="retro"]');
+  assert.equal(await pressed("retro"), "true");
+  assert.equal(await page.locator("#edit-rules").isVisible(), false, "프리셋에는 편집 버튼이 없다");
+
+  await startMode(page, "sprint40");
+  await page.keyboard.press("Space");
+  await page.keyboard.press("KeyC");
+  await page.waitForTimeout(150);
+  assert.equal(await text(page, "hud-pieces"), "0", "하드 드롭 없음");
+  await page.keyboard.down("ArrowDown");
+  await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "1", null, {
+    timeout: 5000,
+  });
+  await page.keyboard.up("ArrowDown");
+
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  assert.equal(await pressed("retro"), "true");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("Custom 규칙: 편집 내용이 저장되고 기록표 id가 바뀌며, 게임에 반영된다", async () => {
+  const { context, page, errors } = await openPage();
+  await page.click('[data-rules="custom"]');
+  await page.click("#edit-rules");
+  assert.equal(await page.locator("#rules-editor").isVisible(), true);
+  const idText = () => page.locator("#rules-editor .settings-notice").textContent();
+  const before = await idText();
+
+  // 하드 드롭 끄기
+  await page.locator("#rule-hardDrop").uncheck();
+  const after = await idText();
+  assert.notEqual(after, before, "조합이 바뀌면 기록표도 바뀐다");
+  // 프리셋 버튼으로 채우면 해당 값으로 바뀐다
+  await page.click('[data-preset="arcade"]');
+  assert.equal(
+    await page.locator("#rule-rotation option:checked").textContent(),
+    "ARS — 좌우 1칸만, 중앙열 규칙 (아케이드)"
+  );
+  await page.locator("#rule-hardDrop").uncheck();
+  await page.click("#rules-close");
+
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  await page.click("#edit-rules");
+  assert.equal(await page.locator("#rule-hardDrop").isChecked(), false, "새로고침 후에도 유지");
+  await page.click("#rules-close");
+
+  await startMode(page, "sprint40");
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(150);
+  assert.equal(await text(page, "hud-pieces"), "0", "Custom에서 끈 하드 드롭은 동작하지 않는다");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
