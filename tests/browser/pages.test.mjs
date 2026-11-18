@@ -58,7 +58,7 @@ test("배포본 파일: index.html·매니페스트·아이콘·서비스 워커
 });
 
 test("한 번 열면 서비스 워커가 저장해 두고, 인터넷이 끊겨도 다시 열린다", async () => {
-  const context = await browser.newContext();
+  const context = await browser.newContext({ locale: "ko-KR" });
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", e => errors.push(e.message));

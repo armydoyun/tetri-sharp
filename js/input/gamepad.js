@@ -4,6 +4,7 @@
 // 왼쪽 스틱(좌우·아래)과 메뉴 이동(A 선택, 십자키 위·아래)은 고정이다.
 import { BTN } from "../core/engine.js";
 import { ACTIONS, SLOTS } from "./keymap.js";
+import { t } from "../i18n/index.js";
 
 export const PAD_BUTTON_COUNT = 17;
 
@@ -34,15 +35,15 @@ export const PAD_BUTTON_NAMES = Object.freeze([
   "Start",
   "LS",
   "RS",
-  "십자 위",
-  "십자 아래",
-  "십자 왼쪽",
-  "십자 오른쪽",
+  t("십자 위"),
+  t("십자 아래"),
+  t("십자 왼쪽"),
+  t("십자 오른쪽"),
   "Home",
 ]);
 export const PAD_ICONS = Object.freeze({ 12: "arrow-up", 13: "arrow-down", 14: "arrow-left", 15: "arrow-right" });
 
-export const padButtonName = i => PAD_BUTTON_NAMES[i] ?? `버튼 ${i}`;
+export const padButtonName = i => PAD_BUTTON_NAMES[i] ?? t("버튼 {n}", { n: i });
 
 /** 메뉴에서 쓰는 버튼(고정): A 선택, 십자키 위·아래 이동 */
 export const PAD_MENU = Object.freeze({ 0: "select", 12: "up", 13: "down" });

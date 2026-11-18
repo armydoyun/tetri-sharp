@@ -5,6 +5,7 @@ import { GARBAGE } from "../core/pieces.js";
 import { get, set } from "../core/board.js";
 import { findPractice } from "./practice.js";
 import { formatScore, formatTime } from "./format.js";
+import { t } from "../i18n/index.js";
 
 /**
  * @typedef {Object} Mode
@@ -24,6 +25,8 @@ import { formatScore, formatTime } from "./format.js";
  * @property {readonly string[]} [hud]  정보 칸에 보일 항목(time·score·level·lines·pieces·pps·split)
  * @property {(entry: any) => string} formatRecord
  * @property {(state: any) => boolean} isRecordable  이번 판을 기록에 남길지
+ * @property {{ finish: string, progress: (state: any) => { value: number, max: number, text: string } }} [race]
+ *   "내 기록과 달리기"를 할 수 있는 모드: 최고 기록 리플레이가 끝나야 하는 결과와 진행 막대
  */
 
 // ---- 레벨·중력 ----
@@ -40,10 +43,10 @@ export const guidelineGravity = level => {
 
 const levelByLines = state => Math.min(MAX_LEVEL, 1 + Math.floor(state.stats.lines / LINES_PER_LEVEL));
 
-const elapsed = state => ({ label: "시간", frames: state.frame });
+const elapsed = state => ({ label: t("시간"), frames: state.frame });
 const recordTime = e => formatTime(e.frames);
-const recordLines = e => `${e.lines}줄`;
-const recordScore = e => `${formatScore(e.score ?? 0)}점`;
+const recordLines = e => t("{n}줄", { n: e.lines });
+const recordScore = e => t("{n}점", { n: formatScore(e.score ?? 0) });
 
 // ---- 모드 ----
 
@@ -53,22 +56,29 @@ const SPRINT_GOAL = 40;
 export const SPRINT_40 = Object.freeze({
   id: "sprint40",
   name: "Sprint 40L",
-  description: "40줄을 가장 빨리 지우기",
+  description: t("40줄을 가장 빨리 지우기"),
   rules: MODERN,
   goal: SPRINT_GOAL,
   /** 구간 기록: 이 줄 수에 닿은 시각을 남겨 최고 기록과 비교한다 */
   splits: Object.freeze([10, 20, 30, 40]),
   hud: Object.freeze(["time", "lines", "pieces", "pps", "split"]),
   check: state => (state.stats.lines >= SPRINT_GOAL ? { result: "clear" } : null),
-  hudLines: state => ({ label: "남은 줄", value: String(Math.max(0, SPRINT_GOAL - state.stats.lines)) }),
+  hudLines: state => ({ label: t("남은 줄"), value: String(Math.max(0, SPRINT_GOAL - state.stats.lines)) }),
   hudTime: elapsed,
   summary: state =>
     state.over === "clear"
-      ? { title: "완료!", main: formatTime(state.frame) }
-      : { title: "게임 오버", main: `${state.stats.lines} / ${SPRINT_GOAL}줄` },
+      ? { title: t("완료!"), main: formatTime(state.frame) }
+      : { title: t("게임 오버"), main: t("{n} / {goal}줄", { n: state.stats.lines, goal: SPRINT_GOAL }) },
   record: Object.freeze({ metric: "frames", order: "asc" }),
   formatRecord: recordTime,
   isRecordable: state => state.over === "clear",
+  race: Object.freeze({
+    finish: "clear",
+    progress: state => {
+      const lines = Math.min(SPRINT_GOAL, state.stats.lines);
+      return { value: lines, max: SPRINT_GOAL, text: t("{n} / {goal}줄", { n: lines, goal: SPRINT_GOAL }) };
+    },
+  }),
 });
 
 const MARATHON_GOAL = 150;
@@ -78,17 +88,17 @@ export const MARATHON = Object.freeze({
   id: "marathon",
   hud: Object.freeze(["time", "score", "level", "lines", "pieces", "pps"]),
   name: "Marathon",
-  description: "150줄 · 10줄마다 빨라진다",
+  description: t("150줄 · 10줄마다 빨라진다"),
   rules: MODERN,
   goal: MARATHON_GOAL,
   check: state => (state.stats.lines >= MARATHON_GOAL ? { result: "clear" } : null),
   levelFor: levelByLines,
   gravityFor: state => guidelineGravity(state.level),
-  hudLines: state => ({ label: "줄", value: `${state.stats.lines} / ${MARATHON_GOAL}` }),
+  hudLines: state => ({ label: t("줄"), value: `${state.stats.lines} / ${MARATHON_GOAL}` }),
   hudTime: elapsed,
   summary: state => ({
-    title: state.over === "clear" ? "완료!" : "게임 오버",
-    main: `${formatScore(state.score)}점`,
+    title: state.over === "clear" ? t("완료!") : t("게임 오버"),
+    main: t("{n}점", { n: formatScore(state.score) }),
   }),
   record: Object.freeze({ metric: "score", order: "desc" }),
   formatRecord: recordScore,
@@ -102,19 +112,27 @@ export const ULTRA = Object.freeze({
   id: "ultra",
   hud: Object.freeze(["time", "score", "lines", "pieces", "pps"]),
   name: "Ultra",
-  description: "2분 동안 최고 점수",
+  description: t("2분 동안 최고 점수"),
   rules: MODERN,
   timeLimit: ULTRA_FRAMES,
   check: state => (state.frame >= ULTRA_FRAMES ? { result: "timeUp" } : null),
-  hudLines: state => ({ label: "줄", value: String(state.stats.lines) }),
-  hudTime: state => ({ label: "남은 시간", frames: ULTRA_FRAMES - state.frame }),
+  hudLines: state => ({ label: t("줄"), value: String(state.stats.lines) }),
+  hudTime: state => ({ label: t("남은 시간"), frames: ULTRA_FRAMES - state.frame }),
   summary: state => ({
-    title: state.over === "timeUp" ? "시간 종료!" : "게임 오버",
-    main: `${formatScore(state.score)}점`,
+    title: state.over === "timeUp" ? t("시간 종료!") : t("게임 오버"),
+    main: t("{n}점", { n: formatScore(state.score) }),
   }),
   record: Object.freeze({ metric: "score", order: "desc" }),
   formatRecord: recordScore,
   isRecordable: state => state.score > 0,
+  race: Object.freeze({
+    finish: "timeUp",
+    progress: state => ({
+      value: Math.min(ULTRA_FRAMES, state.frame),
+      max: ULTRA_FRAMES,
+      text: t("{n}점", { n: formatScore(state.score) }),
+    }),
+  }),
 });
 
 // ---- Master: 레벨 0 → 999. 고정할 때마다 +1(구간 끝 x99에서는 멈춤), 줄을 지우면 지운 줄 수만큼 +.
@@ -167,7 +185,7 @@ export const MASTER = Object.freeze({
   id: "master",
   hud: Object.freeze(["time", "level", "lines", "pieces", "pps"]),
   name: "Master",
-  description: "레벨 999까지 · 500부터 20G",
+  description: t("레벨 999까지 · 500부터 20G"),
   rules: MODERN,
   initialLevel: 0,
   levelStep: 100,
@@ -180,15 +198,15 @@ export const MASTER = Object.freeze({
   gravityFor: state => masterGravity(state.level),
   scoreLevel: state => 1 + Math.floor(state.level / 100),
   check: state => (state.level >= MASTER_MAX ? { result: "clear" } : null),
-  hudLines: state => ({ label: "줄", value: String(state.stats.lines) }),
+  hudLines: state => ({ label: t("줄"), value: String(state.stats.lines) }),
   hudLevel: state => `${state.level} / ${Math.min(MASTER_MAX, (Math.floor(state.level / 100) + 1) * 100)}`,
   hudTime: elapsed,
   summary: state => ({
-    title: state.over === "clear" ? "완료!" : "게임 오버",
-    main: `레벨 ${state.level}`,
+    title: state.over === "clear" ? t("완료!") : t("게임 오버"),
+    main: t("레벨 {n}", { n: state.level }),
   }),
   record: Object.freeze({ metric: "level", order: "desc" }),
-  formatRecord: e => `레벨 ${e.level ?? 0}`,
+  formatRecord: e => t("레벨 {n}", { n: e.level ?? 0 }),
   isRecordable: state => state.level > 0,
 });
 
@@ -215,7 +233,7 @@ export const DIG = Object.freeze({
   id: "dig",
   hud: Object.freeze(["time", "lines", "pieces", "pps"]),
   name: "Dig",
-  description: `쓰레기 ${DIG_ROWS}줄을 가장 빨리 파내기`,
+  description: t("쓰레기 {n}줄을 가장 빨리 파내기", { n: DIG_ROWS }),
   rules: MODERN,
   goal: DIG_ROWS,
   setup: (state, rng) => {
@@ -231,15 +249,98 @@ export const DIG = Object.freeze({
     }
   },
   check: state => (garbageRows(state.board) === 0 ? { result: "clear" } : null),
-  hudLines: state => ({ label: "남은 쓰레기", value: String(garbageRows(state.board)) }),
+  hudLines: state => ({ label: t("남은 쓰레기"), value: String(garbageRows(state.board)) }),
   hudTime: elapsed,
   summary: state =>
     state.over === "clear"
-      ? { title: "완료!", main: formatTime(state.frame) }
-      : { title: "게임 오버", main: `${DIG_ROWS - garbageRows(state.board)} / ${DIG_ROWS}줄` },
+      ? { title: t("완료!"), main: formatTime(state.frame) }
+      : {
+          title: t("게임 오버"),
+          main: t("{n} / {goal}줄", { n: DIG_ROWS - garbageRows(state.board), goal: DIG_ROWS }),
+        },
   record: Object.freeze({ metric: "frames", order: "asc" }),
   formatRecord: recordTime,
   isRecordable: state => state.over === "clear",
+  race: Object.freeze({
+    finish: "clear",
+    progress: state => {
+      const dug = DIG_ROWS - garbageRows(state.board);
+      return { value: dug, max: DIG_ROWS, text: t("{n} / {goal}줄", { n: dug, goal: DIG_ROWS }) };
+    },
+  }),
+});
+
+// ---- Survival: 시간이 갈수록 쓰레기 줄이 쌓여 대기한다. 줄을 지우면 대기 중인 줄을 막고(T-spin은 두 배),
+// 줄을 못 지우고 고정하면 대기 중인 줄이 한꺼번에 아래에서 올라온다. 막힐 때까지 버틴 시간이 기록. ----
+
+export const SURVIVAL_LEVEL_FRAMES = 30 * 60;
+/** 쓰레기 한 줄이 쌓이기까지의 프레임(레벨이 오를수록 짧다) */
+export const survivalInterval = level => Math.max(60, 300 - (level - 1) * 20);
+/** 줄을 지웠을 때 막는 쓰레기 줄 수 */
+export const survivalBlock = lockEvent => lockEvent.lines * (lockEvent.tspin === "full" ? 2 : 1);
+/** 같은 구멍이 이어질 확률(%) — 구멍이 한 열에 모여 있어야 파낼 수 있다 */
+const SAME_HOLE = 70;
+
+/** 보드를 n줄 밀어 올리고 아래에 구멍 하나짜리 쓰레기 줄을 넣는다. */
+export const raiseGarbage = (board, n, nextHole) => {
+  const w = board.width;
+  board.cells.copyWithin(0, n * w);
+  for (let i = 0; i < n; i++) {
+    const y = board.height - n + i;
+    const hole = nextHole();
+    for (let x = 0; x < w; x++) set(board, x, y, x === hole ? 0 : GARBAGE);
+  }
+};
+
+/** @type {Mode} */
+export const SURVIVAL = Object.freeze({
+  id: "survival",
+  hud: Object.freeze(["time", "level", "lines", "pieces", "pps"]),
+  name: "Survival",
+  description: t("올라오는 쓰레기 줄 버티기 · 줄을 지우면 막아요"),
+  rules: MODERN,
+  setup: (state, rng) => {
+    state.garbage = { pending: 0, timer: 0, hole: rng.int(10), received: 0, blocked: 0, rng };
+  },
+  levelFor: state => Math.min(MAX_LEVEL, 1 + Math.floor(state.frame / SURVIVAL_LEVEL_FRAMES)),
+  gravityFor: state => guidelineGravity(Math.min(state.level, 10)),
+  onFrame: (state, events) => {
+    const g = state.garbage;
+    g.timer += 1;
+    if (g.timer < survivalInterval(state.level)) return;
+    g.timer = 0;
+    g.pending += 1;
+    events.push({ type: "garbagePending", pending: g.pending });
+  },
+  onLock: (state, ev, events) => {
+    const g = state.garbage;
+    if (ev.lines > 0) {
+      const blocked = Math.min(g.pending, survivalBlock(ev));
+      g.pending -= blocked;
+      g.blocked += blocked;
+      return false;
+    }
+    if (!g.pending) return false;
+    const n = Math.min(g.pending, 12);
+    raiseGarbage(state.board, n, () => {
+      if (g.rng.int(100) >= SAME_HOLE) {
+        const h = g.rng.int(state.board.width - 1);
+        g.hole = h >= g.hole ? h + 1 : h;
+      }
+      return g.hole;
+    });
+    g.received += n;
+    g.pending -= n;
+    events.push({ type: "garbage", rows: n });
+    return false;
+  },
+  check: () => null,
+  hudLines: state => ({ label: t("받을 쓰레기"), value: String(state.garbage.pending) }),
+  hudTime: elapsed,
+  summary: state => ({ title: t("게임 오버"), main: formatTime(state.frame) }),
+  record: Object.freeze({ metric: "frames", order: "desc" }),
+  formatRecord: recordTime,
+  isRecordable: state => state.stats.pieces > 0,
 });
 
 /** @type {Mode} */
@@ -247,16 +348,18 @@ export const ZEN = Object.freeze({
   id: "zen",
   hud: Object.freeze(["time", "score", "lines", "pieces", "pps"]),
   name: "Endless",
-  description: "막힐 때까지 끝없이",
+  description: t("막힐 때까지 끝없이"),
   rules: MODERN,
   check: () => null,
-  hudLines: state => ({ label: "줄", value: String(state.stats.lines) }),
+  hudLines: state => ({ label: t("줄"), value: String(state.stats.lines) }),
   hudTime: elapsed,
-  summary: state => ({ title: "게임 오버", main: `${state.stats.lines}줄` }),
+  summary: state => ({ title: t("게임 오버"), main: t("{n}줄", { n: state.stats.lines }) }),
   record: Object.freeze({ metric: "lines", order: "desc" }),
   formatRecord: recordLines,
   isRecordable: state => state.stats.lines > 0,
 });
 
-export const MODES = Object.freeze([SPRINT_40, MARATHON, ULTRA, MASTER, DIG, ZEN]);
+export const MODES = Object.freeze([SPRINT_40, MARATHON, ULTRA, MASTER, DIG, SURVIVAL, ZEN]);
+/** "내 기록과 달리기"를 할 수 있는 모드 */
+export const RACE_MODES = Object.freeze(MODES.filter(m => m.race));
 export const findMode = id => MODES.find(m => m.id === id) ?? findPractice(id) ?? SPRINT_40;

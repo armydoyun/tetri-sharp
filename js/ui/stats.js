@@ -1,12 +1,13 @@
 // 판 통계 대화상자: 결과 화면의 "통계"에서 연다. 엔진이 센 값(state.tally)을 보여 주기만 한다.
 import { formatScore, formatTime } from "../modes/format.js";
 import { el, fillDialog } from "./dom.js";
+import { t } from "../i18n/index.js";
 
 const CLEAR_ROWS = [
-  ["none-1", "1줄"],
-  ["none-2", "2줄"],
-  ["none-3", "3줄"],
-  ["none-4", "QUAD (4줄)"],
+  ["none-1", t("1줄")],
+  ["none-2", t("2줄")],
+  ["none-3", t("3줄")],
+  ["none-4", t("QUAD (4줄)")],
   ["mini-0", "MINI T-SPIN"],
   ["mini-1", "MINI T-SPIN SINGLE"],
   ["mini-2", "MINI T-SPIN DOUBLE"],
@@ -18,28 +19,29 @@ const CLEAR_ROWS = [
 
 /** 통계 표의 줄들 — 판마다 같은 항목이 같은 순서로 나온다(원칙 2) */
 export const statRows = state => {
-  const t = state.tally;
+  const tally = state.tally;
   const seconds = state.frame / 60;
   const per = (n, d) => (d ? (n / d).toFixed(2) : "0.00");
   return {
     play: [
-      ["시간", formatTime(state.frame)],
-      ["점수", formatScore(state.score)],
-      ["피스", String(state.stats.pieces)],
-      ["줄", String(state.stats.lines)],
-      ["PPS (초당 피스)", per(state.stats.pieces, seconds)],
-      ["키 입력", String(t.inputs)],
-      ["KPP (피스당 입력)", per(t.inputs, state.stats.pieces)],
-      ["좌우 이동", String(t.moves)],
-      ["회전", String(t.rotations)],
-      ["회전 보정(킥)", String(t.kicks)],
-      ["홀드", String(t.holds)],
+      [t("시간"), formatTime(state.frame)],
+      [t("점수"), formatScore(state.score)],
+      [t("피스"), String(state.stats.pieces)],
+      [t("줄"), String(state.stats.lines)],
+      [t("PPS (초당 피스)"), per(state.stats.pieces, seconds)],
+      [t("키 입력"), String(tally.inputs)],
+      [t("KPP (피스당 입력)"), per(tally.inputs, state.stats.pieces)],
+      [t("좌우 이동"), String(tally.moves)],
+      [t("회전"), String(tally.rotations)],
+      [t("회전 보정(킥)"), String(tally.kicks)],
+      [t("홀드"), String(tally.holds)],
+      [t("피네스 실수 (판정한 피스)"), state.finesse ? `${state.finesse.faults} (${state.finesse.judged})` : "—"],
     ],
     clears: [
-      ...CLEAR_ROWS.map(([key, label]) => [label, String(t.clears[key] ?? 0)]),
-      ["퍼펙트 클리어", String(t.perfect)],
-      ["최대 콤보", String(Math.max(0, t.maxCombo))],
-      ["최대 B2B", String(t.maxB2b)],
+      ...CLEAR_ROWS.map(([key, label]) => [label, String(tally.clears[key] ?? 0)]),
+      [t("퍼펙트 클리어"), String(tally.perfect)],
+      [t("최대 콤보"), String(Math.max(0, tally.maxCombo))],
+      [t("최대 B2B"), String(tally.maxB2b)],
     ],
   };
 };
@@ -68,8 +70,8 @@ export const createStatsUI = ({ dialog }) => {
       const rows = statRows(state);
       notice.textContent = subtitle;
       fillDialog(dialog, {
-        title: "이번 판 통계",
-        body: el("div", { class: "stat-columns" }, table("플레이", rows.play), table("줄 삭제", rows.clears)),
+        title: t("이번 판 통계"),
+        body: el("div", { class: "stat-columns" }, table(t("플레이"), rows.play), table(t("줄 삭제"), rows.clears)),
         notice,
         actions: [],
         closeId: "stats-close",

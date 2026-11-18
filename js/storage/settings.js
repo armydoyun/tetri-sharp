@@ -3,6 +3,7 @@ import { msToFrames } from "../core/engine.js";
 import { DEFAULT_KEYMAP, sanitizeKeymap } from "../input/keymap.js";
 import { DEFAULT_PADMAP, sanitizePadmap } from "../input/gamepad.js";
 import { DEFAULT_THEME, THEME_IDS } from "../render/themes.js";
+import { LANG_OPTIONS } from "../i18n/index.js";
 
 export const SETTINGS_VERSION = 1;
 export const SDF_INFINITE = 41; // 슬라이더 맨 끝 = 즉시 바닥까지
@@ -47,7 +48,13 @@ export const DEFAULT_SETTINGS = Object.freeze({
   /** 터치 버튼: auto(터치 화면이면) · on · off */
   touch: "auto",
   visual: Object.freeze(defaultVisual()),
+  /** 효과음 크기 0~100 (0 = 끄기) */
+  volume: 50,
+  /** 화면 언어: auto(브라우저 언어) · ko · en */
+  lang: "auto",
 });
+
+export const VOLUME_LIMITS = Object.freeze({ min: 0, max: 100, step: 5, default: 50 });
 
 export const sanitizeVisual = raw => {
   const r = { ...(raw && typeof raw === "object" ? raw : {}) };
@@ -84,6 +91,8 @@ export const sanitizeSettings = raw => {
     padmap: sanitizePadmap(s.padmap ?? DEFAULT_PADMAP),
     touch: TOUCH_OPTIONS.includes(s.touch) ? s.touch : "auto",
     visual: sanitizeVisual(s.visual),
+    volume: clampNum(s.volume, VOLUME_LIMITS),
+    lang: LANG_OPTIONS.includes(s.lang) ? s.lang : "auto",
   };
 };
 

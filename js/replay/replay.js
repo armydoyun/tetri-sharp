@@ -178,24 +178,65 @@ export const sanitizeReplay = (raw, findMode) => {
   };
 };
 
-/** 저장소용: 마지막 판 + 기록별 최고 기록 리플레이 */
+/** 저장소용: 마지막 판 + 기록표마다 상위 3개 기록의 리플레이 */
 const MAX_BEST = 30;
+export const MAX_RANKED = 3;
+
+/** 기록 한 줄과 리플레이 결과가 같은 판인지(같은 시간·줄·피스·점수) */
+export const replayMatches = (replay, entry) =>
+  Boolean(replay && entry) &&
+  replay.result.frames === entry.frames &&
+  replay.result.lines === entry.lines &&
+  replay.result.pieces === entry.pieces &&
+  replay.result.score === (entry.score ?? replay.result.score);
+
+/** 예전 형식(기록표마다 리플레이 하나)도 목록으로 읽는다. */
+const toList = value => (Array.isArray(value) ? value : value && typeof value === "object" ? [value] : []);
+const newest = list => list.reduce((d, r) => (String(r?.date) > d ? String(r?.date) : d), "");
 
 /** @param {ReturnType<typeof import("../storage/store.js").createStore>} store */
-export const createReplayStore = (store, findMode) => ({
-  saveLast: replay => store.set("replay:last", replay),
-  last: () => sanitizeReplay(store.get("replay:last", null), findMode),
-  saveBest(key, replay) {
+export const createReplayStore = (store, findMode) => {
+  const readMap = () => {
     const all = store.get("replay:best", {});
-    const map = all && typeof all === "object" && !Array.isArray(all) ? all : {};
-    map[key] = replay;
-    // 오래된 것부터 지워 개수를 제한한다.
-    const keys = Object.keys(map).sort((a, b) => String(map[a]?.date).localeCompare(String(map[b]?.date)));
-    for (const k of keys.slice(0, Math.max(0, keys.length - MAX_BEST))) delete map[k];
-    return store.set("replay:best", map);
-  },
-  best(key) {
-    const all = store.get("replay:best", {});
-    return sanitizeReplay(all?.[key], findMode);
-  },
-});
+    return all && typeof all === "object" && !Array.isArray(all) ? all : {};
+  };
+  /** 기록표 하나의 리플레이들(읽을 수 있는 것만) */
+  const ranked = key =>
+    toList(readMap()[key])
+      .map(r => sanitizeReplay(r, findMode))
+      .filter(Boolean);
+
+  return {
+    saveLast: replay => store.set("replay:last", replay),
+    last: () => sanitizeReplay(store.get("replay:last", null), findMode),
+    /**
+     * 새 리플레이를 기록표에 넣는다. top: 지금 상위 기록들 — 이 기록과 맞지 않는 리플레이는 버린다.
+     * 저장 공간이 모자라면 오래된 기록표의 2·3위 리플레이부터 지워 가며 다시 시도한다.
+     */
+    saveRanked(key, replay, top) {
+      const map = readMap();
+      const keep = top.slice(0, MAX_RANKED);
+      const list = [replay, ...toList(map[key])].filter(r => r?.result && keep.some(e => replayMatches(r, e)));
+      // 상위 기록 순서대로 늘어놓는다.
+      map[key] = keep.map(e => list.find(r => replayMatches(r, e))).filter(Boolean);
+      const keys = Object.keys(map).sort((a, b) => newest(toList(map[a])).localeCompare(newest(toList(map[b]))));
+      for (const k of keys.slice(0, Math.max(0, keys.length - MAX_BEST))) delete map[k];
+      if (store.set("replay:best", map)) return true;
+      for (const k of Object.keys(map).sort((a, b) => newest(toList(map[a])).localeCompare(newest(toList(map[b]))))) {
+        if (k === key || toList(map[k]).length <= 1) continue;
+        map[k] = toList(map[k]).slice(0, 1);
+        if (store.set("replay:best", map)) return true;
+      }
+      map[key] = map[key].slice(0, 1);
+      return store.set("replay:best", map);
+    },
+    /** 예전 방식: 1위 리플레이만 바꾼다 */
+    saveBest(key, replay) {
+      return this.saveRanked(key, replay, [replay.result]);
+    },
+    ranked,
+    best: key => ranked(key)[0] ?? null,
+    /** 기록 한 줄에 맞는 리플레이 */
+    forEntry: (key, entry) => ranked(key).find(r => replayMatches(r, entry)) ?? null,
+  };
+};

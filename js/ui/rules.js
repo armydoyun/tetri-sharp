@@ -3,10 +3,11 @@ import { PRESET_LIST } from "../rules/presets.js";
 import { GRAVITY_OPTIONS, LIMITS, makeCustomRules, sanitizeRuleBody } from "../rules/sanitize.js";
 import { button, el, fieldRow, fillDialog, tabBar } from "./dom.js";
 import { decodeRules, encodeRules, rulesLink } from "../rules/share.js";
+import { t } from "../i18n/index.js";
 
 const ms = frames => `${Math.round((frames * 1000) / 60)}ms`;
 
-const GRAVITY_LABELS = ["1칸/초", "1.25칸/초", "2칸/초", "6칸/초", "1G (60칸/초)", "20G (즉시 바닥)"];
+const GRAVITY_LABELS = [t("1칸/초"), t("1.25칸/초"), t("2칸/초"), t("6칸/초"), t("1G (60칸/초)"), t("20G (즉시 바닥)")];
 
 /**
  * 편집 항목. path는 규칙 객체 안의 위치.
@@ -15,112 +16,117 @@ const GRAVITY_LABELS = ["1칸/초", "1.25칸/초", "2칸/초", "6칸/초", "1G (
  *   options?: ReadonlyArray<[any, string]>, range?: readonly number[], unit?: (v: number) => string, when?: (r: any) => boolean, off?: string, fallback?: any }>}
  */
 const FIELDS = [
-  { section: "피스" },
+  { section: t("피스") },
   {
     path: "rotation",
-    label: "회전 시스템",
+    label: t("회전 시스템"),
     type: "select",
     options: [
-      ["srs", "SRS — 벽차기 5단계 (현대 표준)"],
-      ["ars", "ARS — 좌우 1칸만, 중앙열 규칙 (아케이드)"],
-      ["classic", "킥 없음 — 막히면 안 돈다 (옛날 방식)"],
+      ["srs", t("SRS — 벽차기 5단계 (현대 표준)")],
+      ["ars", t("ARS — 좌우 1칸만, 중앙열 규칙 (아케이드)")],
+      ["classic", t("킥 없음 — 막히면 안 돈다 (옛날 방식)")],
     ],
   },
   {
     path: "randomizer",
-    label: "생성기",
+    label: t("생성기"),
     type: "select",
     options: [
-      ["bag7", "7-Bag — 7개마다 한 벌씩"],
-      ["bag14", "14-Bag — 두 벌씩 섞기"],
-      ["random", "완전 무작위"],
-      ["nesReroll", "직전 재추첨 — 같은 게 나오면 한 번 다시"],
-      ["history4", "이력 4개 — 최근 4개를 피함"],
+      ["bag7", t("7-Bag — 7개마다 한 벌씩")],
+      ["bag14", t("14-Bag — 두 벌씩 섞기")],
+      ["random", t("완전 무작위")],
+      ["nesReroll", t("직전 재추첨 — 같은 게 나오면 한 번 다시")],
+      ["history4", t("이력 4개 — 최근 4개를 피함")],
     ],
   },
   {
     path: "previewCount",
-    label: "넥스트 미리보기",
-    hint: "다음에 나올 피스를 몇 개까지 미리 보여 줄지",
+    label: t("넥스트 미리보기"),
+    hint: t("다음에 나올 피스를 몇 개까지 미리 보여 줄지"),
     type: "number",
     range: LIMITS.previewCount,
-    unit: v => `${v}개`,
+    unit: v => t("{n}개", { n: v }),
   },
-  { path: "hold.enabled", label: "홀드", hint: "피스 하나를 맡겨 두었다가 바꿔 쓰기", type: "toggle" },
-  { path: "ghost", label: "고스트", hint: "피스가 떨어질 자리를 흐리게 보여 줘요", type: "toggle" },
-  { path: "hardDrop", label: "하드 드롭", hint: "한 번에 바닥까지 떨어뜨리고 바로 고정", type: "toggle" },
+  { path: "hold.enabled", label: t("홀드"), hint: t("피스 하나를 맡겨 두었다가 바꿔 쓰기"), type: "toggle" },
+  { path: "ghost", label: t("고스트"), hint: t("피스가 떨어질 자리를 흐리게 보여 줘요"), type: "toggle" },
+  { path: "hardDrop", label: t("하드 드롭"), hint: t("한 번에 바닥까지 떨어뜨리고 바로 고정"), type: "toggle" },
 
-  { section: "고정·낙하" },
+  { section: t("고정·낙하") },
   {
     path: "lock.type",
-    label: "고정 방식",
+    label: t("고정 방식"),
     type: "select",
     options: [
-      ["moveReset", "움직이면 리셋 (횟수 제한)"],
-      ["stepReset", "더 내려갔을 때만 리셋"],
-      ["infinite", "무제한 리셋 (인피니티)"],
-      ["none", "닿으면 다음 낙하 때 즉시 고정"],
+      ["moveReset", t("움직이면 리셋 (횟수 제한)")],
+      ["stepReset", t("더 내려갔을 때만 리셋")],
+      ["infinite", t("무제한 리셋 (인피니티)")],
+      ["none", t("닿으면 다음 낙하 때 즉시 고정")],
     ],
   },
   {
     path: "lock.delay",
-    label: "고정 지연",
+    label: t("고정 지연"),
     type: "number",
     range: LIMITS.lockDelay,
     unit: v => `${v}F · ${ms(v)}`,
     when: r => r.lock.type !== "none",
-    off: "고정 방식이 ‘즉시 고정’이라 쓰지 않아요",
+    off: t("고정 방식이 ‘즉시 고정’이라 쓰지 않아요"),
   },
   {
     path: "lock.maxResets",
-    label: "리셋 한도",
+    label: t("리셋 한도"),
     type: "number",
     range: LIMITS.maxResets,
-    unit: v => `${v}회`,
+    unit: v => t("{n}회", { n: v }),
     when: r => r.lock.type === "moveReset",
-    off: "‘움직이면 리셋’ 방식에서만 써요",
+    off: t("‘움직이면 리셋’ 방식에서만 써요"),
   },
   {
     path: "gravity",
-    label: "기본 중력",
-    hint: "Marathon은 레벨에 따라 따로 정해진다",
+    label: t("기본 중력"),
+    hint: t("Marathon은 레벨에 따라 따로 정해진다"),
     type: "select",
     options: GRAVITY_OPTIONS.map((g, i) => [g, GRAVITY_LABELS[i]]),
   },
-  { path: "are.spawn", label: "생성 지연", type: "number", range: LIMITS.are, unit: v => `${v}F · ${ms(v)}` },
-  { path: "are.lineClear", label: "줄 삭제 지연", type: "number", range: LIMITS.are, unit: v => `${v}F · ${ms(v)}` },
+  { path: "are.spawn", label: t("생성 지연"), type: "number", range: LIMITS.are, unit: v => `${v}F · ${ms(v)}` },
+  { path: "are.lineClear", label: t("줄 삭제 지연"), type: "number", range: LIMITS.are, unit: v => `${v}F · ${ms(v)}` },
 
-  { section: "점수" },
+  { section: t("점수") },
   {
     path: "tspin",
-    label: "T-spin 판정",
+    label: t("T-spin 판정"),
     type: "select",
     options: [
-      ["threeCorner", "3-corner (Mini 포함)"],
-      ["none", "없음"],
+      ["threeCorner", t("3-corner (Mini 포함)")],
+      ["none", t("없음")],
     ],
   },
   {
     path: "scoring",
-    label: "점수표",
+    label: t("점수표"),
     type: "select",
     options: [
-      ["guideline", "가이드라인 — B2B·콤보·퍼펙트 클리어"],
-      ["classic", "클래식 — 줄 수만"],
+      ["guideline", t("가이드라인 — B2B·콤보·퍼펙트 클리어")],
+      ["classic", t("클래식 — 줄 수만")],
     ],
   },
 
-  { section: "조작" },
-  { path: "irs", label: "미리 회전 (IRS)", hint: "생성 순간 회전 키를 누르고 있으면 돌린 채로 나온다", type: "toggle" },
+  { section: t("조작") },
+  {
+    path: "irs",
+    label: t("미리 회전 (IRS)"),
+    hint: t("생성 순간 회전 키를 누르고 있으면 돌린 채로 나온다"),
+    type: "toggle",
+  },
   {
     path: "ihs",
-    label: "미리 홀드 (IHS)",
-    hint: "생성 순간 홀드 키를 누르고 있으면 바로 홀드",
+    label: t("미리 홀드 (IHS)"),
+    hint: t("생성 순간 홀드 키를 누르고 있으면 바로 홀드"),
     type: "toggle",
     when: r => r.hold.enabled,
-    off: "홀드가 꺼져 있어 쓰지 않아요",
+    off: t("홀드가 꺼져 있어 쓰지 않아요"),
   },
-  { path: "fixedHandlingOn", label: "조작감 고정", hint: "켜면 개인 설정 대신 아래 값으로 강제", type: "toggle" },
+  { path: "fixedHandlingOn", label: t("조작감 고정"), hint: t("켜면 개인 설정 대신 아래 값으로 강제"), type: "toggle" },
   {
     path: "fixedHandling.das",
     label: "DAS",
@@ -128,7 +134,7 @@ const FIELDS = [
     range: LIMITS.das,
     unit: v => `${v}F · ${ms(v)}`,
     when: r => r.fixedHandling,
-    off: "‘조작감 고정’을 켜면 쓸 수 있어요",
+    off: t("‘조작감 고정’을 켜면 쓸 수 있어요"),
     fallback: 16,
   },
   {
@@ -138,7 +144,7 @@ const FIELDS = [
     range: LIMITS.arr,
     unit: v => `${v}F · ${ms(v)}`,
     when: r => r.fixedHandling,
-    off: "‘조작감 고정’을 켜면 쓸 수 있어요",
+    off: t("‘조작감 고정’을 켜면 쓸 수 있어요"),
     fallback: 6,
   },
   {
@@ -146,9 +152,9 @@ const FIELDS = [
     label: "SDF",
     type: "number",
     range: LIMITS.sdf,
-    unit: v => `${v}배`,
+    unit: v => t("{n}배", { n: v }),
     when: r => r.fixedHandling,
-    off: "‘조작감 고정’을 켜면 쓸 수 있어요",
+    off: t("‘조작감 고정’을 켜면 쓸 수 있어요"),
     fallback: 30,
   },
 ];
@@ -186,7 +192,7 @@ const selectedDescription = (field, rules) => {
 };
 
 /** 탭: FIELDS의 구역 이름 + 공유 */
-const TABS = [...FIELDS.filter(f => f.section).map(f => [f.section, f.section]), ["공유", "공유"]];
+const TABS = [...FIELDS.filter(f => f.section).map(f => [f.section, f.section]), [t("공유"), t("공유")]];
 
 /**
  * @param {{ dialog: HTMLDialogElement, getRules: () => any, onChange: (body: any) => void, onClose?: () => void }} options
@@ -257,38 +263,43 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
       value: code,
       readOnly: true,
     });
-    const copyCode = button({ text: "복사", iconName: "copy", className: "btn btn-small", id: "rule-share-copy" });
+    const copyCode = button({ text: t("복사"), iconName: "copy", className: "btn btn-small", id: "rule-share-copy" });
     copyCode.addEventListener("click", async () => {
       message = (await copy(code, codeInput))
-        ? "규칙 코드를 복사했어요"
-        : "복사하지 못했어요. 코드를 선택해 직접 복사해 주세요";
+        ? t("규칙 코드를 복사했어요")
+        : t("복사하지 못했어요. 코드를 선택해 직접 복사해 주세요");
       notice.textContent = message;
     });
     const link = rulesLink(rules, location.href);
-    const copyLink = button({ text: "링크 복사", iconName: "link", className: "btn btn-small", id: "rule-share-link" });
+    const copyLink = button({
+      text: t("링크 복사"),
+      iconName: "link",
+      className: "btn btn-small",
+      id: "rule-share-link",
+    });
     copyLink.addEventListener("click", async () => {
       message = (await copy(link, null))
-        ? "링크를 복사했어요. 받은 사람이 열면 이 규칙이 Custom으로 들어가요"
-        : "복사하지 못했어요";
+        ? t("링크를 복사했어요. 받은 사람이 열면 이 규칙이 Custom으로 들어가요")
+        : t("복사하지 못했어요");
       notice.textContent = message;
     });
     const pasteInput = el("input", {
       id: "rule-share-paste",
       class: "text-input num",
       type: "text",
-      placeholder: "TS1-로 시작하는 코드나 링크",
+      placeholder: t("TS1-로 시작하는 코드나 링크"),
       autocomplete: "off",
       spellcheck: false,
     });
-    const load = button({ text: "불러오기", iconName: "folder", className: "btn btn-small", id: "rule-share-load" });
+    const load = button({ text: t("불러오기"), iconName: "folder", className: "btn btn-small", id: "rule-share-load" });
     const doLoad = () => {
       const body = decodeRules(pasteInput.value);
       if (!body) {
-        notice.textContent = "읽을 수 없는 코드예요";
+        notice.textContent = t("읽을 수 없는 코드예요");
         return;
       }
       onChange(body);
-      message = `불러왔어요 · 기록표 ${makeCustomRules(body).id}`;
+      message = t("불러왔어요 · 기록표 {id}", { id: makeCustomRules(body).id });
       render("rule-share-paste");
     };
     load.addEventListener("click", doLoad);
@@ -300,20 +311,20 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
       { class: "field-section" },
       fieldRow({
         id: "rule-share-code",
-        label: "규칙 코드",
-        hint: "지금 조합을 코드로",
+        label: t("규칙 코드"),
+        hint: t("지금 조합을 코드로"),
         control: el("span", { class: "inline-control" }, codeInput, copyCode),
       }),
       fieldRow({
         id: "rule-share-link",
-        label: "공유 링크",
-        hint: "배포 주소에서 열었을 때 쓸모 있어요",
+        label: t("공유 링크"),
+        hint: t("배포 주소에서 열었을 때 쓸모 있어요"),
         control: el("span", { class: "inline-control" }, copyLink),
       }),
       fieldRow({
         id: "rule-share-paste",
-        label: "코드 불러오기",
-        hint: "받은 코드나 링크를 붙여 넣기",
+        label: t("코드 불러오기"),
+        hint: t("받은 코드나 링크를 붙여 넣기"),
         control: el("span", { class: "inline-control" }, pasteInput, load),
       })
     );
@@ -331,12 +342,12 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
     const presets = el(
       "div",
       { class: "rule-presets" },
-      el("span", { class: "field-help", text: "프리셋에서 시작" }),
+      el("span", { class: "field-help", text: t("프리셋에서 시작") }),
       ...PRESET_LIST.map(p => {
         const b = button({ text: p.name, className: "btn btn-small", "data-preset": p.id });
         b.addEventListener("click", () => {
           onChange(sanitizeRuleBody(p));
-          message = `${p.name} 값으로 채웠어요 · 기록표 ${makeCustomRules(p).id}`;
+          message = t("{name} 값으로 채웠어요 · 기록표 {id}", { name: p.name, id: makeCustomRules(p).id });
           render();
         });
         return b;
@@ -352,7 +363,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
       },
     });
 
-    if (tab === "공유") {
+    if (tab === t("공유")) {
       body.append(shareSection(rules));
     } else {
       const section = el("section", { class: "field-section" });
@@ -371,10 +382,10 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
       body.append(section);
     }
 
-    notice.textContent = message || `기록표 ${makeCustomRules(rules).id} · 조합마다 기록이 따로 쌓여요`;
+    notice.textContent = message || t("기록표 {id} · 조합마다 기록이 따로 쌓여요", { id: makeCustomRules(rules).id });
     message = "";
     fillDialog(dialog, {
-      title: "Custom 규칙",
+      title: t("Custom 규칙"),
       body,
       notice,
       actions: [],

@@ -1,6 +1,7 @@
 // 연습 고르기 대화상자: 종류를 누르면 바로 시작한다.
 import { DRILLS } from "../modes/practice.js";
 import { el, fillDialog } from "./dom.js";
+import { t } from "../i18n/index.js";
 
 /** @param {{ dialog: HTMLDialogElement, onPick: (drill: any) => void }} options */
 export const createPracticeUI = ({ dialog, onPick }) => {
@@ -24,9 +25,9 @@ export const createPracticeUI = ({ dialog, onPick }) => {
           return card;
         })
       );
-      notice.textContent = "중력이 없고 기록은 남지 않아요. 지금 고른 규칙으로 연습해요.";
+      notice.textContent = t("중력이 없고 기록은 남지 않아요. 지금 고른 규칙으로 연습해요.");
       fillDialog(dialog, {
-        title: "연습",
+        title: t("연습"),
         body: el("div", {}, el("section", { class: "field-section" }, list)),
         notice,
         actions: [],

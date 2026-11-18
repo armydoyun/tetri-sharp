@@ -38,8 +38,8 @@ test("결과는 파일 하나이고 바깥 파일을 참조하지 않는다", ()
   assert.ok(result.bytes < 1024 * 1024, `배포본 크기 ${result.bytes} bytes`);
 });
 
-const openPage = async (initScript = null, initArg = undefined) => {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true });
+const openPage = async (initScript = null, initArg = undefined, { locale = "ko-KR" } = {}) => {
+  const context = await browser.newContext({ locale, viewport: { width: 1280, height: 900 }, acceptDownloads: true });
   if (initScript) await context.addInitScript(initScript, initArg);
   const blocked = [];
   await context.route("**/*", route => {
@@ -185,9 +185,9 @@ test("설정: 슬라이더 값과 키 변경이 저장되고 새로고침 후에
   await context.close();
 });
 
-test("Ultra: 남은 시간이 줄어들고 하드 드롭으로 점수가 오른다, 메뉴에 여섯 모드", async () => {
+test("Ultra: 남은 시간이 줄어들고 하드 드롭으로 점수가 오른다, 메뉴에 일곱 모드", async () => {
   const { context, page, errors } = await openPage();
-  assert.equal(await page.locator(".mode-card").count(), 6);
+  assert.equal(await page.locator(".mode-card").count(), 7);
   await startMode(page, "ultra");
   assert.equal(await text(page, "hud-time-label"), "남은 시간");
   await page.waitForTimeout(300);
@@ -490,7 +490,11 @@ test("테마: 라이트에서 UI는 밝고 게임 화면(보드)은 어둡다, �
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
   };
   for (const scheme of ["light", "dark"]) {
-    const context = await browser.newContext({ colorScheme: scheme, viewport: { width: 1280, height: 900 } });
+    const context = await browser.newContext({
+      locale: "ko-KR",
+      colorScheme: scheme,
+      viewport: { width: 1280, height: 900 },
+    });
     const page = await context.newPage();
     await page.goto(url);
     await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
@@ -597,9 +601,10 @@ test("Sprint 최고 기록과 달리기: 같은 규칙에서 시작하고 상대
     localStorage.setItem("tetrisharp:replay:best", JSON.stringify({ [key]: replay }));
   }, fixture);
   await page.click('[data-rules="retro"]');
-  assert.equal(await page.locator("#start-pb-race").isDisabled(), true);
+  assert.equal(await page.locator('[data-race="sprint40"]').isDisabled(), true);
   await page.click('[data-rules="modern"]');
-  await page.click("#start-pb-race");
+  assert.equal(await page.locator('[data-race="ultra"]').isDisabled(), true, "Ultra 최고 기록은 없다");
+  await page.click('[data-race="sprint40"]');
   assert.equal(await visible(page, "race-board"), true);
   await page.waitForFunction(() => document.getElementById("race-progress").value > 0);
   await page.click("#pause-game");
@@ -618,7 +623,7 @@ test("Sprint 최고 기록과 달리기: 같은 규칙에서 시작하고 상대
     await page.keyboard.press("Space");
     await page.waitForTimeout(25);
   }
-  assert.match(await text(page, "race-result"), /완주하지 못했어요/);
+  assert.match(await text(page, "race-result"), /끝까지 가지 못했어요/);
   await page.keyboard.press("Escape");
   assert.equal(await visible(page, "race-panel"), false);
   assert.deepEqual(errors, []);
@@ -736,7 +741,7 @@ test("규칙 공유: 편집기에서 코드를 붙여 넣으면 불러오고, #r
   await context.close();
 
   // 새 브라우저(저장소 비어 있음)에서 링크로 연다
-  const fresh = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const fresh = await browser.newContext({ locale: "ko-KR", viewport: { width: 1280, height: 900 } });
   const p2 = await fresh.newPage();
   const errs2 = [];
   p2.on("pageerror", e => errs2.push(e.message));
@@ -754,7 +759,7 @@ test("규칙 공유: 편집기에서 코드를 붙여 넣으면 불러오고, #r
 test("연습: 메뉴에서 고르면 시작하고, 놓을 때마다 성공/시도를 센다", async () => {
   const { context, page, errors } = await openPage();
   await page.click("#open-practice");
-  assert.equal(await page.locator("#practice .mode-card").count(), 4);
+  assert.equal(await page.locator("#practice .mode-card").count(), 7);
   assert.equal(await page.locator('[data-drill="double"]').isVisible(), true);
   await page.click('[data-drill="tsd"]');
   await page.waitForFunction(() => document.getElementById("countdown")?.textContent === "GO!", null, {
@@ -771,7 +776,7 @@ test("연습: 메뉴에서 고르면 시작하고, 놓을 때마다 성공/시�
 });
 
 test("터치 버튼: 켜면 보드 아래에 보이고, 누르면 조작된다", async () => {
-  const context = await browser.newContext({ viewport: { width: 412, height: 860 }, hasTouch: true });
+  const context = await browser.newContext({ locale: "ko-KR", viewport: { width: 412, height: 860 }, hasTouch: true });
   await context.addInitScript(() => localStorage.setItem("tetrisharp:settings", JSON.stringify({ touch: "on" })));
   const page = await context.newPage();
   const errors = [];
@@ -813,7 +818,7 @@ test("글자 잘림 없음: 첫 화면·설정 모든 탭·규칙 편집 모든 
     { width: 1280, height: 800 },
     { width: 390, height: 844 },
   ]) {
-    const context = await browser.newContext({ viewport });
+    const context = await browser.newContext({ locale: "ko-KR", viewport });
     const page = await context.newPage();
     await page.goto(url);
     await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
@@ -841,4 +846,149 @@ test("글자 잘림 없음: 첫 화면·설정 모든 탭·규칙 편집 모든 
     assert.deepEqual(found, []);
     await context.close();
   }
+});
+
+test("영어: 브라우저가 영어면 영어로 뜨고, 설정에서 한국어로 바꾸면 다시 불러와 한국어가 된다", async () => {
+  const { context, page, errors } = await openPage(null, undefined, { locale: "en-US" });
+  assert.equal(await page.evaluate(() => document.documentElement.lang), "en");
+  assert.equal(await text(page, "mode-title"), "Modes");
+  const hangul = () => page.evaluate(() => /[가-힣]/.test(document.body.innerText));
+  assert.equal(await hangul(), false, "첫 화면에 한국어가 남지 않는다");
+  assert.equal(
+    await page.locator('[data-mode="sprint40"] small').first().textContent(),
+    "Clear 40 lines as fast as you can"
+  );
+  await startMode(page, "sprint40");
+  assert.equal(await text(page, "hud-lines-label"), "Lines left");
+  await page.keyboard.press("Escape");
+  assert.equal(await hangul(), false, "일시정지 화면도 영어");
+  await page.click('#pause [data-action="menu"]');
+
+  await page.click("#open-settings");
+  assert.equal(await hangul(), false, "설정 첫 탭도 영어");
+  await page.click('.dialog-tabs [data-value="visual"]');
+  await Promise.all([page.waitForEvent("load"), page.click('#set-lang [data-value="ko"]')]);
+  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  assert.equal(await page.evaluate(() => document.documentElement.lang), "ko");
+  assert.equal(await text(page, "mode-title"), "플레이 모드");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("글자 잘림 없음(영어): 첫 화면·설정·기록·연습", async () => {
+  for (const viewport of [
+    { width: 1280, height: 800 },
+    { width: 390, height: 844 },
+  ]) {
+    const context = await browser.newContext({ locale: "en-US", viewport });
+    const page = await context.newPage();
+    await page.goto(url);
+    await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+    const found = [];
+    const check = async where =>
+      found.push(
+        ...(
+          await page.evaluate(() =>
+            [...document.querySelectorAll("button, label, small, strong, td, th, dd, dt, p, .keys-label, option")]
+              .filter(el => el.offsetParent !== null && el.scrollWidth > el.clientWidth + 1)
+              .filter(
+                el => getComputedStyle(el).overflowX !== "visible" || getComputedStyle(el).textOverflow === "ellipsis"
+              )
+              .map(el => `${el.tagName}.${el.className}: ${el.textContent.trim().slice(0, 30)}`)
+          )
+        ).map(x => `[${viewport.width}] ${where} ${x}`)
+      );
+    await check("home");
+    await page.click("#open-settings");
+    for (const tab of ["control", "visual", "keys", "pad"]) {
+      await page.click(`.dialog-tabs [data-value="${tab}"]`);
+      await check(`settings/${tab}`);
+    }
+    await page.click("#settings-close");
+    await page.click("#open-records");
+    await check("records");
+    await page.click("#records-close");
+    await page.click("#open-practice");
+    await check("practice");
+    assert.deepEqual(found, []);
+    await context.close();
+  }
+});
+
+test("전체 흐름: Survival 한 판 → 결과·새 기록 → 기록표 리플레이 → 백업 저장 → 지우고 백업 불러오기", async () => {
+  const { context, page, errors } = await openPage();
+  await startMode(page, "survival");
+  assert.equal(await text(page, "hud-lines-label"), "받을 쓰레기");
+  for (let i = 0; i < 60 && !(await visible(page, "results")); i++) {
+    await page.keyboard.press("Space");
+    await page.waitForTimeout(20);
+  }
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 5000 });
+  assert.equal(await text(page, "results-title"), "게임 오버");
+  assert.equal(await page.locator("#results-badge").evaluate(e => e.classList.contains("is-invisible")), false);
+  assert.match(await page.locator("#results-stats").textContent(), /순위1위/);
+  await page.keyboard.press("Escape");
+
+  // 기록표: 1위 기록과 그 리플레이
+  await page.click("#open-records");
+  await page.locator("#records-mode").selectOption("survival");
+  assert.equal(await page.locator(".records-table tbody tr.is-empty").count(), 9);
+  assert.equal(await page.locator("#records-watch").isDisabled(), false);
+  await page.click("#records-watch");
+  assert.equal(await visible(page, "replay-bar"), true);
+  await page.click('[data-replay="exit"]');
+  assert.equal(await visible(page, "menu"), true);
+
+  // 백업 저장
+  const [download] = await Promise.all([page.waitForEvent("download"), page.click("#export-backup")]);
+  const file = path.join(dir, "backup.json");
+  await download.saveAs(file);
+  const backup = JSON.parse(fs.readFileSync(file, "utf8"));
+  assert.equal(backup.kind, "backup");
+  assert.equal(backup.data.records["survival|modern"].length, 1);
+
+  // 이 브라우저의 저장 데이터를 지우고 백업을 불러온다
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  assert.equal(await page.locator('[data-mode="survival"] .mode-best').textContent(), "");
+  page.once("dialog", dialog => dialog.accept());
+  await page.setInputFiles("#backup-file", file);
+  await page.waitForFunction(() => /백업을 불러왔어요/.test(document.getElementById("menu-notice")?.textContent ?? ""));
+  assert.match(await page.locator('[data-mode="survival"] .mode-best').textContent(), /최고 기록/);
+  assert.equal(await page.locator("#watch-last").isDisabled(), false, "마지막 판 리플레이도 돌아온다");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("효과음: 소리를 켜면 게임 중 오디오를 만들고, 끄면 만들지 않는다", async () => {
+  const count = () => page.evaluate(() => window.__audioContexts ?? 0);
+  const { context, page, errors } = await openPage(() => {
+    const Real = window.AudioContext;
+    window.AudioContext = class extends Real {
+      constructor(...args) {
+        super(...args);
+        window.__audioContexts = (window.__audioContexts ?? 0) + 1;
+      }
+    };
+  });
+  await page.click("#open-settings");
+  await page.click('.dialog-tabs [data-value="visual"]');
+  await page.locator("#set-volume").fill("0");
+  await page.click("#settings-close");
+  await startMode(page, "zen");
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(100);
+  assert.equal(await count(), 0, "끄면 오디오를 만들지 않는다");
+  await page.keyboard.press("Escape");
+  await page.click("#open-settings");
+  await page.click('.dialog-tabs [data-value="visual"]');
+  await page.locator("#set-volume").fill("60");
+  await page.click("#settings-close");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(100);
+  assert.equal(await count(), 1);
+  assert.deepEqual(errors, []);
+  await context.close();
 });

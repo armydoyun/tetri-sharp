@@ -2,7 +2,9 @@
 // 표는 늘 10줄이라 고르는 조건이 바뀌어도 대화상자 크기가 그대로다(원칙 2).
 import { PRESET_LIST } from "../rules/presets.js";
 import { recordKey } from "../storage/records.js";
+import { MAX_RANKED } from "../replay/replay.js";
 import { button, el, fillDialog, fieldRow } from "./dom.js";
+import { t } from "../i18n/index.js";
 
 const ROWS = 10;
 
@@ -18,11 +20,11 @@ const formatDate = iso => {
  *   dialog: HTMLDialogElement,
  *   modes: readonly any[],
  *   records: ReturnType<typeof import("../storage/records.js").createRecords>,
- *   bestReplay: (key: string) => any,
+ *   replayFor: (key: string, entry: any) => any,
  *   onWatch: (replay: any) => void,
  * }} options
  */
-export const createRecordsUI = ({ dialog, modes, records, bestReplay, onWatch }) => {
+export const createRecordsUI = ({ dialog, modes, records, replayFor, onWatch }) => {
   let modeId = modes[0].id;
   let rulesId = "modern";
   const notice = el("p", { class: "notice-slot", role: "status", id: "records-notice" });
@@ -39,7 +41,8 @@ export const createRecordsUI = ({ dialog, modes, records, bestReplay, onWatch })
     if (!options.some(([id]) => id === rulesId)) rulesId = options[0][0];
     const rules = { id: rulesId };
     const list = records.list(mode, rules);
-    const replay = bestReplay(recordKey(mode, rules));
+    const key = recordKey(mode, rules);
+    const replays = list.slice(0, MAX_RANKED).map(e => replayFor(key, e));
 
     const modeSelect = el("select", { id: "records-mode", class: "select" });
     for (const m of modes) modeSelect.append(el("option", { value: m.id, text: m.name, selected: m.id === mode.id }));
@@ -62,37 +65,41 @@ export const createRecordsUI = ({ dialog, modes, records, bestReplay, onWatch })
       class: "text-input",
       type: "text",
       value: records.playerName,
-      placeholder: "이름 없음",
+      placeholder: t("이름 없음"),
       autocomplete: "off",
     });
-    const nameSave = button({ type: "submit", text: "저장", "aria-label": "플레이어 이름 저장" });
+    const nameSave = button({ type: "submit", text: t("저장"), "aria-label": t("플레이어 이름 저장") });
     const nameForm = el("form", { class: "record-name-form" }, nameInput, nameSave);
     nameForm.addEventListener("submit", event => {
       event.preventDefault();
       const saved = records.setPlayerName(nameInput.value);
       nameInput.value = records.playerName;
       notice.textContent = !saved
-        ? "이번 접속에만 이름을 적용했어요. 브라우저에 저장하지 못했어요."
+        ? t("이번 접속에만 이름을 적용했어요. 브라우저에 저장하지 못했어요.")
         : records.playerName
-          ? "새 기록에 이 이름을 사용해요."
-          : "새 기록을 이름 없이 남겨요.";
+          ? t("새 기록에 이 이름을 사용해요.")
+          : t("새 기록을 이름 없이 남겨요.");
     });
 
     const head = el(
       "tr",
       {},
-      ...["순위", "이름", "기록", "줄", "피스", "PPS", "날짜", "리플레이"].map(t => el("th", { scope: "col", text: t }))
+      ...[t("순위"), t("이름"), t("기록"), t("줄"), t("피스"), "PPS", t("날짜"), t("리플레이")].map(label =>
+        el("th", { scope: "col", text: label })
+      )
     );
     const rows = Array.from({ length: ROWS }, (_, i) => {
       const e = list[i];
+      const replay = replays[i] ?? null;
       const watch =
-        i === 0 && e
+        i < MAX_RANKED && e
           ? button({
-              text: "보기",
+              text: t("보기"),
               iconName: "play",
               className: "btn btn-small",
-              id: "records-watch",
+              id: i === 0 ? "records-watch" : `records-watch-${i + 1}`,
               disabled: !replay,
+              "aria-label": t("{n}위 리플레이 보기", { n: i + 1 }),
             })
           : null;
       if (watch && replay)
@@ -114,8 +121,8 @@ export const createRecordsUI = ({ dialog, modes, records, bestReplay, onWatch })
         "tr",
         { class: e ? "" : "is-empty" },
         el("td", { class: "num", text: cells[0] }),
-        el("td", { class: "record-player", text: e ? e.playerName || "이름 없음" : "", title: e?.playerName }),
-        ...cells.slice(1).map(t => el("td", { class: "num", text: t })),
+        el("td", { class: "record-player", text: e ? e.playerName || t("이름 없음") : "", title: e?.playerName }),
+        ...cells.slice(1).map(text => el("td", { class: "num", text })),
         el("td", {}, ...(watch ? [watch] : []))
       );
     });
@@ -128,22 +135,23 @@ export const createRecordsUI = ({ dialog, modes, records, bestReplay, onWatch })
         { class: "field-section" },
         fieldRow({
           id: "record-player-name",
-          label: "플레이어 이름",
-          hint: "새 기록에 표시돼요. 최대 24자.",
+          label: t("플레이어 이름"),
+          hint: t("새 기록에 표시돼요. 최대 24자."),
           control: nameForm,
         }),
-        fieldRow({ id: "records-mode", label: "모드", control: modeSelect }),
-        fieldRow({ id: "records-rules", label: "규칙", control: rulesSelect })
+        fieldRow({ id: "records-mode", label: t("모드"), control: modeSelect }),
+        fieldRow({ id: "records-rules", label: t("규칙"), control: rulesSelect })
       ),
       el("table", { class: "records-table" }, el("thead", {}, head), el("tbody", {}, ...rows))
     );
+    const watchable = replays.filter(Boolean).length;
     notice.textContent = list.length
-      ? replay
-        ? `${mode.name} · ${options.find(([id]) => id === rulesId)[1]} — 1위 리플레이를 볼 수 있어요`
-        : "1위 리플레이는 이 기능이 생긴 뒤 세운 기록부터 남아요"
-      : "아직 기록이 없어요";
+      ? watchable
+        ? `${mode.name} · ${options.find(([id]) => id === rulesId)[1]} — ${t("상위 {n}개 기록의 리플레이를 볼 수 있어요", { n: MAX_RANKED })}`
+        : t("상위 {n}개 기록의 리플레이는 이 기능이 생긴 뒤 세운 기록부터 남아요", { n: MAX_RANKED })
+      : t("아직 기록이 없어요");
     const scroll = dialog.querySelector(".dialog-body")?.scrollTop ?? 0;
-    fillDialog(dialog, { title: "기록", body, notice, actions: [], closeId: "records-close" });
+    fillDialog(dialog, { title: t("기록"), body, notice, actions: [], closeId: "records-close" });
     body.scrollTop = scroll;
   };
 

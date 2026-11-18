@@ -146,6 +146,14 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
 
     effects.draw(ctx, { bx, cell, toY, cols: COLS }, now, theme.board.ink, visual.effects);
 
+    // Survival: 대기 중인 쓰레기 줄을 보드 왼쪽 가장자리에 빨간 막대로
+    const pending = Math.min(VISIBLE_ROWS, game?.state.garbage?.pending ?? 0);
+    if (pending > 0) {
+      const w = Math.max(2, Math.round(cell * 0.18));
+      ctx.fillStyle = "#e5484d";
+      ctx.fillRect(bx - w - 1, by + (VISIBLE_ROWS - pending) * cell, w, pending * cell);
+    }
+
     if (!game || compact) return;
 
     // 홀드

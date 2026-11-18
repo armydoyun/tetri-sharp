@@ -11,45 +11,55 @@ import {
   pressedButtons,
 } from "../input/gamepad.js";
 import { icon } from "./icons.js";
-import { DEFAULT_SETTINGS, HANDLING_LIMITS, SDF_INFINITE, defaultVisual } from "../storage/settings.js";
+import { DEFAULT_SETTINGS, HANDLING_LIMITS, SDF_INFINITE, VOLUME_LIMITS, defaultVisual } from "../storage/settings.js";
 import { button, choice, choiceCards, el, fieldRow, fillDialog, tabBar } from "./dom.js";
 import { CONTRAST_PALETTE, THEMES, THEME_IDS } from "../render/themes.js";
 import { keycap } from "./keycap.js";
+import { drawThemePreview } from "../render/preview.js";
+import { t } from "../i18n/index.js";
 
 const HANDLING_ROWS = [
-  { key: "das", label: "DAS (자동 이동 시작)", hint: "방향키를 누른 채로 있을 때 자동 이동이 시작되기까지의 시간" },
-  { key: "arr", label: "ARR (자동 이동 간격)", hint: "자동 이동 중 한 칸씩 움직이는 간격. 0이면 바로 벽까지" },
-  { key: "sdf", label: "SDF (소프트 드롭 속도)", hint: "아래 키를 누를 때 떨어지는 속도 배율. 맨 끝은 즉시 바닥까지" },
+  {
+    key: "das",
+    label: t("DAS (자동 이동 시작)"),
+    hint: t("방향키를 누른 채로 있을 때 자동 이동이 시작되기까지의 시간"),
+  },
+  { key: "arr", label: t("ARR (자동 이동 간격)"), hint: t("자동 이동 중 한 칸씩 움직이는 간격. 0이면 바로 벽까지") },
+  {
+    key: "sdf",
+    label: t("SDF (소프트 드롭 속도)"),
+    hint: t("아래 키를 누를 때 떨어지는 속도 배율. 맨 끝은 즉시 바닥까지"),
+  },
 ];
 
 const TABS = [
-  ["control", "조작"],
-  ["visual", "화면"],
-  ["keys", "키보드"],
-  ["pad", "게임패드"],
+  ["control", t("조작")],
+  ["visual", t("화면·소리")],
+  ["keys", t("키보드")],
+  ["pad", t("게임패드")],
 ];
 
-const formatValue = (key, v) => (key === "sdf" ? (v >= SDF_INFINITE ? "즉시" : `${v}배`) : `${v} ms`);
+const formatValue = (key, v) => (key === "sdf" ? (v >= SDF_INFINITE ? t("즉시") : t("{n}배", { n: v })) : `${v} ms`);
 
 const EFFECT_OPTIONS = [
-  ["full", "전체"],
-  ["reduced", "줄임"],
-  ["off", "끄기"],
+  ["full", t("전체")],
+  ["reduced", t("줄임")],
+  ["off", t("끄기")],
 ];
 const EFFECT_HINTS = {
-  full: "테마마다 이동, 착지 반동, 하드 드롭 잔상, 줄 삭제 효과가 달라요",
-  reduced: "줄이 삭제된 위치에 가는 선을 잠깐 표시해요",
-  off: "연출을 모두 꺼요",
+  full: t("테마마다 이동, 착지 반동, 하드 드롭 잔상, 줄 삭제 효과가 달라요"),
+  reduced: t("줄이 삭제된 위치에 가는 선을 잠깐 표시해요"),
+  off: t("연출을 모두 꺼요"),
 };
 const TOUCH_OPTIONS = [
-  ["auto", "자동"],
-  ["on", "켜기"],
-  ["off", "끄기"],
+  ["auto", t("자동")],
+  ["on", t("켜기")],
+  ["off", t("끄기")],
 ];
 const TOUCH_HINTS = {
-  auto: "터치 화면이면 보드 아래에 조작 버튼을 보여요",
-  on: "늘 보드 아래에 조작 버튼을 보여요",
-  off: "조작 버튼을 숨겨요",
+  auto: t("터치 화면이면 보드 아래에 조작 버튼을 보여요"),
+  on: t("늘 보드 아래에 조작 버튼을 보여요"),
+  off: t("조작 버튼을 숨겨요"),
 };
 
 /**
@@ -58,9 +68,11 @@ const TOUCH_HINTS = {
  *   getSettings: () => any,
  *   onChange: (settings: any) => void,
  *   onClose?: () => void,
+ *   onPreviewSound?: () => void,
+ *   onLanguage?: (lang: string) => void,
  * }} options
  */
-export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => {
+export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPreviewSound, onLanguage }) => {
   /** 키 입력을 기다리는 칸 */
   let capture = null;
   const notice = el("p", { class: "notice-slot", role: "status", id: "settings-notice" });
@@ -93,11 +105,11 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
       }),
       fieldRow({
         id: "set-touch",
-        label: "터치 버튼",
+        label: t("터치 버튼"),
         hint: TOUCH_HINTS[getSettings().touch],
         control: choice({
           id: "set-touch",
-          label: "터치 버튼",
+          label: t("터치 버튼"),
           options: TOUCH_OPTIONS,
           value: getSettings().touch,
           onChange: v => {
@@ -120,22 +132,17 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
       { class: "field-section" },
       fieldRow({
         id: "set-theme",
-        label: "게임 테마",
-        hint: "격자 색과 블록의 색·모서리를 바꿔요",
+        label: t("게임 테마"),
+        hint: t("격자 색과 블록의 색·모서리를 바꿔요"),
         className: "is-wide",
         control: choiceCards({
           id: "set-theme",
-          label: "게임 테마",
+          label: t("게임 테마"),
           options: THEME_IDS.map(id => {
             const theme = THEMES[id];
             const palette = visual.palette === "contrast" ? CONTRAST_PALETTE : theme.palette;
-            const preview = el(
-              "span",
-              { class: "theme-preview", "aria-hidden": "true" },
-              ...[1, 3, 4, 6].map(i => el("span", { style: `background-color: ${palette[i]}` }))
-            );
-            preview.style.backgroundColor = theme.board.bg;
-            preview.style.setProperty("--preview-radius", `${theme.radius * 20}px`);
+            const preview = el("canvas", { class: "theme-preview", "aria-hidden": "true" });
+            drawThemePreview(preview, theme, palette);
             return { value: id, title: theme.name, desc: theme.description, preview };
           }),
           value: visual.theme,
@@ -144,11 +151,11 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
       }),
       fieldRow({
         id: "set-effects",
-        label: "화면 효과",
+        label: t("화면 효과"),
         hint: EFFECT_HINTS[visual.effects],
         control: choice({
           id: "set-effects",
-          label: "화면 효과",
+          label: t("화면 효과"),
           options: EFFECT_OPTIONS,
           value: visual.effects,
           onChange: v => setVisual("effects", v),
@@ -156,20 +163,71 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
       }),
       fieldRow({
         id: "set-palette",
-        label: "블록 색",
-        hint: visual.palette === "contrast" ? "색을 구분하기 쉬운 색 조합을 써요" : "고른 테마의 색을 써요",
+        label: t("블록 색"),
+        hint: visual.palette === "contrast" ? t("색을 구분하기 쉬운 색 조합을 써요") : t("고른 테마의 색을 써요"),
         control: choice({
           id: "set-palette",
-          label: "블록 색",
+          label: t("블록 색"),
           options: [
-            ["theme", "테마 색"],
-            ["contrast", "색각 친화"],
+            ["theme", t("테마 색")],
+            ["contrast", t("색각 친화")],
           ],
           value: visual.palette,
           onChange: v => setVisual("palette", v),
         }),
+      }),
+      volumeRow(),
+      fieldRow({
+        id: "set-lang",
+        label: t("언어"),
+        hint:
+          getSettings().lang === "auto"
+            ? t("브라우저 언어를 따라요 · 바꾸면 페이지를 다시 불러와요")
+            : t("바꾸면 페이지를 다시 불러와요"),
+        control: choice({
+          id: "set-lang",
+          label: t("언어"),
+          options: [
+            ["auto", t("자동")],
+            ["ko", "한국어"],
+            ["en", "English"],
+          ],
+          value: getSettings().lang,
+          onChange: v => {
+            if (v === getSettings().lang) return;
+            update({ lang: v });
+            onLanguage?.(v);
+          },
+        }),
       })
     );
+  };
+
+  const formatVolume = v => (v <= 0 ? t("끄기") : `${v}%`);
+  const volumeRow = () => {
+    const value = getSettings().volume;
+    const output = el("output", { text: formatVolume(value), htmlFor: "set-volume" });
+    const input = el("input", {
+      type: "range",
+      id: "set-volume",
+      min: String(VOLUME_LIMITS.min),
+      max: String(VOLUME_LIMITS.max),
+      step: String(VOLUME_LIMITS.step),
+      value: String(value),
+    });
+    input.addEventListener("input", () => {
+      const v = Number(input.value);
+      output.textContent = formatVolume(v);
+      update({ volume: v });
+    });
+    // 손을 뗄 때 한 번 들려준다(끄기면 조용).
+    input.addEventListener("change", () => onPreviewSound?.());
+    return fieldRow({
+      id: "set-volume",
+      label: t("효과음"),
+      hint: t("블록 이동·회전·줄 삭제 소리의 크기. 맨 왼쪽은 끄기"),
+      control: el("span", { class: "range" }, input, output),
+    });
   };
 
   /** 게임패드 버튼 하나를 키캡 모양으로(십자키는 화살표 아이콘) */
@@ -186,7 +244,6 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
    */
   const bindingSection = kind => {
     const map = kind === "key" ? getSettings().keymap : getSettings().padmap;
-    const noun = kind === "key" ? "키" : "버튼";
     return el(
       "section",
       { class: "field-section" },
@@ -194,26 +251,30 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
         class: "field-help",
         text:
           kind === "key"
-            ? "칸을 누르고 원하는 키를 누르세요. Backspace는 지우기, Esc는 취소."
-            : "칸을 누르고 패드의 원하는 버튼을 누르세요. 왼쪽 스틱과 메뉴 이동(A·십자키)은 고정이에요.",
+            ? t("칸을 누르고 원하는 키를 누르세요. Backspace는 지우기, Esc는 취소.")
+            : t("칸을 누르고 패드의 원하는 버튼을 누르세요. 왼쪽 스틱과 메뉴 이동(A·십자키)은 고정이에요."),
       }),
       ...ACTIONS.map(action => {
         const slots = Array.from({ length: SLOTS }, (_, slot) => {
           const value = map[action.id]?.[slot];
           const has = value !== undefined;
           const waiting = capture && capture.kind === kind && capture.action === action.id && capture.slot === slot;
-          const name = has ? (kind === "key" ? keyLabel(value) : padButtonName(value)) : "없음";
+          const name = has ? (kind === "key" ? keyLabel(value) : padButtonName(value)) : t("없음");
           const btn = el("button", {
             type: "button",
             class: `key-slot${waiting ? " is-waiting" : ""}${has ? "" : " is-empty"}`,
             "data-kind": kind,
             "data-action": action.id,
             "data-slot": String(slot),
-            "aria-label": `${action.label} ${slot + 1}번 ${noun}: ${name}`,
+            "aria-label": t(kind === "key" ? "{action} {n}번 키: {name}" : "{action} {n}번 버튼: {name}", {
+              action: action.label,
+              n: slot + 1,
+              name,
+            }),
           });
-          if (waiting) btn.textContent = `${noun}를 누르세요`;
+          if (waiting) btn.textContent = t(kind === "key" ? "키를 누르세요" : "버튼을 누르세요");
           else if (has) btn.append(kind === "key" ? keycap(value) : padCap(value));
-          else btn.textContent = "없음";
+          else btn.textContent = t("없음");
           btn.addEventListener("click", () => startCapture(kind, action.id, slot));
           return btn;
         });
@@ -237,7 +298,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
 
   const render = () => {
     const scroll = dialog.querySelector(".dialog-body")?.scrollTop ?? 0;
-    const reset = button({ text: "기본값으로", iconName: "reset", id: "settings-reset" });
+    const reset = button({ text: t("기본값으로"), iconName: "reset", id: "settings-reset" });
     reset.addEventListener("click", () => {
       capture = null;
       onChange({
@@ -247,8 +308,9 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
         padmap: { ...DEFAULT_PADMAP },
         touch: "auto",
         visual: defaultVisual(),
+        volume: DEFAULT_SETTINGS.volume,
       });
-      notice.textContent = "모든 설정을 기본값으로 되돌렸어요.";
+      notice.textContent = t("모든 설정을 기본값으로 되돌렸어요.");
       render();
     });
     const tabs = tabBar({
@@ -264,7 +326,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
       },
     });
     const body = el("div", {}, sectionFor(tab));
-    fillDialog(dialog, { title: "설정", body, notice, actions: [reset], closeId: "settings-close", tabs });
+    fillDialog(dialog, { title: t("설정"), body, notice, actions: [reset], closeId: "settings-close", tabs });
     body.scrollTop = scroll;
   };
 
@@ -282,7 +344,9 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
       const result = assignPadButton(getSettings().padmap, action, slot, fresh);
       update({ padmap: result.padmap });
       const moved = result.movedFrom && ACTIONS.find(a => a.id === result.movedFrom);
-      notice.textContent = moved ? `‘${padButtonName(fresh)}’ 버튼을 ‘${moved.label}’에서 옮겼어요.` : "";
+      notice.textContent = moved
+        ? t("‘{key}’ 버튼을 ‘{action}’에서 옮겼어요.", { key: padButtonName(fresh), action: moved.label })
+        : "";
       endCapture();
       return;
     }
@@ -292,7 +356,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
   const startCapture = (kind, action, slot) => {
     capture = { kind, action, slot };
     notice.textContent =
-      kind === "pad" && !connectedPads().length ? "게임패드가 연결돼 있지 않아요. 연결하고 버튼을 눌러 주세요." : "";
+      kind === "pad" && !connectedPads().length ? t("게임패드가 연결돼 있지 않아요. 연결하고 버튼을 눌러 주세요.") : "";
     render();
     /** @type {HTMLElement | null} */ (dialog.querySelector(slotSelector(capture)))?.focus();
     if (kind === "pad") {
@@ -329,7 +393,9 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose }) => 
       const result = assignKey(keymap, action, slot, e.code);
       update({ keymap: result.keymap });
       const moved = result.movedFrom && ACTIONS.find(a => a.id === result.movedFrom);
-      notice.textContent = moved ? `‘${keyLabel(e.code)}’ 키를 ‘${moved.label}’에서 옮겼어요.` : "";
+      notice.textContent = moved
+        ? t("‘{key}’ 키를 ‘{action}’에서 옮겼어요.", { key: keyLabel(e.code), action: moved.label })
+        : "";
       endCapture();
     },
     { capture: true }

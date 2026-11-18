@@ -1,21 +1,22 @@
 // 키 배치 모델. e.code(물리 키 위치) 기준이라 한글 입력 상태나 자판 배열과 상관없이 같은 키로 동작한다.
 // 저장 형식: { 동작 id: [키 코드, 키 코드] } — 동작마다 최대 SLOTS개, 한 키는 한 동작에만.
 import { BTN } from "../core/engine.js";
+import { t } from "../i18n/index.js";
 
 export const SLOTS = 2;
 
 /** @type {ReadonlyArray<{ id: string, label: string, bit?: number, system?: "restart" | "pause" }>} */
 export const ACTIONS = Object.freeze([
-  { id: "LEFT", label: "왼쪽 이동", bit: BTN.LEFT },
-  { id: "RIGHT", label: "오른쪽 이동", bit: BTN.RIGHT },
-  { id: "SOFT", label: "소프트 드롭", bit: BTN.SOFT },
-  { id: "HARD", label: "하드 드롭", bit: BTN.HARD },
-  { id: "CW", label: "시계 방향 회전", bit: BTN.CW },
-  { id: "CCW", label: "반시계 방향 회전", bit: BTN.CCW },
-  { id: "R180", label: "180° 회전", bit: BTN.R180 },
-  { id: "HOLD", label: "홀드", bit: BTN.HOLD },
-  { id: "RESTART", label: "다시 시작", system: "restart" },
-  { id: "PAUSE", label: "일시정지", system: "pause" },
+  { id: "LEFT", label: t("왼쪽 이동"), bit: BTN.LEFT },
+  { id: "RIGHT", label: t("오른쪽 이동"), bit: BTN.RIGHT },
+  { id: "SOFT", label: t("소프트 드롭"), bit: BTN.SOFT },
+  { id: "HARD", label: t("하드 드롭"), bit: BTN.HARD },
+  { id: "CW", label: t("시계 방향 회전"), bit: BTN.CW },
+  { id: "CCW", label: t("반시계 방향 회전"), bit: BTN.CCW },
+  { id: "R180", label: t("180° 회전"), bit: BTN.R180 },
+  { id: "HOLD", label: t("홀드"), bit: BTN.HOLD },
+  { id: "RESTART", label: t("다시 시작"), system: "restart" },
+  { id: "PAUSE", label: t("일시정지"), system: "pause" },
 ]);
 
 export const DEFAULT_KEYMAP = Object.freeze({
@@ -117,10 +118,10 @@ export const KEY_ICONS = Object.freeze({
 });
 
 const NAMED = {
-  ArrowLeft: "왼쪽 화살표",
-  ArrowRight: "오른쪽 화살표",
-  ArrowUp: "위쪽 화살표",
-  ArrowDown: "아래쪽 화살표",
+  ArrowLeft: t("왼쪽 화살표"),
+  ArrowRight: t("오른쪽 화살표"),
+  ArrowUp: t("위쪽 화살표"),
+  ArrowDown: t("아래쪽 화살표"),
   Space: "Space",
   ShiftLeft: "L Shift",
   ShiftRight: "R Shift",

@@ -57,10 +57,10 @@
         <section class="home-modes" aria-labelledby="mode-title">
           <h2 id="mode-title" class="section-title">플레이 모드</h2>
           <div id="mode-list" class="mode-grid"></div>
-          <button id="start-pb-race" class="tool-row race-entry" type="button" aria-describedby="race-availability" disabled>
-            <span><strong>내 기록과 달리기</strong><span id="race-availability">Sprint 40L 완주 리플레이 필요</span></span>
-            <span data-icon="arrow-right"></span>
-          </button>
+          <div class="race-entry" role="group" aria-labelledby="race-title">
+            <p class="race-entry-head"><strong id="race-title">내 기록과 달리기</strong><span>같은 규칙의 최고 기록 리플레이와 같은 블록 순서로 겨뤄요</span></p>
+            <div id="race-modes" class="race-modes"></div>
+          </div>
         </section>
 
         <section class="home-tools" aria-label="플레이 도구">
@@ -74,6 +74,12 @@
             <button id="watch-last" class="tool-row" type="button" disabled>마지막 판 다시 보기<span data-icon="arrow-right"></span><small>저장된 판 없음</small></button>
             <button id="open-replay" class="tool-row" type="button">파일 열기<span data-icon="arrow-right"></span></button>
             <input id="replay-file" type="file" accept=".json,application/json" hidden />
+          </section>
+          <section class="tool-group" aria-labelledby="data-tools-title">
+            <h2 id="data-tools-title" class="section-title">데이터</h2>
+            <button id="export-backup" class="tool-row" type="button">백업 파일로 저장<span data-icon="download"></span></button>
+            <button id="import-backup" class="tool-row" type="button">백업 불러오기<span data-icon="arrow-right"></span></button>
+            <input id="backup-file" type="file" accept=".json,application/json" hidden />
           </section>
           <p id="menu-notice" class="notice-slot menu-notice" role="status"></p>
         </section>
@@ -97,13 +103,14 @@
             <div data-hud="pps"><dt>PPS</dt><dd id="hud-pps">0.00</dd></div>
             <div data-hud="streak" class="is-off"><dt>연속 / 최고</dt><dd id="hud-streak">0 / 0</dd></div>
             <div data-hud="split"><dt>PB 대비</dt><dd id="hud-split" class="hud-split">—</dd></div>
+            <div data-hud="finesse" class="is-off"><dt>피네스 실수</dt><dd id="hud-finesse">0 / 0</dd></div>
           </dl>
           <aside id="race-panel" class="race-panel" aria-label="내 최고 기록 진행 상황" hidden>
             <div class="race-panel-head">
               <strong>내 최고 기록</strong>
               <span id="race-progress-label" class="num">0 / 40줄</span>
             </div>
-            <progress id="race-progress" aria-label="최고 기록이 지운 줄" value="0" max="40"></progress>
+            <progress id="race-progress" aria-label="최고 기록 진행" value="0" max="40"></progress>
             <canvas id="race-board" class="race-board" aria-label="최고 기록 보드"></canvas>
           </aside>
         </div>

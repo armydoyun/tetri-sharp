@@ -1,5 +1,6 @@
 // 작은 DOM 도우미와 대화상자 틀. 설정·규칙 편집이 같은 모양(머리·몸통·발)을 쓴다.
 import { icon } from "./icons.js";
+import { t } from "../i18n/index.js";
 
 /**
  * @param {string} tag
@@ -30,9 +31,13 @@ export const button = ({ text, iconName, className = "btn", ...attrs }) =>
  * @param {{ title: string, body: HTMLElement, notice: HTMLElement, actions: HTMLElement[], closeId: string }} parts
  */
 export const fillDialog = (dialog, { title, body, notice, actions, closeId, tabs = null }) => {
-  const close = el("button", { type: "button", class: "btn btn-ghost btn-small", "aria-label": "닫기" }, icon("close"));
+  const close = el(
+    "button",
+    { type: "button", class: "btn btn-ghost btn-small", "aria-label": t("닫기") },
+    icon("close")
+  );
   close.addEventListener("click", () => dialog.close());
-  const done = button({ text: "닫기", className: "btn btn-primary", id: closeId });
+  const done = button({ text: t("닫기"), className: "btn btn-primary", id: closeId });
   done.addEventListener("click", () => dialog.close());
   body.classList.add("dialog-body");
   dialog.classList.toggle("dialog-tabbed", Boolean(tabs));
@@ -98,4 +103,11 @@ export const choiceCards = ({ id, label, options, value, onChange }) => {
 
 /** 대화상자 탭 줄 */
 export const tabBar = ({ tabs, active, onSelect }) =>
-  choice({ id: "dialog-tab", label: "구역", options: tabs, value: active, onChange: onSelect, className: "segmented" });
+  choice({
+    id: "dialog-tab",
+    label: t("구역"),
+    options: tabs,
+    value: active,
+    onChange: onSelect,
+    className: "segmented",
+  });
