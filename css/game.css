@@ -447,7 +447,7 @@ body.touch-on {
 }
 
 body[data-screen="replay"] {
-  --replay-controls-h: 104px;
+  --replay-controls-h: 200px;
   --under-h: var(--replay-controls-h);
 }
 
@@ -457,7 +457,7 @@ body[data-screen="replay"]:has(.replay-note:not(:empty)) {
 
 @media (max-width: 720px) {
   body[data-screen="replay"] {
-    --replay-controls-h: 154px;
+    --replay-controls-h: 270px;
   }
 }
 
@@ -922,4 +922,99 @@ body[data-screen="replay"] .touchpad {
   margin: 0;
   font-family: var(--font-num);
   font-weight: 700;
+
+/* ---- 리플레이 진행 막대(이동 가능) + 분석 표시 ---- */
+.replay-track {
+  display: block;
+  position: relative;
+  padding-top: 10px;
+}
+
+.replay-track input {
+  display: block;
+}
+
+/* 막대 위 표시: 누를 수 있는 작은 기둥. 색으로 종류를 나눈다 */
+.replay-markers {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 12px;
+  pointer-events: none;
+}
+
+.replay-mark {
+  appearance: none;
+  position: absolute;
+  top: 0;
+  width: 4px;
+  height: 12px;
+  margin-left: -2px;
+  padding: 0;
+  border: 0;
+  border-radius: 1px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* 누르기 쉽게 보이지 않는 여유를 둔다 */
+.replay-mark::before {
+  content: "";
+  position: absolute;
+  inset: -4px -5px;
+}
+
+.replay-mark:hover,
+.replay-mark:focus-visible {
+  height: 14px;
+  top: -2px;
+}
+
+.replay-mark.is-finesse,
+.replay-legend.is-finesse::before {
+  background: #f0a35e;
+}
+
+.replay-mark.is-slow,
+.replay-legend.is-slow::before {
+  background: #8fa6d8;
+}
+
+.replay-mark.is-highlight,
+.replay-legend.is-highlight::before {
+  background: var(--accent);
+}
+
+.replay-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 var(--space-2);
+  white-space: nowrap;
+}
+
+.replay-legend::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+}
+
+.replay-analysis {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.replay-summary {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--text-s);
+  text-align: center;
+}
+
+.replay-buttons .btn[data-replay="back"],
+.replay-buttons .btn[data-replay="ahead"],
+.replay-buttons .btn[data-replay="step-back"],
+.replay-buttons .btn[data-replay="step"] {
+  font-family: var(--font-num);
 }

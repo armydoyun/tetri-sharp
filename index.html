@@ -205,14 +205,26 @@
             <span id="replay-status" class="replay-status"></span>
           </div>
           <p id="replay-note" class="replay-note" role="status"></p>
+          <!-- 진행 막대: 눌러서 원하는 시점으로. 위에는 분석 표시(피네스 실수·오래 고민한 피스·주요 장면) -->
           <div class="replay-timeline">
-            <progress id="replay-progress" aria-label="리플레이 진행률" value="0" max="1"></progress>
+            <div class="replay-track range">
+              <div id="replay-markers" class="replay-markers"></div>
+              <input id="replay-progress" type="range" min="0" max="1" step="1" value="0" aria-label="리플레이 위치" />
+            </div>
             <span id="replay-time" class="num"></span>
+          </div>
+          <div class="replay-analysis">
+            <button type="button" class="btn btn-small" data-replay="prev-mark" aria-label="이전 표시로"><span data-icon="arrow-left"></span>이전 표시</button>
+            <p id="replay-summary" class="replay-summary"></p>
+            <button type="button" class="btn btn-small" data-replay="next-mark" aria-label="다음 표시로">다음 표시<span data-icon="arrow-right"></span></button>
           </div>
           <div class="replay-buttons">
             <button type="button" class="btn" data-replay="toggle"><span class="replay-toggle-icon"><span data-icon="pause"></span></span><span class="replay-toggle-text">일시정지</span></button>
+            <button type="button" class="btn num" data-replay="back" aria-label="5초 뒤로">-5초</button>
+            <button type="button" class="btn num" data-replay="ahead" aria-label="5초 앞으로">+5초</button>
+            <button type="button" class="btn num" data-replay="step-back" aria-label="한 프레임 뒤로">-1F</button>
+            <button type="button" class="btn num" data-replay="step" aria-label="한 프레임 앞으로">+1F</button>
             <button type="button" class="btn num" data-replay="speed" aria-label="재생 속도 바꾸기"><span data-icon="forward"></span><span class="replay-speed">1x</span></button>
-            <button type="button" class="btn" data-replay="step" aria-label="한 프레임 앞으로">한 프레임</button>
             <button type="button" class="btn" data-replay="restart"><span data-icon="restart"></span>처음부터</button>
             <button type="button" class="btn" data-replay="exit"><span data-icon="close"></span>닫기</button>
           </div>

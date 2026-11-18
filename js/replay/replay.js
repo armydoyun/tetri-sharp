@@ -85,9 +85,14 @@ export const createPlayer = (replay, findMode) => {
   let cursor = 0;
   let change = 0;
   let held = 0;
+  let lastInput = { held: 0, pressed: 0 };
   return {
     game,
     mode,
+    /** 마지막 step()에 넣은 입력(분석용) */
+    get input() {
+      return lastInput;
+    },
     get frame() {
       return index;
     },
@@ -108,6 +113,7 @@ export const createPlayer = (replay, findMode) => {
         cursor += 1;
       }
       index += 1;
+      lastInput = { held, pressed };
       return game.step({ held, pressed });
     },
   };

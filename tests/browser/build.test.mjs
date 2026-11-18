@@ -330,9 +330,12 @@ test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파�
   await page.click('[data-action="watch"]');
   assert.equal(await visible(page, "replay-bar"), true);
   await page.click('[data-replay="step"]');
-  const stepFrame = await page.locator("#replay-progress").evaluate(progress => progress.value);
+  const position = () => page.locator("#replay-progress").evaluate(input => Number(input.value));
+  const stepFrame = await position();
   await page.click('[data-replay="step"]');
-  assert.equal(await page.locator("#replay-progress").evaluate(progress => progress.value), stepFrame + 1);
+  assert.equal(await position(), stepFrame + 1);
+  await page.click('[data-replay="step-back"]');
+  assert.equal(await position(), stepFrame, "한 프레임 뒤로");
   assert.match(await text(page, "replay-time"), / \/ /);
   await page.click('[data-replay="toggle"]');
   await page.keyboard.press("Digit4");
@@ -1200,4 +1203,40 @@ test("오늘의 도전: 창에서 시작하고, 받은 코드(이름 포함)로 
   assert.equal(await p2.evaluate(() => location.hash), "", "주소의 해시는 지운다");
   assert.deepEqual(errors, []);
   await linked.close();
+});
+
+test("리플레이 탐색: 막대로 원하는 시점에 가고, 표시로 건너뛰며, 뒤로 가도 같은 판이 나온다", async () => {
+  const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
+  const { context, page, errors } = await openPage(replay => {
+    localStorage.setItem("tetrisharp:replay:last", JSON.stringify(replay));
+  }, fixture.replay);
+  await page.click("#watch-last");
+  const position = () => page.locator("#replay-progress").evaluate(input => Number(input.value));
+  const board = () => page.locator("#board").evaluate(c => c.toDataURL());
+  assert.ok((await page.locator(".replay-mark").count()) > 0, "분석 표시가 있다");
+  assert.match(await text(page, "replay-summary"), /피네스 실수 \d+/);
+
+  // 막대를 끝 근처로 → 그 시점, 멈춤
+  await page.locator("#replay-progress").fill("300");
+  assert.equal(await position(), 300);
+  assert.equal(await page.locator('[data-replay="toggle"] .replay-toggle-text').textContent(), "재생");
+  await page.waitForTimeout(50);
+  const at300 = await board();
+  // 앞으로 갔다가 다시 300으로 되감으면 같은 판
+  await page.click('[data-replay="ahead"]');
+  assert.ok((await position()) > 300);
+  await page.locator("#replay-progress").fill("300");
+  await page.waitForTimeout(50);
+  assert.equal(await board(), at300, "되감아도 같은 판");
+
+  // 다음 표시 → 위치가 바뀌고 멈춘다
+  await page.locator("#replay-progress").fill("0");
+  await page.click('[data-replay="next-mark"]');
+  const first = await position();
+  await page.click('[data-replay="next-mark"]');
+  assert.ok((await position()) >= first);
+  await page.click('[data-replay="prev-mark"]');
+  assert.equal(await position(), first);
+  assert.deepEqual(errors, []);
+  await context.close();
 });
