@@ -18,6 +18,8 @@ const lockEvent = {
     [2, 38],
   ],
 };
+const studio = THEMES.modern.motion;
+const dropEvent = { type: "hardDrop", distance: 14, cells: lockEvent.cells };
 const clearEvent = { ...lockEvent, lines: 1, rows: [39] };
 const fakeCtx = (calls = []) =>
   new Proxy(
@@ -58,24 +60,24 @@ test("세 테마의 보드 색과 블록 모서리가 서로 다르다", () => {
 test("착지한 블록만 열 바닥을 기준으로 눌렸다가 원래 크기로 돌아온다", () => {
   const fx = createEffects();
   const value = CELL_ID.L;
-  fx.add([lockEvent], "full", 0);
+  fx.add([lockEvent], "full", 0, studio);
   assert.deepEqual(fx.landing(0, 38, value, 0), { floor: 40, scale: 1 });
-  assert.deepEqual(fx.landing(0, 39, value, 29), { floor: 40, scale: 0.88 });
-  assert.deepEqual(fx.landing(1, 38, value, 29), { floor: 39, scale: 0.88 });
-  assert.ok(fx.landing(0, 38, value, 85).scale > 0.88);
-  assert.equal(fx.landing(2, 39, value, 29), null);
+  assert.deepEqual(fx.landing(0, 39, value, 33), { floor: 40, scale: 0.85 });
+  assert.deepEqual(fx.landing(1, 38, value, 33), { floor: 39, scale: 0.85 });
+  assert.ok(fx.landing(0, 38, value, 100).scale > 1);
+  assert.equal(fx.landing(2, 39, value, 33), null);
   assert.equal(fx.landing(0, 39, CELL_ID.O, 29), null);
-  assert.equal(fx.landing(0, 39, value, 145), null);
+  assert.equal(fx.landing(0, 39, value, studio.landMs), null);
 });
 
 test("줄 삭제·연습 보드 교체·효과 줄임은 낡은 착지 좌표를 버린다", () => {
   const fx = createEffects();
   for (const event of [clearEvent, { type: "practice", success: false }]) {
-    fx.add([lockEvent], "full", 0);
-    fx.add([event], "full", 16);
+    fx.add([lockEvent], "full", 0, studio);
+    fx.add([event], "full", 16, studio);
     assert.equal(fx.landing(0, 39, CELL_ID.L, 20), null);
   }
-  fx.add([lockEvent], "full", 0);
+  fx.add([lockEvent], "full", 0, studio);
   fx.prune(20, "reduced");
   assert.equal(fx.landing(0, 39, CELL_ID.L, 20), null);
 });
@@ -84,7 +86,7 @@ test("줄 삭제 표시가 차지하는 범위와 수명은 효과 수준에 따
   const marks = (level, now) => {
     const fx = createEffects();
     const calls = [];
-    fx.add([clearEvent], level, 0);
+    fx.add([clearEvent], level, 0, studio);
     fx.prune(now, level);
     fx.draw(fakeCtx(calls), { bx: 0, cell: 10, toY: y => y * 10, cols: 10 }, now, "#fff", level);
     return calls.filter(([name]) => name === "fillRect");
@@ -92,7 +94,51 @@ test("줄 삭제 표시가 차지하는 범위와 수명은 효과 수준에 따
   assert.ok(marks("full", 30)[0][4] > marks("reduced", 30)[0][4]);
   assert.equal(marks("reduced", 30)[0][4], 1.2);
   assert.deepEqual(marks("off", 30), []);
-  assert.deepEqual(marks("full", 175), []);
+  assert.deepEqual(marks("full", studio.clearMs), []);
+});
+
+test("하드 드롭은 테마마다 다른 압축과 짧은 잔상을 만들고 줄임·끄기에서는 생략한다", () => {
+  const samples = [];
+  for (const { motion } of Object.values(THEMES)) {
+    const fx = createEffects();
+    fx.add([dropEvent, lockEvent], "full", 0, motion);
+    samples.push(fx.landing(0, 39, CELL_ID.L, motion.landMs * 0.2).scale);
+
+    const geometry = { bx: 0, by: 360, cell: 10, toY: y => y * 10 };
+    const calls = [];
+    fx.drawDrops(fakeCtx(calls), geometry, 0, "#fff");
+    assert.equal(calls.filter(([name]) => name === "fillRect").length, 3);
+    const [, , top, , height] = calls.find(([name]) => name === "fillRect");
+    assert.equal(height, Math.min(motion.trailCells * 10, 380 - geometry.by));
+    assert.ok(top >= geometry.by);
+
+    for (const [now, level] of [
+      [motion.trailMs, "full"],
+      [20, "reduced"],
+      [20, "off"],
+    ]) {
+      fx.add([dropEvent, lockEvent], "full", 0, motion);
+      fx.prune(now, level);
+      const after = [];
+      fx.drawDrops(fakeCtx(after), geometry, now, "#fff");
+      assert.deepEqual(after, []);
+    }
+  }
+  assert.equal(new Set(samples).size, 3);
+  assert.equal(samples[0], 0.8);
+});
+
+test("줄 삭제는 스튜디오에서 가운데로부터, 페이퍼에서 왼쪽부터, 슬레이트에서 두 줄로 그린다", () => {
+  const marks = Object.values(THEMES).map(({ motion }) => {
+    const fx = createEffects();
+    fx.add([clearEvent], "full", 0, motion);
+    const calls = [];
+    fx.draw(fakeCtx(calls), { bx: 0, cell: 10, toY: y => y * 10, cols: 10 }, 30, "#fff", "full");
+    return calls.filter(([name]) => name === "fillRect");
+  });
+  assert.ok(marks[0][0][1] > 0);
+  assert.equal(marks[1][0][1], 0);
+  assert.equal(marks[2].length, 2);
 });
 
 test("미끄러짐: 같은 피스는 짧게 따라가고, 새 피스나 0ms는 바로 그 자리", () => {

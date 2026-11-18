@@ -37,7 +37,7 @@ const EFFECT_OPTIONS = [
   ["off", "끄기"],
 ];
 const EFFECT_HINTS = {
-  full: "짧은 이동, 착지 눌림, 줄 삭제 표시를 보여요",
+  full: "테마마다 이동, 착지 반동, 하드 드롭 잔상, 줄 삭제 효과가 달라요",
   reduced: "줄이 삭제된 위치에 가는 선을 잠깐 표시해요",
   off: "연출을 모두 꺼요",
 };

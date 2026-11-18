@@ -35,7 +35,7 @@
 .session-title {
   margin: 0;
   color: var(--text-dim);
-  font: 600 var(--text-m) var(--font-display);
+  font: 600 var(--text-m) var(--font-ui);
   text-align: center;
 }
 
@@ -48,7 +48,7 @@ body:not([data-screen="play"], [data-screen="countdown"]) #pause-game {
   align-items: center;
   gap: var(--space-2);
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--text-3xl);
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -112,9 +112,9 @@ body[data-screen="menu"] .stage {
 
 .intro-copy h2 {
   margin: 0;
-  font-size: clamp(32px, 5vw, 60px);
-  font-weight: 750;
-  letter-spacing: -0.065em;
+  font-size: clamp(28px, 4.5vw, 52px);
+  font-weight: 700;
+  letter-spacing: -0.045em;
   line-height: 1.12;
 }
 
@@ -359,7 +359,7 @@ body[data-screen="menu"] .stage {
 }
 
 .mode-card strong {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--text-2xl);
   line-height: 1.2;
 }
@@ -371,7 +371,7 @@ body[data-screen="menu"] .stage {
 }
 
 .mode-card .mode-best {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--text-m);
   font-weight: 600;
   color: var(--accent);
@@ -382,6 +382,17 @@ body[data-screen="menu"] .stage {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+.home-actions .btn {
+  gap: 7px;
+  padding-inline: 14px;
+}
+
+.home-actions .icon {
+  width: 20px;
+  height: 20px;
+  margin-inline-start: -3px; /* SVG 격자 자체의 빈 여백 보정 */
 }
 
 .menu-notice {
@@ -569,7 +580,7 @@ body[data-screen="replay"] {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: 48px;
   font-weight: 700;
   letter-spacing: -0.035em;
@@ -603,7 +614,7 @@ body[data-screen="replay"] {
   gap: var(--space-1);
   justify-items: center;
   text-align: center;
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: clamp(11px, 1.6vw, 15px);
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -641,7 +652,7 @@ body[data-screen="replay"] {
 
 .results-main {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--text-5xl);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -665,7 +676,7 @@ body[data-screen="replay"] {
 .results-stats dd {
   margin: 0;
   text-align: right;
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -685,7 +696,7 @@ body[data-screen="replay"] {
 }
 
 .replay-tag {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--accent);
@@ -740,7 +751,7 @@ body[data-screen="replay"] {
 
 .hud dd {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--text-3xl);
   font-weight: 600;
   font-variant-numeric: tabular-nums;

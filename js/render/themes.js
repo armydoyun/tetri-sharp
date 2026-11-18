@@ -30,7 +30,12 @@ const drawCell = (ctx, x, y, size, theme, color, outline) => {
 };
 
 const makeTheme = spec => {
-  const theme = { ...spec, palette: Object.freeze(["", ...spec.palette]), board: Object.freeze(spec.board) };
+  const theme = {
+    ...spec,
+    palette: Object.freeze(["", ...spec.palette]),
+    board: Object.freeze(spec.board),
+    motion: Object.freeze(spec.motion),
+  };
   return Object.freeze({
     ...theme,
     block: (ctx, x, y, size, color) => drawCell(ctx, x, y, size, theme, color, false),
@@ -51,6 +56,16 @@ export const THEMES = Object.freeze({
     board: { bg: "#202421", grid: "#2b312c", edge: "#414941", ink: "#d6ed84" },
     gap: 0.045,
     radius: 0.15,
+    motion: {
+      slideMs: 42,
+      landMs: 165,
+      depth: 0.15,
+      rebound: 0.035,
+      trailMs: 115,
+      trailCells: 2.5,
+      clear: "spread",
+      clearMs: 205,
+    },
   }),
   retro: makeTheme({
     name: "페이퍼",
@@ -59,6 +74,16 @@ export const THEMES = Object.freeze({
     board: { bg: "#eeede3", grid: "#dfded2", edge: "#cfcec0", ink: "#52624a" },
     gap: 0.055,
     radius: 0.06,
+    motion: {
+      slideMs: 24,
+      landMs: 115,
+      depth: 0.09,
+      rebound: 0,
+      trailMs: 75,
+      trailCells: 1,
+      clear: "wipe",
+      clearMs: 155,
+    },
   }),
   minimal: makeTheme({
     name: "슬레이트",
@@ -67,6 +92,16 @@ export const THEMES = Object.freeze({
     board: { bg: "#262d35", grid: "#323c46", edge: "#46525d", ink: "#adc9d1" },
     gap: 0.085,
     radius: 0.1,
+    motion: {
+      slideMs: 56,
+      landMs: 215,
+      depth: 0.12,
+      rebound: 0.015,
+      trailMs: 155,
+      trailCells: 2,
+      clear: "rails",
+      clearMs: 245,
+    },
   }),
 });
 

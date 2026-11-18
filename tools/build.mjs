@@ -24,7 +24,7 @@ export const JS_OPTIONS = Object.freeze({
 });
 export const CSS_OPTIONS = Object.freeze({ loader: "css", minify: true, charset: "utf8" });
 
-const MIME = { ".woff2": "font/woff2", ".svg": "image/svg+xml", ".png": "image/png" };
+const MIME = { ".svg": "image/svg+xml", ".png": "image/png" };
 
 /**
  * CSS 안의 url("../assets/…")를 data: URI로 바꾼다(한 파일 배포본이 바깥 파일을 찾지 않게).

@@ -29,7 +29,7 @@ select {
 
 /* 숫자는 항상 같은 폭(값이 바뀌어도 글자가 흔들리지 않게) */
 .num {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-variant-numeric: tabular-nums;
 }
 
