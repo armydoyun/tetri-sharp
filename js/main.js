@@ -6,7 +6,7 @@ import { createKeyboard } from "./input/keyboard.js";
 import { createTouch, touchVisible } from "./input/touch.js";
 import { PAD_ICONS, compilePadmap, createGamepad, padButtonName } from "./input/gamepad.js";
 import { ACTIONS, compileKeymap } from "./input/keymap.js";
-import { MODES, findMode } from "./modes/index.js";
+import { MODES, SPRINT_40, findMode } from "./modes/index.js";
 import { formatScore, formatTime } from "./modes/format.js";
 import { clearName } from "./rules/scoring/guideline.js";
 import { createStore } from "./storage/store.js";
@@ -56,6 +56,17 @@ let bindings = compileKeymap(settings.keymap);
 let padBindings = compilePadmap(settings.padmap);
 
 const renderer = createRenderer(canvas, { getVisual: () => settings.visual });
+const racePanel = $("race-panel");
+const raceProgress = /** @type {HTMLProgressElement} */ ($("race-progress"));
+const raceLabel = $("race-progress-label");
+const raceEntry = /** @type {HTMLButtonElement} */ ($("start-pb-race"));
+const raceBoard = /** @type {HTMLCanvasElement} */ ($("race-board"));
+const raceBoardVisible = window.matchMedia("(width > 720px)");
+const raceRenderer = createRenderer(raceBoard, {
+  compact: true,
+  getVisual: () => ({ ...settings.visual, effects: "off" }),
+});
+let race = null;
 
 /** @type {"menu" | "countdown" | "play" | "paused" | "results" | "replay"} */
 let screen = "menu";
@@ -188,9 +199,39 @@ const renderRuleTabs = () => {
       : `${RULE_DESCRIPTIONS[ruleChoice]} 바꾸고 싶으면 Custom을 골라 편집하세요.`;
 };
 
+const raceTargetFor = ruleSet => {
+  const best = records.best(SPRINT_40, ruleSet);
+  if (!best) return null;
+  const replay = replays.best(recordKey(SPRINT_40, ruleSet));
+  if (
+    !replay ||
+    replay.mode !== SPRINT_40.id ||
+    replay.rules.id !== ruleSet.id ||
+    replay.result.over !== "clear" ||
+    replay.result.lines < SPRINT_40.goal ||
+    replay.result.frames !== best.frames ||
+    replay.result.lines !== best.lines ||
+    replay.result.pieces !== best.pieces
+  )
+    return null;
+  return { replay, best };
+};
+
+const updateRaceProgress = () => {
+  if (!race) return;
+  const lines = Math.min(SPRINT_40.goal, race.player.game.state.stats.lines);
+  raceProgress.value = lines;
+  raceLabel.textContent = race.player.done ? formatTime(race.target.best.frames) : `${lines} / ${SPRINT_40.goal}줄`;
+};
+
 const renderMenu = () => {
   renderRuleTabs();
   const ruleSet = currentRules();
+  const target = raceTargetFor(ruleSet);
+  raceEntry.disabled = !target;
+  $("race-availability").textContent = target
+    ? `Sprint 40L · ${formatTime(target.best.frames)}`
+    : "Sprint 40L 완주 리플레이 필요";
   const list = $("mode-list");
   list.replaceChildren(
     ...MODES.map(m => {
@@ -246,6 +287,8 @@ const setScreen = next => {
 
 const toMenu = (initial = false) => {
   game = null;
+  race = null;
+  racePanel.hidden = true;
   setScreen("menu");
   countdownEl.hidden = true;
   renderMenu();
@@ -265,18 +308,21 @@ const showModeHud = (m, replay = false) => {
   }
 };
 
-const start = (m, selectedRules = currentRules()) => {
+const start = (m, selectedRules = currentRules(), target = null) => {
   if (screen === "replay") stopReplay();
   mode = m;
   if (!m.practice) store.set("lastMode", m.id);
   rules = selectedRules;
   runPlayerName = records.playerName;
-  const seed = (Math.random() * 2 ** 32) >>> 0;
+  const seed = target?.replay.seed ?? (Math.random() * 2 ** 32) >>> 0;
+  race = target ? { target, player: createPlayer(target.replay, findMode) } : null;
+  racePanel.hidden = !race;
+  updateRaceProgress();
   game = createGame({ rules, handling: toEngineHandling(settings.handling), seed, mode: m });
   recorder = createRecorder({ seed, mode: m, rules, handling: game.handling });
   splits = [];
   showModeHud(m);
-  pbSplits = records.best(m, rules)?.splits;
+  pbSplits = target?.splits ?? records.best(m, rules)?.splits;
   acc = 0;
   countdown = READY_FRAMES;
   goTimer = 0;
@@ -290,6 +336,21 @@ const start = (m, selectedRules = currentRules()) => {
   countdownEl.dataset.phase = "ready";
   $("countdown-label").textContent = "READY";
 };
+
+raceEntry.addEventListener("click", () => {
+  const selected = currentRules();
+  const target = raceTargetFor(selected);
+  if (!target) return;
+  let targetSplits = [];
+  const verified = verifyReplay(target.replay, findMode, state => {
+    targetSplits = advanceSplits(SPRINT_40.splits, targetSplits, state.stats.lines, state.frame);
+  });
+  if (!verified.ok || verified.actual.over !== "clear") {
+    showMenuNotice("이 최고 기록은 현재 버전에서 재현할 수 없어요. 새 최고 기록이 필요해요.");
+    return;
+  }
+  start(SPRINT_40, selected, { ...target, splits: targetSplits });
+});
 
 let pausedFrom = /** @type {"play" | "countdown"} */ ("play");
 
@@ -370,6 +431,15 @@ const finish = () => {
   $("results-title").textContent = summary.title;
   $("results-main").textContent = summary.main;
   $("results-badge").classList.toggle("is-invisible", !outcome?.isBest);
+
+  const delta = race && state.over === "clear" ? state.frame - race.target.best.frames : null;
+  $("race-result").textContent = !race
+    ? ""
+    : delta === null
+      ? `완주하지 못했어요 · 상대 기록 ${formatTime(race.target.best.frames)}`
+      : delta === 0
+        ? "내 최고 기록과 같은 시간이에요."
+        : `이전 최고 기록보다 ${(Math.abs(delta) / 60).toFixed(2)}초 ${delta < 0 ? "빨라요" : "느려요"}.`;
 
   const seconds = state.frame / 60;
   const rows = [
@@ -505,7 +575,7 @@ const handleSystem = action => {
     else stopReplay();
     return;
   }
-  if (action === "restart" && screen !== "menu") return start(mode, rules);
+  if (action === "restart" && screen !== "menu") return start(mode, rules, race?.target);
   if (action !== "pause") return;
   if (screen === "play" || screen === "countdown") pause();
   else if (screen === "paused") resume();
@@ -556,7 +626,7 @@ for (const btn of document.querySelectorAll("[data-action]")) {
   btn.addEventListener("click", () => {
     const action = btn.getAttribute("data-action");
     if (action === "resume") resume();
-    if (action === "retry") start(mode, rules);
+    if (action === "retry") start(mode, rules, race?.target);
     if (action === "menu") toMenu();
     if (action === "watch" && lastReplay) startReplay(lastReplay);
     if (action === "stats" && game) statsUI.open(game.state, `${mode.name} · ${rules.name}`);
@@ -787,6 +857,10 @@ const tick = () => {
   recorder?.input(held, pressed);
   const events = game.step({ held, pressed });
   if (mode.splits) splits = advanceSplits(mode.splits, splits, game.state.stats.lines, game.state.frame);
+  if (race && !race.player.done) {
+    race.player.step();
+    updateRaceProgress();
+  }
   for (const e of events) announce(e);
   renderer.addEvents(events);
   if (events.some(e => e.type === "gameOver" || e.type === "finish")) finish();
@@ -808,6 +882,7 @@ const loop = now => {
     acc -= FRAME_MS;
   }
   renderer.draw(game);
+  if (race && screen !== "replay" && raceBoardVisible.matches) raceRenderer.draw(race.player.game);
   updateHud();
   requestAnimationFrame(loop);
 };

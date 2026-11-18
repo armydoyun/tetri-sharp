@@ -38,9 +38,9 @@ test("결과는 파일 하나이고 바깥 파일을 참조하지 않는다", ()
   assert.ok(result.bytes < 1024 * 1024, `배포본 크기 ${result.bytes} bytes`);
 });
 
-const openPage = async (initScript = null) => {
+const openPage = async (initScript = null, initArg = undefined) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true });
-  if (initScript) await context.addInitScript(initScript);
+  if (initScript) await context.addInitScript(initScript, initArg);
   const blocked = [];
   await context.route("**/*", route => {
     if (route.request().url() === url) return route.continue();
@@ -583,6 +583,44 @@ test("기록 화면: 표는 늘 10줄, 조건을 바꿔도 크기가 그대로, 
   // 그 기록이 PB라 Sprint를 시작하면 PB 대비 칸이 준비된다(구간 전에는 —)
   await startMode(page, "sprint40");
   assert.equal(await text(page, "hud-split"), "—");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("Sprint 최고 기록과 달리기: 같은 규칙에서 시작하고 상대 진행을 같이 멈춘다", async () => {
+  // 실제 엔진에서 입력을 기록해 완주한 판. 예전 기록처럼 splits 없이 저장한다.
+  const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
+  delete fixture.record.splits;
+  const { context, page, errors } = await openPage(({ replay, record }) => {
+    const key = "sprint40|modern";
+    localStorage.setItem("tetrisharp:records", JSON.stringify({ [key]: [record] }));
+    localStorage.setItem("tetrisharp:replay:best", JSON.stringify({ [key]: replay }));
+  }, fixture);
+  await page.click('[data-rules="retro"]');
+  assert.equal(await page.locator("#start-pb-race").isDisabled(), true);
+  await page.click('[data-rules="modern"]');
+  await page.click("#start-pb-race");
+  assert.equal(await visible(page, "race-board"), true);
+  await page.waitForFunction(() => document.getElementById("race-progress").value > 0);
+  await page.click("#pause-game");
+  const progress = () => page.locator("#race-progress").evaluate(element => element.value);
+  const pausedAt = await progress();
+  await page.waitForTimeout(500);
+  assert.equal(await progress(), pausedAt);
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await visible(page, "race-panel"), true);
+  assert.equal(await visible(page, "race-board"), false);
+  await page.click('#pause [data-action="retry"]');
+  assert.equal(await progress(), 0);
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+
+  for (let i = 0; i < 25 && !(await visible(page, "results")); i++) {
+    await page.keyboard.press("Space");
+    await page.waitForTimeout(25);
+  }
+  assert.match(await text(page, "race-result"), /완주하지 못했어요/);
+  await page.keyboard.press("Escape");
+  assert.equal(await visible(page, "race-panel"), false);
   assert.deepEqual(errors, []);
   await context.close();
 });

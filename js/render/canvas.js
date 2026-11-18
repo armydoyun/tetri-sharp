@@ -15,9 +15,9 @@ const CSS_CELL = 28;
 /**
  * @typedef {{ theme: string, effects: "full" | "reduced" | "off", palette: "theme" | "contrast" }} Visual
  * @param {HTMLCanvasElement} canvas
- * @param {{ getVisual: () => Visual }} options
+ * @param {{ getVisual: () => Visual, compact?: boolean }} options
  */
-export const createRenderer = (canvas, { getVisual }) => {
+export const createRenderer = (canvas, { getVisual, compact = false }) => {
   const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext("2d"));
   const effects = createEffects();
   const slide = createSlide();
@@ -29,8 +29,8 @@ export const createRenderer = (canvas, { getVisual }) => {
   /** devicePixelRatio를 반영해 캔버스 해상도를 정하고 셀 크기를 정수로 맞춘다(번짐 방지). */
   const fit = () => {
     const dpr = window.devicePixelRatio || 1;
-    const next = Math.max(8, Math.round(CSS_CELL * dpr));
-    const nextSide = narrow.matches ? 3 : 5;
+    const next = Math.max(8, Math.round((compact ? 14 : CSS_CELL) * dpr));
+    const nextSide = compact ? 0 : narrow.matches ? 3 : 5;
     if (next === cell && nextSide === side) return;
     cell = next;
     side = nextSide;
@@ -146,7 +146,7 @@ export const createRenderer = (canvas, { getVisual }) => {
 
     effects.draw(ctx, { bx, cell, toY, cols: COLS }, now, theme.board.ink, visual.effects);
 
-    if (!game) return;
+    if (!game || compact) return;
 
     // 홀드
     const small = Math.round(cell * (narrow.matches ? 0.57 : 0.8));

@@ -57,6 +57,10 @@
         <section class="home-modes" aria-labelledby="mode-title">
           <h2 id="mode-title" class="section-title">플레이 모드</h2>
           <div id="mode-list" class="mode-grid"></div>
+          <button id="start-pb-race" class="tool-row race-entry" type="button" aria-describedby="race-availability" disabled>
+            <span><strong>내 기록과 달리기</strong><span id="race-availability">Sprint 40L 완주 리플레이 필요</span></span>
+            <span data-icon="arrow-right"></span>
+          </button>
         </section>
 
         <section class="home-tools" aria-label="플레이 도구">
@@ -83,16 +87,26 @@
       <!-- 게임 화면: 첫 화면에서는 숨긴다 -->
       <section class="stage" aria-label="게임 화면">
         <!-- 정보 칸: 모드마다 필요한 칸만(게임 시작 때 정해지고 게임 중에는 그대로) -->
-        <dl class="hud">
-          <div data-hud="time"><dt id="hud-time-label">시간</dt><dd id="hud-time">0:00.00</dd></div>
-          <div data-hud="score"><dt>점수</dt><dd id="hud-score">0</dd></div>
-          <div data-hud="level"><dt>레벨</dt><dd id="hud-level">1</dd></div>
-          <div data-hud="lines"><dt id="hud-lines-label">줄</dt><dd id="hud-lines">0</dd></div>
-          <div data-hud="pieces"><dt>피스</dt><dd id="hud-pieces">0</dd></div>
-          <div data-hud="pps"><dt>PPS</dt><dd id="hud-pps">0.00</dd></div>
-          <div data-hud="streak" class="is-off"><dt>연속 / 최고</dt><dd id="hud-streak">0 / 0</dd></div>
-          <div data-hud="split"><dt>PB 대비</dt><dd id="hud-split" class="hud-split">—</dd></div>
-        </dl>
+        <div class="stage-side">
+          <dl class="hud">
+            <div data-hud="time"><dt id="hud-time-label">시간</dt><dd id="hud-time">0:00.00</dd></div>
+            <div data-hud="score"><dt>점수</dt><dd id="hud-score">0</dd></div>
+            <div data-hud="level"><dt>레벨</dt><dd id="hud-level">1</dd></div>
+            <div data-hud="lines"><dt id="hud-lines-label">줄</dt><dd id="hud-lines">0</dd></div>
+            <div data-hud="pieces"><dt>피스</dt><dd id="hud-pieces">0</dd></div>
+            <div data-hud="pps"><dt>PPS</dt><dd id="hud-pps">0.00</dd></div>
+            <div data-hud="streak" class="is-off"><dt>연속 / 최고</dt><dd id="hud-streak">0 / 0</dd></div>
+            <div data-hud="split"><dt>PB 대비</dt><dd id="hud-split" class="hud-split">—</dd></div>
+          </dl>
+          <aside id="race-panel" class="race-panel" aria-label="내 최고 기록 진행 상황" hidden>
+            <div class="race-panel-head">
+              <strong>내 최고 기록</strong>
+              <span id="race-progress-label" class="num">0 / 40줄</span>
+            </div>
+            <progress id="race-progress" aria-label="최고 기록이 지운 줄" value="0" max="40"></progress>
+            <canvas id="race-board" class="race-board" aria-label="최고 기록 보드"></canvas>
+          </aside>
+        </div>
 
         <!-- 보드 주변 UI는 다크 표면을 사용한다. 플레이 격자의 색은 테마가 정한다. -->
         <div class="board-wrap surface-game">
@@ -118,6 +132,7 @@
               <p id="results-main" class="results-main"></p>
               <!-- 새 기록일 때만 보이지만 자리는 늘 차지한다(원칙 2) -->
               <p id="results-badge" class="badge is-invisible"><span data-icon="star"></span>새 기록</p>
+              <p id="race-result" class="race-result"></p>
               <dl id="results-stats" class="results-stats"></dl>
               <details id="results-splits" class="results-splits">
                 <summary>구간 기록</summary>
