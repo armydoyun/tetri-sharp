@@ -32,6 +32,8 @@ export const VISUAL_OPTIONS = Object.freeze({
   ghost: Object.freeze(["normal", "strong", "faint"]),
   // 격자 선
   grid: Object.freeze(["on", "off"]),
+  // 키 입력 표시(누르는 키를 정보 칸 아래에)
+  inputs: Object.freeze(["off", "on"]),
 });
 
 /** 접근성·편의: 화면 읽기 알림, 진동, 카운트다운 길이 */
@@ -80,6 +82,7 @@ export const defaultVisual = () => ({
   pattern: "off",
   ghost: "normal",
   grid: "on",
+  inputs: "off",
 });
 
 export const DEFAULT_SETTINGS = Object.freeze({

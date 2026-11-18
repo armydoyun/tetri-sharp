@@ -91,6 +91,7 @@ const applyScheme = () => {
   else document.documentElement.dataset.scheme = settings.scheme;
   // 게임 화면: 늘 어둡게(기본) 또는 화면 색 따르기 — css/tokens.css
   document.body.dataset.gameSurface = settings.gameSurface;
+  document.body.classList.toggle("show-inputs", settings.visual.inputs === "on");
 };
 applyScheme();
 
@@ -1007,6 +1008,26 @@ const gestures = createGestures({
 const gesturesOn = () => settings.touchMode === "gestures" && touchVisible(settings.touch, isTouchScreen());
 
 const undo = createUndo();
+
+// ---- 키 입력 표시 ----
+const inputCells = [...document.querySelectorAll("#input-display [data-bit]")].map(el => ({
+  el,
+  bit: Number(el.getAttribute("data-bit")),
+}));
+/** 누른 순간은 짧게 남겨 둔다(한 프레임만 눌린 탭도 보이게) */
+let inputFlash = [];
+let inputHeld = 0;
+const showInputs = (held, pressed) => {
+  inputHeld = held;
+  if (pressed) inputFlash.push({ bits: pressed, until: performance.now() + 110 });
+};
+const paintInputs = () => {
+  if (settings.visual.inputs !== "on") return;
+  const now = performance.now();
+  inputFlash = inputFlash.filter(f => f.until > now);
+  const lit = inputFlash.reduce((b, f) => b | f.bits, inputHeld);
+  for (const c of inputCells) c.el.classList.toggle("is-on", Boolean(lit & c.bit));
+};
 /** 연습 모드에서 바로 앞 피스로 되돌린다 */
 const undoPiece = () => {
   if (!game || !mode.practice || (screen !== "play" && screen !== "paused")) return;
@@ -1337,6 +1358,7 @@ const advanceReplay = count => {
   if (!player || player.done) return;
   for (let i = 0; i < count && !player.done; i++) {
     const events = player.step();
+    showInputs(player.input.held, player.input.pressed);
     for (const e of events) announce(e);
     renderer.addEvents(events);
     // 빨리 감기 중에는 소리를 겹쳐 내지 않는다.
@@ -1559,6 +1581,7 @@ const tick = () => {
   const held = keyboard.held | pad.held | touch.held | gestures.held;
   const pressed = keyboard.takePressed() | touch.takePressed() | gestures.takePressed();
   if (mode.practice) undo.track(game.state);
+  showInputs(held, pressed);
   recorder?.input(held, pressed);
   const hadActive = Boolean(game.state.active);
   const events = game.step({ held, pressed });
@@ -1601,6 +1624,7 @@ const loop = now => {
   if (race && screen !== "replay" && raceBoardVisible.matches) raceRenderer.draw(race.player.game);
   if (versus && raceBoardVisible.matches) cpuRenderer.draw(versus.cpu);
   updateHud();
+  paintInputs();
   requestAnimationFrame(loop);
 };
 

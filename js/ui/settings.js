@@ -392,6 +392,21 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
           onChange: v => setVisual("grid", v),
         }),
       }),
+      fieldRow({
+        id: "set-inputs",
+        label: t("키 입력 표시"),
+        hint: t("게임과 리플레이에서 누르는 키를 정보 칸 아래에 보여 줘요"),
+        control: choice({
+          id: "set-inputs",
+          label: t("키 입력 표시"),
+          options: [
+            ["off", t("끄기")],
+            ["on", t("켜기")],
+          ],
+          value: visual.inputs,
+          onChange: v => setVisual("inputs", v),
+        }),
+      }),
       volumeRow(),
       fieldRow({
         id: "set-lang",

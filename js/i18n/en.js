@@ -278,6 +278,10 @@ export const EN = {
   "리플레이 공유(링크·파일)": "Share replay (link or file)",
   "이 기록과 달리기": "Race this run",
 
+  "키 입력 표시": "Input display",
+  "게임과 리플레이에서 누르는 키를 정보 칸 아래에 보여 줘요":
+    "Shows the keys being pressed under the HUD, in games and replays",
+
   // ---- 결과 ----
   "새 기록": "New record",
   "최고 기록": "Best",

@@ -137,6 +137,17 @@
             <progress id="race-progress" aria-label="최고 기록 진행" value="0" max="40"></progress>
             <canvas id="race-board" class="race-board" aria-label="최고 기록 보드"></canvas>
           </aside>
+          <!-- 키 입력 표시: 누르고 있는 동작에 불이 들어온다(설정에서 켠다) -->
+          <div id="input-display" class="input-display" aria-hidden="true">
+            <span data-bit="128"><span data-icon="hold"></span></span>
+            <span data-bit="32"><span data-icon="rotate-ccw"></span></span>
+            <span data-bit="64"><span data-icon="rotate-180"></span></span>
+            <span data-bit="16"><span data-icon="rotate-cw"></span></span>
+            <span data-bit="1"><span data-icon="arrow-left"></span></span>
+            <span data-bit="4"><span data-icon="arrow-down"></span></span>
+            <span data-bit="8"><span data-icon="drop"></span></span>
+            <span data-bit="2"><span data-icon="arrow-right"></span></span>
+          </div>
           <button id="undo-piece" class="btn btn-small undo-piece" type="button" title="되돌리기 (연습)"><span data-icon="undo"></span>되돌리기 <kbd data-key="UNDO"></kbd></button>
           <aside id="versus-panel" class="race-panel versus-panel" aria-label="CPU 상황" hidden>
             <div class="race-panel-head">

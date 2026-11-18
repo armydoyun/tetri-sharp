@@ -170,7 +170,7 @@ test("시각 설정 보정과 예전 형식 옮기기", () => {
   const old = sanitizeVisual({ effects: "off", skin: "outline", palette: "default" });
   assert.deepEqual(
     old,
-    { theme: "modern", effects: "off", palette: "theme", pattern: "off", ghost: "normal", grid: "on" },
+    { theme: "modern", effects: "off", palette: "theme", pattern: "off", ghost: "normal", grid: "on", inputs: "off" },
     "skin은 버리고 default → theme, 새 항목은 기본값"
   );
   assert.equal(sanitizeVisual({ palette: "contrast", theme: "retro" }).theme, "retro");
@@ -178,6 +178,7 @@ test("시각 설정 보정과 예전 형식 옮기기", () => {
     "effects",
     "ghost",
     "grid",
+    "inputs",
     "palette",
     "pattern",
     "theme",
