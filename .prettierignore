@@ -1,4 +1,5 @@
 deploy/
+deploy-pages/
 node_modules/
 **/package.json
 **/package-lock.json

@@ -25,6 +25,7 @@ npx serve .        # 또는 아무 정적 서버. ES 모듈이라 file://로는 
 | 명령 | 하는 일 |
 |---|---|
 | `npm run build` | `deploy/index.html` 한 파일 생성 (file://로 더블클릭해도 동작) |
+| `npm run build:pages` | `deploy-pages/` — 위 파일 + 설치형 앱(PWA) 파일. GitHub Pages용 |
 | `npm run test:unit` | Node 단위 테스트 (코어·규칙·빌드 도구) |
 | `npm run test:browser` | 배포본을 Chromium으로 열어 보는 테스트 (`npx playwright install chromium` 필요) |
 | `npm run lint` / `npm run format` | ESLint / Prettier |
@@ -33,3 +34,12 @@ npx serve .        # 또는 아무 정적 서버. ES 모듈이라 file://로는 
 
 `.github/workflows/ci.yml` — 모든 push·PR에서 lint → unit/browser 테스트 → 모두 통과하면 단일 파일 빌드를
 실행 페이지의 **Artifacts**(`tetri-sharp-<커밋 SHA>`)로 올립니다.
+
+## 배포 (GitHub Pages)
+
+`.github/workflows/pages.yml` — `main`에 push되면 `npm run build:pages` 결과를 GitHub Pages로 배포합니다.
+배포본은 설치형 앱(PWA)이라 한 번 열면 인터넷 없이도 열리고, 휴대폰 홈 화면에 추가할 수 있습니다.
+
+처음 한 번만:
+1. 저장소 **Settings → Pages → Build and deployment → Source**를 **GitHub Actions**로.
+2. 기본 브랜치를 `main`으로(Settings → General → Default branch). Pages 배포 환경은 기본 브랜치만 허용합니다.

@@ -88,6 +88,8 @@ jobs:
         run: npm ci --no-audit --no-fund --ignore-scripts
       - name: Build single-file deploy
         run: npm run build
+      - name: Build Pages site (check only)
+        run: npm run build:pages
       - uses: actions/upload-artifact@v6
         with:
           name: tetri-sharp-${{ github.sha }}

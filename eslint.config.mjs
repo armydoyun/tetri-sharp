@@ -12,7 +12,7 @@ const rules = {
 };
 
 export default [
-  { ignores: ["deploy/**", "node_modules/**", "test-results/**"] },
+  { ignores: ["deploy/**", "deploy-pages/**", "node_modules/**", "test-results/**"] },
   { linterOptions: { reportUnusedDisableDirectives: "warn" } },
   js.configs.recommended,
 
@@ -33,6 +33,12 @@ export default [
         { object: "Date", property: "now", message: "코어는 틱 단위로만 시간을 센다." },
       ],
     },
+  },
+  // 서비스 워커 원본(브라우저 워커 환경)
+  {
+    files: ["tools/sw-template.js"],
+    languageOptions: { ecmaVersion: 2022, sourceType: "script", globals: { ...globals.serviceworker } },
+    rules,
   },
   // 빌드 도구·테스트: Node ES 모듈
   {

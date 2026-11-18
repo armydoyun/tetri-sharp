@@ -725,5 +725,17 @@ if (importRulesFromLink()) renderKeyHelp();
 toMenu();
 requestAnimationFrame(loop);
 
+// 설치형 앱(GitHub Pages 배포본): 매니페스트가 걸려 있을 때만 서비스 워커를 등록한다.
+// 한 파일 배포본(파일로 열기)에는 매니페스트가 없어서 등록하지 않는다.
+if (
+  "serviceWorker" in navigator &&
+  document.querySelector('link[rel="manifest"]') &&
+  location.protocol.startsWith("http")
+) {
+  navigator.serviceWorker.register("./sw.js").catch(() => {
+    /* 등록이 안 돼도 게임은 그대로 된다 */
+  });
+}
+
 // 브라우저 테스트가 "앱이 끝까지 떴는지" 확인하는 표시.
 document.documentElement.dataset.ready = "1";

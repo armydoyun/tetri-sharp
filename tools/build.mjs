@@ -4,6 +4,7 @@
 //   node tools/build.mjs                 deploy/index.html을 만든다 (deploy/는 git에 올리지 않는다)
 //   node tools/build.mjs --out=a.html    다른 곳에 만든다
 import { build as esbuild, transform } from "esbuild";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -71,13 +72,55 @@ export const build = async ({ outFile = path.join(DEPLOY, "index.html") } = {}) 
   };
 };
 
+export const MANIFEST = Object.freeze({
+  name: "Tetri#",
+  short_name: "Tetri#",
+  description: "규칙을 직접 조합하는 낙하 블록 퍼즐",
+  lang: "ko",
+  start_url: "./",
+  scope: "./",
+  display: "standalone",
+  background_color: "#101114",
+  theme_color: "#101114",
+  icons: [{ src: "icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }],
+});
+
+/** 설치형 앱 연결: 매니페스트·아이콘 링크를 <head>에 넣는다(바깥 파일 검사는 이미 끝난 뒤). */
+export const PWA_HEAD =
+  '    <link rel="manifest" href="./manifest.webmanifest">\n    <link rel="icon" href="./icon.svg" type="image/svg+xml">\n';
+
+/**
+ * GitHub Pages용: 한 파일 배포본 + manifest.webmanifest + icon.svg + sw.js
+ * 서비스 워커 버전은 index.html 내용의 해시 → 내용이 바뀌면 새 저장본을 받는다.
+ */
+export const buildPages = async ({ outDir = path.join(ROOT, "deploy-pages") } = {}) => {
+  fs.rmSync(outDir, { recursive: true, force: true });
+  const result = await build({ outFile: path.join(outDir, "index.html") });
+  let html = fs.readFileSync(result.outFile, "utf8");
+  if (!html.includes("</head>")) throw new Error("index.html에 </head>가 없습니다");
+  html = html.replace("</head>", `${PWA_HEAD}  </head>`);
+  fs.writeFileSync(result.outFile, html, "utf8");
+  const version = crypto.createHash("sha256").update(html).digest("hex").slice(0, 12);
+  fs.writeFileSync(path.join(outDir, "manifest.webmanifest"), JSON.stringify(MANIFEST, null, 2), "utf8");
+  fs.copyFileSync(path.join(ROOT, "assets", "pwa", "icon.svg"), path.join(outDir, "icon.svg"));
+  const sw = fs.readFileSync(path.join(ROOT, "tools", "sw-template.js"), "utf8").replace("__VERSION__", version);
+  fs.writeFileSync(path.join(outDir, "sw.js"), sw, "utf8");
+  // Pages가 _로 시작하는 파일을 숨기지 않게
+  fs.writeFileSync(path.join(outDir, ".nojekyll"), "", "utf8");
+  return { ...result, outDir, version, bytes: Buffer.byteLength(html) };
+};
+
 if (path.resolve(process.argv[1] || "") === fileURLToPath(import.meta.url)) {
   const out = process.argv.find(a => a.startsWith("--out="))?.slice(6);
+  const pages = process.argv.includes("--pages");
   const kb = n => `${(n / 1024).toFixed(1)} KB`;
   try {
-    const result = await build(out ? { outFile: path.resolve(out) } : {});
+    const result = pages
+      ? await buildPages(out ? { outDir: path.resolve(out) } : {})
+      : await build(out ? { outFile: path.resolve(out) } : {});
     console.log(
-      `${path.relative(ROOT, result.outFile)}: ${kb(result.bytes)} (JS ${kb(result.jsBytes)} · CSS ${kb(result.cssBytes)})`
+      `${path.relative(ROOT, result.outFile)}: ${kb(result.bytes)} (JS ${kb(result.jsBytes)} · CSS ${kb(result.cssBytes)})` +
+        (pages ? ` + PWA (sw ${result.version})` : "")
     );
   } catch (error) {
     console.error(

@@ -1,0 +1,50 @@
+name: pages
+
+# main에 push되면 GitHub Pages로 배포한다. Actions 탭의 "Run workflow"로 직접 돌릴 수도 있다.
+# 처음 한 번: 저장소 Settings → Pages → Source를 "GitHub Actions"로 바꿔야 한다.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 배포는 한 번에 하나씩. 진행 중인 배포는 끊지 않는다.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install tools
+        run: npm ci --no-audit --no-fund --ignore-scripts
+      - name: Unit tests
+        run: npm run test:unit
+      - name: Build Pages site (single file + PWA files)
+        run: npm run build:pages
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: deploy-pages
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
