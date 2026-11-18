@@ -81,6 +81,8 @@ let padBindings = compilePadmap(settings.padmap);
 const applyScheme = () => {
   if (settings.scheme === "system") delete document.documentElement.dataset.scheme;
   else document.documentElement.dataset.scheme = settings.scheme;
+  // 게임 화면: 늘 어둡게(기본) 또는 화면 색 따르기 — css/tokens.css
+  document.body.dataset.gameSurface = settings.gameSurface;
 };
 applyScheme();
 

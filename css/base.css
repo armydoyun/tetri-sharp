@@ -23,7 +23,7 @@ html {
 }
 
 /* 게임 화면은 body 전체가 다크 → 비워 둔 스크롤바 자리(html 배경)도 같은 색 */
-html:has(> body:not([data-screen="menu"])) {
+html:has(> body:not([data-screen="menu"], [data-game-surface="scheme"])) {
   background: var(--game-bg);
 }
 

@@ -61,3 +61,10 @@ test("화면 색 설정: 기본은 시스템, 라이트·다크만 받는다", a
   assert.equal(clean({ scheme: "light" }).scheme, "light");
   assert.equal(clean({ scheme: "blue" }).scheme, "system");
 });
+
+test("게임 중 화면 설정: 기본은 늘 어둡게, 정해진 값만 받는다", async () => {
+  const { sanitizeSettings: clean } = await import("../../js/storage/settings.js");
+  assert.equal(clean({}).gameSurface, "dark");
+  assert.equal(clean({ gameSurface: "scheme" }).gameSurface, "scheme");
+  assert.equal(clean({ gameSurface: "pink" }).gameSurface, "dark");
+});

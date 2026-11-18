@@ -1261,3 +1261,36 @@ test("결과 카드는 보드 안에 스크롤 없이 들어간다(데스크톱 
     await context.close();
   }
 });
+
+test("게임 중 화면: 기본은 늘 어둡고, '화면 색 따르기'를 고르면 라이트에서 게임 중에도 밝다", async () => {
+  const context = await browser.newContext({
+    locale: "ko-KR",
+    colorScheme: "light",
+    viewport: { width: 1280, height: 900 },
+  });
+  const page = await context.newPage();
+  await page.goto(url);
+  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  const lum = async sel => {
+    await page.waitForTimeout(300);
+    return page.evaluate(s => {
+      const [r, g, b] = getComputedStyle(document.querySelector(s)).backgroundColor.match(/\d+/g).map(Number);
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }, sel);
+  };
+  await startMode(page, "zen");
+  assert.ok((await lum("body")) < 40, "기본: 게임 중에는 어둡다");
+  assert.ok((await lum(".board-wrap")) < 40);
+  await page.keyboard.press("Escape");
+  await page.click("#open-settings");
+  await page.click('.dialog-tabs [data-value="visual"]');
+  await page.click('#set-game-surface [data-value="scheme"]');
+  await page.click("#settings-close");
+  assert.ok((await lum("body")) > 200, "화면 색 따르기: 게임 중에도 밝다");
+  assert.ok((await lum(".board-wrap")) > 200, "보드 둘레도 밝다");
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  await startMode(page, "zen");
+  assert.ok((await lum("body")) > 200, "새로고침 후에도 유지");
+  await context.close();
+});

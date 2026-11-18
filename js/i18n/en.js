@@ -330,11 +330,15 @@ export const EN = {
   시스템: "System",
   라이트: "Light",
   다크: "Dark",
-  "기기의 라이트·다크 설정을 따라요. 게임 화면은 늘 어두워요":
-    "Follows your device's light or dark setting. The game screen is always dark",
-  "첫 화면과 메뉴를 밝게 써요. 게임 화면은 늘 어두워요":
-    "Uses a light home screen and menus. The game screen is always dark",
-  "첫 화면과 메뉴도 어둡게 써요": "Uses a dark home screen and menus too",
+  "기기의 라이트·다크 설정을 따라요": "Follows your device's light or dark setting",
+  "첫 화면과 메뉴를 밝게 써요": "Uses a light home screen and menus",
+  "첫 화면과 메뉴를 어둡게 써요": "Uses a dark home screen and menus",
+  "게임 중 화면": "While playing",
+  "늘 어둡게": "Always dark",
+  "화면 색 따르기": "Match appearance",
+  "게임 중에는 화면 색과 상관없이 어둡게 써요. 보드에 집중하기 좋아요":
+    "Stays dark while playing, whatever the appearance. Helps you focus on the board",
+  "게임 중에도 위의 화면 색을 그대로 써요": "Uses the appearance above while playing too",
   "색각 친화": "Color-blind friendly",
   효과음: "Sound effects",
   "블록 이동·회전·줄 삭제 소리의 크기. 맨 왼쪽은 끄기": "Volume of move, rotate and line clear sounds. Far left is off",

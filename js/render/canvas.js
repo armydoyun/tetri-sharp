@@ -54,8 +54,10 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     ctx.globalAlpha = 1;
   };
 
+  /** "Hold"·"Next" 글자색: 캔버스의 CSS 글자색(게임 화면 표면에 맞춘다) */
+  let labelColor = "#b1b9b0";
   const label = (text, x, y) => {
-    ctx.fillStyle = "#b1b9b0";
+    ctx.fillStyle = labelColor;
     ctx.font = `600 ${Math.round(cell * 0.46)}px system-ui, sans-serif`;
     ctx.textBaseline = "top";
     ctx.fillText(text, x, y);
@@ -156,6 +158,7 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
 
     if (!game || compact) return;
 
+    labelColor = getComputedStyle(canvas).color || labelColor;
     // 홀드
     const small = Math.round(cell * (narrow.matches ? 0.57 : 0.8));
     const sidePad = Math.round((side * cell - 4 * small) / 2);
