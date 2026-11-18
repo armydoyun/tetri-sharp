@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#101114" />
+    <meta name="description" content="Tetri# — 규칙을 직접 조합하는 낙하 블록 퍼즐." />
+    <title>Tetri#</title>
+    <!-- 스타일시트: 위에서 아래 순서가 곧 우선순위. 빌드는 이 순서대로 이어 붙인다(tools/build.mjs). -->
+    <link rel="stylesheet" href="./css/tokens.css">
+    <link rel="stylesheet" href="./css/base.css">
+    <link rel="stylesheet" href="./css/game.css">
+  </head>
+  <body>
+    <main id="app" class="app">
+      <header class="app-header">
+        <h1 class="logo">Tetri<span class="logo-sharp">#</span></h1>
+      </header>
+      <section class="stage" aria-label="게임 화면">
+        <canvas id="board" class="board" width="300" height="600" aria-label="보드"></canvas>
+      </section>
+      <p id="status" class="status" role="status"></p>
+    </main>
+    <!-- ES Modules: 개발용 실행은 http://localhost를 사용한다. -->
+    <script type="module" src="./js/main.js"></script>
+  </body>
+</html>

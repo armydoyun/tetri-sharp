@@ -1,0 +1,20 @@
+:root {
+  --bg: #101114;
+  --surface: #191b20;
+  --grid: #23262d;
+  --text: #e8e9ec;
+  --text-dim: #8b8f99;
+  --accent: #7c9cff;
+
+  --piece-i: #3fc7e0;
+  --piece-j: #4a6cf0;
+  --piece-l: #f0a03c;
+  --piece-o: #f0d23c;
+  --piece-s: #5cd06a;
+  --piece-t: #b05cf0;
+  --piece-z: #f05c5c;
+  --piece-garbage: #6b6f78;
+
+  --radius: 8px;
+  --font: system-ui, -apple-system, "Segoe UI", "Noto Sans KR", sans-serif;
+}
