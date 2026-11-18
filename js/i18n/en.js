@@ -141,6 +141,22 @@ export const EN = {
     "The replay doesn't match its saved result. It may be from another version.",
   "파일을 읽지 못했어요. 다시 선택해 주세요.": "Couldn't read the file. Please pick it again.",
 
+  "리플레이 위치": "Replay position",
+  "이전 표시": "Previous mark",
+  "다음 표시": "Next mark",
+  "이전 표시로": "Go to previous mark",
+  "다음 표시로": "Go to next mark",
+  "5초 뒤로": "Back 5 seconds",
+  "5초 앞으로": "Forward 5 seconds",
+  "한 프레임 뒤로": "Step back one frame",
+  "-5초": "-5s",
+  "+5초": "+5s",
+  "피네스 실수 {n}": "{n} finesse faults",
+  "오래 고민 {n}": "{n} slow pieces",
+  "주요 장면 {n}": "{n} highlights",
+  "피네스 실수 +{n} · {piece}": "Finesse fault +{n} · {piece}",
+  "오래 고민한 피스 · {s}초": "Slow piece · {s}s",
+
   // ---- 백업 ----
   "설정·기록·리플레이를 백업 파일로 저장했어요.": "Saved settings, records and replays to a backup file.",
   "읽을 수 없는 백업 파일이에요.": "Can't read this backup file.",
