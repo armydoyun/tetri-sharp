@@ -146,7 +146,7 @@ test("설정: 슬라이더 값과 키 변경이 저장되고 새로고침 후에
   assert.equal(await page.locator("#settings").isVisible(), true);
 
   await page.locator("#set-das").fill("100");
-  await page.locator("#set-skin").selectOption("outline");
+  await page.locator("#set-theme").selectOption("retro");
   // 하드 드롭 첫 칸을 W로 바꾼다.
   await page.click('.key-slot[data-action="HARD"][data-slot="0"]');
   assert.equal(await page.locator(".key-slot.is-waiting").count(), 1);
@@ -163,7 +163,7 @@ test("설정: 슬라이더 값과 키 변경이 저장되고 새로고침 후에
   await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
   await page.click("#open-settings");
   assert.equal(await page.locator("#set-das").inputValue(), "100");
-  assert.equal(await page.locator("#set-skin").inputValue(), "outline");
+  assert.equal(await page.locator("#set-theme").inputValue(), "retro");
   assert.equal(await page.locator('.key-slot[data-action="HARD"][data-slot="0"]').textContent(), "W");
   await page.keyboard.press("Escape");
 
@@ -477,6 +477,31 @@ test("접근성: 모든 버튼에 읽을 수 있는 이름이 있고, 화면 글
   });
   assert.deepEqual(result.unnamed, []);
   assert.equal(result.emoji, false);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("게임 테마: 세 테마가 서로 다르게 그려지고, 설정에서 바꾸면 바로 반영된다", async () => {
+  const { context, page, errors } = await openPage();
+  await startMode(page, "dig");
+  const snapshot = () =>
+    page.evaluate(() => {
+      const c = /** @type {HTMLCanvasElement} */ (document.getElementById("board"));
+      const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+      let h = 0;
+      for (let i = 0; i < d.length; i += 97) h = (h * 31 + d[i]) >>> 0;
+      return h;
+    });
+  await page.keyboard.press("Escape"); // 일시정지해서 화면을 멈춘다
+  const seen = new Set();
+  for (const theme of ["retro", "minimal", "modern"]) {
+    await page.click("#open-settings");
+    await page.locator("#set-theme").selectOption(theme);
+    await page.click("#settings-close");
+    await page.waitForTimeout(100);
+    seen.add(await snapshot());
+  }
+  assert.equal(seen.size, 3, "테마마다 다른 그림");
   assert.deepEqual(errors, []);
   await context.close();
 });

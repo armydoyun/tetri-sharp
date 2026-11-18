@@ -106,6 +106,8 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
     das: { dir: 0, charge: 0, arrAcc: 0 },
     prevHeld: 0,
     stats: { pieces: 0, lines: 0 },
+    /** 생성될 때마다 1씩 오르는 번호(화면 쪽에서 "새 피스"를 알아보는 데 쓴다) */
+    pieceId: 0,
     score: 0,
     level: 1,
     /** 이어지고 있는 어려운 클리어 수(0 = B2B 없음) */
@@ -183,6 +185,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
     // 20G: 생성되자마자 바닥까지.
     if (currentGravity() === Infinity) while (fits(a, 0, 1)) a.y += 1;
     state.active = a;
+    state.pieceId += 1;
     state.gravityAcc = 0;
     resetLock(a.y);
     events.push({ type: "spawn", piece: type });

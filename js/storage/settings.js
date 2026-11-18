@@ -1,6 +1,7 @@
 // 사용자 설정: 조작감(Handling, ms 단위)과 키 배치. 저장된 값은 항상 검증·보정해서 쓴다.
 import { msToFrames } from "../core/engine.js";
 import { DEFAULT_KEYMAP, sanitizeKeymap } from "../input/keymap.js";
+import { DEFAULT_THEME, THEME_IDS } from "../render/themes.js";
 
 export const SETTINGS_VERSION = 1;
 export const SDF_INFINITE = 41; // 슬라이더 맨 끝 = 즉시 바닥까지
@@ -13,9 +14,11 @@ export const HANDLING_LIMITS = Object.freeze({
 });
 
 export const VISUAL_OPTIONS = Object.freeze({
+  // 게임 테마(블록·격자·움직임·연출의 모습) — js/render/themes.js
+  theme: THEME_IDS,
+  // 접근성: 테마와 상관없이 적용
   effects: Object.freeze(["full", "reduced", "off"]),
-  skin: Object.freeze(["flat", "bevel", "outline"]),
-  palette: Object.freeze(["default", "contrast"]),
+  palette: Object.freeze(["theme", "contrast"]),
 });
 
 /** 동작 줄이기를 켠 환경이면 효과 기본값을 "reduced"로 */
@@ -28,9 +31,9 @@ const prefersReducedMotion = () => {
 };
 
 export const defaultVisual = () => ({
+  theme: DEFAULT_THEME,
   effects: prefersReducedMotion() ? "reduced" : "full",
-  skin: "bevel",
-  palette: "default",
+  palette: "theme",
 });
 
 export const DEFAULT_SETTINGS = Object.freeze({
@@ -41,7 +44,9 @@ export const DEFAULT_SETTINGS = Object.freeze({
 });
 
 export const sanitizeVisual = raw => {
-  const r = raw && typeof raw === "object" ? raw : {};
+  const r = { ...(raw && typeof raw === "object" ? raw : {}) };
+  // 예전 형식: palette "default"는 지금의 "theme"(테마 색). skin(블록 모양)은 테마로 흡수됐다.
+  if (r.palette === "default") r.palette = "theme";
   const d = defaultVisual();
   /** @type {any} */
   const out = {};

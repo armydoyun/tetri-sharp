@@ -2,6 +2,7 @@
 import { ACTIONS, DEFAULT_KEYMAP, SLOTS, assignKey, clearKey, keyLabel } from "../input/keymap.js";
 import { DEFAULT_SETTINGS, HANDLING_LIMITS, SDF_INFINITE, defaultVisual } from "../storage/settings.js";
 import { button, el, fieldRow, fillDialog } from "./dom.js";
+import { THEMES, THEME_IDS } from "../render/themes.js";
 import { keycap } from "./keycap.js";
 
 const HANDLING_ROWS = [
@@ -14,9 +15,15 @@ const formatValue = (key, v) => (key === "sdf" ? (v >= SDF_INFINITE ? "즉시" :
 
 const VISUAL_ROWS = [
   {
+    key: "theme",
+    label: "게임 테마",
+    hint: "블록 모양·격자·움직임·연출",
+    options: THEME_IDS.map(id => [id, `${THEMES[id].name} · ${THEMES[id].description}`]),
+  },
+  {
     key: "effects",
     label: "화면 효과",
-    hint: "줄 삭제 섬광·파편·흔들림",
+    hint: "모든 테마에 적용 · 줄임은 움직임 없이",
     options: [
       ["full", "전체"],
       ["reduced", "줄임 (움직임 없이)"],
@@ -24,19 +31,11 @@ const VISUAL_ROWS = [
     ],
   },
   {
-    key: "skin",
-    label: "블록 모양",
-    options: [
-      ["flat", "평면"],
-      ["bevel", "입체"],
-      ["outline", "윤곽선"],
-    ],
-  },
-  {
     key: "palette",
     label: "블록 색",
+    hint: "모든 테마에 적용",
     options: [
-      ["default", "기본"],
+      ["theme", "테마 색"],
       ["contrast", "색각 친화"],
     ],
   },

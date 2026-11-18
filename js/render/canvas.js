@@ -1,22 +1,12 @@
 // 렌더러. 엔진 상태를 읽어서 그리기만 한다(상태를 바꾸지 않는다).
 // 한 캔버스에 [홀드 | 보드 | 넥스트]를 나란히 그린다. 보드 위로 2줄 여유를 둬서 막 생성된 피스가 보이게 한다.
+// 모습은 게임 테마(./themes.js)가 정한다. 접근성 설정(색각 친화 색, 효과 줄임/끄기)은 테마 위에 덮인다.
 import { VISIBLE_ROWS, createBoard, get } from "../core/board.js";
 import { CELL_ID } from "../core/pieces.js";
 import { VISIBLE_TOP } from "../core/engine.js";
 import { createEffects } from "./effects.js";
-import { PALETTES, drawBlock } from "./skins.js";
-
-const COLOR_VARS = [
-  "",
-  "--piece-i",
-  "--piece-j",
-  "--piece-l",
-  "--piece-o",
-  "--piece-s",
-  "--piece-t",
-  "--piece-z",
-  "--piece-garbage",
-];
+import { createSlide } from "./motion.js";
+import { CONTRAST_PALETTE, findTheme } from "./themes.js";
 
 const SIDE = 5; // 홀드·넥스트 칸 너비(셀)
 const MARGIN_TOP = 2; // 보드 위 여유 줄
@@ -24,26 +14,15 @@ const COLS = 10;
 export const LAYOUT = Object.freeze({ cols: SIDE + COLS + SIDE, rows: VISIBLE_ROWS + MARGIN_TOP, cssCell: 28 });
 
 /**
- * @typedef {{ effects: "full" | "reduced" | "off", skin: "flat" | "bevel" | "outline", palette: "default" | "contrast" }} Visual
+ * @typedef {{ theme: string, effects: "full" | "reduced" | "off", palette: "theme" | "contrast" }} Visual
  * @param {HTMLCanvasElement} canvas
  * @param {{ getVisual: () => Visual }} options
  */
 export const createRenderer = (canvas, { getVisual }) => {
   const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext("2d"));
-  const css = getComputedStyle(document.documentElement);
-  const v = name => css.getPropertyValue(name).trim();
-  const basePalette = COLOR_VARS.map(name => (name ? v(name) : ""));
-  // 게임 화면은 테마와 무관하게 항상 다크 → --game-* 토큰만 읽는다.
-  const colors = {
-    grid: v("--game-grid"),
-    board: v("--game-board"),
-    text: v("--game-text-dim"),
-    bg: v("--game-bg"),
-    accent: v("--game-accent"),
-  };
   const effects = createEffects();
-  let palette = basePalette;
-  let skin = /** @type {Visual["skin"]} */ ("flat");
+  const slide = createSlide();
+  const emptyBoard = createBoard();
 
   let cell = 0;
   /** devicePixelRatio를 반영해 캔버스 해상도를 정하고 셀 크기를 정수로 맞춘다(번짐 방지). */
@@ -57,10 +36,8 @@ export const createRenderer = (canvas, { getVisual }) => {
     canvas.style.aspectRatio = `${LAYOUT.cols} / ${LAYOUT.rows}`;
   };
 
-  const block = (px, py, color, size = cell) => drawBlock(ctx, skin, px, py, size, color);
-
   /** 미리보기 상자(4×2칸) 가운데에 피스를 그린다. */
-  const preview = (game, type, left, top, size, dim = false) => {
+  const preview = (theme, palette, game, type, left, top, size, dim = false) => {
     const shape = game.shapeOf(type, 0);
     const xs = shape.map(c => c[0]);
     const ys = shape.map(c => c[1]);
@@ -69,25 +46,52 @@ export const createRenderer = (canvas, { getVisual }) => {
     const ox = left + ((4 - w) * size) / 2 - Math.min(...xs) * size;
     const oy = top + ((2 - h) * size) / 2 - Math.min(...ys) * size;
     ctx.globalAlpha = dim ? 0.35 : 1;
-    for (const [x, y] of shape) block(ox + x * size, oy + y * size, palette[CELL_ID[type]], size);
+    for (const [x, y] of shape) theme.block(ctx, ox + x * size, oy + y * size, size, palette[CELL_ID[type]]);
     ctx.globalAlpha = 1;
   };
 
-  const label = (text, x, y) => {
-    ctx.fillStyle = colors.text;
-    ctx.font = `600 ${Math.round(cell * 0.45)}px "Space Grotesk", system-ui, sans-serif`;
+  const label = (theme, text, x, y) => {
+    ctx.fillStyle = theme.board.label;
+    ctx.font = `${theme.label.weight} ${Math.round(cell * 0.45)}px "Space Grotesk", system-ui, sans-serif`;
+    if ("letterSpacing" in ctx) ctx.letterSpacing = `${theme.label.spacing}em`;
     ctx.textBaseline = "top";
-    ctx.fillText(text, x, y);
+    ctx.fillText(theme.label.upper ? text.toUpperCase() : text.toLowerCase(), x, y);
+    if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
   };
 
-  const emptyBoard = createBoard();
+  const drawGrid = (theme, bx, by) => {
+    const { grid, gridColor } = theme.board;
+    if (grid === "lines") {
+      ctx.strokeStyle = gridColor;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let x = 1; x < COLS; x++) {
+        ctx.moveTo(bx + x * cell + 0.5, by);
+        ctx.lineTo(bx + x * cell + 0.5, by + VISIBLE_ROWS * cell);
+      }
+      for (let y = 1; y < VISIBLE_ROWS; y++) {
+        ctx.moveTo(bx, by + y * cell + 0.5);
+        ctx.lineTo(bx + COLS * cell, by + y * cell + 0.5);
+      }
+      ctx.stroke();
+    } else if (grid === "dots") {
+      ctx.fillStyle = gridColor;
+      const d = Math.max(2, Math.round(cell * 0.08));
+      for (let x = 1; x < COLS; x++) {
+        for (let y = 1; y < VISIBLE_ROWS; y++) ctx.fillRect(bx + x * cell - d / 2, by + y * cell - d / 2, d, d);
+      }
+    }
+  };
 
-  /** @param {ReturnType<typeof import("../core/engine.js").createGame> | null} game  null이면 빈 보드만 */
+  /**
+   * @param {ReturnType<typeof import("../core/engine.js").createGame> | null} game  null이면 빈 보드만
+   */
   const draw = (game, now = performance.now()) => {
     fit();
     const visual = getVisual();
-    palette = PALETTES[visual.palette] ?? basePalette;
-    skin = visual.skin;
+    const theme = findTheme(visual.theme);
+    const palette = visual.palette === "contrast" ? CONTRAST_PALETTE : theme.palette;
+    const motion = visual.effects === "full";
     const { board, active, hold, holdUsed, queue } = game
       ? game.state
       : { board: emptyBoard, active: null, hold: null, holdUsed: false, queue: [] };
@@ -97,52 +101,58 @@ export const createRenderer = (canvas, { getVisual }) => {
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const { dx, dy } = effects.shake(now, cell / 10);
+    const { dx, dy } = theme.fx.shake && motion ? effects.shake(now, cell / 10) : { dx: 0, dy: 0 };
     ctx.translate(dx, dy);
 
-    // 보드 바탕과 격자
-    ctx.fillStyle = colors.board;
+    // 보드 바탕
+    if (theme.board.bgTop) {
+      const grad = ctx.createLinearGradient(0, by, 0, by + VISIBLE_ROWS * cell);
+      grad.addColorStop(0, theme.board.bgTop);
+      grad.addColorStop(1, theme.board.bg);
+      ctx.fillStyle = grad;
+    } else {
+      ctx.fillStyle = theme.board.bg;
+    }
     ctx.fillRect(bx, by, COLS * cell, VISIBLE_ROWS * cell);
-    ctx.strokeStyle = colors.grid;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let x = 1; x < COLS; x++) {
-      ctx.moveTo(bx + x * cell + 0.5, by);
-      ctx.lineTo(bx + x * cell + 0.5, by + VISIBLE_ROWS * cell);
-    }
-    for (let y = 1; y < VISIBLE_ROWS; y++) {
-      ctx.moveTo(bx, by + y * cell + 0.5);
-      ctx.lineTo(bx + COLS * cell, by + y * cell + 0.5);
-    }
-    ctx.stroke();
+    drawGrid(theme, bx, by);
 
     // 쌓인 블록(보이는 영역 + 바로 위 여유 줄)
     for (let y = VISIBLE_TOP - MARGIN_TOP; y < board.height; y++) {
       for (let x = 0; x < board.width; x++) {
         const c = get(board, x, y);
-        if (c) block(bx + x * cell, toY(y), palette[c]);
+        if (c) theme.block(ctx, bx + x * cell, toY(y), cell, palette[c]);
       }
     }
 
     if (active) {
       const color = palette[CELL_ID[active.type]];
       const cells = game.activeCells();
-      // 고스트
+      // 고스트(판정 위치 그대로)
       const gy = game.ghostY();
       if (game.rules.ghost && gy !== null && gy !== active.y) {
-        ctx.globalAlpha = 0.25;
-        for (const [x, y] of cells) block(bx + x * cell, toY(y + gy - active.y), color);
-        ctx.globalAlpha = 1;
+        for (const [x, y] of cells) theme.ghost(ctx, bx + x * cell, toY(y + gy - active.y), cell, color);
       }
+      // 그리는 위치는 테마에 따라 짧게 미끄러질 수 있다(효과 "전체"일 때만).
+      const shown = slide.at(game.state.pieceId, active.x, active.y, now, motion ? theme.slideMs : 0);
+      const ox = (shown.x - active.x) * cell;
+      const oy = (shown.y - active.y) * cell;
       // 고정까지 남은 시간만큼 살짝 어두워진다.
       const lock = game.state.lock;
       const delay = game.rules.lock.delay;
       ctx.globalAlpha = lock.timer > 0 && delay > 0 ? 1 - 0.4 * Math.min(1, lock.timer / delay) : 1;
-      for (const [x, y] of cells) if (y >= VISIBLE_TOP - MARGIN_TOP) block(bx + x * cell, toY(y), color);
+      if (theme.glow > 0) {
+        ctx.shadowColor = color;
+        ctx.shadowBlur = cell * theme.glow;
+      }
+      for (const [x, y] of cells) {
+        if (y >= VISIBLE_TOP - MARGIN_TOP) theme.block(ctx, bx + x * cell + ox, toY(y) + oy, cell, color);
+      }
+      ctx.shadowBlur = 0;
+      ctx.shadowColor = "transparent";
       ctx.globalAlpha = 1;
     }
 
-    effects.draw(ctx, { bx, cell, toY, cols: COLS }, now, colors.accent);
+    effects.draw(ctx, { bx, cell, toY, cols: COLS }, now, theme);
 
     if (!game) return;
 
@@ -150,16 +160,16 @@ export const createRenderer = (canvas, { getVisual }) => {
     const small = Math.round(cell * 0.8);
     const sidePad = Math.round((SIDE * cell - 4 * small) / 2);
     if (game.rules.hold.enabled) {
-      label("HOLD", sidePad, by);
-      if (hold) preview(game, hold, sidePad, by + cell, small, holdUsed);
+      label(theme, "Hold", sidePad, by);
+      if (hold) preview(theme, palette, game, hold, sidePad, by + cell, small, holdUsed);
     }
 
     // 넥스트
     const nx = bx + COLS * cell + sidePad;
     if (game.rules.previewCount > 0) {
-      label("NEXT", nx, by);
+      label(theme, "Next", nx, by);
       queue.slice(0, game.rules.previewCount).forEach((type, i) => {
-        preview(game, type, nx, by + cell + i * small * 3, small);
+        preview(theme, palette, game, type, nx, by + cell + i * small * 3, small);
       });
     }
   };
@@ -167,7 +177,10 @@ export const createRenderer = (canvas, { getVisual }) => {
   return {
     draw,
     /** 엔진 이벤트로 효과를 만든다 */
-    addEvents: (events, now = performance.now()) => effects.add(events, getVisual().effects, now),
+    addEvents: (events, now = performance.now()) => {
+      const visual = getVisual();
+      effects.add(events, visual.effects, now, findTheme(visual.theme));
+    },
     clearEffects: () => effects.clear(),
   };
 };
