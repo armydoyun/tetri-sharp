@@ -1145,3 +1145,59 @@ body[data-game-surface="scheme"] .countdown > span {
 body[data-game-surface="scheme"] .countdown[data-phase="go"] > span {
   border-color: var(--accent);
 }
+
+/* ---- CPU 대전 배치: 화면 한 장에 들어가게 ----
+   넓은 화면: [보드 | 계기판 | CPU] — CPU 칸을 계기판 옆으로 내어 세로로 쌓이지 않게 하고, 그만큼 보드 가로 여유를 늘린다.
+   좁은 화면: CPU 칸은 계기판 아래 한 줄(보드 없이 숫자만), 보드 높이 계산에 그 줄을 넣는다. */
+body.is-versus {
+  --board-inline-reserve: calc(2 * var(--hud-width) + var(--space-3) + var(--space-5) + 2px);
+}
+
+@media (min-width: 721px) {
+  body.is-versus .stage {
+    grid-template-columns: auto calc(2 * var(--hud-width) + var(--space-3));
+  }
+
+  body.is-versus .stage-side {
+    grid-template-columns: var(--hud-width) var(--hud-width);
+    align-items: start;
+    gap: var(--space-3);
+  }
+
+  body.is-versus .versus-panel {
+    padding-top: 0;
+    border-top: 2px solid var(--border-strong);
+  }
+
+  body.is-versus .cpu-board {
+    width: min(var(--hud-width), max(70px, calc((100dvh - 230px) * 10 / 22)));
+  }
+}
+
+@media (max-width: 720px) {
+  body.is-versus {
+    --board-inline-reserve: 2px;
+    --chrome-h: 236px;
+  }
+
+  body.is-versus .versus-panel {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    padding-top: var(--space-1);
+  }
+
+  body.is-versus .versus-panel .race-panel-head {
+    width: auto;
+  }
+
+  body.is-versus .versus-stats {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-3);
+  }
+
+  body.is-versus .versus-stats > div {
+    border: 0;
+    gap: var(--space-1);
+  }
+}
