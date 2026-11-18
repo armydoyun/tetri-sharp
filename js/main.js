@@ -38,6 +38,7 @@ import { createSfx } from "./audio/sfx.js";
 import { createBackup, parseBackup, restoreBackup } from "./storage/backup.js";
 import { createFinesseTracker } from "./modes/finesse.js";
 import { ROTATIONS } from "./rules/rotation/index.js";
+import { lang, t, translateDom } from "./i18n/index.js";
 
 const FRAME_MS = 1000 / 60;
 const MAX_CATCH_UP_MS = 250; // 시간이 크게 튀면(탭 복귀 등) 한꺼번에 따라잡지 않는다.
@@ -155,16 +156,16 @@ const textCap = text => {
 const renderKeyHelp = () => {
   const r = game?.rules ?? currentRules();
   const unavailable = new Set([...(r.hardDrop ? [] : ["HARD"]), ...(r.hold.enabled ? [] : ["HOLD"])]);
-  const items = [icon("keyboard", { label: "키보드" })];
+  const items = [icon("keyboard", { label: t("키보드") })];
   for (const a of ACTIONS) {
     if (unavailable.has(a.id) || !keysOf(a.id).length) continue;
     items.push(helpItem(a.label, keysOf(a.id).map(keycap)));
   }
-  items.push(helpItem("메뉴·일시정지", [textCap("Esc")]));
+  items.push(helpItem(t("메뉴·일시정지"), [textCap("Esc")]));
   if (padRef?.connected) {
     const br = document.createElement("span");
     br.className = "keys-break";
-    items.push(br, icon("gamepad", { label: "게임패드" }));
+    items.push(br, icon("gamepad", { label: t("게임패드") }));
     for (const a of ACTIONS) {
       const buttons = settings.padmap[a.id] ?? [];
       if (unavailable.has(a.id) || !buttons.length) continue;
@@ -181,9 +182,9 @@ const renderKeyHelp = () => {
 
 /** 프리셋 한 줄 설명(첫 화면 규칙 카드) */
 const RULE_DESCRIPTIONS = {
-  modern: "요즘 표준: SRS 회전, 7-Bag, 홀드·하드 드롭·고스트, 넥스트 5개, T-spin 점수.",
-  retro: "옛날 가정용 게임 느낌: 벽차기·홀드·하드 드롭·고스트 없음, 닿으면 바로 고정, 조작감 고정.",
-  arcade: "아케이드 느낌: ARS 회전, 최근 4개를 피하는 생성기, 생성·줄 삭제 지연, 미리 회전(IRS).",
+  modern: t("요즘 표준: SRS 회전, 7-Bag, 홀드·하드 드롭·고스트, 넥스트 5개, T-spin 점수."),
+  retro: t("옛날 가정용 게임 느낌: 벽차기·홀드·하드 드롭·고스트 없음, 닿으면 바로 고정, 조작감 고정."),
+  arcade: t("아케이드 느낌: ARS 회전, 최근 4개를 피하는 생성기, 생성·줄 삭제 지연, 미리 회전(IRS)."),
 };
 
 const renderRuleTabs = () => {
@@ -210,8 +211,10 @@ const renderRuleTabs = () => {
   /** @type {HTMLButtonElement} */ ($("edit-rules")).disabled = ruleChoice !== "custom";
   $("rule-desc").textContent =
     ruleChoice === "custom"
-      ? `직접 조합한 규칙이에요. "편집"으로 바꿀 수 있고, 조합마다 기록이 따로 쌓여요 (기록표 ${makeCustomRules(customBody).id}).`
-      : `${RULE_DESCRIPTIONS[ruleChoice]} 바꾸고 싶으면 Custom을 골라 편집하세요.`;
+      ? t('직접 조합한 규칙이에요. "편집"으로 바꿀 수 있고, 조합마다 기록이 따로 쌓여요 (기록표 {id}).', {
+          id: makeCustomRules(customBody).id,
+        })
+      : `${RULE_DESCRIPTIONS[ruleChoice]} ${t("바꾸고 싶으면 Custom을 골라 편집하세요.")}`;
 };
 
 /** 이 모드·규칙의 최고 기록과 그 리플레이(둘이 같은 판이고, 끝까지 간 판일 때만) */
@@ -248,7 +251,7 @@ const startRace = m => {
     if (m.splits) targetSplits = advanceSplits(m.splits, targetSplits, state.stats.lines, state.frame);
   });
   if (!verified.ok || verified.actual.over !== m.race.finish) {
-    showMenuNotice("이 최고 기록은 현재 버전에서 재현할 수 없어요. 새 최고 기록이 필요해요.");
+    showMenuNotice(t("이 최고 기록은 현재 버전에서 재현할 수 없어요. 새 최고 기록이 필요해요."));
     return;
   }
   start(m, selected, { ...target, splits: targetSplits });
@@ -266,7 +269,7 @@ const renderRaceModes = ruleSet => {
       const name = document.createElement("strong");
       name.textContent = m.name;
       const info = document.createElement("small");
-      info.textContent = target ? m.formatRecord(target.best) : "끝까지 간 리플레이 필요";
+      info.textContent = target ? m.formatRecord(target.best) : t("끝까지 간 리플레이 필요");
       const body = document.createElement("span");
       body.append(name, info);
       btn.append(body, icon("arrow-right"));
@@ -294,7 +297,7 @@ const renderMenu = () => {
       desc.textContent = m.description;
       const pb = document.createElement("small");
       pb.className = "mode-best";
-      pb.textContent = best ? `최고 기록 ${m.formatRecord(best)}` : "";
+      pb.textContent = best ? t("최고 기록 {record}", { record: m.formatRecord(best) }) : "";
       btn.append(name, desc, pb, icon("arrow-right"));
       btn.addEventListener("click", () => start(m));
       return btn;
@@ -305,8 +308,8 @@ const renderMenu = () => {
 const updateHud = () => {
   const frame = game?.state.frame ?? 0;
   const stats = game?.state.stats ?? { pieces: 0, lines: 0 };
-  const lines = game ? mode.hudLines(game.state) : { label: "줄", value: "0" };
-  const time = game ? mode.hudTime(game.state) : { label: "시간", frames: 0 };
+  const lines = game ? mode.hudLines(game.state) : { label: t("줄"), value: "0" };
+  const time = game ? mode.hudTime(game.state) : { label: t("시간"), frames: 0 };
   hud.timeLabel.textContent = time.label;
   hud.time.textContent = formatTime(time.frames);
   hud.score.textContent = formatScore(game?.state.score ?? 0);
@@ -416,38 +419,51 @@ const renderResultSplits = () => {
   $("results-split-rows").replaceChildren(
     ...rows.map(({ to, frames, delta }) => {
       const row = document.createElement("tr");
-      for (const value of [`${to}줄`, formatTime(frames), formatDelta(delta === null ? null : delta / 60)]) {
+      for (const value of [
+        t("{n}줄", { n: to }),
+        formatTime(frames),
+        formatDelta(delta === null ? null : delta / 60),
+      ]) {
         row.insertCell().textContent = value;
       }
       return row;
     })
   );
   const note = slowest
-    ? `가장 많이 밀린 구간 ${slowest.from}–${slowest.to}줄 (${formatDelta(slowest.lost / 60)}초)`
+    ? t("가장 많이 밀린 구간 {from}–{to}줄 ({delta}초)", {
+        from: slowest.from,
+        to: slowest.to,
+        delta: formatDelta(slowest.lost / 60),
+      })
     : rows.length === 0
-      ? "10줄부터 구간 기록이 남아요."
+      ? t("10줄부터 구간 기록이 남아요.")
       : rows.every(row => row.delta === null)
-        ? "같은 규칙의 최고 기록이 쌓이면 비교할 수 있어요."
-        : "완료한 비교 구간에서 잃은 시간이 없어요.";
+        ? t("같은 규칙의 최고 기록이 쌓이면 비교할 수 있어요.")
+        : t("완료한 비교 구간에서 잃은 시간이 없어요.");
   $("results-split-note").textContent = note;
   details.querySelector("summary").textContent = slowest
-    ? `구간 기록 · ${slowest.from}–${slowest.to}줄 확인`
-    : "구간 기록";
+    ? t("구간 기록 · {from}–{to}줄 확인", { from: slowest.from, to: slowest.to })
+    : t("구간 기록");
 };
 
 /** 달리기 결과 한 줄: 시간 기록 모드는 시간 차, 점수 모드는 점수 차 */
 const raceResultText = (state, best) => {
-  if (state.over !== mode.race.finish) return `끝까지 가지 못했어요 · 상대 기록 ${mode.formatRecord(best)}`;
+  if (state.over !== mode.race.finish)
+    return t("끝까지 가지 못했어요 · 상대 기록 {record}", { record: mode.formatRecord(best) });
   if (mode.record.metric === "score") {
     const diff = state.score - (best.score ?? 0);
     return diff === 0
-      ? "내 최고 기록과 같은 점수예요."
-      : `이전 최고 기록보다 ${formatScore(Math.abs(diff))}점 ${diff > 0 ? "높아요" : "낮아요"}.`;
+      ? t("내 최고 기록과 같은 점수예요.")
+      : t(diff > 0 ? "이전 최고 기록보다 {n}점 높아요." : "이전 최고 기록보다 {n}점 낮아요.", {
+          n: formatScore(Math.abs(diff)),
+        });
   }
   const delta = state.frame - best.frames;
   return delta === 0
-    ? "내 최고 기록과 같은 시간이에요."
-    : `이전 최고 기록보다 ${(Math.abs(delta) / 60).toFixed(2)}초 ${delta < 0 ? "빨라요" : "느려요"}.`;
+    ? t("내 최고 기록과 같은 시간이에요.")
+    : t(delta < 0 ? "이전 최고 기록보다 {n}초 빨라요." : "이전 최고 기록보다 {n}초 느려요.", {
+        n: (Math.abs(delta) / 60).toFixed(2),
+      });
 };
 
 const finish = () => {
@@ -489,17 +505,17 @@ const finish = () => {
 
   const seconds = state.frame / 60;
   const rows = [
-    ["시간", formatTime(state.frame)],
-    ["점수", formatScore(state.score)],
-    ["레벨", String(state.level)],
-    ["줄", String(state.stats.lines)],
-    ["피스", String(state.stats.pieces)],
+    [t("시간"), formatTime(state.frame)],
+    [t("점수"), formatScore(state.score)],
+    [t("레벨"), String(state.level)],
+    [t("줄"), String(state.stats.lines)],
+    [t("피스"), String(state.stats.pieces)],
     ["PPS", seconds ? (state.stats.pieces / seconds).toFixed(2) : "0.00"],
-    ["최고 기록", best ? mode.formatRecord(best) : "—"],
+    [t("최고 기록"), best ? mode.formatRecord(best) : "—"],
   ];
   // 순위 줄은 늘 둔다(없으면 —) → 결과 화면 높이가 판마다 같다.
-  rows.push(["순위", outcome && outcome.rank < 10 ? `${outcome.rank + 1}위` : "—"]);
-  if (mode.splits) rows.push(["PB 대비", formatDelta(splitDelta(splits, pbSplits))]);
+  rows.push([t("순위"), outcome && outcome.rank < 10 ? t("{n}위", { n: outcome.rank + 1 }) : "—"]);
+  if (mode.splits) rows.push([t("PB 대비"), formatDelta(splitDelta(splits, pbSplits))]);
   $("results-stats").replaceChildren(
     ...rows.flatMap(([k, v]) => {
       const dt = document.createElement("dt");
@@ -528,7 +544,7 @@ const announce = e => {
     if (e.combo >= 1) lines.push(`${e.combo} COMBO`);
     if (lines.length && e.points) lines.push(`+${formatScore(e.points)}`);
   } else if (e.type === "practice" && !e.reset) {
-    lines = [e.success ? "성공" : "다시"];
+    lines = [e.success ? t("성공") : t("다시")];
   } else if (e.type === "levelUp") {
     lines = [`LEVEL ${e.level}`];
   }
@@ -571,6 +587,8 @@ const settingsUI = createSettingsUI({
     renderKeyHelp();
   },
   onPreviewSound: () => sfx.play("clear2"),
+  // 모드 이름처럼 시작할 때 만든 글자까지 바꾸려면 다시 불러오는 게 가장 확실하다.
+  onLanguage: () => location.reload(),
   onClose: () => {
     if (screen === "menu") toMenu();
     else if (screen === "paused") showPanel("pause");
@@ -728,10 +746,10 @@ const updateReplayBar = () => {
     icon(replayPaused ? "play" : "pause")
   );
   /** @type {HTMLElement} */ (replayBar.querySelector(".replay-toggle-text")).textContent = replayPaused
-    ? "재생"
-    : "일시정지";
+    ? t("재생")
+    : t("일시정지");
   /** @type {HTMLElement} */ (replayBar.querySelector(".replay-speed")).textContent = `${replaySpeed}x`;
-  replayStatus.textContent = player?.done ? "끝" : "";
+  replayStatus.textContent = player?.done ? t("끝") : "";
   replayStep.disabled = !player || player.done;
   replayToggle.disabled = replayStep.disabled;
   updateReplayProgress();
@@ -860,12 +878,12 @@ const openReplayText = text => {
   }
   const replay = sanitizeReplay(raw, findMode);
   if (!replay) {
-    showMenuNotice("읽을 수 없는 리플레이 파일이에요.");
+    showMenuNotice(t("읽을 수 없는 리플레이 파일이에요."));
     return false;
   }
   const check = verifyReplay(replay, findMode);
   showMenuNotice("");
-  const note = check.ok ? "" : "저장된 결과와 재생 결과가 달라요. 다른 버전의 파일일 수 있어요.";
+  const note = check.ok ? "" : t("저장된 결과와 재생 결과가 달라요. 다른 버전의 파일일 수 있어요.");
   startReplay(replay, "menu", note);
   return true;
 };
@@ -887,7 +905,8 @@ fileInput.addEventListener("change", async () => {
   try {
     text = await file.text();
   } catch {
-    if (request === replayFileRequest && screen === "menu") showMenuNotice("파일을 읽지 못했어요. 다시 선택해 주세요.");
+    if (request === replayFileRequest && screen === "menu")
+      showMenuNotice(t("파일을 읽지 못했어요. 다시 선택해 주세요."));
     return;
   }
   if (request === replayFileRequest && screen === "menu") openReplayText(text);
@@ -898,7 +917,7 @@ fileInput.addEventListener("change", async () => {
 $("export-backup").addEventListener("click", () => {
   const backup = createBackup(store);
   downloadJson(backup, `tetri-sharp-backup-${backup.date.slice(0, 10).replace(/-/g, "")}.json`);
-  showMenuNotice("설정·기록·리플레이를 백업 파일로 저장했어요.");
+  showMenuNotice(t("설정·기록·리플레이를 백업 파일로 저장했어요."));
 });
 
 /** 백업을 들인 뒤 메모리에 들고 있던 값들을 저장소에서 다시 읽는다. */
@@ -930,14 +949,20 @@ backupInput.addEventListener("change", async () => {
     parsed = null;
   }
   if (!parsed) {
-    showMenuNotice("읽을 수 없는 백업 파일이에요.");
+    showMenuNotice(t("읽을 수 없는 백업 파일이에요."));
     return;
   }
   const { records: count, replays: replayCount } = parsed.summary;
   const when = parsed.date ? ` (${parsed.date.slice(0, 10)})` : "";
   if (
     !window.confirm(
-      `백업${when}에는 기록 ${count}개, 리플레이 ${replayCount}개가 있어요.\n지금 이 브라우저의 설정·기록·리플레이를 백업 내용으로 바꿀까요?`
+      t("백업{when}에는 기록 {records}개, 리플레이 {replays}개가 있어요.", {
+        when,
+        records: count,
+        replays: replayCount,
+      }) +
+        "\n" +
+        t("지금 이 브라우저의 설정·기록·리플레이를 백업 내용으로 바꿀까요?")
     )
   )
     return;
@@ -945,8 +970,8 @@ backupInput.addEventListener("change", async () => {
   reloadFromStore();
   showMenuNotice(
     ok
-      ? `백업을 불러왔어요 · 기록 ${count}개, 리플레이 ${replayCount}개`
-      : "일부를 저장하지 못했어요. 저장 공간을 확인해 주세요."
+      ? t("백업을 불러왔어요 · 기록 {records}개, 리플레이 {replays}개", { records: count, replays: replayCount })
+      : t("일부를 저장하지 못했어요. 저장 공간을 확인해 주세요.")
   );
 });
 
@@ -975,7 +1000,7 @@ const tick = () => {
   const hadActive = Boolean(game.state.active);
   const events = game.step({ held, pressed });
   const extra = finesse?.frame(held, pressed, hadActive, events) ?? 0;
-  if (extra > 0 && mode.finesse) announceText([`피네스 +${extra}`]);
+  if (extra > 0 && mode.finesse) announceText([t("피네스 +{n}", { n: extra })]);
   if (mode.splits) splits = advanceSplits(mode.splits, splits, game.state.stats.lines, game.state.frame);
   if (race && !race.player.done) {
     race.player.step();
@@ -1018,17 +1043,19 @@ const importRulesFromLink = () => {
     /* file:// 등에서 막혀도 괜찮다 */
   }
   if (!body) {
-    showMenuNotice("링크의 규칙 코드를 읽을 수 없었어요.");
+    showMenuNotice(t("링크의 규칙 코드를 읽을 수 없었어요."));
     return false;
   }
   customBody = body;
   store.set("customRules", customBody);
   ruleChoice = "custom";
   store.set("lastRules", "custom");
-  showMenuNotice(`링크로 받은 규칙을 Custom에 불러왔어요 · 기록표 ${makeCustomRules(body).id}`);
+  showMenuNotice(t("링크로 받은 규칙을 Custom에 불러왔어요 · 기록표 {id}", { id: makeCustomRules(body).id }));
   return true;
 };
 
+document.documentElement.lang = lang;
+translateDom(document.documentElement);
 hydrateIcons();
 applyTouch();
 renderKeyHelp();

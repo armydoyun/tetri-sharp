@@ -4,6 +4,7 @@ import { HEIGHT, WIDTH, set } from "../core/board.js";
 import { GARBAGE, PIECES } from "../core/pieces.js";
 import { MODERN } from "../rules/presets.js";
 import { formatTime } from "./format.js";
+import { t } from "../i18n/index.js";
 
 /** 보드를 비운다 */
 const clear = board => board.cells.fill(0);
@@ -161,7 +162,7 @@ export const DRILLS = Object.freeze([
   Object.freeze({
     id: "tsd",
     name: "T-spin Double",
-    description: "좌우가 바뀌는 T-spin Double 자리에 T를 돌려 넣기",
+    description: t("좌우가 바뀌는 T-spin Double 자리에 T를 돌려 넣기"),
     sequence: Object.freeze(["T"]),
     build: (board, rng) => buildTsd(board, rng.int(WIDTH - 2), rng.int(2) === 0),
     success: ev => ev.tspin === "full" && ev.lines === 2,
@@ -169,7 +170,7 @@ export const DRILLS = Object.freeze([
   Object.freeze({
     id: "tst",
     name: "T-spin Triple",
-    description: "지붕 아래로 T를 돌려 넣어 세 줄 지우기 · 좌우가 바뀌어요",
+    description: t("지붕 아래로 T를 돌려 넣어 세 줄 지우기 · 좌우가 바뀌어요"),
     sequence: Object.freeze(["T"]),
     build: (board, rng) => {
       const right = rng.int(2) === 0;
@@ -179,8 +180,8 @@ export const DRILLS = Object.freeze([
   }),
   Object.freeze({
     id: "pc",
-    name: "퍼펙트 클리어 마무리",
-    description: "아래 두 줄의 구멍을 다음 피스들로 채워 판을 비우기 · 보통 두 개",
+    name: t("퍼펙트 클리어 마무리"),
+    description: t("아래 두 줄의 구멍을 다음 피스들로 채워 판을 비우기 · 보통 두 개"),
     sequence: null,
     build: (board, rng, state) => {
       state.practice.need = buildPcFinish(board, state.queue, rng) || 1;
@@ -195,32 +196,32 @@ export const DRILLS = Object.freeze([
   }),
   Object.freeze({
     id: "quad",
-    name: "4줄 우물",
-    description: "한쪽에 비워 둔 우물에 I를 세워 4줄 지우기",
+    name: t("4줄 우물"),
+    description: t("한쪽에 비워 둔 우물에 I를 세워 4줄 지우기"),
     sequence: Object.freeze(["I"]),
     build: (board, rng) => buildWell(board, rng.int(2) === 0 ? 0 : WIDTH - 1),
     success: ev => ev.lines === 4,
   }),
   Object.freeze({
     id: "double",
-    name: "2줄 우물",
-    description: "위치가 바뀌는 두 칸짜리 구멍에 O를 넣어 2줄 지우기",
+    name: t("2줄 우물"),
+    description: t("위치가 바뀌는 두 칸짜리 구멍에 O를 넣어 2줄 지우기"),
     sequence: Object.freeze(["O"]),
     build: (board, rng) => buildDoubleWell(board, rng.int(WIDTH - 1)),
     success: ev => ev.lines === 2,
   }),
   Object.freeze({
     id: "free",
-    name: "자유 쌓기",
-    description: "중력 없이 천천히 — 판이 높아지면 비워요",
+    name: t("자유 쌓기"),
+    description: t("중력 없이 천천히 — 판이 높아지면 비워요"),
     sequence: null,
     build: board => clear(board),
     success: null,
   }),
   Object.freeze({
     id: "finesse",
-    name: "피네스",
-    description: "가장 적은 키 입력으로 놓기 · 더 누르면 실수로 세요",
+    name: t("피네스"),
+    description: t("가장 적은 키 입력으로 놓기 · 더 누르면 실수로 세요"),
     sequence: null,
     build: board => clear(board),
     success: null,
@@ -235,7 +236,7 @@ export const practiceMode = drill => {
   if (cache.has(drill.id)) return cache.get(drill.id);
   const mode = Object.freeze({
     id: `practice-${drill.id}`,
-    name: `연습 · ${drill.name}`,
+    name: t("연습 · {name}", { name: drill.name }),
     description: drill.description,
     rules: MODERN,
     practice: true,
@@ -279,17 +280,20 @@ export const practiceMode = drill => {
     check: () => null,
     hudLines: state =>
       drill.success || drill.judge
-        ? { label: "성공", value: `${state.practice.success} / ${state.practice.tries}` }
-        : { label: "줄", value: String(state.stats.lines) },
-    hudTime: state => ({ label: "시간", frames: state.frame }),
+        ? { label: t("성공"), value: `${state.practice.success} / ${state.practice.tries}` }
+        : { label: t("줄"), value: String(state.stats.lines) },
+    hudTime: state => ({ label: t("시간"), frames: state.frame }),
     summary: state => ({
-      title: "연습 끝",
+      title: t("연습 끝"),
       main:
         drill.success || drill.judge
           ? `${state.practice.success} / ${state.practice.tries}`
           : drill.finesse
-            ? `실수 ${state.finesse?.faults ?? 0} / ${state.finesse?.judged ?? 0}피스`
-            : `${state.stats.lines}줄`,
+            ? t("실수 {faults} / {pieces}피스", {
+                faults: state.finesse?.faults ?? 0,
+                pieces: state.finesse?.judged ?? 0,
+              })
+            : t("{n}줄", { n: state.stats.lines }),
     }),
     record: Object.freeze({ metric: "frames", order: "asc" }),
     formatRecord: e => formatTime(e.frames),
