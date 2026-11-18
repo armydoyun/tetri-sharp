@@ -7,6 +7,13 @@
   padding: 24px 16px;
 }
 
+.app-header {
+  width: min(760px, 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .logo {
   margin: 0;
   font-size: 32px;
@@ -16,6 +23,55 @@
 
 .logo-sharp {
   color: var(--accent);
+}
+
+/* 버튼 */
+.btn {
+  appearance: none;
+  border: 1px solid var(--grid);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn:hover {
+  border-color: var(--text-dim);
+}
+
+.btn:focus-visible,
+.key-slot:focus-visible,
+input[type="range"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0b0d14;
+}
+
+.btn-ghost {
+  background: transparent;
+}
+
+kbd {
+  font: inherit;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+kbd:empty {
+  display: none;
 }
 
 .stage {
@@ -37,21 +93,137 @@
   height: auto;
 }
 
-.overlay {
+/* 보드 위에 겹치는 화면(메뉴·일시정지·결과) */
+.panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  text-align: center;
+}
+
+.panel:focus {
+  outline: none;
+}
+
+.panel[hidden],
+.countdown[hidden] {
+  display: none;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 22px;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 200px;
+}
+
+.mode-list {
+  display: grid;
+  gap: 10px;
+  width: min(300px, 100%);
+}
+
+.mode-card {
+  appearance: none;
+  text-align: left;
+  border: 1px solid var(--grid);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+}
+
+.mode-card:hover,
+.mode-card:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.mode-card strong {
+  font-size: 16px;
+}
+
+.mode-card small {
+  color: var(--text-dim);
+}
+
+.mode-card .mode-best {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.countdown {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--bg) 70%, transparent);
-  font-size: 18px;
-  font-weight: 700;
-  text-align: center;
-  padding: 16px;
+  font-size: 48px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+  text-shadow: 0 2px 12px var(--bg);
 }
 
-.overlay[hidden] {
+.results-mode {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.results-main {
+  margin: 0;
+  font-size: 40px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.badge {
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #0b0d14;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.badge[hidden] {
   display: none;
+}
+
+.results-stats {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 4px 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.results-stats dt {
+  color: var(--text-dim);
+  text-align: right;
+}
+
+.results-stats dd {
+  margin: 0;
+  text-align: left;
+  font-weight: 600;
 }
 
 .hud {
@@ -80,4 +252,121 @@
   font-size: 12px;
   text-align: center;
   line-height: 1.6;
+}
+
+/* 설정 대화상자 */
+.settings {
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  border: 1px solid var(--grid);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.settings[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings::backdrop {
+  background: rgb(0 0 0 / 0.55);
+}
+
+.settings-title {
+  margin: 0;
+  padding: 16px 20px 8px;
+  font-size: 20px;
+}
+
+.settings-body {
+  overflow: auto;
+  padding: 0 20px;
+}
+
+.settings-section {
+  padding: 8px 0 16px;
+}
+
+.settings-section h3 {
+  margin: 8px 0 12px;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.settings-help {
+  margin: -4px 0 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.settings-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 64px;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.settings-label {
+  display: grid;
+  gap: 2px;
+  font-size: 14px;
+}
+
+.settings-label small {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.settings-value {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-row input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.keys-row {
+  grid-template-columns: minmax(0, 1fr) 1fr 1fr;
+}
+
+.key-slot {
+  appearance: none;
+  border: 1px solid var(--grid);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.key-slot.is-empty {
+  color: var(--text-dim);
+}
+
+.key-slot.is-waiting {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.settings-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--grid);
+}
+
+.settings-notice {
+  margin: 0 auto 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
 }

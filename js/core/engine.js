@@ -46,9 +46,14 @@ export const msToFrames = ms => (ms * 60) / 1000;
  */
 
 /**
- * @param {{ rules: import("../rules/presets.js").RuleSet, handling?: Handling, seed?: number }} options
+ * 모드: 목표·종료 조건. check()가 결과를 돌려주면 그 프레임에 게임이 끝난다.
+ * @typedef {{ check?: (state: any, events: any[]) => null | { result: string } }} ModeHook
  */
-export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1 }) => {
+
+/**
+ * @param {{ rules: import("../rules/presets.js").RuleSet, handling?: Handling, seed?: number, mode?: ModeHook }} options
+ */
+export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode }) => {
   const rotation = ROTATIONS[rules.rotation];
   if (!rotation) throw new Error(`알 수 없는 회전 시스템: ${rules.rotation}`);
   const makeRandomizer = RANDOMIZERS[rules.randomizer];
@@ -74,7 +79,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1 }) => 
     das: { dir: 0, charge: 0, arrAcc: 0 },
     prevHeld: 0,
     stats: { pieces: 0, lines: 0 },
-    /** @type {null | "blockOut" | "lockOut"} */
+    /** @type {null | "blockOut" | "lockOut" | string} 끝난 이유(모드 목표 달성이면 모드가 정한 결과) */
     over: null,
   };
 
@@ -267,7 +272,20 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1 }) => 
    *   held: 지금 누르고 있는 버튼, pressed: 지난 프레임 이후 새로 눌린 버튼(짧게 눌렀다 뗀 것 포함)
    * @returns {any[]} 이번 프레임의 이벤트
    */
-  const step = ({ held = 0, pressed = 0 } = {}) => {
+  const step = input => {
+    const out = advance(input);
+    if (!state.over && mode?.check) {
+      const done = mode.check(state, out);
+      if (done) {
+        state.over = done.result;
+        state.active = null;
+        out.push({ type: "finish", ...done });
+      }
+    }
+    return out;
+  };
+
+  const advance = ({ held = 0, pressed = 0 } = {}) => {
     events = [];
     if (state.over) return events;
     if (state.frame === 0 && !state.active) spawn(takeNext());
@@ -326,7 +344,13 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1 }) => 
     step,
     state,
     rules,
-    handling,
+    get handling() {
+      return handling;
+    },
+    /** 조작 설정을 바꾼다(설정 화면에서 바로 반영). DAS 충전 상태는 그대로 둔다. */
+    setHandling(next) {
+      handling = next;
+    },
     ghostY,
     /** 현재 피스의 칸 좌표(보드 기준) */
     activeCells: () =>

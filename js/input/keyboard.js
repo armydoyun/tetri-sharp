@@ -4,22 +4,28 @@
 // OS 키 반복(e.repeat)은 무시한다 — DAS/ARR은 엔진이 직접 센다.
 
 /**
- * @param {{ keymap: Record<string, number>, systemKeys: Record<string, string>, onSystem: (action: string) => void }} options
+ * @param {{
+ *   getBindings: () => { buttons: Record<string, number>, system: Record<string, string> },
+ *   onSystem: (action: string) => void,
+ * }} options
  */
-export const createKeyboard = ({ keymap, systemKeys, onSystem }) => {
+export const createKeyboard = ({ getBindings, onSystem }) => {
   let held = 0;
   /** 프레임별로 넘겨줄 pressed 비트마스크 대기열. 맨 앞이 다음 프레임 몫. */
   let pending = [0];
-  /** 같은 버튼에 키가 여러 개일 때(ArrowUp·X) 하나를 떼도 다른 키가 눌려 있으면 유지한다. */
+  /** 같은 버튼에 키가 여러 개일 때(↑·X) 하나를 떼도 다른 키가 눌려 있으면 유지한다. */
   const down = new Set();
+  let enabled = false;
 
   const recompute = () => {
+    const { buttons } = getBindings();
     held = 0;
-    for (const code of down) held |= keymap[code] || 0;
+    for (const code of down) held |= buttons[code] || 0;
   };
 
   const onKeyDown = e => {
-    const bit = keymap[e.code];
+    const { buttons, system } = getBindings();
+    const bit = enabled ? buttons[e.code] : 0;
     if (bit) {
       e.preventDefault();
       if (e.repeat) return;
@@ -30,15 +36,15 @@ export const createKeyboard = ({ keymap, systemKeys, onSystem }) => {
       else pending[last] |= bit;
       return;
     }
-    const action = systemKeys[e.code];
+    const action = system[e.code];
     if (action && !e.repeat) {
-      e.preventDefault();
+      if (enabled) e.preventDefault();
       onSystem(action);
     }
   };
 
   const onKeyUp = e => {
-    if (!keymap[e.code]) return;
+    if (!down.has(e.code)) return;
     e.preventDefault();
     down.delete(e.code);
     recompute();
@@ -47,9 +53,20 @@ export const createKeyboard = ({ keymap, systemKeys, onSystem }) => {
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);
 
+  const releaseAll = () => {
+    down.clear();
+    held = 0;
+    pending = [0];
+  };
+
   return {
     get held() {
       return held;
+    },
+    /** 게임 조작 키를 받을지(메뉴·설정 화면에서는 끈다). */
+    setEnabled(value) {
+      if (enabled !== value) releaseAll();
+      enabled = value;
     },
     /** 모아 둔 pressed를 꺼내고 비운다. */
     takePressed() {
@@ -58,10 +75,6 @@ export const createKeyboard = ({ keymap, systemKeys, onSystem }) => {
       return p;
     },
     /** 창이 포커스를 잃으면 keyup이 오지 않으므로 전부 뗀 것으로 친다. */
-    releaseAll() {
-      down.clear();
-      held = 0;
-      pending = [0];
-    },
+    releaseAll,
   };
 };

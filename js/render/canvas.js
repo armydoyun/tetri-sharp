@@ -1,6 +1,6 @@
 // 렌더러. 엔진 상태를 읽어서 그리기만 한다(상태를 바꾸지 않는다).
 // 한 캔버스에 [홀드 | 보드 | 넥스트]를 나란히 그린다. 보드 위로 2줄 여유를 둬서 막 생성된 피스가 보이게 한다.
-import { VISIBLE_ROWS, get } from "../core/board.js";
+import { VISIBLE_ROWS, createBoard, get } from "../core/board.js";
 import { CELL_ID } from "../core/pieces.js";
 import { VISIBLE_TOP } from "../core/engine.js";
 
@@ -69,10 +69,14 @@ export const createRenderer = canvas => {
     ctx.fillText(text, x, y);
   };
 
-  /** @param {ReturnType<typeof import("../core/engine.js").createGame>} game */
+  const emptyBoard = createBoard();
+
+  /** @param {ReturnType<typeof import("../core/engine.js").createGame> | null} game  null이면 빈 보드만 */
   const draw = game => {
     fit();
-    const { board, active, hold, holdUsed, queue } = game.state;
+    const { board, active, hold, holdUsed, queue } = game
+      ? game.state
+      : { board: emptyBoard, active: null, hold: null, holdUsed: false, queue: [] };
     const bx = SIDE * cell;
     const by = MARGIN_TOP * cell;
     const toY = y => by + (y - VISIBLE_TOP) * cell;
@@ -120,6 +124,8 @@ export const createRenderer = canvas => {
       for (const [x, y] of cells) if (y >= VISIBLE_TOP - MARGIN_TOP) block(bx + x * cell, toY(y), color);
       ctx.globalAlpha = 1;
     }
+
+    if (!game) return;
 
     // 홀드
     const small = Math.round(cell * 0.8);

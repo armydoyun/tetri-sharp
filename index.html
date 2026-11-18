@@ -15,21 +15,50 @@
     <main id="app" class="app">
       <header class="app-header">
         <h1 class="logo">Tetri<span class="logo-sharp">#</span></h1>
+        <button id="open-settings" class="btn btn-ghost" type="button">설정</button>
       </header>
       <section class="stage" aria-label="게임 화면">
         <div class="board-wrap">
           <canvas id="board" class="board" aria-label="보드"></canvas>
-          <div id="overlay" class="overlay" role="status" hidden></div>
+
+          <div id="menu" class="panel" hidden>
+            <h2 class="panel-title">모드 선택</h2>
+            <div id="mode-list" class="mode-list"></div>
+          </div>
+
+          <div id="countdown" class="countdown" aria-live="assertive" hidden></div>
+
+          <div id="pause" class="panel" hidden>
+            <h2 class="panel-title">일시정지</h2>
+            <div class="actions">
+              <button type="button" class="btn btn-primary" data-action="resume">계속 <kbd>Esc</kbd></button>
+              <button type="button" class="btn" data-action="retry">다시 시작 <kbd data-key="RESTART"></kbd></button>
+              <button type="button" class="btn" data-action="menu">메뉴로</button>
+            </div>
+          </div>
+
+          <div id="results" class="panel" tabindex="-1" hidden>
+            <p id="results-mode" class="results-mode"></p>
+            <h2 id="results-title" class="panel-title"></h2>
+            <p id="results-main" class="results-main"></p>
+            <p id="results-badge" class="badge" hidden>새 기록!</p>
+            <dl id="results-stats" class="results-stats"></dl>
+            <div class="actions">
+              <button type="button" class="btn btn-primary" data-action="retry">다시 하기 <kbd data-key="RESTART"></kbd></button>
+              <button type="button" class="btn" data-action="menu">메뉴로 <kbd>Esc</kbd></button>
+            </div>
+          </div>
         </div>
         <dl class="hud">
           <div><dt>시간</dt><dd id="hud-time">0:00.00</dd></div>
-          <div><dt>줄</dt><dd id="hud-lines">0</dd></div>
+          <div><dt id="hud-lines-label">줄</dt><dd id="hud-lines">0</dd></div>
           <div><dt>피스</dt><dd id="hud-pieces">0</dd></div>
           <div><dt>PPS</dt><dd id="hud-pps">0.00</dd></div>
         </dl>
       </section>
-      <p class="keys">← → 이동 · ↓ 소프트 드롭 · Space 하드 드롭 · ↑/X 회전 · Z 반대 회전 · A 180° · C/Shift 홀드 · Esc 일시정지 · R 재시작</p>
+      <p id="key-help" class="keys"></p>
     </main>
+    <dialog id="settings" class="settings" aria-label="설정"></dialog>
     <!-- ES Modules: 개발용 실행은 http://localhost를 사용한다. -->
     <script type="module" src="./js/main.js"></script>
   </body>

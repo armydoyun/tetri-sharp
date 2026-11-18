@@ -268,8 +268,8 @@ export default {
 |---|---|---|
 | **M0 셋업** ✅ | esbuild 단일 파일 빌드, ESLint/Prettier, node:test, Playwright, GitHub Actions, 빈 보드 | CI 통과 시 Artifacts에 `index.html` 하나 |
 | **M1 코어 MVP** ✅ | 보드, 7종 미노, SRS, 7-Bag, 중력, moveReset, 하드드롭, 고스트, 홀드, 넥스트 5 | 키보드로 끝없이 플레이 가능 |
-| **M2 조작감** (엔진 쪽 DAS/ARR/SDF ✅, 설정 UI·키 리매핑·저장 남음) | DAS/ARR/SDF, 키 리매핑, 설정 저장 | ARR 0 / SDF ∞ 정상 동작 |
-| **M3 Sprint 40L** | 모드 인터페이스, 타이머, 결과 화면, 개인 기록 | 첫 "완성된 게임" |
+| **M2 조작감** ✅ | DAS/ARR/SDF, 키 리매핑, 설정 저장 | ARR 0 / SDF ∞ 정상 동작 |
+| **M3 Sprint 40L** ✅ (+ Endless) | 모드 인터페이스, 타이머, 결과 화면, 개인 기록 | 첫 "완성된 게임" |
 | **M4 점수 & Marathon/Ultra** | T-spin, B2B, 콤보, PC, 레벨 곡선 | |
 | **M5 규칙 샌드박스** | 전략 모듈 추가(ARS, Classic, 생성기들, lock 타입), 프리셋, 규칙 편집 UI, 기록 분리 | Modern/Retro/Arcade 전환 |
 | **M6 고속 플레이** | ARE, IRS/IHS, 20G, Master 모드 | |
