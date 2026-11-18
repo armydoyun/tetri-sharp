@@ -17,9 +17,18 @@
         <h1 class="logo">Tetri<span class="logo-sharp">#</span></h1>
       </header>
       <section class="stage" aria-label="게임 화면">
-        <canvas id="board" class="board" width="300" height="600" aria-label="보드"></canvas>
+        <div class="board-wrap">
+          <canvas id="board" class="board" aria-label="보드"></canvas>
+          <div id="overlay" class="overlay" role="status" hidden></div>
+        </div>
+        <dl class="hud">
+          <div><dt>시간</dt><dd id="hud-time">0:00.00</dd></div>
+          <div><dt>줄</dt><dd id="hud-lines">0</dd></div>
+          <div><dt>피스</dt><dd id="hud-pieces">0</dd></div>
+          <div><dt>PPS</dt><dd id="hud-pps">0.00</dd></div>
+        </dl>
       </section>
-      <p id="status" class="status" role="status"></p>
+      <p class="keys">← → 이동 · ↓ 소프트 드롭 · Space 하드 드롭 · ↑/X 회전 · Z 반대 회전 · A 180° · C/Shift 홀드 · Esc 일시정지 · R 재시작</p>
     </main>
     <!-- ES Modules: 개발용 실행은 http://localhost를 사용한다. -->
     <script type="module" src="./js/main.js"></script>

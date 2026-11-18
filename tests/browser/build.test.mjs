@@ -38,8 +38,8 @@ test("결과는 파일 하나이고 바깥 파일을 참조하지 않는다", ()
   assert.ok(result.bytes < 1024 * 1024, `배포본 크기 ${result.bytes} bytes`);
 });
 
-test("브라우저에서 오류 없이 뜨고 보드를 그린다", async () => {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+const openPage = async () => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const blocked = [];
   await context.route("**/*", route => {
     if (route.request().url() === url) return route.continue();
@@ -50,21 +50,60 @@ test("브라우저에서 오류 없이 뜨고 보드를 그린다", async () => 
   const errors = [];
   page.on("pageerror", e => errors.push(e.message));
   page.on("console", m => m.type() === "error" && errors.push(m.text()));
-
   await page.goto(url);
   await page.waitForFunction(() => document.documentElement.dataset.ready === "1", null, { timeout: 5000 });
+  return { context, page, errors, blocked };
+};
 
-  assert.equal(await page.title(), "Tetri#");
-  const painted = await page.evaluate(() => {
+const opaquePixels = page =>
+  page.evaluate(() => {
     const c = /** @type {HTMLCanvasElement} */ (document.getElementById("board"));
     const data = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
     let opaque = 0;
     for (let i = 3; i < data.length; i += 4) if (data[i]) opaque++;
     return { w: c.width, h: c.height, opaque };
   });
-  assert.equal(painted.w * 2, painted.h, "보드 비율은 10:20");
+
+test("브라우저에서 오류 없이 뜨고 보드를 그린다", async () => {
+  const { context, page, errors, blocked } = await openPage();
+  assert.equal(await page.title(), "Tetri#");
+  const painted = await opaquePixels(page);
+  assert.equal(painted.w * 22, painted.h * 20, "캔버스 비율은 20:22칸(홀드·보드·넥스트)");
   assert.ok(painted.opaque > 0, "캔버스에 무언가 그려졌다");
   assert.deepEqual(errors, []);
   assert.deepEqual(blocked, [], "추가 요청이 없어야 한다");
+  await context.close();
+});
+
+test("키보드로 플레이할 수 있다: 하드 드롭·홀드·일시정지·재시작", async () => {
+  const { context, page, errors } = await openPage();
+  const text = id => page.locator(`#${id}`).textContent();
+
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("ArrowUp");
+    await page.keyboard.press("Space");
+  }
+  await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "3", null, {
+    timeout: 3000,
+  });
+
+  await page.keyboard.press("KeyC");
+  await page.waitForTimeout(100);
+  assert.equal(await text("hud-pieces"), "3", "홀드는 피스를 고정하지 않는다");
+
+  await page.keyboard.press("Escape");
+  assert.equal(await page.locator("#overlay").isVisible(), true, "일시정지 표시");
+  const frozen = await text("hud-time");
+  await page.waitForTimeout(200);
+  assert.equal(await text("hud-time"), frozen, "일시정지 중에는 시간이 멈춘다");
+  await page.keyboard.press("Escape");
+  assert.equal(await page.locator("#overlay").isVisible(), false);
+
+  await page.keyboard.press("KeyR");
+  await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "0", null, {
+    timeout: 3000,
+  });
+  assert.deepEqual(errors, []);
   await context.close();
 });
