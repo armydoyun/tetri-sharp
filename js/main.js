@@ -153,6 +153,7 @@ let game = null;
 let countdown = 0;
 /** 이번 판의 구간 기록(프레임)과 비교할 최고 기록의 구간 */
 let splits = [];
+let resultPbSplits = /** @type {number[] | undefined} */ (undefined);
 let pbSplits = /** @type {number[] | undefined} */ (undefined);
 let goTimer = 0;
 /** @type {ReturnType<typeof createFinesseTracker> | null} 이번 판의 피네스 판정 */
@@ -247,8 +248,7 @@ const updateRaceProgress = () => {
   raceLabel.textContent = race.player.done ? mode.formatRecord(race.target.best) : p.text;
 };
 
-const startRace = m => {
-  const selected = currentRules();
+const startRace = (m, selected = currentRules()) => {
   const target = raceTargetFor(m, selected);
   if (!target) return;
   let targetSplits = [];
@@ -256,7 +256,9 @@ const startRace = m => {
     if (m.splits) targetSplits = advanceSplits(m.splits, targetSplits, state.stats.lines, state.frame);
   });
   if (!verified.ok || verified.actual.over !== m.race.finish) {
-    showMenuNotice(t("이 최고 기록은 현재 버전에서 재현할 수 없어요. 새 최고 기록이 필요해요."));
+    const message = t("이 최고 기록은 현재 버전에서 재현할 수 없어요. 새 최고 기록이 필요해요.");
+    if (screen === "results") $("results-split-note").textContent = message;
+    else showMenuNotice(message);
     return;
   }
   start(m, selected, { ...target, splits: targetSplits });
@@ -476,14 +478,19 @@ const showModeHud = (m, replay = false) => {
   }
 };
 
-const start = (m, selectedRules = currentRules(), target = null) => {
+const start = (
+  m,
+  selectedRules = currentRules(),
+  target = null,
+  retrySeed = /** @type {number | undefined} */ (undefined)
+) => {
   confirming = null;
   if (screen === "replay") stopReplay();
   mode = m;
   if (!m.practice) store.set("lastMode", m.id);
   rules = selectedRules;
   runPlayerName = records.playerName;
-  const seed = target?.replay.seed ?? m.fixedSeed ?? (Math.random() * 2 ** 32) >>> 0;
+  const seed = target?.replay.seed ?? retrySeed ?? m.fixedSeed ?? (Math.random() * 2 ** 32) >>> 0;
   $("race-label").textContent = target?.friend ? t("{name}의 기록", { name: target.friend }) : t("내 최고 기록");
   race = target ? { target, player: createPlayer(target.replay, findMode) } : null;
   racePanel.hidden = !race;
@@ -501,7 +508,18 @@ const start = (m, selectedRules = currentRules(), target = null) => {
   finesse = createFinesseTracker(game, ROTATIONS[rules.rotation]);
   splits = [];
   showModeHud(m);
-  pbSplits = target?.splits ?? records.best(m, rules)?.splits;
+  resultPbSplits = m.splits ? records.best(m, rules)?.splits : undefined;
+  if (m.splits && !resultPbSplits) {
+    const best = raceTargetFor(m, rules);
+    if (best) {
+      let restored = [];
+      const check = verifyReplay(best.replay, findMode, state => {
+        restored = advanceSplits(m.splits, restored, state.stats.lines, state.frame);
+      });
+      if (check.ok) resultPbSplits = restored;
+    }
+  }
+  pbSplits = target?.splits ?? resultPbSplits;
   acc = 0;
   countdown = COUNTDOWN_FRAMES[settings.access.countdown] ?? READY_FRAMES;
   goTimer = 0;
@@ -612,17 +630,34 @@ const renderResultSplits = () => {
   details.open = false;
   if (!mode.splits) return;
 
-  const { rows, slowest } = analyzeSplits(mode.splits, splits, pbSplits);
+  const { rows, slowest } = analyzeSplits(mode.splits, splits, resultPbSplits);
+  const replay = lastReplay;
+  /** @type {HTMLButtonElement} */ ($("results-race-best")).disabled = !raceTargetFor(mode, rules);
   $("results-split-rows").replaceChildren(
-    ...rows.map(({ to, frames, delta }) => {
+    ...rows.map(({ to, frames, delta }, index) => {
       const row = document.createElement("tr");
-      for (const value of [
-        t("{n}줄", { n: to }),
-        formatTime(frames),
-        formatDelta(delta === null ? null : delta / 60),
-      ]) {
-        row.insertCell().textContent = value;
-      }
+      const from = mode.splits[index - 1] ?? 0;
+      const startFrame = splits[index - 1] ?? 0;
+      const label = t("{from}–{to}줄", { from, to });
+      row.classList.toggle("is-slowest", slowest?.to === to);
+      const segment = row.insertCell();
+      if (replay) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "btn btn-small";
+        button.textContent = label;
+        button.setAttribute("aria-label", t("{segment} 구간 다시 보기", { segment: label }));
+        button.addEventListener("click", () => {
+          startReplay(replay, "results");
+          seekReplay(startFrame, true);
+        });
+        segment.append(button);
+      } else segment.textContent = label;
+      const priorDelta = index === 0 ? 0 : rows[index - 1].delta;
+      row.insertCell().textContent = formatTime(frames - startFrame);
+      row.insertCell().textContent = formatDelta(
+        delta === null || priorDelta === null ? null : (delta - priorDelta) / 60
+      );
       return row;
     })
   );
@@ -635,11 +670,15 @@ const renderResultSplits = () => {
     : rows.length === 0
       ? t("10줄부터 구간 기록이 남아요.")
       : rows.every(row => row.delta === null)
-        ? t("같은 규칙의 최고 기록이 쌓이면 비교할 수 있어요.")
+        ? ""
         : t("완료한 비교 구간에서 잃은 시간이 없어요.");
   $("results-split-note").textContent = note;
   details.querySelector("summary").textContent = slowest
-    ? t("구간 기록 · {from}–{to}줄 확인", { from: slowest.from, to: slowest.to })
+    ? t("구간 기록 · {from}–{to}줄 {delta}초", {
+        from: slowest.from,
+        to: slowest.to,
+        delta: formatDelta(slowest.lost / 60),
+      })
     : t("구간 기록");
 };
 
@@ -1044,6 +1083,8 @@ for (const btn of document.querySelectorAll("[data-action]")) {
     const action = btn.getAttribute("data-action");
     if (action === "resume") resume();
     if (action === "retry") start(mode, rules, race?.target);
+    if (action === "retry-seed" && mode.splits && lastReplay) start(mode, rules, null, lastReplay.seed);
+    if (action === "race-best" && mode.splits) startRace(mode, rules);
     if (action === "next-puzzle" && mode.puzzle) {
       const next = PUZZLES[mode.puzzle.number] ?? puzzleProgress.next();
       start(puzzleMode(next), MODERN);

@@ -202,10 +202,14 @@
               <details id="results-splits" class="results-splits">
                 <summary>구간 기록</summary>
                 <table>
-                  <thead><tr><th scope="col">누적 줄</th><th scope="col">경과 시간</th><th scope="col">PB 대비</th></tr></thead>
+                  <thead><tr><th scope="col">구간</th><th scope="col">구간 시간</th><th scope="col">PB 대비</th></tr></thead>
                   <tbody id="results-split-rows"></tbody>
                 </table>
-                <p id="results-split-note"></p>
+                <p id="results-split-note" role="status"></p>
+                <div class="actions-row">
+                  <button type="button" class="btn btn-small" data-action="retry-seed">같은 블록 재시작</button>
+                  <button type="button" class="btn btn-small" id="results-race-best" data-action="race-best" disabled>PB와 달리기</button>
+                </div>
               </details>
               <div class="actions">
                 <div class="actions-row">
