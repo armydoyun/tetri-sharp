@@ -82,15 +82,32 @@ export const ICONS = Object.freeze({
   "chevron-down": [["path", { d: "M6.5 9.5 12 15l5.5-5.5" }]],
   "chevron-right": [["path", { d: "M9.5 6.5 15 12l-5.5 5.5" }]],
   check: [["path", { d: "M5.5 12.5 10 17l8.5-9.5" }]],
+  undo: [["path", { d: "M9 7.5H4.5V3M4.8 7.3A8 8 0 1 1 4.5 15" }]],
+  help: [
+    ["circle", { cx: 12, cy: 12, r: 8.5 }],
+    ["path", { d: "M9.6 9.6a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.4v.7M12 16.6v.4" }],
+  ],
+  hand: [
+    [
+      "path",
+      {
+        d: "M8.5 12.5V5.5a1.5 1.5 0 0 1 3 0V11m0-1.5a1.5 1.5 0 0 1 3 0V11m0-.5a1.5 1.5 0 0 1 3 0v4a6 6 0 0 1-6 6h-1a5 5 0 0 1-4-2l-2.5-3.5a1.5 1.5 0 0 1 2.3-1.9l1.7 1.9",
+      },
+    ],
+  ],
 });
 
+/** @typedef {keyof typeof ICONS} IconName */
+
 /**
- * @param {keyof typeof ICONS} name
+ * @param {IconName} name
  * @param {{ label?: string, className?: string }} [options]  label이 있으면 화면 읽기 프로그램이 읽는다(없으면 장식)
  * @returns {SVGSVGElement}
  */
 export const icon = (name, { label, className } = {}) => {
-  const parts = ICONS[name];
+  const parts = /** @type {ReadonlyArray<[string, Record<string, string | number>]>} */ (
+    /** @type {unknown} */ (ICONS[name])
+  );
   if (!parts) throw new Error(`아이콘이 없습니다: ${name}`);
   const svg = document.createElementNS(SVG_NS, "svg");
   svg.setAttribute("viewBox", "0 0 24 24");

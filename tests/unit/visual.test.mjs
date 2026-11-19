@@ -33,8 +33,18 @@ const fakeCtx = (calls = []) =>
     }
   );
 
-test("테마 세 가지, 기본은 모던", () => {
-  assert.deepEqual([...THEME_IDS].sort(), ["minimal", "modern", "retro"]);
+test("테마 아홉 가지, 기본은 모던", () => {
+  assert.deepEqual([...THEME_IDS].sort(), [
+    "forest",
+    "frame",
+    "graphite",
+    "midnight",
+    "minimal",
+    "modern",
+    "retro",
+    "stone",
+    "white",
+  ]);
   assert.equal(DEFAULT_THEME, "modern");
   assert.equal(findTheme("없음"), THEMES.modern);
 });
@@ -51,10 +61,49 @@ test("테마마다 8색이 모두 다르고, 블록·고스트를 그린다", ()
   assert.equal(new Set(CONTRAST_PALETTE.slice(1)).size, 8);
 });
 
-test("세 테마의 보드 색과 블록 모서리가 서로 다르다", () => {
+test("테마마다 보드 색 · 블록 모서리 · 줄 삭제 모양이 서로 다르다", () => {
   const themes = Object.values(THEMES);
-  assert.equal(new Set(themes.map(theme => theme.board.bg)).size, 3);
-  assert.equal(new Set(themes.map(theme => theme.radius)).size, 3);
+  assert.equal(new Set(themes.map(theme => theme.board.bg)).size, themes.length);
+  assert.equal(new Set(themes.map(theme => theme.radius)).size, themes.length);
+  assert.equal(new Set(themes.map(theme => theme.motion.clear)).size, themes.length);
+});
+
+test("블록 마감: 그라파이트는 윗면을 더 칠하고 프레임은 속 + 테두리, 고스트는 늘 윤곽선", () => {
+  const count = theme => {
+    const calls = [];
+    theme.block(fakeCtx(calls), 0, 0, 30, theme.palette[1]);
+    return calls.filter(([name]) => name === "fill" || name === "stroke").length;
+  };
+  assert.equal(count(THEMES.modern), 1);
+  assert.equal(count(THEMES.stone), 1);
+  assert.equal(count(THEMES.frame), 2);
+  const edge = [];
+  THEMES.graphite.block(fakeCtx(edge), 0, 0, 30, "#fff");
+  assert.equal(edge.filter(([name]) => name === "fillRect").length, 1, "윗면 밝게");
+  const ghost = [];
+  THEMES.frame.ghost(fakeCtx(ghost), 0, 0, 30, "#fff");
+  assert.deepEqual(
+    ghost.filter(([name]) => name === "fill" || name === "stroke").map(([name]) => name),
+    ["stroke"]
+  );
+});
+
+test("새 줄 삭제 모양(번쩍임·훑기·작은 네모·모이기·옅어지기·가라앉기)도 수명이 끝나면 사라진다", () => {
+  for (const id of ["graphite", "frame", "stone", "midnight", "forest", "white"]) {
+    const { motion } = THEMES[id];
+    const fx = createEffects();
+    fx.add([clearEvent], "full", 0, motion);
+    const calls = [];
+    fx.draw(fakeCtx(calls), { bx: 0, cell: 10, toY: y => y * 10, cols: 10 }, 30, "#fff", "full");
+    assert.ok(
+      calls.some(([name]) => name === "fillRect"),
+      id
+    );
+    fx.prune(motion.clearMs, "full");
+    const after = [];
+    fx.draw(fakeCtx(after), { bx: 0, cell: 10, toY: y => y * 10, cols: 10 }, motion.clearMs, "#fff", "full");
+    assert.deepEqual(after, [], id);
+  }
 });
 
 test("착지한 블록만 열 바닥을 기준으로 눌렸다가 원래 크기로 돌아온다", () => {
@@ -124,7 +173,7 @@ test("하드 드롭은 테마마다 다른 압축과 짧은 잔상을 만들고 
       assert.deepEqual(after, []);
     }
   }
-  assert.equal(new Set(samples).size, 3);
+  assert.equal(new Set(samples).size, samples.length);
   assert.equal(samples[0], 0.8);
 });
 
@@ -163,12 +212,37 @@ test("미끄러지는 중에 또 움직이면 지금 보이는 자리에서 이�
 });
 
 test("시각 설정 보정과 예전 형식 옮기기", () => {
-  const v = sanitizeVisual({ effects: "loud", theme: "neon", palette: 3 });
+  const v = sanitizeVisual({ effects: "loud", theme: "vapor", palette: 3 });
   assert.equal(v.theme, "modern");
   assert.ok(["full", "reduced"].includes(v.effects));
   assert.equal(v.palette, "theme");
   const old = sanitizeVisual({ effects: "off", skin: "outline", palette: "default" });
-  assert.deepEqual(old, { theme: "modern", effects: "off", palette: "theme" }, "skin은 버리고 default → theme");
+  assert.deepEqual(
+    old,
+    {
+      theme: "modern",
+      effects: "off",
+      palette: "theme",
+      pattern: "off",
+      ghost: "normal",
+      grid: "on",
+      inputs: "off",
+      colors: {},
+    },
+    "skin은 버리고 default → theme, 새 항목은 기본값"
+  );
   assert.equal(sanitizeVisual({ palette: "contrast", theme: "retro" }).theme, "retro");
-  assert.deepEqual(Object.keys(sanitizeSettings({}).visual).sort(), ["effects", "palette", "theme"]);
+  assert.deepEqual(Object.keys(sanitizeSettings({}).visual).sort(), [
+    "colors",
+    "effects",
+    "ghost",
+    "grid",
+    "inputs",
+    "palette",
+    "pattern",
+    "theme",
+  ]);
+  assert.equal(sanitizeVisual({ ghost: "huge", grid: 0, pattern: "on" }).ghost, "normal");
+  assert.equal(sanitizeVisual({ pattern: "on" }).pattern, "on");
+  assert.deepEqual(sanitizeVisual({ colors: { T: "#AABBCC", I: "red", Q: "#000000" } }).colors, { T: "#aabbcc" });
 });

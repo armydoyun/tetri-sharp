@@ -163,6 +163,136 @@ export const EN = {
   "받은 결과가 있어요. 겨루기를 누르면 같은 블록 순서로 함께 달려요":
     "You received a result. Press Race to run against it with the same pieces",
 
+  // ---- 편의·접근성 ----
+  "되돌리기 (연습)": "Undo (practice)",
+  되돌리기: "Undo",
+  "{mode} 시작": "{mode} started",
+  "더 되돌릴 수 없어요": "Nothing more to undo",
+  "한 피스 되돌렸어요": "Undid one piece",
+  "{n}줄 지움": "Cleared {n} lines",
+  "좌우로 밀기": "Swipe left or right",
+  "한 칸씩 이동": "Move one cell at a time",
+  두드리기: "Tap",
+  "회전 (오른쪽 절반은 시계, 왼쪽 절반은 반시계)": "Rotate (right half clockwise, left half counterclockwise)",
+  "아래로 밀고 있기": "Swipe down and hold",
+  "아래로 빠르게 튕기기": "Flick down",
+  "위로 밀기": "Swipe up",
+  "보드 아래 버튼": "Buttons under the board",
+  "이동 · 회전 · 드롭 · 홀드": "Move · rotate · drop · hold",
+  "오른쪽 끝 버튼": "Rightmost buttons",
+  "일시정지 · 다시 시작": "Pause · restart",
+  "조작감 바꾸기": "Change handling",
+  "접근성 설정": "Accessibility settings",
+  "이렇게 시작해요": "Getting started",
+  "위의 규칙에서 Modern을 고른 채로 두세요. 요즘 표준 규칙이에요.":
+    "Keep Modern selected under Rules. It's today's standard.",
+  "플레이 모드에서 Marathon이나 Sprint 40L을 눌러 시작해요.": "Pick Marathon or Sprint 40L under Modes to start.",
+  "줄을 가득 채우면 지워져요. 블록이 위까지 차면 끝나요.":
+    "Filled lines disappear. The game ends when blocks reach the top.",
+  "익숙해지면 연습에서 T-spin을, CPU 대전에서 공격과 방어를 익혀 보세요.":
+    "Once you're comfortable, learn T-spins in Practice and attack and defense in CPU battle.",
+  "키보드 조작": "Keyboard controls",
+  "편하게 하기": "Make it comfortable",
+  "블록이 너무 빨리 미끄러지거나 느리면 설정의 조작 탭에서 조작감을 고르세요.":
+    "If pieces slide too fast or too slow, pick a handling preset on the Controls tab in Settings.",
+  "블록 무늬·진동·화면 읽기 알림·카운트다운 길이는 설정의 접근성 탭에 있어요.":
+    "Block patterns, vibration, screen reader announcements and countdown length are on the Accessibility tab in Settings.",
+  "연습 모드에서는 되돌리기로 방금 놓은 피스를 취소할 수 있어요.":
+    "In practice modes, Undo takes back the piece you just placed.",
+  "게임 중 R을 누르면 다시 시작할지 먼저 물어요. 로고를 누르면 첫 화면으로 가요.":
+    "Pressing R during a game asks before restarting. The logo takes you home.",
+  "이 안내는 머리글의 도움말에서 언제든 다시 볼 수 있어요.": "You can open this again anytime from Help at the top.",
+  도움말: "Help",
+  "처음 오셨나요?": "New here?",
+  "조작법과 추천 순서, 편하게 하는 설정을 짧게 알려 드릴게요.":
+    "A quick guide to controls, where to start and settings that help.",
+  "안내 보기": "Show guide",
+  "안내 닫기": "Close guide",
+  느긋하게: "Relaxed",
+  빠르게: "Fast",
+  "아주 빠르게": "Very fast",
+  "처음 해 보는 분께: 천천히 움직이고 실수가 적어요": "For beginners: slower movement, fewer mistakes",
+  "대부분에게 맞는 기본값이에요": "The default that suits most players",
+  "익숙해지면: 누르고 있으면 바로 벽까지 가요": "Once you're used to it: holding a direction goes straight to the wall",
+  "숙련자용: 가장 빨리 반응하고 소프트 드롭은 즉시 바닥까지": "For experts: quickest response and instant soft drop",
+  "보드 아래 버튼으로 조작해요": "Play with the buttons under the board",
+  "보드를 좌우로 밀어 이동, 두드려 회전(왼쪽 절반은 반대 방향), 아래로 튕겨 하드 드롭, 위로 밀어 홀드":
+    "Swipe to move, tap to rotate (left half the other way), flick down to hard drop, swipe up to hold",
+  접근성: "Accessibility",
+  조작감: "Handling",
+  "아래에서 직접 조절한 값이에요": "Custom values set below",
+  "터치 조작 방식": "Touch controls",
+  버튼: "Buttons",
+  제스처: "Gestures",
+  "블록 무늬": "Block patterns",
+  "피스마다 다른 무늬를 그려요. 색을 구분하기 어려워도 알아볼 수 있어요":
+    "Draws a different mark on each piece, so you can tell them apart without color",
+  "색만으로 피스를 구분해요": "Pieces are told apart by color only",
+  "화면 읽기 알림": "Screen reader announcements",
+  "화면 읽기 프로그램이 줄 삭제·레벨업·결과를 읽어 줘요": "Screen readers announce line clears, level ups and results",
+  진동: "Vibration",
+  "휴대폰에서 고정·줄 삭제·게임 오버 때 짧게 진동해요(지원하는 기기만)":
+    "Short vibrations on lock, line clear and game over on phones (where supported)",
+  "시작 카운트다운": "Start countdown",
+  "누르자마자 바로 시작해요": "Starts right away",
+  "시작 전에 READY를 보여 줘요": "Shows READY before the start",
+  짧게: "Short",
+  "화면 효과 줄이기와 색각 친화 색은 화면·소리 탭에 있어요.":
+    "Reduced effects and color-blind friendly colors are on the Display & sound tab.",
+  "피스가 떨어질 자리 표시의 진하기": "How strongly the landing spot is shown",
+  흐리게: "Faint",
+  진하게: "Strong",
+  "격자 선": "Grid lines",
+  "격자 선 없이 블록만 보여요": "Shows blocks without grid lines",
+  "보드에 칸을 나누는 선을 그려요": "Draws lines between cells",
+
+  // ---- 퍼즐 ----
+  퍼즐: "Puzzles",
+  "판 비우기": "Clear the board",
+  "퍼즐 {n} · {kind}": "Puzzle {n} · {kind}",
+  "남은 피스": "Pieces left",
+  "성공!": "Solved!",
+  실패: "Failed",
+  "단계 {n}": "Stage {n}",
+  "다음 단계": "Next stage",
+  "{n}단계 · {kind} · 피스 {count}개{done}": "Stage {n} · {kind} · {count} pieces{done}",
+  깸: "solved",
+  "{n}피스": "{n} pcs",
+  "{done} / {total}단계 깸 · 중력 없음, 정해진 피스만 써요":
+    "{done} / {total} solved · no gravity, only the given pieces",
+  "판 비우기는 주어진 피스로 아래 두 줄을 모두 지우고, T-spin은 T 하나로 해내요.":
+    "Clear the board: use the given pieces to clear the bottom two lines. T-spin stages: do it with a single T.",
+
+  // ---- 리플레이 공유 ----
+  "이 리플레이": "this replay",
+  "링크의 리플레이를 읽을 수 없었어요.": "Couldn't read the replay in the link.",
+  "{name}의 리플레이": "{name}'s replay",
+  "받은 리플레이": "A shared replay",
+  "링크를 복사했어요. 받은 사람이 열면 바로 재생하고 이 기록과 달릴 수 있어요":
+    "Copied the link. Whoever opens it can watch it and race this run",
+  "파일로 저장": "Save as file",
+  "리플레이 파일을 저장했어요": "Saved the replay file",
+  파일: "File",
+  "메신저로 보내거나 보관할 때": "To send by messenger or keep",
+  "리플레이 공유": "Share replay",
+  "리플레이 공유(링크·파일)": "Share replay (link or file)",
+  "이 기록과 달리기": "Race this run",
+
+  "키 입력 표시": "Input display",
+  "게임과 리플레이에서 누르는 키를 정보 칸 아래에 보여 줘요":
+    "Shows the keys being pressed under the HUD, in games and replays",
+
+  "직접 고르기": "Custom",
+  "아래에서 피스를 고르고 색을 눌러요. 고르지 않은 피스는 테마 색이에요":
+    "Pick a piece below, then a color. Untouched pieces keep the theme color",
+  "색을 바꿀 피스": "Piece to recolor",
+  "{piece} 피스": "{piece} piece",
+  "색 견본": "Color swatches",
+  "{piece} 피스를 이 색으로 · {color}": "Color the {piece} piece {color}",
+  "테마 색으로": "Theme colors",
+  "피스 색": "Piece colors",
+  "{piece} 피스를 고른 상태예요": "{piece} piece selected",
+
   // ---- 결과 ----
   "새 기록": "New record",
   "최고 기록": "Best",
@@ -376,6 +506,18 @@ export const EN = {
   "종이색 보드와 차분한 잉크색 블록": "Paper-colored board with calm ink blocks",
   슬레이트: "Slate",
   "푸른 회색 보드와 낮은 채도의 블록": "Blue-gray board with muted blocks",
+  그라파이트: "Graphite",
+  "무채색 숯빛 보드와 채도를 낮춘 블록": "Neutral charcoal board with muted blocks",
+  프레임: "Frame",
+  "검은 보드와 테두리만 색이 있는 블록": "Black board with color-outlined blocks",
+  스톤: "Stone",
+  "밝은 돌빛 보드와 흙빛이 도는 각진 블록": "Light stone board with earthy square blocks",
+  미드나잇: "Midnight",
+  "짙은 남색 보드와 보석빛을 눌러 담은 블록": "Deep navy board with muted jewel blocks",
+  포레스트: "Forest",
+  "짙은 숲빛 보드와 이끼·흙빛 블록": "Deep forest board with moss and earth blocks",
+  화이트: "White",
+  "깨끗한 흰 보드와 선명하고 묵직한 블록": "Clean white board with bold solid blocks",
 
   // ---- Custom 규칙 ----
   "Custom 규칙": "Custom rules",

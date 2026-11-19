@@ -32,6 +32,8 @@ jobs:
         run: npm run lint
       - name: Prettier
         run: npm run format:check
+      - name: Type check (JSDoc)
+        run: npm run typecheck
 
   # unit    Node만으로 도는 코어·규칙·빌드 도구 테스트
   # browser 한 파일 배포본을 실제 Chromium으로 열어 보는 테스트

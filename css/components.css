@@ -668,6 +668,7 @@
    그래도 모자라면 두 줄로 꺾되, 한국어는 단어 중간에서 꺾지 않는다. */
 .dialog-tabs .segmented {
   display: flex;
+  flex-wrap: wrap;
 }
 
 .dialog-tabs .segmented > button {
@@ -682,7 +683,8 @@
 }
 
 @media (max-width: 420px) {
-  .dialog-tabs .segmented > button {
+  .dialog-tabs .segmented > button,
+  .choice > button {
     padding-inline: var(--space-1);
     font-size: var(--text-s);
   }
@@ -1171,4 +1173,197 @@ body.touch-on :is(.btn, .btn-small, .key-slot, .select, .text-input, .choice > b
   .daily-head {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* ---- 도움말 대화상자 ---- */
+.help-section h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-m);
+  font-weight: 800;
+}
+
+.help-section h3::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+}
+
+.help-steps,
+.help-tips {
+  margin: 0;
+  padding-left: 1.4em;
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-m);
+  line-height: 1.5;
+}
+
+.help-steps li::marker {
+  color: var(--accent);
+  font-family: var(--font-num);
+  font-weight: 800;
+}
+
+.help-keys {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin: 0;
+  font-size: var(--text-m);
+}
+
+.help-keys :is(dt, dd) {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  border-bottom: var(--border-w) solid var(--border);
+}
+
+.help-keys dt {
+  color: var(--text-dim);
+}
+
+.help-keys dd {
+  justify-content: flex-end;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.help-keys dd.help-touch {
+  justify-content: flex-start;
+  padding-left: var(--space-3);
+}
+
+.help-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+/* 도구 줄 오른쪽 작은 정보(퍼즐 진행도 등) — 누를 수 있는 줄에서도 보인다 */
+.tool-row:enabled > small.tool-meta {
+  display: inline;
+  color: var(--text-dim);
+}
+
+/* ---- 퍼즐 단계 격자 ---- */
+.puzzle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-2) 0 var(--space-4);
+}
+
+.puzzle-tile {
+  appearance: none;
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: var(--space-2) var(--space-1) var(--space-3);
+  border: var(--border-w) solid var(--border-strong);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  box-shadow: inset 0 calc(-1 * var(--ledge)) 0 var(--ledge-color);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.puzzle-tile:hover {
+  background: var(--surface-2);
+}
+
+.puzzle-tile strong {
+  font-family: var(--font-num);
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.puzzle-tile small {
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.puzzle-tile > .icon {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+}
+
+.puzzle-tile.is-done {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.puzzle-tile.is-next {
+  border-width: 2px;
+  border-color: var(--accent);
+}
+
+/* ---- 블록 색 직접 고르기 ---- */
+.color-picker {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.color-pieces {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.color-piece {
+  appearance: none;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: var(--space-1) 0 var(--space-2);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-num);
+  cursor: pointer;
+}
+
+.color-piece[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.color-chip {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-s);
+  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.18);
+}
+
+.color-swatches {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.color-swatch {
+  appearance: none;
+  height: 30px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-s);
+  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.18);
+  cursor: pointer;
+}
+
+.color-swatch[aria-pressed="true"] {
+  border-color: var(--text);
+  outline: 2px solid var(--surface);
+  outline-offset: -4px;
 }

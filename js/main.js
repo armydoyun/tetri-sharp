@@ -4,14 +4,13 @@ import { createGame } from "./core/engine.js";
 import { createRenderer } from "./render/canvas.js";
 import { createKeyboard } from "./input/keyboard.js";
 import { createTouch, touchVisible } from "./input/touch.js";
-import { PAD_ICONS, compilePadmap, createGamepad, padButtonName } from "./input/gamepad.js";
-import { ACTIONS, compileKeymap } from "./input/keymap.js";
+import { compilePadmap, createGamepad } from "./input/gamepad.js";
+import { compileKeymap } from "./input/keymap.js";
 import { MODES, RACE_MODES, findMode as findBaseMode } from "./modes/index.js";
 import { dailyMode, dateKey, findDaily } from "./modes/daily.js";
 import { decodeReplayCode, encodeReplayCode, replayLink } from "./replay/share.js";
 import { createDailyUI } from "./ui/daily.js";
 import { formatScore, formatTime } from "./modes/format.js";
-import { clearName } from "./rules/scoring/guideline.js";
 import { createStore } from "./storage/store.js";
 import { loadSettings, sanitizeSettings, saveSettings, toEngineHandling } from "./storage/settings.js";
 import { createRecords } from "./storage/records.js";
@@ -38,18 +37,31 @@ import { MODERN, PRESETS, PRESET_LIST } from "./rules/presets.js";
 import { makeCustomRules, sanitizeRuleBody } from "./rules/sanitize.js";
 import { decodeRules } from "./rules/share.js";
 import { createSfx } from "./audio/sfx.js";
-import { createBackup, parseBackup, restoreBackup } from "./storage/backup.js";
 import { createFinesseTracker } from "./modes/finesse.js";
 import { analyzeReplay } from "./replay/analyze.js";
 import { ROTATIONS } from "./rules/rotation/index.js";
 import { WIN, exchangeGarbage, versusMode } from "./modes/versus.js";
 import { createBot } from "./ai/bot.js";
+import { createGestures } from "./input/gestures.js";
+import { createUndo } from "./modes/undo.js";
+import { createHelpUI } from "./ui/help.js";
+import { PUZZLES, createPuzzleProgress, findPuzzle, puzzleMode } from "./modes/puzzles.js";
+import { createPuzzleUI } from "./ui/puzzles.js";
+import { createShareUI } from "./ui/share.js";
 import { createVersusUI } from "./ui/versus.js";
 import { lang, t, translateDom } from "./i18n/index.js";
+import { createFeedback } from "./app/feedback.js";
+import { createInputDisplay } from "./app/input-display.js";
+import { createKeyHelp } from "./app/key-help.js";
+import { setupBackup } from "./app/backup.js";
+import { downloadJson } from "./app/download.js";
+import { takeLinkHash } from "./app/links.js";
 
 const FRAME_MS = 1000 / 60;
 const MAX_CATCH_UP_MS = 250; // 시간이 크게 튀면(탭 복귀 등) 한꺼번에 따라잡지 않는다.
 const READY_FRAMES = 40; // "READY"
+/** 카운트다운 길이 설정 → 프레임 */
+const COUNTDOWN_FRAMES = { normal: READY_FRAMES, short: 15, off: 0 };
 const GO_FRAMES = 20; // "GO!" — 이 동안에는 이미 플레이 중
 
 const $ = id => /** @type {HTMLElement} */ (document.getElementById(id));
@@ -83,6 +95,7 @@ const applyScheme = () => {
   else document.documentElement.dataset.scheme = settings.scheme;
   // 게임 화면: 늘 어둡게(기본) 또는 화면 색 따르기 — css/tokens.css
   document.body.dataset.gameSurface = settings.gameSurface;
+  document.body.classList.toggle("show-inputs", settings.visual.inputs === "on");
 };
 applyScheme();
 
@@ -122,7 +135,7 @@ const addVersusResult = (levelId, won) => {
 /** @type {"menu" | "countdown" | "play" | "paused" | "results" | "replay"} */
 let screen = "menu";
 /** 모드 찾기: 오늘의 도전(날짜별) + 나머지 */
-const findMode = id => findDaily(id) ?? findBaseMode(id);
+const findMode = id => findDaily(id) ?? findPuzzle(id) ?? findBaseMode(id);
 let mode = findMode(store.get("lastMode", null));
 
 // ---- 규칙 선택 (Modern / Retro / Arcade / Custom) ----
@@ -161,63 +174,16 @@ const showPanel = name => {
   if (!name && document.activeElement instanceof HTMLElement) document.activeElement.blur();
 };
 
-const keysOf = id => settings.keymap[id] ?? [];
-
 /** @type {ReturnType<typeof createGamepad> | null} 아래에서 만든 뒤 채운다 */
 let padRef = null;
-/** 게임패드 버튼 키캡(십자키는 화살표 아이콘) */
-const padCap = i => {
-  const kbd = document.createElement("kbd");
-  kbd.className = "keycap";
-  if (PAD_ICONS[i]) kbd.append(icon(PAD_ICONS[i], { label: padButtonName(i) }));
-  else kbd.textContent = padButtonName(i);
-  return kbd;
-};
-
-/** 안내 한 칸: 동작 이름 + 키캡들 */
-const helpItem = (label, caps) => {
-  const span = document.createElement("span");
-  const name = document.createElement("span");
-  name.className = "keys-label";
-  name.textContent = label;
-  span.append(name, ...caps);
-  return span;
-};
-
-const textCap = text => {
-  const kbd = document.createElement("kbd");
-  kbd.className = "keycap";
-  kbd.textContent = text;
-  return kbd;
-};
-
-/** 키 안내. 지금 규칙에서 쓸 수 없는 동작(하드 드롭·홀드가 꺼진 규칙 등)은 뺀다. 키 이름은 키캡(화살표는 SVG). */
-const renderKeyHelp = () => {
-  const r = game?.rules ?? currentRules();
-  const unavailable = new Set([...(r.hardDrop ? [] : ["HARD"]), ...(r.hold.enabled ? [] : ["HOLD"])]);
-  const items = [icon("keyboard", { label: t("키보드") })];
-  for (const a of ACTIONS) {
-    if (unavailable.has(a.id) || !keysOf(a.id).length) continue;
-    items.push(helpItem(a.label, keysOf(a.id).map(keycap)));
-  }
-  items.push(helpItem(t("메뉴·일시정지"), [textCap("Esc")]));
-  if (padRef?.connected) {
-    const br = document.createElement("span");
-    br.className = "keys-break";
-    items.push(br, icon("gamepad", { label: t("게임패드") }));
-    for (const a of ACTIONS) {
-      const buttons = settings.padmap[a.id] ?? [];
-      if (unavailable.has(a.id) || !buttons.length) continue;
-      items.push(helpItem(a.label, buttons.map(padCap)));
-    }
-  }
-  $("key-help").replaceChildren(...items);
-  // 버튼 안 단축키 표시는 첫 번째 키만
-  for (const kbd of document.querySelectorAll("kbd[data-key]")) {
-    const first = keysOf(kbd.getAttribute("data-key"))[0];
-    kbd.replaceChildren(...(first ? [keycap(first)] : []));
-  }
-};
+const keyHelp = createKeyHelp({
+  target: $("key-help"),
+  getSettings: () => settings,
+  getRules: () => game?.rules ?? currentRules(),
+  padConnected: () => Boolean(padRef?.connected),
+});
+const keysOf = keyHelp.keysOf;
+const renderKeyHelp = keyHelp.render;
 
 /** 프리셋 한 줄 설명(첫 화면 규칙 카드) */
 const RULE_DESCRIPTIONS = {
@@ -321,6 +287,7 @@ const renderRaceModes = ruleSet => {
 
 const renderMenu = () => {
   renderRuleTabs();
+  renderPuzzleProgress();
   const ruleSet = currentRules();
   renderRaceModes(ruleSet);
   const list = $("mode-list");
@@ -477,6 +444,8 @@ const setScreen = next => {
   document.body.dataset.screen = next;
   keyboard.setEnabled(next === "play" || next === "countdown");
   touch.setEnabled(next === "play" || next === "countdown");
+  gestures.setEnabled((next === "play" || next === "countdown") && gesturesOn());
+  document.body.classList.toggle("is-practice", Boolean(mode.practice) && next !== "menu");
   $("session-title").textContent = next === "menu" ? "" : mode.name;
 };
 
@@ -534,10 +503,11 @@ const start = (m, selectedRules = currentRules(), target = null) => {
   showModeHud(m);
   pbSplits = target?.splits ?? records.best(m, rules)?.splits;
   acc = 0;
-  countdown = READY_FRAMES;
+  countdown = COUNTDOWN_FRAMES[settings.access.countdown] ?? READY_FRAMES;
   goTimer = 0;
+  undo.reset();
   showPanel(null);
-  actionEl.classList.remove("is-shown");
+  fb.clearAction();
   renderer.clearEffects();
   renderKeyHelp();
   setScreen("countdown");
@@ -545,7 +515,13 @@ const start = (m, selectedRules = currentRules(), target = null) => {
   countdownEl.hidden = false;
   countdownEl.dataset.phase = "ready";
   $("countdown-label").textContent = "READY";
-  sfx.play("ready");
+  // 카운트다운 "없음": 바로 시작
+  if (countdown <= 0) {
+    countdownEl.hidden = true;
+    setScreen("play");
+    sfx.play("go");
+  } else sfx.play("ready");
+  say(t("{mode} 시작", { mode: mode.name }));
 };
 
 let pausedFrom = /** @type {"play" | "countdown"} */ ("play");
@@ -618,7 +594,10 @@ $("go-home").addEventListener("click", () => {
     statsUI.isOpen ||
     practiceUI.isOpen ||
     versusUI.isOpen ||
-    dailyUI.isOpen
+    dailyUI.isOpen ||
+    helpUI.isOpen ||
+    puzzleUI.isOpen ||
+    shareUI.isOpen
   )
     return;
   if (screen === "menu") return window.scrollTo(0, 0);
@@ -717,9 +696,13 @@ const finish = () => {
   const best = records.best(mode, rules);
 
   if (mode.versus) addVersusResult(mode.versus.id, state.over === WIN);
+  // 퍼즐: 깬 단계를 남기고, 깼으면 "다음 단계"를 보인다(마지막 단계면 다시 하기만)
+  if (mode.puzzle && state.over === "clear") puzzleProgress.markCleared(mode.puzzle.number);
+  const nextPuzzle = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="next-puzzle"]'));
+  nextPuzzle.hidden = !(mode.puzzle && state.over === "clear" && mode.puzzle.number < PUZZLES.length);
   lastReplay = recorder ? recorder.finish(state) : null;
-  /** @type {HTMLButtonElement} */ for (const b of panels.results.querySelectorAll(
-    '[data-action="watch"], [data-action="export"]'
+  for (const b of /** @type {NodeListOf<HTMLButtonElement>} */ (
+    panels.results.querySelectorAll('[data-action="watch"], [data-action="export"]')
   ))
     b.disabled = !lastReplay;
   if (lastReplay) {
@@ -733,6 +716,7 @@ const finish = () => {
   const summary = mode.summary(state);
   $("results-title").textContent = summary.title;
   $("results-main").textContent = summary.main;
+  say(`${summary.title} ${summary.main}`);
   $("results-badge").classList.toggle("is-invisible", !outcome?.isBest);
 
   $("race-result").textContent = race ? raceResultText(state, race.target.best, race.target.friend) : "";
@@ -791,44 +775,15 @@ const finish = () => {
   showPanel("results");
 };
 
-// ---- 액션 표시 (T-SPIN DOUBLE, B2B, 콤보, 퍼펙트 클리어, 레벨업) ----
-
-const actionEl = $("action");
-const announce = e => {
-  /** @type {string[]} */
-  let lines = [];
-  if (e.type === "lock") {
-    const name = clearName(e);
-    const showName = e.tspin !== "none" || e.lines >= 4;
-    if (e.perfect) lines.push("PERFECT CLEAR");
-    if (e.b2b) lines.push("BACK-TO-BACK");
-    if (showName && name) lines.push(name);
-    if (e.combo >= 1) lines.push(`${e.combo} COMBO`);
-    if (lines.length && e.points) lines.push(`+${formatScore(e.points)}`);
-  } else if (e.type === "practice" && !e.reset) {
-    lines = [e.success ? t("성공") : t("다시")];
-  } else if (e.type === "levelUp") {
-    lines = [`LEVEL ${e.level}`];
-  }
-  announceText(lines);
-};
-
-/** 보드 위에 큰 글씨로 잠깐 띄운다 */
-const announceText = lines => {
-  if (!lines.length) return;
-  actionEl.replaceChildren(
-    ...lines.map((text, i) => {
-      const div = document.createElement("div");
-      div.textContent = text;
-      if (i === 0) div.className = "action-main";
-      return div;
-    })
-  );
-  // 애니메이션을 처음부터 다시 돌린다.
-  actionEl.classList.remove("is-shown");
-  void actionEl.offsetWidth;
-  actionEl.classList.add("is-shown");
-};
+// ---- 반응: 액션 표시(보드 위 큰 글씨) · 진동 · 화면 읽기 알림 ----
+const fb = createFeedback({
+  actionEl: $("action"),
+  srStatus: $("sr-status"),
+  getSettings: () => settings,
+  describeLeft: () => (game ? mode.hudLines(game.state) : null),
+});
+const { announce, announceText, say } = fb;
+const feedback = fb.react;
 
 // ---- 입력 ----
 
@@ -879,6 +834,22 @@ const practiceUI = createPracticeUI({
   onPick: drill => start(practiceMode(drill)),
 });
 $("open-practice").addEventListener("click", () => practiceUI.open());
+
+// ---- 퍼즐 ----
+const puzzleProgress = createPuzzleProgress(store);
+const puzzleUI = createPuzzleUI({
+  dialog: /** @type {HTMLDialogElement} */ ($("puzzles")),
+  progress: puzzleProgress,
+  onPick: p => start(puzzleMode(p), MODERN),
+});
+$("open-puzzles").addEventListener("click", () => puzzleUI.open());
+$("puzzles").addEventListener("close", () => {
+  if (screen === "menu") /** @type {HTMLElement | null} */ ($("open-puzzles"))?.focus();
+});
+/** 첫 화면 "퍼즐" 줄의 진행도 */
+const renderPuzzleProgress = () => {
+  $("puzzle-progress").textContent = `${puzzleProgress.cleared().size} / ${PUZZLES.length}`;
+};
 $("practice").addEventListener("close", () => {
   if (screen === "menu") /** @type {HTMLElement | null} */ ($("open-practice"))?.focus();
 });
@@ -918,7 +889,10 @@ const handleSystem = action => {
     statsUI.isOpen ||
     practiceUI.isOpen ||
     versusUI.isOpen ||
-    dailyUI.isOpen
+    dailyUI.isOpen ||
+    helpUI.isOpen ||
+    puzzleUI.isOpen ||
+    shareUI.isOpen
   )
     return;
   if (screen === "replay") {
@@ -935,6 +909,7 @@ const handleSystem = action => {
   // 진행 중인 판은 묻고, 끝난 판(결과 화면)은 바로 다시 시작
   if (action === "restart" && inProgress()) return askConfirm("restart");
   if (action === "restart" && screen === "results") return start(mode, rules, race?.target);
+  if (action === "undo") return undoPiece();
   if (action !== "pause") return;
   if (screen === "play" || screen === "countdown") pause();
   else if (screen === "paused") resume();
@@ -942,7 +917,44 @@ const handleSystem = action => {
 };
 
 const keyboard = createKeyboard({ getBindings: () => bindings, onSystem: handleSystem });
-const touch = createTouch({ root: $("touchpad"), onSystem: handleSystem });
+const touch = createTouch({
+  root: $("touchpad"),
+  onSystem: handleSystem,
+  vibrate: () => settings.access.vibrate === "on",
+});
+
+// ---- 편의: 제스처 조작 · 되돌리기 · 진동 · 화면 읽기 알림 ----
+
+/** 보드 한 칸의 화면 폭(px): 캔버스 폭 ÷ 칸 수(넓으면 20, 좁으면 16) */
+const boardCellPx = () =>
+  canvas.getBoundingClientRect().width /
+  (window.matchMedia("(max-width: 720px) and (not ((orientation: landscape) and (max-height: 520px)))").matches
+    ? 16
+    : 20);
+const gestures = createGestures({
+  root: /** @type {HTMLElement} */ (document.querySelector(".board-wrap")),
+  cellSize: boardCellPx,
+});
+/** 제스처 방식을 쓰는가: 설정이 제스처이고 터치 조작이 보이는 기기 */
+const gesturesOn = () => settings.touchMode === "gestures" && touchVisible(settings.touch, isTouchScreen());
+
+const undo = createUndo();
+
+// ---- 키 입력 표시 ----
+const inputDisplay = createInputDisplay({ root: $("input-display"), isOn: () => settings.visual.inputs === "on" });
+
+/** 연습 모드에서 바로 앞 피스로 되돌린다 */
+const undoPiece = () => {
+  if (!game || !mode.practice || (screen !== "play" && screen !== "paused")) return;
+  if (!undo.undo(game.state)) {
+    say(t("더 되돌릴 수 없어요"));
+    return;
+  }
+  renderer.clearEffects();
+  announceText([t("되돌리기")]);
+  say(t("한 피스 되돌렸어요"));
+};
+$("undo-piece").addEventListener("click", undoPiece);
 
 /** 터치 버튼 보이기: 설정 + 기기(굵은 포인터). 설정을 바꿀 때만 바뀐다(원칙 2). */
 // 터치 화면 판정: 굵은 포인터이거나, 마우스 올리기가 없는 화면에서 터치를 지원할 때(iPhone 등)
@@ -950,7 +962,12 @@ const coarse = typeof matchMedia === "function" ? matchMedia("(pointer: coarse)"
 const noHover = typeof matchMedia === "function" ? matchMedia("(hover: none)") : null;
 const isTouchScreen = () =>
   Boolean(coarse?.matches) || (Boolean(noHover?.matches) && (navigator.maxTouchPoints ?? 0) > 0);
-const applyTouch = () => document.body.classList.toggle("touch-on", touchVisible(settings.touch, isTouchScreen()));
+const applyTouch = () => {
+  document.body.classList.toggle("touch-on", touchVisible(settings.touch, isTouchScreen()));
+  // 제스처 방식: 보드 아래 버튼 대신 보드를 밀고 두드린다
+  document.body.classList.toggle("gestures-mode", gesturesOn());
+  gestures.setEnabled((screen === "play" || screen === "countdown") && gesturesOn());
+};
 coarse?.addEventListener?.("change", applyTouch);
 noHover?.addEventListener?.("change", applyTouch);
 
@@ -963,7 +980,10 @@ const handlePadMenu = action => {
     statsUI.isOpen ||
     practiceUI.isOpen ||
     versusUI.isOpen ||
-    dailyUI.isOpen
+    dailyUI.isOpen ||
+    helpUI.isOpen ||
+    puzzleUI.isOpen ||
+    shareUI.isOpen
   )
     return;
   const panel = Object.values(panels).find(p => !p.hidden);
@@ -985,6 +1005,35 @@ const handlePadMenu = action => {
 const pad = createGamepad({ onSystem: handleSystem, onMenu: handlePadMenu, getMap: () => padBindings });
 padRef = pad;
 
+// ---- 도움말 · 처음 오신 분 안내 ----
+const helpUI = createHelpUI({
+  dialog: /** @type {HTMLDialogElement} */ ($("help")),
+  getSettings: () => settings,
+  isTouch: () => touchVisible(settings.touch, isTouchScreen()),
+  onOpenSettings: tab => {
+    pause();
+    settingsUI.open(tab);
+  },
+});
+const welcome = $("welcome");
+const dismissWelcome = () => {
+  welcome.hidden = true;
+  store.set("welcomeSeen", true);
+};
+welcome.hidden = Boolean(store.get("welcomeSeen", false));
+$("welcome-open").addEventListener("click", () => {
+  dismissWelcome();
+  helpUI.open();
+});
+$("welcome-close").addEventListener("click", dismissWelcome);
+$("open-help").addEventListener("click", () => {
+  pause();
+  helpUI.open();
+});
+$("help").addEventListener("close", () => {
+  if (screen === "paused") showPanel("pause");
+});
+
 $("open-settings").addEventListener("click", () => {
   pause();
   settingsUI.open();
@@ -995,10 +1044,14 @@ for (const btn of document.querySelectorAll("[data-action]")) {
     const action = btn.getAttribute("data-action");
     if (action === "resume") resume();
     if (action === "retry") start(mode, rules, race?.target);
+    if (action === "next-puzzle" && mode.puzzle) {
+      const next = PUZZLES[mode.puzzle.number] ?? puzzleProgress.next();
+      start(puzzleMode(next), MODERN);
+    }
     if (action === "menu") toMenu();
     if (action === "watch" && lastReplay) startReplay(lastReplay);
     if (action === "stats" && game) statsUI.open(game.state, `${mode.name} · ${rules.name}`);
-    if (action === "export" && lastReplay) exportReplay(lastReplay);
+    if (action === "export" && lastReplay) shareUI.open(lastReplay, `${mode.name} · ${rules.name}`);
   });
 }
 
@@ -1026,7 +1079,7 @@ const replayStatus = $("replay-status");
 const replayNote = $("replay-note");
 const replayProgress = /** @type {HTMLInputElement} */ ($("replay-progress"));
 const replayMarkers = $("replay-markers");
-/** @type {ReturnType<typeof analyzeReplay> | null} 지금 보는 리플레이의 분석 */
+/** @type {(ReturnType<typeof analyzeReplay> & { for: any }) | null} 지금 보는 리플레이의 분석 */
 let analysis = null;
 const replayTime = $("replay-time");
 const replayStep = /** @type {HTMLButtonElement} */ (replayBar.querySelector('[data-replay="step"]'));
@@ -1082,8 +1135,8 @@ const renderMarkers = () => {
         ]
       : [])
   );
-  /** @type {HTMLButtonElement} */ for (const b of replayBar.querySelectorAll(
-    '[data-replay="prev-mark"], [data-replay="next-mark"]'
+  for (const b of /** @type {NodeListOf<HTMLButtonElement>} */ (
+    replayBar.querySelectorAll('[data-replay="prev-mark"], [data-replay="next-mark"]')
   ))
     b.disabled = !markers.length;
 };
@@ -1102,7 +1155,7 @@ const seekReplay = (target, pause = false) => {
   while (player.frame < to && !player.done) player.step();
   if (pause) replayPaused = true;
   renderer.clearEffects();
-  actionEl.classList.remove("is-shown");
+  fb.clearAction();
   updateReplayBar();
 };
 
@@ -1128,8 +1181,8 @@ const updateReplayBar = () => {
   replayStatus.textContent = player?.done ? t("끝") : "";
   replayStep.disabled = !player || player.done;
   replayToggle.disabled = replayStep.disabled;
-  /** @type {HTMLButtonElement} */ for (const b of replayBar.querySelectorAll(
-    '[data-replay="back"], [data-replay="step-back"]'
+  for (const b of /** @type {NodeListOf<HTMLButtonElement>} */ (
+    replayBar.querySelectorAll('[data-replay="back"], [data-replay="step-back"]')
   ))
     b.disabled = !player || player.frame === 0;
   updateReplayProgress();
@@ -1146,7 +1199,7 @@ const startReplay = (replay, returnTo = screen, note = "") => {
   if (analysis?.for !== replay) analysis = { ...analyzeReplay(replay, findMode), for: replay };
   acc = 0;
   renderer.clearEffects();
-  actionEl.classList.remove("is-shown");
+  fb.clearAction();
   countdownEl.hidden = true;
   showPanel(null);
   setScreen("replay");
@@ -1155,6 +1208,7 @@ const startReplay = (replay, returnTo = screen, note = "") => {
   replayNote.textContent = note;
   $("replay-title").textContent = `${mode.name} · ${rules.name}`;
   renderMarkers();
+  /** @type {HTMLButtonElement} */ (replayBar.querySelector('[data-replay="race"]')).hidden = !canRace(replay);
   updateReplayBar();
 };
 
@@ -1180,6 +1234,7 @@ const advanceReplay = count => {
   if (!player || player.done) return;
   for (let i = 0; i < count && !player.done; i++) {
     const events = player.step();
+    inputDisplay.show(player.input.held, player.input.pressed);
     for (const e of events) announce(e);
     renderer.addEvents(events);
     // 빨리 감기 중에는 소리를 겹쳐 내지 않는다.
@@ -1207,6 +1262,8 @@ for (const btn of replayBar.querySelectorAll("[data-replay]")) {
     if (action === "ahead") return seekReplay((player?.frame ?? 0) + 300);
     if (action === "prev-mark") return jumpMark(-1);
     if (action === "next-mark") return jumpMark(1);
+    if (action === "share" && playing) return shareUI.open(playing, `${mode.name} · ${rules.name}`);
+    if (action === "race" && playing) return raceReplay(playing);
     if (action === "restart") return restartReplay();
     if (action === "exit") return stopReplay();
     updateReplayBar();
@@ -1224,6 +1281,9 @@ window.addEventListener("keydown", e => {
     practiceUI.isOpen ||
     versusUI.isOpen ||
     dailyUI.isOpen ||
+    helpUI.isOpen ||
+    puzzleUI.isOpen ||
+    shareUI.isOpen ||
     e.repeat
   )
     return;
@@ -1244,18 +1304,6 @@ window.addEventListener("keydown", e => {
 });
 
 /** JSON 값을 파일로 내려받게 한다 */
-const downloadJson = (value, filename) => {
-  const blob = new Blob([JSON.stringify(value)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-};
-
 const exportReplay = replay => {
   const stamp = (replay.date || "").replace(/[-:]/g, "").slice(0, 15);
   downloadJson(replay, `tetri-sharp-${replay.mode}-${stamp || "replay"}.json`);
@@ -1312,12 +1360,6 @@ fileInput.addEventListener("change", async () => {
 
 // ---- 저장 데이터 백업 ----
 
-$("export-backup").addEventListener("click", () => {
-  const backup = createBackup(store);
-  downloadJson(backup, `tetri-sharp-backup-${backup.date.slice(0, 10).replace(/-/g, "")}.json`);
-  showMenuNotice(t("설정·기록·리플레이를 백업 파일로 저장했어요."));
-});
-
 /** 백업을 들인 뒤 메모리에 들고 있던 값들을 저장소에서 다시 읽는다. */
 const reloadFromStore = () => {
   settings = loadSettings(store);
@@ -1335,43 +1377,16 @@ const reloadFromStore = () => {
   toMenu();
 };
 
-const backupInput = /** @type {HTMLInputElement} */ ($("backup-file"));
-$("import-backup").addEventListener("click", () => backupInput.click());
-backupInput.addEventListener("change", async () => {
-  const file = backupInput.files?.[0];
-  backupInput.value = "";
-  if (!file || screen !== "menu") return;
-  let parsed = null;
-  try {
-    parsed = parseBackup(JSON.parse(await file.text()), findMode);
-  } catch {
-    parsed = null;
-  }
-  if (!parsed) {
-    showMenuNotice(t("읽을 수 없는 백업 파일이에요."));
-    return;
-  }
-  const { records: count, replays: replayCount } = parsed.summary;
-  const when = parsed.date ? ` (${parsed.date.slice(0, 10)})` : "";
-  if (
-    !window.confirm(
-      t("백업{when}에는 기록 {records}개, 리플레이 {replays}개가 있어요.", {
-        when,
-        records: count,
-        replays: replayCount,
-      }) +
-        "\n" +
-        t("지금 이 브라우저의 설정·기록·리플레이를 백업 내용으로 바꿀까요?")
-    )
-  )
-    return;
-  const ok = restoreBackup(store, parsed);
-  reloadFromStore();
-  showMenuNotice(
-    ok
-      ? t("백업을 불러왔어요 · 기록 {records}개, 리플레이 {replays}개", { records: count, replays: replayCount })
-      : t("일부를 저장하지 못했어요. 저장 공간을 확인해 주세요.")
-  );
+setupBackup({
+  store,
+  findMode,
+  exportButton: $("export-backup"),
+  importButton: $("import-backup"),
+  fileInput: /** @type {HTMLInputElement} */ ($("backup-file")),
+  canImport: () => screen === "menu",
+  confirmImport: message => window.confirm(message),
+  notify: text => showMenuNotice(text),
+  onRestored: reloadFromStore,
 });
 
 // ---- 루프 ----
@@ -1380,6 +1395,7 @@ const tick = () => {
   if (screen === "countdown") {
     keyboard.takePressed(); // 카운트다운 중 누른 키는 버린다(누르고 있는 키는 시작하자마자 반영).
     touch.takePressed();
+    gestures.takePressed();
     countdown -= 1;
     if (countdown <= 0) {
       setScreen("play");
@@ -1393,8 +1409,10 @@ const tick = () => {
   if (screen === "replay") return tickReplay();
   if (screen !== "play" || !game) return;
   if (goTimer > 0 && --goTimer === 0) countdownEl.hidden = true;
-  const held = keyboard.held | pad.held | touch.held;
-  const pressed = keyboard.takePressed() | touch.takePressed();
+  const held = keyboard.held | pad.held | touch.held | gestures.held;
+  const pressed = keyboard.takePressed() | touch.takePressed() | gestures.takePressed();
+  if (mode.practice) undo.track(game.state);
+  inputDisplay.show(held, pressed);
   recorder?.input(held, pressed);
   const hadActive = Boolean(game.state.active);
   const events = game.step({ held, pressed });
@@ -1414,6 +1432,7 @@ const tick = () => {
   for (const e of events) announce(e);
   renderer.addEvents(events);
   sfx.events(events);
+  feedback(events);
   if (events.some(e => e.type === "gameOver" || e.type === "finish")) finish();
 };
 
@@ -1436,33 +1455,65 @@ const loop = now => {
   if (race && screen !== "replay" && raceBoardVisible.matches) raceRenderer.draw(race.player.game);
   if (versus && raceBoardVisible.matches) cpuRenderer.draw(versus.cpu);
   updateHud();
+  inputDisplay.paint();
   requestAnimationFrame(loop);
 };
 
 /** 결과 링크(#daily=…)로 열었으면 오늘의 도전 창을 그 코드로 연다. 주소의 해시는 지운다. */
-const importDailyFromLink = () => {
-  if (!/[#&]daily=/.test(location.hash)) return;
-  const pasted = location.hash.slice(1);
-  try {
-    history.replaceState(null, "", location.pathname + location.search);
-  } catch {
-    /* file:// 등에서 막혀도 괜찮다 */
+// ---- 리플레이 공유 · 그 기록과 달리기 ----
+const shareUI = createShareUI({
+  dialog: /** @type {HTMLDialogElement} */ ($("share")),
+  makeCode: replay => encodeReplayCode(replay, replay.name || records.playerName),
+  makeLink: code => replayLink(code, location.href, "replay"),
+  onSaveFile: exportReplay,
+});
+
+/** 지금 보는 리플레이와 같은 블록 순서로 달린다(달리기가 되는 모드, 끝까지 간 판만) */
+const canRace = replay => {
+  const m = findMode(replay.mode);
+  return Boolean(m.race) && replay.result.over === m.race.finish;
+};
+const raceReplay = replay => {
+  if (!canRace(replay)) return;
+  const m = findMode(replay.mode);
+  let targetSplits = [];
+  verifyReplay(replay, findMode, state => {
+    if (m.splits) targetSplits = advanceSplits(m.splits, targetSplits, state.stats.lines, state.frame);
+  });
+  const r = replay.result;
+  const best = { frames: r.frames, lines: r.lines, pieces: r.pieces, score: r.score };
+  start(m, replay.rules, { replay, best, splits: targetSplits, friend: replay.name || t("이 리플레이") });
+};
+
+/** 리플레이 링크(#replay=…)로 열었으면 검증하고 바로 재생한다. 주소의 해시는 지운다. */
+const importReplayFromLink = async () => {
+  const hash = takeLinkHash("replay");
+  if (!hash) return;
+  const raw = await decodeReplayCode(hash);
+  const replay = raw && sanitizeReplay(raw, findMode);
+  if (!replay) {
+    showMenuNotice(t("링크의 리플레이를 읽을 수 없었어요."));
+    return;
   }
+  const check = verifyReplay(replay, findMode);
+  const from = replay.name ? t("{name}의 리플레이", { name: replay.name }) : t("받은 리플레이");
+  startReplay(replay, "menu", check.ok ? from : t("저장된 결과와 재생 결과가 달라요. 다른 버전의 파일일 수 있어요."));
+};
+
+const importDailyFromLink = () => {
+  const pasted = takeLinkHash("daily");
+  if (!pasted) return;
   dailyUI.open({
-    pasted: `#${pasted}`,
+    pasted,
     message: t("받은 결과가 있어요. 겨루기를 누르면 같은 블록 순서로 함께 달려요"),
   });
 };
 
 /** 공유 링크(#rules=…)로 열었으면 그 규칙을 Custom으로 들이고 알린다. 주소의 해시는 지운다. */
 const importRulesFromLink = () => {
-  if (!/[#&]rules=/.test(location.hash)) return false;
-  const body = decodeRules(location.hash);
-  try {
-    history.replaceState(null, "", location.pathname + location.search);
-  } catch {
-    /* file:// 등에서 막혀도 괜찮다 */
-  }
+  const hash = takeLinkHash("rules");
+  if (!hash) return false;
+  const body = decodeRules(hash);
   if (!body) {
     showMenuNotice(t("링크의 규칙 코드를 읽을 수 없었어요."));
     return false;
@@ -1484,6 +1535,7 @@ renderKeyHelp();
 if (importRulesFromLink()) renderKeyHelp();
 toMenu(true);
 importDailyFromLink();
+importReplayFromLink();
 requestAnimationFrame(loop);
 
 // 설치형 앱(GitHub Pages 배포본): 매니페스트가 걸려 있을 때만 서비스 워커를 등록한다.

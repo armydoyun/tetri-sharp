@@ -10,7 +10,7 @@ export const TSPIN_TYPES = Object.freeze(["threeCorner", "none"]);
 /** 고를 수 있는 기본 중력(프레임당 칸) */
 export const GRAVITY_OPTIONS = Object.freeze([1 / 60, 1 / 48, 2 / 60, 6 / 60, 1, 20]);
 
-/** 숫자 범위: [최소, 최대] */
+/** 숫자 범위: [최소, 최대] @type {Readonly<Record<string, [number, number]>>} */
 export const LIMITS = Object.freeze({
   previewCount: [0, 6],
   lockDelay: [0, 120],

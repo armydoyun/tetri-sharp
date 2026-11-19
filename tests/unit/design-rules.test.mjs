@@ -71,7 +71,7 @@ test("아이콘은 24 격자 안의 선 요소만 쓴다(채움 속성 없음)",
 test("원칙 2: 흐름 안 요소를 hidden으로 끄지 않는다 — hidden은 겹쳐 뜨는 패널에만", () => {
   const main = fs.readFileSync(path.join(ROOT, "js/main.js"), "utf8");
   const toggled = [...main.matchAll(/\$\("([\w-]+)"\)\.hidden\s*=/g)].map(m => m[1]);
-  const overlays = new Set(["countdown", "replay-bar", "menu", "pause", "results"]);
+  const overlays = new Set(["countdown", "replay-bar", "menu", "pause", "results", "welcome"]);
   for (const id of toggled) assert.ok(overlays.has(id), `${id}는 흐름 안 요소 — .is-invisible이나 비활성을 쓴다`);
 });
 

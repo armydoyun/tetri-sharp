@@ -13,7 +13,7 @@ const GRAVITY_LABELS = [t("1칸/초"), t("1.25칸/초"), t("2칸/초"), t("6칸/
 /**
  * 편집 항목. path는 규칙 객체 안의 위치.
  * when이 거짓이면 항목을 숨기지 않고 같은 자리에서 비활성으로 두며, 설명 줄에 off(쓸 수 없는 이유)를 보여 준다(원칙 2).
- * @type {ReadonlyArray<{ section?: string, path: string, label: string, hint?: string, type: "select" | "toggle" | "number",
+ * @type {ReadonlyArray<{ section?: string, path?: string, label?: string, hint?: string, type?: "select" | "toggle" | "number",
  *   options?: ReadonlyArray<[any, string]>, range?: readonly number[], unit?: (v: number) => string, when?: (r: any) => boolean, off?: string, fallback?: any }>}
  */
 const FIELDS = [
