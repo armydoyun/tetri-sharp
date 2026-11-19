@@ -34,7 +34,7 @@ const fakeCtx = (calls = []) =>
   );
 
 test("테마 여섯 가지, 기본은 모던", () => {
-  assert.deepEqual([...THEME_IDS].sort(), ["blueprint", "candy", "minimal", "modern", "neon", "retro"]);
+  assert.deepEqual([...THEME_IDS].sort(), ["frame", "graphite", "minimal", "modern", "retro", "stone"]);
   assert.equal(DEFAULT_THEME, "modern");
   assert.equal(findTheme("없음"), THEMES.modern);
 });
@@ -58,24 +58,28 @@ test("테마마다 보드 색 · 블록 모서리 · 줄 삭제 모양이 서로
   assert.equal(new Set(themes.map(theme => theme.motion.clear)).size, themes.length);
 });
 
-test("블록 마감(광택·빛·선)은 단색 위에 더 그리고, 고스트는 늘 윤곽선", () => {
+test("블록 마감: 그라파이트는 윗면을 더 칠하고 프레임은 속 + 테두리, 고스트는 늘 윤곽선", () => {
   const count = theme => {
     const calls = [];
     theme.block(fakeCtx(calls), 0, 0, 30, theme.palette[1]);
     return calls.filter(([name]) => name === "fill" || name === "stroke").length;
   };
   assert.equal(count(THEMES.modern), 1);
-  for (const id of ["neon", "candy", "blueprint"]) assert.equal(count(THEMES[id]), 2, id);
+  assert.equal(count(THEMES.stone), 1);
+  assert.equal(count(THEMES.frame), 2);
+  const edge = [];
+  THEMES.graphite.block(fakeCtx(edge), 0, 0, 30, "#fff");
+  assert.equal(edge.filter(([name]) => name === "fillRect").length, 1, "윗면 밝게");
   const ghost = [];
-  THEMES.neon.ghost(fakeCtx(ghost), 0, 0, 30, "#fff");
+  THEMES.frame.ghost(fakeCtx(ghost), 0, 0, 30, "#fff");
   assert.deepEqual(
     ghost.filter(([name]) => name === "fill" || name === "stroke").map(([name]) => name),
     ["stroke"]
   );
 });
 
-test("새 줄 삭제 모양(번쩍임·작은 네모·훑기)도 수명이 끝나면 사라진다", () => {
-  for (const id of ["neon", "candy", "blueprint"]) {
+test("새 줄 삭제 모양(번쩍임·훑기·작은 네모)도 수명이 끝나면 사라진다", () => {
+  for (const id of ["graphite", "frame", "stone"]) {
     const { motion } = THEMES[id];
     const fx = createEffects();
     fx.add([clearEvent], "full", 0, motion);

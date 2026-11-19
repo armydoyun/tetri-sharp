@@ -612,7 +612,7 @@ test("게임 테마: 여섯 테마가 서로 다르게 그려지고, 설정에�
     });
   await page.keyboard.press("Escape"); // 일시정지해서 화면을 멈춘다
   const seen = new Set();
-  for (const theme of ["retro", "minimal", "neon", "candy", "blueprint", "modern"]) {
+  for (const theme of ["retro", "minimal", "graphite", "frame", "stone", "modern"]) {
     await page.click("#open-settings");
     await page.click('.dialog-tabs [data-value="visual"]');
     await page.click(`#set-theme [data-value="${theme}"]`);
