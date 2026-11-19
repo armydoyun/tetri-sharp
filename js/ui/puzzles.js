@@ -32,7 +32,7 @@ export const createPuzzleUI = ({ dialog, progress, onPick }) => {
               }),
             },
             el("strong", { class: "num", text: String(p.number) }),
-            el("small", { text: p.kind === "pc" ? t("{n}피스", { n: p.pieces.length }) : p.kind.toUpperCase() }),
+            el("small", { text: p.kind === "pc" ? t("{n}피스", { n: p.pieces.length }) : KIND_NAMES[p.kind] }),
             ...(done ? [icon("check")] : [])
           );
           b.addEventListener("click", () => {

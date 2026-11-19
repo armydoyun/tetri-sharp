@@ -27,7 +27,12 @@ export const el = (tag, attrs = {}, ...children) => {
  * @param {{ text?: string, iconName?: import("./icons.js").IconName, className?: string, [attr: string]: any }} options
  */
 export const button = ({ text, iconName, className = "btn", ...attrs }) =>
-  el("button", { type: "button", class: className, ...attrs }, ...(iconName ? [icon(iconName)] : []), text ?? "");
+  el(
+    "button",
+    { type: "button", class: className, ...attrs },
+    ...(iconName ? [icon(iconName)] : []),
+    ...(text ? [el("span", { class: "btn-label", text })] : [])
+  );
 
 /**
  * 대화상자 내용을 [머리(제목·닫기) | 몸통 | 발(알림 칸·버튼)]으로 채운다.
@@ -151,8 +156,8 @@ export const switchInput = attrs =>
   /** @type {HTMLInputElement} */ (el("input", { type: "checkbox", class: "switch", role: "switch", ...attrs }));
 
 /** 대화상자 탭 줄 */
-export const tabBar = ({ tabs, active, onSelect }) =>
-  choice({
+export const tabBar = ({ tabs, active, onSelect }) => {
+  const bar = choice({
     id: "dialog-tab",
     label: t("구역"),
     options: tabs,
@@ -160,3 +165,22 @@ export const tabBar = ({ tabs, active, onSelect }) =>
     onChange: onSelect,
     className: "segmented",
   });
+  bar.addEventListener("keydown", e => {
+    const buttons = [...bar.querySelectorAll("button")];
+    const current = buttons.findIndex(button => button === e.target);
+    if (current < 0) return;
+    const offset = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    const next =
+      e.key === "Home"
+        ? 0
+        : e.key === "End"
+          ? buttons.length - 1
+          : offset
+            ? (current + offset + buttons.length) % buttons.length
+            : -1;
+    if (next < 0) return;
+    e.preventDefault();
+    buttons[next].click();
+  });
+  return bar;
+};

@@ -104,6 +104,7 @@ const sfx = createSfx({ getVolume: () => settings.volume });
 const racePanel = $("race-panel");
 const raceProgress = /** @type {HTMLProgressElement} */ ($("race-progress"));
 const raceLabel = $("race-progress-label");
+const raceOwnProgress = /** @type {HTMLProgressElement} */ ($("race-own-progress"));
 const raceBoard = /** @type {HTMLCanvasElement} */ ($("race-board"));
 const raceBoardVisible = window.matchMedia("(width > 720px)");
 const raceRenderer = createRenderer(raceBoard, {
@@ -241,11 +242,15 @@ const raceTargetFor = (m, ruleSet) => {
 };
 
 const updateRaceProgress = () => {
-  if (!race) return;
+  if (!race || !game) return;
   const p = mode.race.progress(race.player.game.state);
   raceProgress.max = p.max;
   raceProgress.value = p.value;
   raceLabel.textContent = race.player.done ? mode.formatRecord(race.target.best) : p.text;
+  const own = mode.race.progress(game.state);
+  raceOwnProgress.max = own.max;
+  raceOwnProgress.value = own.value;
+  $("race-own-label").textContent = own.text;
 };
 
 const startRace = (m, selected = currentRules()) => {
@@ -292,17 +297,15 @@ const renderMenu = () => {
   renderPuzzleProgress();
   const ruleSet = currentRules();
   renderRaceModes(ruleSet);
+  $("active-rules").textContent = t("규칙 · {name}", { name: ruleSet.name });
   const list = $("mode-list");
   list.replaceChildren(
-    ...MODES.map((m, i) => {
+    ...MODES.map(m => {
       const best = records.best(m, ruleSet);
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "menu-row";
       btn.dataset.mode = m.id;
-      const index = document.createElement("span");
-      index.className = "menu-index num";
-      index.textContent = String(i + 1).padStart(2, "0");
       const text = document.createElement("span");
       text.className = "menu-text";
       const name = document.createElement("strong");
@@ -313,24 +316,21 @@ const renderMenu = () => {
       const pb = document.createElement("span");
       pb.className = "mode-best num";
       pb.textContent = best ? t("최고 기록 {record}", { record: m.formatRecord(best) }) : "";
-      btn.append(index, text, pb, icon("chevron-right"));
+      btn.append(text, pb, icon("chevron-right"));
       btn.addEventListener("click", () => start(m));
       return btn;
     }),
-    versusRow(MODES.length + 1),
-    dailyRow(MODES.length + 2)
+    versusRow(),
+    dailyRow()
   );
 };
 
 /** 첫 화면 모드 목록 끝의 CPU 대전 줄: 누르면 난이도를 고른다 */
-const versusRow = n => {
+const versusRow = () => {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "menu-row";
   btn.dataset.mode = "versus";
-  const index = document.createElement("span");
-  index.className = "menu-index num";
-  index.textContent = String(n).padStart(2, "0");
   const text = document.createElement("span");
   text.className = "menu-text";
   const name = document.createElement("strong");
@@ -342,7 +342,7 @@ const versusRow = n => {
   const pb = document.createElement("span");
   pb.className = "mode-best num";
   pb.textContent = wins ? t("{n}승", { n: wins }) : "";
-  btn.append(index, text, pb, icon("chevron-right"));
+  btn.append(text, pb, icon("chevron-right"));
   btn.addEventListener("click", () => versusUI.open());
   return btn;
 };
@@ -356,15 +356,12 @@ const today = () => {
 };
 
 /** 첫 화면 모드 목록 끝의 오늘의 도전 줄 */
-const dailyRow = n => {
+const dailyRow = () => {
   const { key, best, mode: m } = today();
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "menu-row";
   btn.dataset.mode = "daily";
-  const index = document.createElement("span");
-  index.className = "menu-index num";
-  index.textContent = String(n).padStart(2, "0");
   const text = document.createElement("span");
   text.className = "menu-text";
   const name = document.createElement("strong");
@@ -375,7 +372,7 @@ const dailyRow = n => {
   const pb = document.createElement("span");
   pb.className = "mode-best num";
   pb.textContent = best ? t("최고 기록 {record}", { record: m.formatRecord(best) }) : "";
-  btn.append(index, text, pb, icon("chevron-right"));
+  btn.append(text, pb, icon("chevron-right"));
   btn.addEventListener("click", () => dailyUI.open());
   return btn;
 };
@@ -449,6 +446,16 @@ const setScreen = next => {
   gestures.setEnabled((next === "play" || next === "countdown") && gesturesOn());
   document.body.classList.toggle("is-practice", Boolean(mode.practice) && next !== "menu");
   $("session-title").textContent = next === "menu" ? "" : mode.name;
+  $("mode-objective").textContent =
+    next === "menu" || next === "replay"
+      ? ""
+      : mode.puzzle
+        ? mode.puzzle.kind === "pc"
+          ? t("목표 · 주어진 피스로 판 비우기")
+          : t("목표 · T 하나로 {kind} 만들기", { kind: mode.description })
+        : mode.practice
+          ? mode.description
+          : "";
 };
 
 const toMenu = (initial = false) => {
@@ -474,7 +481,7 @@ const showModeHud = (m, replay = false) => {
   const items = m.hud ?? ["time", "score", "level", "lines", "pieces", "pps"];
   for (const cell of document.querySelectorAll(".hud [data-hud]")) {
     const item = cell.getAttribute("data-hud");
-    cell.classList.toggle("is-off", !items.includes(item) || (replay && item === "split"));
+    cell.classList.toggle("is-off", !items.includes(item) || (replay && (item === "split" || item === "time")));
   }
 };
 
@@ -494,8 +501,8 @@ const start = (
   $("race-label").textContent = target?.friend ? t("{name}의 기록", { name: target.friend }) : t("내 최고 기록");
   race = target ? { target, player: createPlayer(target.replay, findMode) } : null;
   racePanel.hidden = !race;
-  updateRaceProgress();
   game = createGame({ rules, handling: toEngineHandling(settings.handling), seed, mode: m });
+  updateRaceProgress();
   // 대전: CPU도 같은 시드(같은 블록 순서)로 시작한다. 상대와 함께라야 재현되므로 리플레이는 남기지 않는다.
   if (m.versus) {
     const cpu = createGame({ rules, seed, mode: m });
@@ -532,7 +539,7 @@ const start = (
   window.scrollTo(0, 0);
   countdownEl.hidden = false;
   countdownEl.dataset.phase = "ready";
-  $("countdown-label").textContent = "READY";
+  $("countdown-label").textContent = t("준비");
   // 카운트다운 "없음": 바로 시작
   if (countdown <= 0) {
     countdownEl.hidden = true;
@@ -564,14 +571,17 @@ const resume = () => {
 
 /** @type {null | "restart" | "menu"} 지금 묻고 있는 것 */
 let confirming = null;
+let confirmWasPaused = false;
 /** 게임이 진행 중(끝나지 않음)이라 버리면 잃는 게 있는가 */
 const inProgress = () => screen === "play" || screen === "countdown" || screen === "paused";
 
 const askConfirm = kind => {
-  if (!inProgress()) return;
+  if (!inProgress() || confirming) return;
+  confirmWasPaused = screen === "paused";
   pause();
   confirming = kind;
   const restart = kind === "restart";
+  panels.confirm.querySelector(".confirm-cancel-text").textContent = confirmWasPaused ? t("취소") : t("계속하기");
   $("confirm-title").textContent = restart ? t("다시 시작할까요?") : t("첫 화면으로 갈까요?");
   const ok = /** @type {HTMLElement} */ (panels.confirm.querySelector('[data-confirm="ok"]'));
   /** @type {HTMLElement} */ (ok.querySelector(".confirm-ok-icon")).replaceChildren(icon(restart ? "restart" : "menu"));
@@ -588,7 +598,8 @@ const askConfirm = kind => {
 const cancelConfirm = () => {
   if (!confirming) return;
   confirming = null;
-  showPanel("pause");
+  if (confirmWasPaused) showPanel("pause");
+  else resume();
 };
 
 const acceptConfirm = () => {
@@ -756,6 +767,8 @@ const finish = () => {
   $("results-title").textContent = summary.title;
   $("results-main").textContent = summary.main;
   say(`${summary.title} ${summary.main}`);
+  fb.clearAction();
+  countdownEl.hidden = true;
   $("results-badge").classList.toggle("is-invisible", !outcome?.isBest);
 
   $("race-result").textContent = race ? raceResultText(state, race.target.best, race.target.friend) : "";
@@ -800,7 +813,11 @@ const finish = () => {
   ];
   // 순위 줄은 늘 둔다(없으면 —) → 결과 화면 높이가 판마다 같다.
   rows.push([t("순위"), outcome && outcome.rank < 10 ? t("{n}위", { n: outcome.rank + 1 }) : "—"]);
-  if (mode.splits) rows.push([t("PB 대비"), formatDelta(splitDelta(splits, pbSplits))]);
+  if (mode.splits) {
+    const delta = splitDelta(splits, resultPbSplits);
+    if (delta !== null) rows.push([t("PB 대비"), formatDelta(delta)]);
+    if (state.over === "clear") rows.splice(0, 1);
+  }
   $("results-stats").replaceChildren(
     ...rows.flatMap(([k, v]) => {
       const dt = document.createElement("dt");
@@ -866,6 +883,10 @@ const rulesUI = createRulesUI({
   },
 });
 
+$("active-rules").addEventListener("click", e => {
+  e.preventDefault();
+  /** @type {HTMLElement | null} */ ($("rule-tabs").querySelector('[aria-pressed="true"]'))?.focus();
+});
 $("edit-rules").addEventListener("click", () => rulesUI.open());
 
 const practiceUI = createPracticeUI({
@@ -904,8 +925,15 @@ $("versus").addEventListener("close", () => {
 
 const statsUI = createStatsUI({ dialog: /** @type {HTMLDialogElement} */ ($("stats")) });
 $("stats").addEventListener("close", () => {
-  if (screen === "results")
+  if (screen !== "results") return;
+  const stats = /** @type {HTMLDialogElement} */ ($("stats"));
+  if (stats.returnValue === "splits") {
+    const details = /** @type {HTMLDetailsElement} */ ($("results-splits"));
+    details.open = true;
+    details.querySelector("summary")?.focus();
+  } else {
     /** @type {HTMLElement | null} */ (document.querySelector('[data-action="stats"]'))?.focus();
+  }
 });
 
 const recordsUI = createRecordsUI({
@@ -920,7 +948,7 @@ $("records").addEventListener("close", () => {
   if (screen === "menu") /** @type {HTMLElement | null} */ ($("open-records"))?.focus();
 });
 
-const handleSystem = action => {
+const handleSystem = (action, code = "") => {
   if (
     settingsUI.isOpen ||
     rulesUI.isOpen ||
@@ -936,7 +964,11 @@ const handleSystem = action => {
     return;
   if (screen === "replay") {
     if (action === "restart") restartReplay();
-    else stopReplay();
+    else if (action === "pause" && code === "Escape") stopReplay();
+    else if (action === "pause" && player && !player.done) {
+      replayPaused = !replayPaused;
+      updateReplayBar();
+    }
     return;
   }
   // 묻는 중: R은 한 번 더 누르면 다시 시작, Esc는 취소
@@ -967,7 +999,9 @@ const touch = createTouch({
 /** 보드 한 칸의 화면 폭(px): 캔버스 폭 ÷ 칸 수(넓으면 20, 좁으면 16) */
 const boardCellPx = () =>
   canvas.getBoundingClientRect().width /
-  (window.matchMedia("(max-width: 720px) and (not ((orientation: landscape) and (max-height: 520px)))").matches
+  (window.matchMedia(
+    "(max-width: 720px) and (not ((orientation: landscape) and (max-height: 520px) and (pointer: coarse)))"
+  ).matches
     ? 16
     : 20);
 const gestures = createGestures({
@@ -1049,6 +1083,8 @@ const helpUI = createHelpUI({
   dialog: /** @type {HTMLDialogElement} */ ($("help")),
   getSettings: () => settings,
   isTouch: () => touchVisible(settings.touch, isTouchScreen()),
+  canStart: () => screen === "menu",
+  onStart: () => start(findMode("sprint40"), MODERN),
   onOpenSettings: tab => {
     pause();
     settingsUI.open(tab);
@@ -1082,16 +1118,23 @@ for (const btn of document.querySelectorAll("[data-action]")) {
   btn.addEventListener("click", () => {
     const action = btn.getAttribute("data-action");
     if (action === "resume") resume();
-    if (action === "retry") start(mode, rules, race?.target);
+    if (action === "retry") {
+      if (inProgress()) askConfirm("restart");
+      else start(mode, rules, race?.target);
+    }
     if (action === "retry-seed" && mode.splits && lastReplay) start(mode, rules, null, lastReplay.seed);
     if (action === "race-best" && mode.splits) startRace(mode, rules);
     if (action === "next-puzzle" && mode.puzzle) {
       const next = PUZZLES[mode.puzzle.number] ?? puzzleProgress.next();
       start(puzzleMode(next), MODERN);
     }
-    if (action === "menu") toMenu();
+    if (action === "menu") {
+      if (inProgress()) askConfirm("menu");
+      else toMenu();
+    }
     if (action === "watch" && lastReplay) startReplay(lastReplay);
-    if (action === "stats" && game) statsUI.open(game.state, `${mode.name} · ${rules.name}`);
+    if (action === "stats" && game)
+      statsUI.open(game.state, `${mode.name} · ${rules.name}`, !!mode.splits && splits.length > 0);
     if (action === "export" && lastReplay) shareUI.open(lastReplay, `${mode.name} · ${rules.name}`);
   });
 }
@@ -1113,13 +1156,14 @@ let playing = null;
 let replayPaused = false;
 let replaySpeed = 1;
 /** 리플레이를 닫으면 돌아갈 곳 */
-let replayReturn = /** @type {{ screen: string, game: any, mode: any, rules: any }} */ ({});
+let replayReturn = /** @type {{ screen: string, game: any, mode: any, rules: any, focus: Element | null }} */ ({});
 const SPEEDS = [1, 2, 4];
 const replayBar = $("replay-bar");
 const replayStatus = $("replay-status");
 const replayNote = $("replay-note");
 const replayProgress = /** @type {HTMLInputElement} */ ($("replay-progress"));
 const replayMarkers = $("replay-markers");
+let selectedMark = -1;
 /** @type {(ReturnType<typeof analyzeReplay> & { for: any }) | null} 지금 보는 리플레이의 분석 */
 let analysis = null;
 const replayTime = $("replay-time");
@@ -1143,22 +1187,48 @@ const MARK_LABELS = {
   highlight: m => m.label,
 };
 
-/** 진행 막대 위 표시. 누르면 그 장면 조금 앞(0.5초)으로 간다 */
-const renderMarkers = () => {
+/** 가까운 표시를 묶어 클릭 영역이 겹치지 않게 한다. */
+const renderTimelineMarks = () => {
   const length = replayLength();
-  const markers = analysis?.markers ?? [];
+  const width = replayMarkers.clientWidth;
+  const groups = [];
+  const marks = analysis?.markers ?? [];
+  if (!length || !width) return;
+  for (const [index, mark] of marks.entries()) {
+    const x = (mark.frame / length) * width;
+    const last = groups.at(-1);
+    if (last && x - last.x < 18) last.count++;
+    else groups.push({ x, index, count: 1 });
+  }
   replayMarkers.replaceChildren(
-    ...markers.map(m => {
+    ...groups.map(({ x, index, count }) => {
+      const mark = marks[index];
       const b = document.createElement("button");
       b.type = "button";
-      b.className = `replay-mark is-${m.kind}`;
-      b.style.left = `${length ? (m.frame / length) * 100 : 0}%`;
-      b.title = `${formatTime(m.frame)} · ${MARK_LABELS[m.kind](m)}`;
+      b.tabIndex = -1;
+      b.className = `replay-mark is-${mark.kind}`;
+      b.classList.toggle("is-group", count > 1);
+      b.style.left = `${(x / width) * 100}%`;
+      const firstLabel = MARK_LABELS[mark.kind](mark);
+      const label = count > 1 ? `${t("장면 {n}개", { n: count })} · ${firstLabel}` : firstLabel;
+      b.title = `${formatTime(mark.frame)} · ${label}`;
       b.setAttribute("aria-label", b.title);
-      b.addEventListener("click", () => seekReplay(m.frame - 30, true));
+      b.addEventListener("click", () => {
+        seekMark(index);
+        replayProgress.focus({ preventScroll: true });
+      });
       return b;
     })
   );
+};
+
+new ResizeObserver(() => {
+  if (screen === "replay") renderTimelineMarks();
+}).observe(replayMarkers);
+
+const renderMarkers = () => {
+  renderTimelineMarks();
+  const markers = analysis?.markers ?? [];
   const highlights = markers.filter(m => m.kind === "highlight").length;
   // 요약: 표시 색과 같은 작은 칸 + 개수(범례 역할)
   const part = (kind, text) => {
@@ -1170,9 +1240,9 @@ const renderMarkers = () => {
   $("replay-summary").replaceChildren(
     ...(analysis
       ? [
-          part("finesse", t("피네스 실수 {n}", { n: analysis.finesse.faults })),
-          part("slow", t("오래 고민 {n}", { n: analysis.slow })),
-          part("highlight", t("주요 장면 {n}", { n: highlights })),
+          ...(analysis.finesse.faults ? [part("finesse", t("피네스 실수 {n}", { n: analysis.finesse.faults }))] : []),
+          ...(analysis.slow ? [part("slow", t("오래 고민 {n}", { n: analysis.slow }))] : []),
+          ...(highlights ? [part("highlight", t("주요 장면 {n}", { n: highlights }))] : []),
         ]
       : [])
   );
@@ -1188,6 +1258,7 @@ const renderMarkers = () => {
  */
 const seekReplay = (target, pause = false) => {
   if (!playing || !player) return;
+  selectedMark = -1;
   const to = Math.max(0, Math.min(Math.round(target), replayLength() || target));
   if (to < player.frame) {
     player = createPlayer(playing, findMode);
@@ -1200,12 +1271,23 @@ const seekReplay = (target, pause = false) => {
   updateReplayBar();
 };
 
-/** 지금 위치 다음(또는 이전) 표시로 */
+const seekMark = index => {
+  const mark = analysis?.markers[index];
+  if (!mark) return;
+  seekReplay(mark.frame - 30, true);
+  selectedMark = index;
+};
+
+/** 지금 위치 또는 마지막으로 선택한 표시를 기준으로 앞뒤 장면을 본다. */
 const jumpMark = dir => {
   const marks = analysis?.markers ?? [];
-  const here = (player?.frame ?? 0) + 30; // 표시로 갈 때 0.5초 앞에 서므로 그만큼 보정
-  const next = dir > 0 ? marks.find(m => m.frame > here) : [...marks].reverse().find(m => m.frame < here - 1);
-  if (next) seekReplay(next.frame - 30, true);
+  const frame = player?.frame ?? 0;
+  if (selectedMark >= 0) return seekMark(selectedMark + dir);
+  const next =
+    dir > 0
+      ? marks.findIndex(mark => (frame === 0 ? mark.frame >= frame : mark.frame > frame))
+      : marks.findLastIndex(mark => mark.frame < frame);
+  seekMark(next);
 };
 
 replayProgress.addEventListener("input", () => seekReplay(Number(replayProgress.value), true));
@@ -1230,7 +1312,10 @@ const updateReplayBar = () => {
 };
 
 const startReplay = (replay, returnTo = screen, note = "") => {
-  if (screen !== "replay") replayReturn = { screen: returnTo, game, mode, rules };
+  const entering = screen !== "replay";
+  const focus = document.activeElement;
+  if (entering) replayReturn = { screen: returnTo, game, mode, rules, focus: document.activeElement };
+  selectedMark = -1;
   playing = replay;
   player = createPlayer(replay, findMode);
   game = player.game;
@@ -1251,6 +1336,8 @@ const startReplay = (replay, returnTo = screen, note = "") => {
   renderMarkers();
   /** @type {HTMLButtonElement} */ (replayBar.querySelector('[data-replay="race"]')).hidden = !canRace(replay);
   updateReplayBar();
+  if (!entering && focus instanceof HTMLElement && replayBar.contains(focus)) focus.focus({ preventScroll: true });
+  else replayToggle.focus({ preventScroll: true });
 };
 
 const restartReplay = () => playing && startReplay(playing, screen, replayNote.textContent);
@@ -1266,13 +1353,18 @@ const stopReplay = () => {
     showModeHud(mode);
     setScreen("results");
     showPanel("results");
+    if (replayReturn.focus instanceof HTMLElement && panels.results.contains(replayReturn.focus))
+      replayReturn.focus.focus();
   } else {
     toMenu();
+    if (replayReturn.focus instanceof HTMLElement && replayReturn.focus.getClientRects().length)
+      replayReturn.focus.focus();
   }
 };
 
 const advanceReplay = count => {
   if (!player || player.done) return;
+  selectedMark = -1;
   for (let i = 0; i < count && !player.done; i++) {
     const events = player.step();
     inputDisplay.show(player.input.held, player.input.pressed);
@@ -1329,14 +1421,15 @@ window.addEventListener("keydown", e => {
   )
     return;
   const inBar = replayBar.contains(document.activeElement);
+  if (e.code === "Escape") return stopReplay();
   if (e.code === "Space" && !inBar) replayPaused = !replayPaused;
   else if (["Digit1", "Digit2", "Digit4"].includes(e.code)) replaySpeed = Number(e.code.slice(5));
   // ←→: 5초(Shift: 한 프레임), 막대에 포커스가 있으면 막대가 처리한다
-  else if (!inBar && (e.code === "ArrowLeft" || e.code === "ArrowRight")) {
+  else if (document.activeElement !== replayProgress && (e.code === "ArrowLeft" || e.code === "ArrowRight")) {
     const dir = e.code === "ArrowLeft" ? -1 : 1;
     e.preventDefault();
     return seekReplay((player?.frame ?? 0) + dir * (e.shiftKey ? 1 : 300), e.shiftKey);
-  } else if (!inBar && (e.code === "BracketLeft" || e.code === "BracketRight")) {
+  } else if (e.code === "BracketLeft" || e.code === "BracketRight") {
     e.preventDefault();
     return jumpMark(e.code === "BracketLeft" ? -1 : 1);
   } else return;
@@ -1365,10 +1458,11 @@ const openReplayText = text => {
   }
   const replay = sanitizeReplay(raw, findMode);
   if (!replay) {
-    showMenuNotice(t("읽을 수 없는 리플레이 파일이에요."));
+    $("replay-import-notice").textContent = t("읽을 수 없는 리플레이 파일이에요.");
     return false;
   }
   const check = verifyReplay(replay, findMode);
+  $("replay-import-notice").textContent = "";
   showMenuNotice("");
   const note = check.ok ? "" : t("저장된 결과와 재생 결과가 달라요. 다른 버전의 파일일 수 있어요.");
   startReplay(replay, "menu", note);
@@ -1393,7 +1487,7 @@ fileInput.addEventListener("change", async () => {
     text = await file.text();
   } catch {
     if (request === replayFileRequest && screen === "menu")
-      showMenuNotice(t("파일을 읽지 못했어요. 다시 선택해 주세요."));
+      $("replay-import-notice").textContent = t("파일을 읽지 못했어요. 다시 선택해 주세요.");
     return;
   }
   if (request === replayFileRequest && screen === "menu") openReplayText(text);
@@ -1442,7 +1536,7 @@ const tick = () => {
       setScreen("play");
       goTimer = GO_FRAMES;
       countdownEl.dataset.phase = "go";
-      $("countdown-label").textContent = "GO!";
+      $("countdown-label").textContent = t("시작!");
       sfx.play("go");
     }
     return;
@@ -1466,8 +1560,8 @@ const tick = () => {
   const extra = finesse?.frame(held, pressed, hadActive, events) ?? 0;
   if (extra > 0 && mode.finesse) announceText([t("피네스 +{n}", { n: extra })]);
   if (mode.splits) splits = advanceSplits(mode.splits, splits, game.state.stats.lines, game.state.frame);
-  if (race && !race.player.done) {
-    race.player.step();
+  if (race) {
+    if (!race.player.done) race.player.step();
     updateRaceProgress();
   }
   for (const e of events) announce(e);

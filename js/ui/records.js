@@ -134,6 +134,10 @@ export const createRecordsUI = ({ dialog, modes, records, replayFor, onWatch }) 
       );
     });
 
+    const empty = el("p", {
+      class: "records-empty",
+      text: t("아직 기록이 없어요. 이 모드와 규칙으로 한 판을 끝내면 여기에 표시돼요."),
+    });
     const body = el(
       "div",
       {},
@@ -149,14 +153,16 @@ export const createRecordsUI = ({ dialog, modes, records, replayFor, onWatch }) 
         fieldRow({ id: "records-mode", label: t("모드"), control: modeSelect }),
         fieldRow({ id: "records-rules", label: t("규칙"), control: rulesSelect })
       ),
-      el("table", { class: "records-table" }, el("thead", {}, head), el("tbody", {}, ...rows))
+      ...(list.length
+        ? [el("table", { class: "records-table" }, el("thead", {}, head), el("tbody", {}, ...rows))]
+        : [empty])
     );
     const watchable = replays.filter(Boolean).length;
     notice.textContent = list.length
       ? watchable
         ? `${mode.name} · ${options.find(([id]) => id === rulesId)[1]} — ${t("상위 {n}개 기록의 리플레이를 볼 수 있어요", { n: MAX_RANKED })}`
         : t("상위 {n}개 기록의 리플레이는 이 기능이 생긴 뒤 세운 기록부터 남아요", { n: MAX_RANKED })
-      : t("아직 기록이 없어요");
+      : "";
     const scroll = dialog.querySelector(".dialog-body")?.scrollTop ?? 0;
     fillDialog(dialog, { title: t("기록"), body, notice, actions: [], closeId: "records-close" });
     body.scrollTop = scroll;

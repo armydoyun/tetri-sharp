@@ -999,6 +999,20 @@
   }
 }
 
+@media (max-width: 420px) {
+  .records-table :is(th, td) {
+    padding-inline: var(--space-1);
+  }
+
+  .records-table :is(th, td):first-child {
+    width: 34px;
+  }
+
+  .records-table :is(th, td):last-child {
+    width: 68px;
+  }
+}
+
 /* ---- 통계: 두 칸(좁으면 한 칸), 항목 이름 | 값 ---- */
 .stat-columns {
   display: grid;
@@ -1368,3 +1382,35 @@ body.touch-on :is(.btn, .btn-small, .key-slot, .select, .text-input, .choice > b
   outline: 2px solid var(--surface);
   outline-offset: -4px;
 }
+
+/* 공통 버튼의 SVG가 인라인 기준선에 매달리지 않게 한다. */
+.btn > .icon, .btn > span > .icon { display: block; }
+.btn > .btn-label { min-width: 0; line-height: 1.2; }
+.dialog-foot > .btn-primary {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--border-strong);
+  box-shadow: none;
+}
+.share-link-control { display: grid; gap: var(--space-2); justify-items: start; min-width: 0; }
+.share-link-control input { width: 100%; min-width: 0; }
+.records-empty { margin-block: var(--space-3); color: var(--text-dim); }
+
+@media (max-height: 500px) {
+  .dialog { max-height: calc(100dvh - 16px); }
+  .dialog-head { padding-block: 4px; }
+  .dialog-tabs { padding-bottom: 4px; }
+  .dialog-foot { padding-block: 4px; }
+  .dialog-head .btn, .dialog-foot .btn { min-height: 30px; height: auto; padding-block: 4px; }
+  .dialog-tabs .segmented > button { min-height: 26px; }
+  .dialog-foot > .notice-slot:empty { min-height: 0; }
+}
+
+@media (max-width: 560px) {
+  .dialog-foot > .notice-slot:empty { display: none; }
+}
+
+.key-head { color: var(--text-dim); font-size: var(--text-s); }
+.key-head > :not(:first-child) { text-align: center; }
+#records[open] { height: min(810px, calc(100dvh - 16px)); }
+.puzzle-tile small { text-align: center; overflow-wrap: anywhere; line-height: 1.2; }

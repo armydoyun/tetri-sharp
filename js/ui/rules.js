@@ -354,6 +354,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
           onChange(sanitizeRuleBody(p));
           message = t("{name} 값으로 채웠어요 · 기록표 {id}", { name: p.name, id: makeCustomRules(p).id });
           render();
+          /** @type {HTMLElement | null} */ (dialog.querySelector(`[data-preset="${p.id}"]`))?.focus();
         });
         return b;
       })
@@ -387,7 +388,8 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
       body.append(section);
     }
 
-    notice.textContent = message || t("기록표 {id} · 조합마다 기록이 따로 쌓여요", { id: makeCustomRules(rules).id });
+    notice.dataset.recordKey = makeCustomRules(rules).id;
+    notice.textContent = message || t("변경은 즉시 저장되며, 규칙 조합마다 기록을 따로 보관해요.");
     message = "";
     fillDialog(dialog, {
       title: t("Custom 규칙"),

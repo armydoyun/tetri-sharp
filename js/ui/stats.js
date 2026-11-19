@@ -1,6 +1,6 @@
 // 판 통계 대화상자: 결과 화면의 "통계"에서 연다. 엔진이 센 값(state.tally)을 보여 주기만 한다.
 import { formatScore, formatTime } from "../modes/format.js";
-import { el, fillDialog } from "./dom.js";
+import { button, el, fillDialog } from "./dom.js";
 import { t } from "../i18n/index.js";
 
 const CLEAR_ROWS = [
@@ -66,14 +66,32 @@ export const createStatsUI = ({ dialog }) => {
   const notice = el("p", { class: "notice-slot", role: "status" });
   return {
     /** @param {any} state 끝난 판의 엔진 상태 */
-    open(state, subtitle = "") {
+    open(state, subtitle = "", canReviewSplits = false) {
       const rows = statRows(state);
+      const clears = rows.clears.filter(([, value]) => value !== "0");
+      const zero = rows.clears.filter(([, value]) => value === "0");
+      const clearance = zero.length
+        ? el(
+            "div",
+            {},
+            table(t("줄 삭제"), clears),
+            el(
+              "details",
+              { class: "stat-details" },
+              el("summary", { text: t("0회 항목 보기") }),
+              table(t("0회 항목"), zero)
+            )
+          )
+        : table(t("줄 삭제"), clears);
+      const review = button({ text: t("구간 기록 보기"), iconName: "chart", id: "stats-splits" });
+      review.addEventListener("click", () => dialog.close("splits"));
+      dialog.returnValue = "";
       notice.textContent = subtitle;
       fillDialog(dialog, {
         title: t("이번 판 통계"),
-        body: el("div", { class: "stat-columns" }, table(t("플레이"), rows.play), table(t("줄 삭제"), rows.clears)),
+        body: el("div", { class: "stat-columns" }, table(t("플레이"), rows.play), clearance),
         notice,
-        actions: [],
+        actions: canReviewSplits ? [review] : [],
         closeId: "stats-close",
       });
       dialog.showModal();

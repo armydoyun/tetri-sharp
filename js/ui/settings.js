@@ -254,7 +254,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
       row(
         "set-countdown",
         t("시작 카운트다운"),
-        a.countdown === "off" ? t("누르자마자 바로 시작해요") : t("시작 전에 READY를 보여 줘요"),
+        a.countdown === "off" ? t("누르자마자 바로 시작해요") : t("시작 전에 준비 신호를 보여 줘요"),
         [
           ["normal", t("보통")],
           ["short", t("짧게")],
@@ -263,10 +263,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
         a.countdown,
         v => setAccess("countdown", v)
       ),
-      el("p", {
-        class: "field-help",
-        text: t("화면 효과 줄이기와 색각 친화 색은 화면·소리 탭에 있어요."),
-      })
+      ...visualAccessRows(visual)
     );
   };
 
@@ -340,12 +337,50 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
     render();
   };
 
+  const visualAccessRows = visual => [
+    fieldRow({
+      id: "set-effects",
+      label: t("화면 효과"),
+      hint: EFFECT_HINTS[visual.effects],
+      control: choice({
+        id: "set-effects",
+        label: t("화면 효과"),
+        options: EFFECT_OPTIONS,
+        value: visual.effects,
+        onChange: v => setVisual("effects", v),
+      }),
+    }),
+    fieldRow({
+      id: "set-palette",
+      label: t("블록 색"),
+      hint:
+        visual.palette === "contrast"
+          ? t("색을 구분하기 쉬운 색 조합을 써요")
+          : visual.palette === "custom"
+            ? t("아래에서 피스를 고르고 색을 눌러요. 고르지 않은 피스는 테마 색이에요")
+            : t("고른 테마의 색을 써요"),
+      control: choice({
+        id: "set-palette",
+        label: t("블록 색"),
+        options: [
+          ["theme", t("테마 색")],
+          ["contrast", t("색각 친화")],
+          ["custom", t("직접 고르기")],
+        ],
+        value: visual.palette,
+        onChange: v => setVisual("palette", v),
+      }),
+    }),
+    ...(visual.palette === "custom" ? [colorPicker(visual)] : []),
+  ];
+
   const visualSection = () => {
     const visual = getSettings().visual;
     const scheme = getSettings().scheme;
     return el(
       "section",
       { class: "field-section" },
+      volumeRow(),
       fieldRow({
         id: "set-scheme",
         label: t("화면 색"),
@@ -402,40 +437,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
           onChange: v => setVisual("theme", v),
         }),
       }),
-      fieldRow({
-        id: "set-effects",
-        label: t("화면 효과"),
-        hint: EFFECT_HINTS[visual.effects],
-        control: choice({
-          id: "set-effects",
-          label: t("화면 효과"),
-          options: EFFECT_OPTIONS,
-          value: visual.effects,
-          onChange: v => setVisual("effects", v),
-        }),
-      }),
-      fieldRow({
-        id: "set-palette",
-        label: t("블록 색"),
-        hint:
-          visual.palette === "contrast"
-            ? t("색을 구분하기 쉬운 색 조합을 써요")
-            : visual.palette === "custom"
-              ? t("아래에서 피스를 고르고 색을 눌러요. 고르지 않은 피스는 테마 색이에요")
-              : t("고른 테마의 색을 써요"),
-        control: choice({
-          id: "set-palette",
-          label: t("블록 색"),
-          options: [
-            ["theme", t("테마 색")],
-            ["contrast", t("색각 친화")],
-            ["custom", t("직접 고르기")],
-          ],
-          value: visual.palette,
-          onChange: v => setVisual("palette", v),
-        }),
-      }),
-      ...(visual.palette === "custom" ? [colorPicker(visual)] : []),
+      ...visualAccessRows(visual),
       fieldRow({
         id: "set-ghost",
         label: t("고스트"),
@@ -482,7 +484,6 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
           onChange: v => setVisual("inputs", v),
         }),
       }),
-      volumeRow(),
       fieldRow({
         id: "set-lang",
         label: t("언어"),
@@ -559,6 +560,13 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
             ? t("칸을 누르고 원하는 키를 누르세요. Backspace는 지우기, Esc는 취소.")
             : t("칸을 누르고 패드의 원하는 버튼을 누르세요. 왼쪽 스틱과 메뉴 이동(A·십자키)은 고정이에요."),
       }),
+      el(
+        "div",
+        { class: "field-row key-row key-head" },
+        el("span", { text: t("동작") }),
+        el("span", { text: t("기본 키") }),
+        el("span", { text: t("보조 키") })
+      ),
       ...ACTIONS.map(action => {
         const slots = Array.from({ length: SLOTS }, (_, slot) => {
           const value = map[action.id]?.[slot];
@@ -606,8 +614,9 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
 
   const render = () => {
     const scroll = dialog.querySelector(".dialog-body")?.scrollTop ?? 0;
-    const reset = button({ text: t("기본값으로"), iconName: "reset", id: "settings-reset" });
+    const reset = button({ text: t("전체 설정 초기화"), iconName: "reset", id: "settings-reset" });
     reset.addEventListener("click", () => {
+      if (!window.confirm(t("조작감, 키 설정, 화면 설정을 모두 기본값으로 되돌릴까요?"))) return;
       capture = null;
       onChange({
         ...getSettings(),
@@ -624,6 +633,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
       });
       notice.textContent = t("모든 설정을 기본값으로 되돌렸어요.");
       render();
+      /** @type {HTMLElement | null} */ (dialog.querySelector("#settings-reset"))?.focus();
     });
     const tabs = tabBar({
       tabs: TABS,

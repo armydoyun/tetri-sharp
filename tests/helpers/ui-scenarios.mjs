@@ -192,6 +192,7 @@ const scenarios = async (page, quick) => {
     await check("CPU 대전 게임");
     await esc();
     await page.click('#pause [data-action="menu"]');
+    await page.click('[data-confirm="ok"]');
   }
   return [...new Set(found)];
 };
