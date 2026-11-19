@@ -12,6 +12,7 @@ import {
   verifyReplay,
 } from "../../js/replay/replay.js";
 import { createStore, memoryBackend } from "../../js/storage/store.js";
+import { createSceneAttempt } from "../../js/replay/practice.js";
 import { createRng } from "../../js/core/rng.js";
 
 /** 무작위 입력으로 한 판을 두고 리플레이를 만든다. changeAt이면 그 프레임에 조작 설정을 바꾼다. */
@@ -186,4 +187,39 @@ test("저장소: 공간이 모자라면 다른 기록표의 2·3위 리플레이
   assert.equal(replays.saveRanked("sprint40|modern", extra, [extra.result]), true);
   assert.equal(replays.ranked("zen|modern").length, 1);
   assert.equal(replays.best("sprint40|modern").result.frames, extra.result.frames);
+});
+
+test("Sprint 장면 연습: 생성 프레임의 홀드 이후 상태에서 분기하고 재시도는 같은 피스 순서를 쓴다", () => {
+  const seed = 77;
+  const mode = SPRINT_40;
+  const game = createGame({ seed, rules: MODERN, mode });
+  const recorder = createRecorder({ seed, rules: MODERN, mode, handling: game.handling });
+  // 첫 프레임에는 피스를 홀드한 뒤 회전한다. 분기점에는 홀드만 남는다.
+  recorder.input(BTN.RIGHT, BTN.HOLD | BTN.CW);
+  game.step({ held: BTN.RIGHT, pressed: BTN.HOLD | BTN.CW });
+  recorder.input(0, 0);
+  game.step();
+  const replay = sanitizeReplay(recorder.finish(game.state), findMode);
+  const original = createPlayer(replay, findMode);
+  original.step();
+  assert.equal(original.spawnFrame, 1);
+
+  const first = createSceneAttempt(replay, findMode, 1);
+  assert.equal(first.state.active.type, original.game.state.active.type);
+  assert.equal(first.state.active.rot, 0);
+  assert.equal(first.state.hold, original.game.state.hold);
+  assert.ok(first.state.holdUsed);
+  assert.deepEqual(first.state.queue, original.game.state.queue);
+  assert.equal(first.state.prevHeld, 0);
+  assert.deepEqual(first.state.das, { dir: 0, charge: 0, arrAcc: 0 });
+  assert.equal(createSceneAttempt(replay, findMode, 0).state.hold, null);
+  const retry = createSceneAttempt(replay, findMode, 1);
+  for (let i = 0; i < 7; i++) {
+    first.step({ pressed: BTN.HARD });
+    retry.step({ pressed: BTN.HARD });
+    assert.deepEqual(first.state.queue, retry.state.queue);
+    assert.deepEqual(first.state.board.cells, retry.state.board.cells);
+  }
+  assert.equal(original.game.state.stats.pieces, 0);
+  assert.equal(retry.state.stats.pieces, 7);
 });
