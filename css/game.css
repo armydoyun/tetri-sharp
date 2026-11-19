@@ -708,6 +708,15 @@ body[data-screen="paused"] .countdown {
   text-align: left;
 }
 
+.results-splits .is-slowest td {
+  background: var(--surface-2);
+  font-weight: 700;
+}
+
+.results-splits p:empty {
+  display: none;
+}
+
 .results-splits p {
   margin-block: var(--space-2);
   color: var(--text-dim);
