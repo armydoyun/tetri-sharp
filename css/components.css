@@ -693,7 +693,8 @@
 .dialog-body {
   flex: 1;
   overflow: auto;
-  padding: 0 var(--space-5);
+  /* 아래 여백: 끝까지 내려도 마지막 줄·버튼이 발(구분선)에 붙지 않게 */
+  padding: 0 var(--space-5) var(--space-4);
   /* 스크롤바가 생기고 없어질 때 내용 폭이 바뀌지 않게 */
   scrollbar-gutter: stable;
 }
@@ -916,7 +917,7 @@
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  margin: var(--space-3) 0 var(--space-4);
+  margin: var(--space-3) 0 0;
   font-size: var(--text-m);
 }
 
