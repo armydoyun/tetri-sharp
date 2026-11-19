@@ -123,6 +123,20 @@ export const createEffects = () => {
           // 칸마다 작은 네모가 줄어들며 사라진다
           const size = cell * 0.7 * remaining;
           for (let c = 0; c < cols; c++) ctx.fillRect(bx + c * cell + (cell - size) / 2, middle - size / 2, size, size);
+        } else if (motion.clear === "converge") {
+          // 양 끝에서 가운데로 모여 닫힌다
+          const half = (width / 2) * (1 - (1 - Math.min(1, t * 2.4)) ** 2);
+          const height = cell * 0.18;
+          ctx.fillRect(bx, middle - height / 2, half, height);
+          ctx.fillRect(bx + width - half, middle - height / 2, half, height);
+        } else if (motion.clear === "fade") {
+          // 칸 높이 그대로 옅어지기만 한다
+          ctx.globalAlpha *= 0.6;
+          ctx.fillRect(bx, middle - cell * 0.45, width, cell * 0.9);
+        } else if (motion.clear === "sink") {
+          // 얇은 띠가 반 칸 아래로 가라앉으며 사라진다
+          const y = middle + cell * 0.5 * t;
+          ctx.fillRect(bx, y - cell * 0.07, width, cell * 0.14);
         } else if (motion.clear === "scan") {
           // 오른쪽에서 왼쪽으로 훑는 가는 선과 그 머리
           const head = width * (1 - Math.min(1, t * 2.2));

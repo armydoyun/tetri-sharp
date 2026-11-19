@@ -512,6 +512,12 @@ export const EN = {
   "검은 보드와 테두리만 색이 있는 블록": "Black board with color-outlined blocks",
   스톤: "Stone",
   "밝은 돌빛 보드와 흙빛이 도는 각진 블록": "Light stone board with earthy square blocks",
+  미드나잇: "Midnight",
+  "짙은 남색 보드와 보석빛을 눌러 담은 블록": "Deep navy board with muted jewel blocks",
+  포레스트: "Forest",
+  "짙은 숲빛 보드와 이끼·흙빛 블록": "Deep forest board with moss and earth blocks",
+  화이트: "White",
+  "깨끗한 흰 보드와 선명하고 묵직한 블록": "Clean white board with bold solid blocks",
 
   // ---- Custom 규칙 ----
   "Custom 규칙": "Custom rules",

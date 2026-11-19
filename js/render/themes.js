@@ -1,6 +1,16 @@
 import { t } from "../i18n/index.js";
 // 저장된 테마 키는 유지한다. 테마는 보드와 블록의 색·모양을 정의한다.
-export const THEME_IDS = Object.freeze(["modern", "retro", "minimal", "graphite", "frame", "stone"]);
+export const THEME_IDS = Object.freeze([
+  "modern",
+  "retro",
+  "minimal",
+  "graphite",
+  "frame",
+  "stone",
+  "midnight",
+  "forest",
+  "white",
+]);
 export const DEFAULT_THEME = "modern";
 
 export const CONTRAST_PALETTE = Object.freeze([
@@ -264,6 +274,63 @@ export const THEMES = Object.freeze({
       trailCells: 1.5,
       clear: "pop",
       clearMs: 210,
+    },
+  }),
+  midnight: makeTheme({
+    name: t("미드나잇"),
+    description: t("짙은 남색 보드와 보석빛을 눌러 담은 블록"),
+    palette: ["#4e9fb3", "#5672b8", "#c47e4f", "#c9a446", "#5c9a6d", "#8a6bb3", "#b85a66", "#4a5268"],
+    board: { bg: "#111827", grid: "#1b2436", edge: "#2c3a52", ink: "#a9c2e6" },
+    gap: 0.05,
+    radius: 0.08,
+    finish: "flat",
+    motion: {
+      slideMs: 44,
+      landMs: 175,
+      depth: 0.13,
+      rebound: 0.03,
+      trailMs: 125,
+      trailCells: 2.5,
+      clear: "converge",
+      clearMs: 215,
+    },
+  }),
+  forest: makeTheme({
+    name: t("포레스트"),
+    description: t("짙은 숲빛 보드와 이끼·흙빛 블록"),
+    palette: ["#6fb2a0", "#6f8fb0", "#c98f5a", "#cdb46a", "#8db36a", "#a08ab8", "#c47766", "#56635a"],
+    board: { bg: "#151d18", grid: "#1f2a23", edge: "#324238", ink: "#c6dccb" },
+    gap: 0.05,
+    radius: 0.05,
+    finish: "edge",
+    motion: {
+      slideMs: 50,
+      landMs: 185,
+      depth: 0.095,
+      rebound: 0.01,
+      trailMs: 120,
+      trailCells: 2,
+      clear: "fade",
+      clearMs: 240,
+    },
+  }),
+  white: makeTheme({
+    name: t("화이트"),
+    description: t("깨끗한 흰 보드와 선명하고 묵직한 블록"),
+    palette: ["#1f9db0", "#3159c4", "#e06a2c", "#e0a81c", "#2f9e57", "#7d4fc4", "#d43c52", "#9aa0a6"],
+    board: { bg: "#fafafa", grid: "#ececec", edge: "#d6d6d6", ink: "#2b2b2b" },
+    gap: 0.05,
+    radius: 0.12,
+    finish: "flat",
+    motion: {
+      slideMs: 26,
+      landMs: 125,
+      depth: 0.14,
+      rebound: 0,
+      trailMs: 80,
+      trailCells: 1.5,
+      clear: "sink",
+      clearMs: 200,
     },
   }),
 });

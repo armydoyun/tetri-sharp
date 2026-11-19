@@ -33,8 +33,18 @@ const fakeCtx = (calls = []) =>
     }
   );
 
-test("테마 여섯 가지, 기본은 모던", () => {
-  assert.deepEqual([...THEME_IDS].sort(), ["frame", "graphite", "minimal", "modern", "retro", "stone"]);
+test("테마 아홉 가지, 기본은 모던", () => {
+  assert.deepEqual([...THEME_IDS].sort(), [
+    "forest",
+    "frame",
+    "graphite",
+    "midnight",
+    "minimal",
+    "modern",
+    "retro",
+    "stone",
+    "white",
+  ]);
   assert.equal(DEFAULT_THEME, "modern");
   assert.equal(findTheme("없음"), THEMES.modern);
 });
@@ -78,8 +88,8 @@ test("블록 마감: 그라파이트는 윗면을 더 칠하고 프레임은 속
   );
 });
 
-test("새 줄 삭제 모양(번쩍임·훑기·작은 네모)도 수명이 끝나면 사라진다", () => {
-  for (const id of ["graphite", "frame", "stone"]) {
+test("새 줄 삭제 모양(번쩍임·훑기·작은 네모·모이기·옅어지기·가라앉기)도 수명이 끝나면 사라진다", () => {
+  for (const id of ["graphite", "frame", "stone", "midnight", "forest", "white"]) {
     const { motion } = THEMES[id];
     const fx = createEffects();
     fx.add([clearEvent], "full", 0, motion);

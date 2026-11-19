@@ -599,7 +599,7 @@ test("접근성: 모든 버튼에 읽을 수 있는 이름이 있고, 화면 글
   await context.close();
 });
 
-test("게임 테마: 여섯 테마가 서로 다르게 그려지고, 설정에서 바꾸면 바로 반영된다", async () => {
+test("게임 테마: 아홉 테마가 서로 다르게 그려지고, 설정에서 바꾸면 바로 반영된다", async () => {
   const { context, page, errors } = await openPage();
   await startMode(page, "dig");
   const snapshot = () =>
@@ -612,7 +612,7 @@ test("게임 테마: 여섯 테마가 서로 다르게 그려지고, 설정에�
     });
   await page.keyboard.press("Escape"); // 일시정지해서 화면을 멈춘다
   const seen = new Set();
-  for (const theme of ["retro", "minimal", "graphite", "frame", "stone", "modern"]) {
+  for (const theme of ["retro", "minimal", "graphite", "frame", "stone", "midnight", "forest", "white", "modern"]) {
     await page.click("#open-settings");
     await page.click('.dialog-tabs [data-value="visual"]');
     await page.click(`#set-theme [data-value="${theme}"]`);
@@ -620,7 +620,7 @@ test("게임 테마: 여섯 테마가 서로 다르게 그려지고, 설정에�
     await page.waitForTimeout(100);
     seen.add(await snapshot());
   }
-  assert.equal(seen.size, 6, "테마마다 다른 그림");
+  assert.equal(seen.size, 9, "테마마다 다른 그림");
   assert.deepEqual(errors, []);
   await context.close();
 });
