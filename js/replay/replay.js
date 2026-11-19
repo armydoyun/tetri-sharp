@@ -76,12 +76,14 @@ export const createRecorder = ({ seed, mode, rules, handling }) => {
 /**
  * 리플레이를 재생한다. step()을 부를 때마다 한 프레임 진행한다.
  * @param {any} replay  sanitizeReplay()를 거친 값
+ * @param {(state: any) => void} [onSpawn]
  * @param {(id: string) => any} findMode
  */
-export const createPlayer = (replay, findMode) => {
+export const createPlayer = (replay, findMode, onSpawn) => {
   const mode = findMode(replay.mode);
-  const game = createGame({ rules: replay.rules, handling: replay.handling, seed: replay.seed, mode });
+  const game = createGame({ rules: replay.rules, handling: replay.handling, seed: replay.seed, mode, onSpawn });
   let index = 0;
+  let spawnFrame = 0;
   let cursor = 0;
   let change = 0;
   let held = 0;
@@ -95,6 +97,9 @@ export const createPlayer = (replay, findMode) => {
     },
     get frame() {
       return index;
+    },
+    get spawnFrame() {
+      return spawnFrame;
     },
     /** 게임이 끝났거나 기록된 길이만큼 다 돌렸으면 true */
     get done() {
@@ -114,7 +119,10 @@ export const createPlayer = (replay, findMode) => {
       }
       index += 1;
       lastInput = { held, pressed };
-      return game.step({ held, pressed });
+      const pieceId = game.state.pieceId;
+      const events = game.step({ held, pressed });
+      if (game.state.pieceId !== pieceId) spawnFrame = index;
+      return events;
     },
   };
 };

@@ -75,9 +75,9 @@ export const msToFrames = ms => (ms * 60) / 1000;
  */
 
 /**
- * @param {{ rules: import("../rules/presets.js").RuleSet, handling?: Handling, seed?: number, mode?: ModeHook }} options
+ * @param {{ rules: import("../rules/presets.js").RuleSet, handling?: Handling, seed?: number, mode?: ModeHook, onSpawn?: (state: any) => void }} options
  */
-export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode }) => {
+export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode, onSpawn }) => {
   const rotation = ROTATIONS[rules.rotation];
   if (!rotation) throw new Error(`알 수 없는 회전 시스템: ${rules.rotation}`);
   const makeRandomizer = RANDOMIZERS[rules.randomizer];
@@ -212,6 +212,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode 
     state.gravityAcc = 0;
     resetLock(a.y);
     events.push({ type: "spawn", piece: type });
+    onSpawn?.(state);
   };
 
   /** 다음 피스를 꺼내 생성한다. IHS: 생성 순간 홀드를 누르고 있으면 바로 홀드한 피스와 바꾼다. */

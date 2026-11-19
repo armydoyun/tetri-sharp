@@ -1859,3 +1859,71 @@ body[data-screen="results"] #action { display: none; }
 #race-own-progress::-webkit-progress-value { background: var(--accent); }
 #race-progress::-webkit-progress-value { background: var(--text-dim); }
 #race-progress::-moz-progress-bar { background: var(--text-dim); }
+
+/* 장면 연습은 기존 보드와 터치 조작을 쓰고 정보 칸에 두 동작만 둔다. */
+body[data-scene-practice] .race-panel {
+  display: none;
+}
+
+.scene-practice-controls {
+  display: grid;
+  gap: var(--space-2);
+  width: min(100%, 640px);
+  min-width: 0;
+}
+
+.scene-practice-controls p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--text-s);
+  font-variant-numeric: tabular-nums;
+}
+
+.scene-practice-actions {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.scene-practice-actions .btn,
+#results-practice-scene {
+  min-width: 0;
+  min-height: var(--control-h-s);
+  height: auto;
+  padding: var(--space-1) var(--space-2);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+#results-practice-scene {
+  margin-bottom: var(--space-2);
+}
+
+@media (max-width: 720px) {
+  body[data-scene-practice] {
+    --chrome-h: 208px;
+  }
+
+  .scene-practice-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (orientation: landscape) and (max-height: 520px) and (pointer: coarse) {
+  body[data-scene-practice] {
+    --chrome-h: 64px;
+  }
+
+  .scene-practice-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .replay-actions:has([data-replay="practice"]:not([hidden])) {
+    display: grid;
+    flex: 1 1 100%;
+    grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+  }
+
+  .replay-actions:has([data-replay="practice"]:not([hidden])) .btn {
+    padding-inline: var(--space-1);
+  }
+}

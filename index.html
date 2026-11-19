@@ -122,6 +122,13 @@
         <!-- 정보 칸: 모드마다 필요한 칸만(게임 시작 때 정해지고 게임 중에는 그대로) -->
         <div class="stage-side">
           <p id="mode-objective" class="mode-objective"></p>
+          <div id="scene-practice-controls" class="scene-practice-controls" hidden>
+            <p id="scene-practice-status" role="status"></p>
+            <div class="scene-practice-actions">
+              <button type="button" class="btn btn-small" data-action="scene-retry"><span data-icon="restart"></span><span class="btn-label">장면 재시도</span></button>
+              <button type="button" class="btn btn-small btn-ghost" data-action="scene-exit"><span class="btn-label">리플레이로</span></button>
+            </div>
+          </div>
           <dl class="hud">
             <div data-hud="time"><dt id="hud-time-label">시간</dt><dd id="hud-time">0:00.00</dd></div>
             <div data-hud="score"><dt>점수</dt><dd id="hud-score">0</dd></div>
@@ -217,6 +224,7 @@
                     <tbody id="results-split-rows"></tbody>
                   </table>
                   <p id="results-split-note" role="status"></p>
+                  <button type="button" class="btn btn-small" id="results-practice-scene" hidden><span class="btn-label">밀린 구간 연습</span></button>
                   <div class="actions-row">
                     <button type="button" class="btn btn-small" data-action="retry-seed">같은 블록 순서로 재시작</button>
                     <button type="button" class="btn btn-small" id="results-race-best" data-action="race-best" disabled>최고 기록과 달리기</button>
@@ -279,6 +287,7 @@
               <button type="button" class="btn btn-ghost" data-replay="restart"><span data-icon="restart"></span><span>처음부터</span></button>
             </div>
             <div class="replay-actions">
+              <button type="button" class="btn" data-replay="practice" hidden><span class="btn-label">장면 연습</span></button>
               <button type="button" class="btn btn-ghost" data-replay="share"><span data-icon="link"></span><span>공유</span></button>
               <button type="button" class="btn btn-ghost" data-replay="race" hidden><span data-icon="play"></span><span>이 기록과 달리기</span></button>
             </div>

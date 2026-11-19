@@ -2,6 +2,14 @@
 // tests/unit/i18n.test.mjs가 코드와 index.html의 한국어 문장이 모두 여기 있는지 확인한다.
 /** @type {Record<string, string>} */
 export const EN = {
+  "장면 연습": "Practice scene",
+  "장면 재시도": "Retry scene",
+  리플레이로: "Back to replay",
+  "장면 연습 종료": "Scene ended",
+  "연습 시작점 · {time}": "Start point · {time}",
+  "이 장면을 연습할 수 없어요. 다른 위치를 선택해 주세요.":
+    "This scene is unavailable. Select another point in the replay.",
+  "밀린 구간 연습": "Practice slowest split",
   "구간 기록 보기": "Review splits",
   "0회 항목 보기": "Show zero counts",
   "0회 항목": "Zero counts",

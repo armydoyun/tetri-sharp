@@ -1282,6 +1282,80 @@ test("리플레이 탐색: 막대로 원하는 시점에 가고, 표시로 건�
   await context.close();
 });
 
+test("내 Sprint 장면을 작은 창과 가로 터치에서 연습하고 리플레이 위치로 돌아간다", async () => {
+  const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
+  for (const [locale, width, height, touch] of [
+    ["ko-KR", 960, 360, false],
+    ["en-US", 560, 500, false],
+    ["en-US", 390, 844, true],
+    ["en-US", 320, 720, true],
+    ["ko-KR", 740, 360, true],
+  ]) {
+    const context = await browser.newContext({ locale, viewport: { width, height }, hasTouch: touch });
+    await context.addInitScript(({ replay, record }) => {
+      localStorage.setItem("tetrisharp:replay:last", JSON.stringify(replay));
+      localStorage.setItem("tetrisharp:records", JSON.stringify({ "sprint40|modern": [record] }));
+    }, fixture);
+    const page = await context.newPage();
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.goto(url);
+    const storage = () =>
+      page.evaluate(() => [localStorage.getItem("tetrisharp:replay:last"), localStorage.getItem("tetrisharp:records")]);
+    const original = await storage();
+    await page.locator("#watch-last").click();
+    const progress = page.locator("#replay-progress");
+    const practice = page.locator('[data-replay="practice"]');
+    await progress.fill("133");
+    const withinWindow = () =>
+      page.evaluate(() => {
+        const root = document.documentElement;
+        return root.scrollWidth <= innerWidth && root.scrollHeight <= innerHeight + 1;
+      });
+    assert.ok(await withinWindow(), `리플레이가 창에 들어간다 · ${width}×${height}`);
+    const entry = await practice.boundingBox();
+    assert.ok(entry.x >= 0 && entry.x + entry.width <= width && entry.y >= 0 && entry.y + entry.height <= height);
+    await practice.click();
+    assert.ok(await withinWindow(), `장면 연습이 창에 들어간다 · ${width}×${height}`);
+    const controls = page.locator("#scene-practice-controls");
+    assert.equal(await controls.isVisible(), true);
+    const retry = controls.locator('[data-action="scene-retry"]');
+    const exit = controls.locator('[data-action="scene-exit"]');
+    for (const button of [retry, exit]) {
+      const box = await button.boundingBox();
+      assert.ok(box.x >= 0 && box.x + box.width <= width);
+      assert.ok(box.y >= 0 && box.y + box.height <= height);
+      assert.ok(await button.evaluate(el => el.scrollWidth <= el.clientWidth + 1));
+    }
+    const disjoint = await controls.evaluate(el => {
+      const note = el.querySelector("p").getBoundingClientRect();
+      const actions = el.querySelector(".scene-practice-actions").getBoundingClientRect();
+      return actions.top - note.bottom >= 8;
+    });
+    assert.ok(disjoint, "상태 안내와 버튼 사이에 여백이 있다");
+    await page.keyboard.press("Space");
+    await retry.click();
+    await page.keyboard.press("Space");
+    if (width === 960) {
+      for (let i = 0; i < 30 && !(await page.locator("#pause").isVisible()); i++) {
+        await page.keyboard.press("Space");
+        await page.waitForTimeout(20);
+      }
+      assert.equal(await page.locator("#pause").isVisible(), true);
+      assert.equal(await page.locator("#results").isVisible(), false);
+      await page.locator('#pause [data-action="retry"]').click();
+      assert.equal(await page.locator("#pause").isVisible(), false);
+    }
+    if (touch) await exit.click();
+    else await page.keyboard.press("Escape");
+    assert.equal(await progress.inputValue(), "133");
+    assert.equal(await practice.evaluate(el => document.activeElement === el), true);
+    assert.deepEqual(await storage(), original);
+    assert.deepEqual(errors, []);
+    await context.close();
+  }
+});
+
 test("데스크톱 창 크기를 바꿔도 리플레이 조작과 플레이 배치를 유지한다", async () => {
   const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
   const { context, page, errors } = await openPage(
@@ -1573,6 +1647,8 @@ test("리플레이 링크: #replay= 로 열면 바로 재생하고, '이 기록�
   await page.waitForFunction(() => document.body.dataset.screen === "replay", null, { timeout: 5000 });
   assert.equal(await page.evaluate(() => location.hash), "", "주소의 해시는 지운다");
   assert.match(await text(page, "replay-note"), /친구의 리플레이/);
+  await page.locator("#replay-progress").fill("133");
+  assert.equal(await page.locator('[data-replay="practice"]').isVisible(), false);
   assert.equal(await page.locator('[data-replay="race"]').isVisible(), true);
   await page.click('[data-replay="race"]');
   await page.waitForFunction(

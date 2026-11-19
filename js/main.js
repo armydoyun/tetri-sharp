@@ -32,6 +32,7 @@ import {
   sanitizeReplay,
   verifyReplay,
 } from "./replay/replay.js";
+import { createSceneAttempt } from "./replay/practice.js";
 import { recordKey } from "./storage/records.js";
 import { MODERN, PRESETS, PRESET_LIST } from "./rules/presets.js";
 import { makeCustomRules, sanitizeRuleBody } from "./rules/sanitize.js";
@@ -135,6 +136,8 @@ const addVersusResult = (levelId, won) => {
 
 /** @type {"menu" | "countdown" | "play" | "paused" | "results" | "replay"} */
 let screen = "menu";
+/** @type {{spawnFrame: number, focus: HTMLElement | null} | null} */
+let scenePractice = null;
 /** 모드 찾기: 오늘의 도전(날짜별) + 나머지 */
 const findMode = id => findDaily(id) ?? findPuzzle(id) ?? findBaseMode(id);
 let mode = findMode(store.get("lastMode", null));
@@ -171,7 +174,7 @@ const showPanel = name => {
   const target =
     name === "results"
       ? panels.results
-      : name && /** @type {HTMLElement | null} */ (panels[name].querySelector("button"));
+      : name && /** @type {HTMLElement | null} */ (panels[name].querySelector("button:not(:disabled)"));
   target?.focus();
   if (!name && document.activeElement instanceof HTMLElement) document.activeElement.blur();
 };
@@ -445,7 +448,7 @@ const setScreen = next => {
   touch.setEnabled(next === "play" || next === "countdown");
   gestures.setEnabled((next === "play" || next === "countdown") && gesturesOn());
   document.body.classList.toggle("is-practice", Boolean(mode.practice) && next !== "menu");
-  $("session-title").textContent = next === "menu" ? "" : mode.name;
+  $("session-title").textContent = next === "menu" ? "" : scenePractice ? t("장면 연습") : mode.name;
   $("mode-objective").textContent =
     next === "menu" || next === "replay"
       ? ""
@@ -561,7 +564,7 @@ const pause = () => {
 $("pause-game").addEventListener("click", pause);
 
 const resume = () => {
-  if (screen !== "paused") return;
+  if (screen !== "paused" || (scenePractice && game?.state.over)) return;
   confirming = null;
   showPanel(null);
   setScreen(pausedFrom);
@@ -630,6 +633,7 @@ $("go-home").addEventListener("click", () => {
   )
     return;
   if (screen === "menu") return window.scrollTo(0, 0);
+  if (scenePractice) exitScenePractice();
   if (inProgress()) return askConfirm("menu");
   if (screen === "replay") stopReplay();
   toMenu();
@@ -659,7 +663,7 @@ const renderResultSplits = () => {
         button.textContent = label;
         button.setAttribute("aria-label", t("{segment} 구간 다시 보기", { segment: label }));
         button.addEventListener("click", () => {
-          startReplay(replay, "results");
+          startReplay(replay, "results", "", true);
           seekReplay(startFrame, true);
         });
         segment.append(button);
@@ -684,6 +688,22 @@ const renderResultSplits = () => {
         ? ""
         : t("완료한 비교 구간에서 잃은 시간이 없어요.");
   $("results-split-note").textContent = note;
+  const practice = $("results-practice-scene");
+  practice.hidden = !slowest || !replay;
+  practice.onclick =
+    slowest && replay
+      ? () => {
+          startReplay(replay, "results", "", true);
+          const index = mode.splits.indexOf(slowest.to);
+          seekReplay(splits[index - 1] ?? 0, true);
+          // 구간 경계에 등장 대기가 있으면 다음 피스를 먼저 보여 준다.
+          if (player?.frame && !player.game.state.active) {
+            while (!player.done && !player.game.state.active) player.step();
+            updateReplayBar();
+          }
+          enterScenePractice();
+        }
+      : null;
   details.querySelector("summary").textContent = slowest
     ? t("구간 기록 · {from}–{to}줄 {delta}초", {
         from: slowest.from,
@@ -941,7 +961,7 @@ const recordsUI = createRecordsUI({
   modes: MODES,
   records,
   replayFor: (key, entry) => replays.forEntry(key, entry),
-  onWatch: replay => startReplay(replay, "menu"),
+  onWatch: replay => startReplay(replay, "menu", "", true),
 });
 $("open-records").addEventListener("click", () => recordsUI.open({ modeId: mode.id, rulesId: currentRules().id }));
 $("records").addEventListener("close", () => {
@@ -962,6 +982,14 @@ const handleSystem = (action, code = "") => {
     shareUI.isOpen
   )
     return;
+  if (scenePractice) {
+    if (action === "restart") resetSceneAttempt();
+    else if (action === "pause" && code !== "Escape") {
+      if (screen === "paused") resume();
+      else pause();
+    }
+    return;
+  }
   if (screen === "replay") {
     if (action === "restart") restartReplay();
     else if (action === "pause" && code === "Escape") stopReplay();
@@ -1117,6 +1145,8 @@ $("open-settings").addEventListener("click", () => {
 for (const btn of document.querySelectorAll("[data-action]")) {
   btn.addEventListener("click", () => {
     const action = btn.getAttribute("data-action");
+    if (action === "scene-retry" || (scenePractice && action === "retry")) return resetSceneAttempt();
+    if (action === "scene-exit" || (scenePractice && action === "menu")) return exitScenePractice();
     if (action === "resume") resume();
     if (action === "retry") {
       if (inProgress()) askConfirm("restart");
@@ -1132,7 +1162,7 @@ for (const btn of document.querySelectorAll("[data-action]")) {
       if (inProgress()) askConfirm("menu");
       else toMenu();
     }
-    if (action === "watch" && lastReplay) startReplay(lastReplay);
+    if (action === "watch" && lastReplay) startReplay(lastReplay, "results", "", true);
     if (action === "stats" && game)
       statsUI.open(game.state, `${mode.name} · ${rules.name}`, !!mode.splits && splits.length > 0);
     if (action === "export" && lastReplay) shareUI.open(lastReplay, `${mode.name} · ${rules.name}`);
@@ -1153,6 +1183,7 @@ let lastReplay = null;
 /** @type {ReturnType<typeof createPlayer> | null} */
 let player = null;
 let playing = null;
+let ownReplay = false;
 let replayPaused = false;
 let replaySpeed = 1;
 /** 리플레이를 닫으면 돌아갈 곳 */
@@ -1293,7 +1324,12 @@ const jumpMark = dir => {
 replayProgress.addEventListener("input", () => seekReplay(Number(replayProgress.value), true));
 const menuNotice = $("menu-notice");
 
+const replayPractice = /** @type {HTMLButtonElement} */ (replayBar.querySelector('[data-replay="practice"]'));
+
+const canPracticeScene = () => ownReplay && playing?.mode === "sprint40" && player && !player.done;
+
 const updateReplayBar = () => {
+  replayPractice.disabled = !replayPaused || !canPracticeScene();
   /** @type {HTMLElement} */ (replayBar.querySelector(".replay-toggle-icon")).replaceChildren(
     icon(replayPaused ? "play" : "pause")
   );
@@ -1311,10 +1347,13 @@ const updateReplayBar = () => {
   updateReplayProgress();
 };
 
-const startReplay = (replay, returnTo = screen, note = "") => {
+const startReplay = (replay, returnTo = screen, note = "", local = false) => {
   const entering = screen !== "replay";
   const focus = document.activeElement;
-  if (entering) replayReturn = { screen: returnTo, game, mode, rules, focus: document.activeElement };
+  if (entering) {
+    replayReturn = { screen: returnTo, game, mode, rules, focus };
+    ownReplay = local;
+  }
   selectedMark = -1;
   playing = replay;
   player = createPlayer(replay, findMode);
@@ -1331,6 +1370,7 @@ const startReplay = (replay, returnTo = screen, note = "") => {
   setScreen("replay");
   showModeHud(mode, true);
   replayBar.hidden = false;
+  replayPractice.hidden = !ownReplay || replay.mode !== "sprint40";
   replayNote.textContent = note;
   $("replay-title").textContent = `${mode.name} · ${rules.name}`;
   renderMarkers();
@@ -1346,6 +1386,7 @@ const stopReplay = () => {
   if (screen !== "replay") return;
   player = null;
   playing = null;
+  ownReplay = false;
   replayBar.hidden = true;
   renderer.clearEffects();
   ({ game, mode, rules } = replayReturn);
@@ -1360,6 +1401,80 @@ const stopReplay = () => {
     if (replayReturn.focus instanceof HTMLElement && replayReturn.focus.getClientRects().length)
       replayReturn.focus.focus();
   }
+};
+
+const sceneControls = $("scene-practice-controls");
+const sceneStatus = $("scene-practice-status");
+const pauseResume = /** @type {HTMLButtonElement} */ (panels.pause.querySelector('[data-action="resume"]'));
+
+const setScenePauseLabels = () => {
+  const ended = Boolean(scenePractice && game?.state.over);
+  pauseResume.disabled = ended;
+  panels.pause.querySelector(".panel-title").textContent = ended ? t("장면 연습 종료") : t("일시정지");
+  panels.pause.querySelector('[data-action="retry"] .btn-label').textContent = scenePractice
+    ? t("장면 재시도")
+    : t("다시 시작");
+  panels.pause.querySelector('[data-action="menu"] .btn-label').textContent = scenePractice
+    ? t("리플레이로")
+    : t("첫 화면으로");
+};
+
+const resetSceneAttempt = () => {
+  if (!scenePractice) return;
+  const attempt = createSceneAttempt(playing, findMode, scenePractice.spawnFrame);
+  if (!attempt) {
+    exitScenePractice();
+    replayNote.textContent = t("이 장면을 연습할 수 없어요. 다른 위치를 선택해 주세요.");
+    return;
+  }
+  game = attempt;
+  game.setHandling(toEngineHandling(settings.handling));
+  keyboard.releaseAll();
+  touch.releaseAll();
+  gestures.setEnabled(false);
+  acc = 0;
+  goTimer = 0;
+  countdownEl.hidden = true;
+  fb.clearAction();
+  renderer.clearEffects();
+  inputDisplay.show(0, 0);
+  showPanel(null);
+  setScreen("play");
+  showModeHud({ hud: [] });
+  setScenePauseLabels();
+  sceneStatus.textContent = t("연습 시작점 · {time}", { time: formatTime(scenePractice.spawnFrame) });
+  /** @type {HTMLElement | null} */ (sceneControls.querySelector('[data-action="scene-retry"]'))?.focus({
+    preventScroll: true,
+  });
+};
+
+const enterScenePractice = () => {
+  if (!replayPaused || !canPracticeScene()) return;
+  scenePractice = { spawnFrame: player.spawnFrame, focus: replayPractice };
+  document.body.toggleAttribute("data-scene-practice", true);
+  replayBar.hidden = true;
+  sceneControls.hidden = false;
+  resetSceneAttempt();
+};
+
+const exitScenePractice = () => {
+  if (!scenePractice || !player) return;
+  const { focus } = scenePractice;
+  scenePractice = null;
+  document.body.removeAttribute("data-scene-practice");
+  sceneControls.hidden = true;
+  game = player.game;
+  renderer.clearEffects();
+  fb.clearAction();
+  inputDisplay.show(player.input.held, player.input.pressed);
+  showPanel(null);
+  setScreen("replay");
+  showModeHud(mode, true);
+  setScenePauseLabels();
+  replayBar.hidden = false;
+  renderTimelineMarks();
+  updateReplayBar();
+  focus?.focus({ preventScroll: true });
 };
 
 const advanceReplay = count => {
@@ -1395,6 +1510,7 @@ for (const btn of replayBar.querySelectorAll("[data-replay]")) {
     if (action === "ahead") return seekReplay((player?.frame ?? 0) + 300);
     if (action === "prev-mark") return jumpMark(-1);
     if (action === "next-mark") return jumpMark(1);
+    if (action === "practice") return enterScenePractice();
     if (action === "share" && playing) return shareUI.open(playing, `${mode.name} · ${rules.name}`);
     if (action === "race" && playing) return raceReplay(playing);
     if (action === "restart") return restartReplay();
@@ -1406,7 +1522,7 @@ for (const btn of replayBar.querySelectorAll("[data-replay]")) {
 // 리플레이 중 단축키: Space 일시정지, 1·2·4 속도 (Esc 닫기, R 처음부터는 시스템 키로 처리)
 window.addEventListener("keydown", e => {
   if (
-    screen !== "replay" ||
+    (screen !== "replay" && !scenePractice) ||
     settingsUI.isOpen ||
     rulesUI.isOpen ||
     recordsUI.isOpen ||
@@ -1420,6 +1536,10 @@ window.addEventListener("keydown", e => {
     e.repeat
   )
     return;
+  if (scenePractice) {
+    if (e.code === "Escape") exitScenePractice();
+    return;
+  }
   const inBar = replayBar.contains(document.activeElement);
   if (e.code === "Escape") return stopReplay();
   if (e.code === "Space" && !inBar) replayPaused = !replayPaused;
@@ -1471,7 +1591,7 @@ const openReplayText = text => {
 
 $("watch-last").addEventListener("click", () => {
   const replay = replays.last();
-  if (replay) startReplay(replay, "menu");
+  if (replay) startReplay(replay, "menu", "", true);
 });
 const fileInput = /** @type {HTMLInputElement} */ ($("replay-file"));
 $("open-replay").addEventListener("click", () => fileInput.click());
@@ -1546,6 +1666,18 @@ const tick = () => {
   if (goTimer > 0 && --goTimer === 0) countdownEl.hidden = true;
   const held = keyboard.held | pad.held | touch.held | gestures.held;
   const pressed = keyboard.takePressed() | touch.takePressed() | gestures.takePressed();
+  if (scenePractice) {
+    const events = game.step({ held, pressed });
+    inputDisplay.show(held, pressed);
+    renderer.addEvents(events);
+    sfx.events(events);
+    feedback(events);
+    if (game.state.over) {
+      setScenePauseLabels();
+      pause();
+    }
+    return;
+  }
   if (mode.practice) undo.track(game.state);
   inputDisplay.show(held, pressed);
   recorder?.input(held, pressed);
@@ -1587,7 +1719,7 @@ const loop = now => {
     acc -= FRAME_MS;
   }
   renderer.draw(game);
-  if (race && screen !== "replay" && raceBoardVisible.matches) raceRenderer.draw(race.player.game);
+  if (race && !scenePractice && screen !== "replay" && raceBoardVisible.matches) raceRenderer.draw(race.player.game);
   if (versus && raceBoardVisible.matches) cpuRenderer.draw(versus.cpu);
   updateHud();
   inputDisplay.paint();
