@@ -1329,6 +1329,27 @@ for (const [locale, width, height] of [
   });
 }
 
+test("대화상자: 끝까지 내려도 마지막 줄·버튼이 아래 구분선에 붙지 않는다", async () => {
+  const { context, page, errors } = await openPage();
+  for (const opener of ["#open-help", "#open-practice", "#open-puzzles", "#open-records", "#open-settings"]) {
+    await page.click(opener);
+    const gap = await page.evaluate(() => {
+      const body = [...document.querySelectorAll("dialog")].find(d => d.open).querySelector(".dialog-body");
+      body.scrollTop = body.scrollHeight;
+      let bottom = 0;
+      for (const e of body.querySelectorAll("*")) {
+        const r = e.getBoundingClientRect();
+        if (r.height) bottom = Math.max(bottom, r.bottom);
+      }
+      return body.getBoundingClientRect().bottom - bottom;
+    });
+    assert.ok(gap >= 12, `${opener} 아래 여백 ${gap}px`);
+    await page.keyboard.press("Escape");
+  }
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
 test("편의: 처음 안내 줄은 닫으면 다시 뜨지 않고, 도움말은 머리글에서 언제든 연다", async () => {
   const { context, page, errors } = await openPage();
   assert.equal(await visible(page, "welcome"), true, "처음에는 안내 줄");
