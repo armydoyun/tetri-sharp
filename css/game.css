@@ -713,6 +713,13 @@ body[data-screen="paused"] .countdown {
   font-weight: 700;
 }
 
+.results-splits .actions-row .btn {
+  min-height: var(--control-h-s);
+  height: auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .results-splits p:empty {
   display: none;
 }
