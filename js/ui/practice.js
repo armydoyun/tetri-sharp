@@ -12,20 +12,22 @@ export const createPracticeUI = ({ dialog, onPick }) => {
       const list = el(
         "div",
         { class: "menu-list practice-list" },
-        ...DRILLS.map((d, i) => {
-          const card = el(
-            "button",
-            { type: "button", class: "menu-row", "data-drill": d.id },
-            el("span", { class: "menu-index num", text: String(i + 1).padStart(2, "0") }),
-            el("span", { class: "menu-text" }, el("strong", { text: d.name }), el("small", { text: d.description })),
-            icon("chevron-right")
-          );
-          card.addEventListener("click", () => {
-            dialog.close();
-            onPick(d);
-          });
-          return card;
-        })
+        ...[...DRILLS.filter(drill => drill.id === "free"), ...DRILLS.filter(drill => drill.id !== "free")].map(
+          (d, i) => {
+            const card = el(
+              "button",
+              { type: "button", class: "menu-row", "data-drill": d.id },
+              el("span", { class: "menu-index num", text: String(i + 1).padStart(2, "0") }),
+              el("span", { class: "menu-text" }, el("strong", { text: d.name }), el("small", { text: d.description })),
+              icon("chevron-right")
+            );
+            card.addEventListener("click", () => {
+              dialog.close();
+              onPick(d);
+            });
+            return card;
+          }
+        )
       );
       notice.textContent = t("중력이 없어요. 소프트 드롭으로 내려 자리에 맞춰 돌려 넣으세요. 기록은 남지 않아요.");
       fillDialog(dialog, {

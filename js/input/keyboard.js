@@ -6,7 +6,7 @@
 /**
  * @param {{
  *   getBindings: () => { buttons: Record<string, number>, system: Record<string, string> },
- *   onSystem: (action: string) => void,
+ *   onSystem: (action: string, code: string) => void,
  * }} options
  */
 export const createKeyboard = ({ getBindings, onSystem }) => {
@@ -39,7 +39,7 @@ export const createKeyboard = ({ getBindings, onSystem }) => {
     const action = system[e.code];
     if (action && !e.repeat) {
       if (enabled) e.preventDefault();
-      onSystem(action);
+      onSystem(action, e.code);
     }
   };
 

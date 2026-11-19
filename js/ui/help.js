@@ -11,9 +11,11 @@ import { t } from "../i18n/index.js";
  *   getSettings: () => any,
  *   isTouch: () => boolean,
  *   onOpenSettings: (tab: string) => void,
+ *   onStart: () => void,
+ *   canStart: () => boolean,
  * }} options
  */
-export const createHelpUI = ({ dialog, getSettings, isTouch, onOpenSettings }) => {
+export const createHelpUI = ({ dialog, getSettings, isTouch, onOpenSettings, onStart, canStart }) => {
   const notice = el("p", { class: "notice-slot", role: "status" });
 
   const keyList = () => {
@@ -39,8 +41,11 @@ export const createHelpUI = ({ dialog, getSettings, isTouch, onOpenSettings }) =
           [t("위로 밀기"), t("홀드")],
         ]
       : [
-          [t("보드 아래 버튼"), t("이동 · 회전 · 드롭 · 홀드")],
-          [t("오른쪽 끝 버튼"), t("일시정지 · 다시 시작")],
+          [t("좌우 화살표"), t("한 칸씩 이동")],
+          [t("아래 화살표"), t("누르는 동안 천천히 내리기")],
+          [t("밑줄 있는 아래 화살표"), t("바닥으로 바로 내려놓기")],
+          [t("원형 화살표"), t("반시계 · 180도 · 시계 방향 회전")],
+          [t("겹친 사각형"), t("현재 피스 맡기기")],
         ];
     return el(
       "dl",
@@ -73,17 +78,22 @@ export const createHelpUI = ({ dialog, getSettings, isTouch, onOpenSettings }) =
     });
     access.addEventListener("click", () => toSettings("access"));
 
+    const start = button({ text: t("Sprint 40L 시작"), iconName: "play", className: "btn btn-primary" });
+    start.addEventListener("click", () => {
+      dialog.close();
+      onStart();
+    });
     const body = el(
       "div",
       {},
       section(
         t("이렇게 시작해요"),
         steps([
-          t("위의 규칙에서 Modern을 고른 채로 두세요. 요즘 표준 규칙이에요."),
-          t("플레이 모드에서 Marathon이나 Sprint 40L을 눌러 시작해요."),
+          t("Sprint 40L은 40줄을 지우는 데 걸린 시간을 재요."),
           t("줄을 가득 채우면 지워져요. 블록이 위까지 차면 끝나요."),
           t("익숙해지면 연습에서 T-spin을, CPU 대전에서 공격과 방어를 익혀 보세요."),
-        ])
+        ]),
+        ...(canStart() ? [start] : [])
       ),
       section(isTouch() ? t("터치 조작") : t("키보드 조작"), isTouch() ? touchList() : keyList()),
       section(

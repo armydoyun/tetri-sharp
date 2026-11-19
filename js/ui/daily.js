@@ -71,10 +71,26 @@ export const createDailyUI = ({ dialog, getToday, makeCode, makeLink, formatReco
       })
     );
     const race = button({ text: t("겨루기"), iconName: "play", className: "btn btn-small", id: "daily-race" });
+    let checking = false;
+    race.disabled = !pasteInput.value.trim();
+    pasteInput.addEventListener("input", () => {
+      race.disabled = checking || !pasteInput.value.trim();
+      pasteInput.removeAttribute("aria-invalid");
+      notice.textContent = "";
+    });
     const doRace = async () => {
-      const problem = await onRace(pasteInput.value);
-      if (problem) notice.textContent = problem;
-      else dialog.close();
+      const value = pasteInput.value.trim();
+      if (!value || checking) return;
+      checking = true;
+      race.disabled = true;
+      const problem = await onRace(value);
+      checking = false;
+      race.disabled = !pasteInput.value.trim();
+      if (problem) {
+        notice.textContent = problem;
+        pasteInput.setAttribute("aria-invalid", "true");
+        pasteInput.focus();
+      } else dialog.close();
     };
     race.addEventListener("click", doRace);
     pasteInput.addEventListener("keydown", e => {
@@ -100,23 +116,27 @@ export const createDailyUI = ({ dialog, getToday, makeCode, makeLink, formatReco
         ),
         play
       ),
-      el("h3", { class: "daily-section", text: t("내 결과 공유") }),
-      el(
-        "section",
-        { class: "field-section" },
-        fieldRow({
-          id: "daily-code",
-          label: t("결과 코드"),
-          hint: t("오늘 최고 기록의 리플레이"),
-          control: el("span", { class: "inline-control" }, codeInput, copyCode),
-        }),
-        fieldRow({
-          id: "daily-link",
-          label: t("공유 링크"),
-          hint: t("배포 주소에서 열었을 때 쓸모 있어요"),
-          control: el("span", { class: "inline-control" }, copyLink),
-        })
-      ),
+      ...(code
+        ? [
+            el("h3", { class: "daily-section", text: t("내 결과 공유") }),
+            el(
+              "section",
+              { class: "field-section" },
+              fieldRow({
+                id: "daily-code",
+                label: t("결과 코드"),
+                hint: t("오늘 최고 기록의 리플레이"),
+                control: el("span", { class: "inline-control" }, codeInput, copyCode),
+              }),
+              fieldRow({
+                id: "daily-link",
+                label: t("공유 링크"),
+                hint: t("배포 주소에서 열었을 때 쓸모 있어요"),
+                control: el("span", { class: "inline-control" }, copyLink),
+              })
+            ),
+          ]
+        : []),
       el("h3", { class: "daily-section", text: t("받은 결과와 겨루기") }),
       el(
         "section",

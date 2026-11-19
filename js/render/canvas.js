@@ -2,6 +2,7 @@
 // 한 캔버스에 [홀드 | 보드 | 넥스트]를 나란히 그린다. 보드 위로 2줄 여유를 둬서 막 생성된 피스가 보이게 한다.
 // 모습은 게임 테마(./themes.js)가 정한다. 접근성 설정(색각 친화 색, 효과 줄임/끄기)은 테마 위에 덮인다.
 import { VISIBLE_ROWS, WIDTH as COLS, createBoard, get } from "../core/board.js";
+import { t } from "../i18n/index.js";
 import { CELL_ID } from "../core/pieces.js";
 import { VISIBLE_TOP } from "../core/engine.js";
 import { createEffects } from "./effects.js";
@@ -24,7 +25,9 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
   const emptyBoard = createBoard();
 
   // 좁은 화면(휴대폰 세로)이면 홀드·넥스트 칸을 줄인다. 휴대폰 가로는 넓은 배치(css/game.css와 같은 조건)
-  const narrow = window.matchMedia("(max-width: 720px) and (not ((orientation: landscape) and (max-height: 520px)))");
+  const narrow = window.matchMedia(
+    "(max-width: 720px) and (not ((orientation: landscape) and (max-height: 520px) and (pointer: coarse)))"
+  );
   let cell = 0;
   let side = 0;
   /** devicePixelRatio를 반영해 캔버스 해상도를 정하고 셀 크기를 정수로 맞춘다(번짐 방지). */
@@ -177,14 +180,14 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     const small = Math.round(cell * (narrow.matches ? 0.57 : 0.8));
     const sidePad = Math.round((side * cell - 4 * small) / 2);
     if (game.rules.hold.enabled) {
-      label("Hold", sidePad, by);
+      label(t("홀드"), sidePad, by);
       if (hold) preview(theme, palette, game, hold, sidePad, by + cell, small, holdUsed);
     }
 
     // 넥스트
     const nx = bx + COLS * cell + sidePad;
     if (game.rules.previewCount > 0) {
-      label("Next", nx, by);
+      label(t("다음 피스"), nx, by);
       // 퍼즐은 주어진 피스만(돌아오는 피스는 보이지 않게): 지금 피스를 뺀 남은 수까지
       const puzzle = game.state.puzzle;
       const shown = puzzle ? Math.max(0, puzzle.need - puzzle.placed - 1) : game.rules.previewCount;

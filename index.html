@@ -31,6 +31,14 @@
       <!-- 첫 화면: 게임 메뉴. 넓으면 [규칙·모드 | 도구] 두 칸, 좁으면 한 칸 -->
       <section id="menu" class="home" aria-label="첫 화면" hidden>
         <div class="home-main">
+          <section class="home-block home-modes" aria-labelledby="mode-title">
+            <div class="block-head">
+              <h2 id="mode-title" class="section-title">플레이 모드</h2>
+              <a id="active-rules" class="active-rules" href="#rules-title"></a>
+            </div>
+            <div id="mode-list" class="menu-list"></div>
+          </section>
+
           <!-- 처음 오신 분 안내: 닫으면 다시 뜨지 않는다(도움말은 머리글에서 언제든) -->
           <section id="welcome" class="welcome" aria-labelledby="welcome-title" hidden>
             <div class="welcome-text">
@@ -38,10 +46,11 @@
               <p>조작법과 추천 순서, 편하게 하는 설정을 짧게 알려 드릴게요.</p>
             </div>
             <div class="welcome-actions">
-              <button id="welcome-open" class="btn btn-primary btn-small" type="button"><span data-icon="help"></span>안내 보기</button>
+              <button id="welcome-open" class="btn btn-primary btn-small" type="button"><span data-icon="help"></span><span class="btn-label">안내 보기</span></button>
               <button id="welcome-close" class="btn btn-ghost btn-small" type="button" aria-label="안내 닫기"><span data-icon="close"></span></button>
             </div>
           </section>
+
           <section class="home-block rule-card" aria-labelledby="rules-title">
             <div class="block-head">
               <h2 id="rules-title" class="section-title">규칙</h2>
@@ -53,24 +62,9 @@
             <!-- 고른 규칙 설명: 두 줄 자리를 늘 차지한다 -->
             <p id="rule-desc" class="rule-desc"></p>
           </section>
-
-          <section class="home-block home-modes" aria-labelledby="mode-title">
-            <div class="block-head">
-              <h2 id="mode-title" class="section-title">플레이 모드</h2>
-            </div>
-            <div id="mode-list" class="menu-list"></div>
-          </section>
         </div>
 
         <aside class="home-side" aria-label="플레이 도구">
-          <section class="home-block race-entry" aria-labelledby="race-title">
-            <div class="block-head">
-              <h2 id="race-title" class="section-title">내 기록과 달리기</h2>
-            </div>
-            <p class="block-note">같은 규칙의 최고 기록 리플레이와 같은 블록 순서로 겨뤄요</p>
-            <div id="race-modes" class="tool-list"></div>
-          </section>
-
           <section class="home-block" aria-labelledby="training-tools-title">
             <div class="block-head">
               <h2 id="training-tools-title" class="section-title">연습과 기록</h2>
@@ -82,6 +76,15 @@
             </div>
           </section>
 
+          <section class="home-block race-entry" aria-labelledby="race-title">
+            <div class="block-head">
+              <h2 id="race-title" class="section-title">내 기록과 달리기</h2>
+            </div>
+            <p class="block-note">같은 규칙의 최고 기록 리플레이와 같은 블록 순서로 겨뤄요</p>
+            <p class="block-note race-empty">완주하면 같은 규칙의 내 기록과 달릴 수 있어요.</p>
+            <div id="race-modes" class="tool-list"></div>
+          </section>
+
           <section class="home-block" aria-labelledby="replay-tools-title">
             <div class="block-head">
               <h2 id="replay-tools-title" class="section-title">리플레이</h2>
@@ -90,6 +93,7 @@
               <button id="watch-last" class="tool-row" type="button" disabled><span>마지막 판 다시 보기</span><small>저장된 판 없음</small><span data-icon="chevron-right"></span></button>
               <button id="open-replay" class="tool-row" type="button"><span>파일 열기</span><span data-icon="folder"></span></button>
             </div>
+            <p id="replay-import-notice" class="inline-notice" role="status"></p>
             <input id="replay-file" type="file" accept=".json,application/json" hidden />
           </section>
 
@@ -117,15 +121,16 @@
       <section class="stage" aria-label="게임 화면">
         <!-- 정보 칸: 모드마다 필요한 칸만(게임 시작 때 정해지고 게임 중에는 그대로) -->
         <div class="stage-side">
+          <p id="mode-objective" class="mode-objective"></p>
           <dl class="hud">
             <div data-hud="time"><dt id="hud-time-label">시간</dt><dd id="hud-time">0:00.00</dd></div>
             <div data-hud="score"><dt>점수</dt><dd id="hud-score">0</dd></div>
             <div data-hud="level"><dt>레벨</dt><dd id="hud-level">1</dd></div>
             <div data-hud="lines"><dt id="hud-lines-label">줄</dt><dd id="hud-lines">0</dd></div>
             <div data-hud="pieces"><dt>피스</dt><dd id="hud-pieces">0</dd></div>
-            <div data-hud="pps"><dt>PPS</dt><dd id="hud-pps">0.00</dd></div>
+            <div data-hud="pps"><dt>초당 피스</dt><dd id="hud-pps">0.00</dd></div>
             <div data-hud="streak" class="is-off"><dt>연속 / 최고</dt><dd id="hud-streak">0 / 0</dd></div>
-            <div data-hud="split"><dt>PB 대비</dt><dd id="hud-split" class="hud-split">—</dd></div>
+            <div data-hud="split"><dt>최고 기록 대비</dt><dd id="hud-split" class="hud-split">—</dd></div>
             <div data-hud="attack" class="is-off"><dt>보낸 줄</dt><dd id="hud-attack">0</dd></div>
             <div data-hud="finesse" class="is-off"><dt>피네스 실수</dt><dd id="hud-finesse">0 / 0</dd></div>
           </dl>
@@ -135,6 +140,11 @@
               <span id="race-progress-label" class="num">0 / 40줄</span>
             </div>
             <progress id="race-progress" aria-label="최고 기록 진행" value="0" max="40"></progress>
+            <div class="race-panel-head">
+              <strong>이번 판</strong>
+              <span id="race-own-label" class="num"></span>
+            </div>
+            <progress id="race-own-progress" aria-label="이번 판 진행" value="0" max="40"></progress>
             <canvas id="race-board" class="race-board" aria-label="최고 기록 보드"></canvas>
           </aside>
           <!-- 키 입력 표시: 누르고 있는 동작에 불이 들어온다(설정에서 켠다) -->
@@ -148,7 +158,7 @@
             <span data-bit="8"><span data-icon="drop"></span></span>
             <span data-bit="2"><span data-icon="arrow-right"></span></span>
           </div>
-          <button id="undo-piece" class="btn btn-small undo-piece" type="button" title="되돌리기 (연습)"><span data-icon="undo"></span>되돌리기 <kbd data-key="UNDO"></kbd></button>
+          <button id="undo-piece" class="btn btn-small undo-piece" type="button" title="되돌리기 (연습)"><span data-icon="undo"></span><span class="btn-label">되돌리기</span><kbd data-key="UNDO"></kbd></button>
           <aside id="versus-panel" class="race-panel versus-panel" aria-label="CPU 상황" hidden>
             <div class="race-panel-head">
               <strong id="versus-name">CPU</strong>
@@ -171,9 +181,9 @@
             <div class="panel-card">
               <h2 class="panel-title">일시정지</h2>
               <div class="actions">
-                <button type="button" class="btn btn-primary" data-action="resume"><span data-icon="play"></span>계속 <kbd><kbd class="keycap">Esc</kbd></kbd></button>
-                <button type="button" class="btn" data-action="retry"><span data-icon="restart"></span>다시 시작 <kbd data-key="RESTART"></kbd></button>
-                <button type="button" class="btn" data-action="menu"><span data-icon="menu"></span>첫 화면으로</button>
+                <button type="button" class="btn btn-primary" data-action="resume"><span data-icon="play"></span><span class="btn-label">계속</span><kbd><kbd class="keycap">Esc</kbd></kbd></button>
+                <button type="button" class="btn" data-action="retry"><span data-icon="restart"></span><span class="btn-label">다시 시작</span><kbd data-key="RESTART"></kbd></button>
+                <button type="button" class="btn" data-action="menu"><span data-icon="menu"></span><span class="btn-label">첫 화면으로</span></button>
               </div>
             </div>
           </div>
@@ -184,7 +194,7 @@
               <h2 id="confirm-title" class="panel-title"></h2>
               <p id="confirm-desc" class="confirm-desc">진행 중인 판은 기록되지 않고 사라져요.</p>
               <div class="actions-row">
-                <button type="button" class="btn" data-confirm="cancel"><span data-icon="play"></span>계속하기 <kbd><kbd class="keycap">Esc</kbd></kbd></button>
+                <button type="button" class="btn" data-confirm="cancel"><span data-icon="play"></span><span class="confirm-cancel-text">계속하기</span> <kbd><kbd class="keycap">Esc</kbd></kbd></button>
                 <button type="button" class="btn btn-primary" data-confirm="ok"><span class="confirm-ok-icon"></span><span class="confirm-ok-text">다시 시작</span> <kbd class="confirm-ok-key"></kbd></button>
               </div>
             </div>
@@ -192,35 +202,37 @@
 
           <div id="results" class="panel" tabindex="-1" hidden>
             <div class="panel-card results-card">
-              <p id="results-mode" class="results-mode"></p>
-              <h2 id="results-title" class="panel-title"></h2>
-              <p id="results-main" class="results-main"></p>
-              <!-- 새 기록일 때만 보이지만 자리는 늘 차지한다(원칙 2) -->
-              <p id="results-badge" class="badge is-invisible"><span data-icon="star"></span>새 기록</p>
-              <p id="race-result" class="race-result"></p>
-              <dl id="results-stats" class="results-stats"></dl>
-              <details id="results-splits" class="results-splits">
-                <summary>구간 기록</summary>
-                <table>
-                  <thead><tr><th scope="col">구간</th><th scope="col">구간 시간</th><th scope="col">PB 대비</th></tr></thead>
-                  <tbody id="results-split-rows"></tbody>
-                </table>
-                <p id="results-split-note" role="status"></p>
-                <div class="actions-row">
-                  <button type="button" class="btn btn-small" data-action="retry-seed">같은 블록 재시작</button>
-                  <button type="button" class="btn btn-small" id="results-race-best" data-action="race-best" disabled>PB와 달리기</button>
-                </div>
-              </details>
+              <div class="results-content">
+                <p id="results-mode" class="results-mode"></p>
+                <h2 id="results-title" class="panel-title"></h2>
+                <p id="results-main" class="results-main"></p>
+                <!-- 새 기록일 때만 보이지만 자리는 늘 차지한다(원칙 2) -->
+                <p id="results-badge" class="badge is-invisible"><span data-icon="star"></span>새 기록</p>
+                <p id="race-result" class="race-result"></p>
+                <dl id="results-stats" class="results-stats"></dl>
+                <details id="results-splits" class="results-splits">
+                  <summary>구간 기록</summary>
+                  <table>
+                    <thead><tr><th scope="col">구간</th><th scope="col">구간 시간</th><th scope="col">PB 대비</th></tr></thead>
+                    <tbody id="results-split-rows"></tbody>
+                  </table>
+                  <p id="results-split-note" role="status"></p>
+                  <div class="actions-row">
+                    <button type="button" class="btn btn-small" data-action="retry-seed">같은 블록 순서로 재시작</button>
+                    <button type="button" class="btn btn-small" id="results-race-best" data-action="race-best" disabled>최고 기록과 달리기</button>
+                  </div>
+                </details>
+              </div>
               <div class="actions">
                 <div class="actions-row">
-                  <button type="button" class="btn btn-primary" data-action="retry"><span data-icon="restart"></span>다시 하기 <kbd data-key="RESTART"></kbd></button>
-                  <button type="button" class="btn btn-primary" data-action="next-puzzle" hidden><span data-icon="chevron-right"></span>다음 단계</button>
-                  <button type="button" class="btn" data-action="menu"><span data-icon="menu"></span>첫 화면 <kbd><kbd class="keycap">Esc</kbd></kbd></button>
+                  <button type="button" class="btn btn-primary" data-action="retry"><span data-icon="restart"></span><span class="btn-label">다시 하기</span><kbd data-key="RESTART"></kbd></button>
+                  <button type="button" class="btn btn-primary" data-action="next-puzzle" hidden><span data-icon="chevron-right"></span><span class="btn-label">다음 단계</span></button>
+                  <button type="button" class="btn" data-action="menu"><span data-icon="menu"></span><span class="btn-label">첫 화면</span><kbd><kbd class="keycap">Esc</kbd></kbd></button>
                 </div>
                 <div class="actions-row actions-row-3">
-                  <button type="button" class="btn btn-small" data-action="stats"><span data-icon="chart"></span>통계</button>
-                  <button type="button" class="btn btn-small" data-action="watch"><span data-icon="play"></span>다시 보기</button>
-                  <button type="button" class="btn btn-small" data-action="export" aria-label="리플레이 공유" title="리플레이 공유(링크·파일)"><span data-icon="link"></span>공유</button>
+                  <button type="button" class="btn btn-small" data-action="stats"><span data-icon="chart"></span><span class="btn-label">통계</span></button>
+                  <button type="button" class="btn btn-small" data-action="watch"><span data-icon="play"></span><span class="btn-label">다시 보기</span></button>
+                  <button type="button" class="btn btn-small" data-action="export" aria-label="리플레이 공유" title="리플레이 공유(링크·파일)"><span data-icon="link"></span><span class="btn-label">공유</span></button>
                 </div>
               </div>
             </div>
@@ -230,9 +242,12 @@
         <!-- 보드 아래 자리: 게임 중에는 터치 버튼, 리플레이 중에는 리플레이 조작 -->
         <div id="replay-bar" class="replay-bar" hidden>
           <div class="replay-info">
-            <span class="replay-tag">REPLAY</span>
-            <span id="replay-title" class="replay-title"></span>
-            <span id="replay-status" class="replay-status"></span>
+            <div class="replay-heading">
+              <span class="replay-tag">REPLAY</span>
+              <span id="replay-title" class="replay-title"></span>
+              <span id="replay-status" class="replay-status"></span>
+            </div>
+            <button type="button" class="btn btn-ghost" data-replay="exit"><span data-icon="close"></span><span>닫기</span></button>
           </div>
           <p id="replay-note" class="replay-note" role="status"></p>
           <!-- 진행 막대: 눌러서 원하는 시점으로. 위에는 분석 표시(피네스 실수·오래 고민한 피스·주요 장면) -->
@@ -244,21 +259,29 @@
             <span id="replay-time" class="num"></span>
           </div>
           <div class="replay-analysis">
-            <button type="button" class="btn btn-small" data-replay="prev-mark" aria-label="이전 표시로"><span data-icon="arrow-left"></span>이전 표시</button>
             <p id="replay-summary" class="replay-summary"></p>
-            <button type="button" class="btn btn-small" data-replay="next-mark" aria-label="다음 표시로">다음 표시<span data-icon="arrow-right"></span></button>
+            <div class="replay-mark-controls">
+              <span>장면</span>
+              <button type="button" class="btn btn-ghost" data-replay="prev-mark" aria-label="이전 표시로" title="이전 표시로"><span data-icon="arrow-left"></span></button>
+              <button type="button" class="btn btn-ghost" data-replay="next-mark" aria-label="다음 표시로" title="다음 표시로"><span data-icon="arrow-right"></span></button>
+            </div>
           </div>
-          <div class="replay-buttons">
-            <button type="button" class="btn" data-replay="toggle"><span class="replay-toggle-icon"><span data-icon="pause"></span></span><span class="replay-toggle-text">일시정지</span></button>
-            <button type="button" class="btn num" data-replay="back" aria-label="5초 뒤로">-5초</button>
-            <button type="button" class="btn num" data-replay="ahead" aria-label="5초 앞으로">+5초</button>
-            <button type="button" class="btn num" data-replay="step-back" aria-label="한 프레임 뒤로">-1F</button>
-            <button type="button" class="btn num" data-replay="step" aria-label="한 프레임 앞으로">+1F</button>
-            <button type="button" class="btn num" data-replay="speed" aria-label="재생 속도 바꾸기"><span data-icon="forward"></span><span class="replay-speed">1x</span></button>
-            <button type="button" class="btn" data-replay="restart"><span data-icon="restart"></span>처음부터</button>
-            <button type="button" class="btn" data-replay="share"><span data-icon="link"></span>공유</button>
-            <button type="button" class="btn" data-replay="race" hidden><span data-icon="play"></span>이 기록과 달리기</button>
-            <button type="button" class="btn" data-replay="exit"><span data-icon="close"></span>닫기</button>
+          <div class="replay-transport">
+            <button type="button" class="btn num" data-replay="back" aria-label="5초 뒤로"><span>-5초</span></button>
+            <button type="button" class="btn btn-primary" data-replay="toggle"><span class="replay-toggle-icon"><span data-icon="pause"></span></span><span class="replay-toggle-text">일시정지</span></button>
+            <button type="button" class="btn num" data-replay="ahead" aria-label="5초 앞으로"><span>+5초</span></button>
+            <button type="button" class="btn num" data-replay="speed" aria-label="재생 속도 바꾸기"><span class="replay-speed">1x</span></button>
+          </div>
+          <div class="replay-utilities">
+            <div class="replay-refine">
+              <button type="button" class="btn btn-ghost num" data-replay="step-back" aria-label="한 프레임 뒤로"><span>-1F</span></button>
+              <button type="button" class="btn btn-ghost num" data-replay="step" aria-label="한 프레임 앞으로"><span>+1F</span></button>
+              <button type="button" class="btn btn-ghost" data-replay="restart"><span data-icon="restart"></span><span>처음부터</span></button>
+            </div>
+            <div class="replay-actions">
+              <button type="button" class="btn btn-ghost" data-replay="share"><span data-icon="link"></span><span>공유</span></button>
+              <button type="button" class="btn btn-ghost" data-replay="race" hidden><span data-icon="play"></span><span>이 기록과 달리기</span></button>
+            </div>
           </div>
         </div>
         <!-- 터치 버튼: 세로 화면은 보드 아래 5×2, 가로 화면은 왼쪽(이동)·오른쪽(회전·드롭)으로 나눈다 -->

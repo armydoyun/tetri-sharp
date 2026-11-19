@@ -113,7 +113,7 @@ body[data-screen="menu"] .stage {
 .home {
   width: min(1120px, 100%);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  grid-template-columns: minmax(0, 1fr) clamp(210px, 29%, 320px);
   align-items: start;
   gap: var(--space-6);
   padding-top: var(--space-2);
@@ -123,7 +123,7 @@ body[data-screen="menu"] .stage {
   display: none;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 680px) {
   .home {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-5);
@@ -431,7 +431,7 @@ body[data-screen="replay"] .race-panel,
   }
 
   body:not([data-screen="replay"]):has(.race-panel:not([hidden])) {
-    --chrome-h: 232px;
+    --chrome-h: 260px;
   }
 }
 
@@ -476,19 +476,21 @@ body[data-screen="replay"]:has(.replay-note:not(:empty)) {
 
 @media (max-width: 720px) {
   body[data-screen="replay"] {
-    --replay-controls-h: 270px;
+    --replay-controls-h: 340px;
   }
 }
 
 .board {
+  --board-height: calc(100vh - var(--chrome-h) - var(--under-h));
+  --board-width: min(640px, calc(100cqi - var(--board-inline-reserve)), max(80px, calc(var(--board-height) * var(--board-ratio))));
   display: block;
-  width: min(640px, calc(100cqi - var(--board-inline-reserve)), calc((100vh - var(--chrome-h) - var(--under-h)) * var(--board-ratio)));
-  height: auto;
+  width: var(--board-width);
+  height: calc(var(--board-width) / var(--board-ratio));
 }
 
 @supports (height: 100dvh) {
   .board {
-    width: min(640px, calc(100cqi - var(--board-inline-reserve)), calc((100dvh - var(--chrome-h) - var(--under-h)) * var(--board-ratio)));
+    --board-height: calc(100dvh - var(--chrome-h) - var(--under-h));
   }
 }
 
@@ -736,32 +738,42 @@ body[data-screen="paused"] .countdown {
   gap: var(--space-2);
 }
 
-.replay-info {
+.replay-info,
+.replay-heading {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-2);
-  font-size: var(--text-m);
+  min-width: 0;
+}
+
+.replay-info {
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--space-1);
+}
+
+.replay-info .btn {
+  flex: none;
+  white-space: nowrap;
+}
+
+.replay-heading {
+  flex-wrap: wrap;
+  gap: 2px var(--space-2);
 }
 
 .replay-tag {
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-s);
-  background: var(--accent);
-  color: var(--on-accent);
+  color: var(--accent);
   font-size: var(--text-xs);
   font-weight: 900;
   letter-spacing: 0.08em;
 }
 
-.replay-title {
-  color: var(--text-dim);
-}
-
+.replay-title,
 .replay-status {
-  margin-left: auto;
-  min-width: 3em;
-  text-align: right;
   color: var(--text-dim);
+  font-size: var(--text-s);
+  overflow-wrap: anywhere;
 }
 
 .replay-note {
@@ -786,14 +798,73 @@ body[data-screen="paused"] .countdown {
 
 
 
-.replay-buttons {
+.replay-transport {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(96px, 100%), 1fr));
-  gap: var(--space-2);
+  grid-template-columns: minmax(34px, 1fr) minmax(max-content, 2.5fr) repeat(2, minmax(34px, 1fr));
+  gap: var(--space-1);
 }
 
-.replay-buttons .btn {
-  padding: 0 var(--space-2);
+.replay-bar .btn {
+  min-width: 0;
+  min-height: 32px;
+  height: auto;
+  padding: 4px 6px;
+  gap: 6px;
+  font-size: var(--text-s);
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.replay-bar .btn:focus-visible {
+  outline-offset: 1px;
+}
+
+.replay-bar .btn .icon,
+.replay-toggle-icon {
+  display: block;
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+}
+
+/* 아이콘과 글자의 보이는 중심을 맞춘다. */
+.replay-bar .btn > span:not(.replay-toggle-icon) {
+  transform: translateY(2px);
+}
+
+.replay-bar .btn-ghost {
+  color: var(--text-dim);
+}
+
+.replay-bar .btn-ghost:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.replay-mark-controls,
+.replay-refine,
+.replay-actions,
+.replay-utilities {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.replay-mark-controls { color: var(--text-dim); font-size: var(--text-s); }
+.replay-mark-controls .btn {
+  width: 30px;
+}
+
+.replay-utilities {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-1);
+}
+
+.replay-refine,
+.replay-actions {
+  flex-wrap: wrap;
 }
 
 /* ---- 정보 칸(HUD) ---- */
@@ -912,7 +983,7 @@ body[data-screen="paused"] .countdown {
   -webkit-touch-callout: none;
 }
 
-body.touch-on .touchpad {
+body.touch-on:not(.gestures-mode):is([data-screen="play"], [data-screen="countdown"]) .touchpad {
   display: grid;
 }
 
@@ -988,17 +1059,18 @@ body[data-screen="replay"] .touchpad {
 .replay-track {
   display: block;
   position: relative;
-  padding-top: 10px;
+  padding-top: 16px;
 }
 
 .replay-track input {
   display: block;
+  outline-offset: 0;
 }
 
 /* 막대 위 표시: 누를 수 있는 작은 기둥. 색으로 종류를 나눈다 */
 .replay-markers {
   position: absolute;
-  inset: 0 0 auto;
+  inset: 0 8px auto;
   height: 12px;
   pointer-events: none;
 }
@@ -1017,11 +1089,17 @@ body[data-screen="replay"] .touchpad {
   cursor: pointer;
 }
 
+/* 같은 위치에 모인 표시는 점 하나로 표시한다. 이전/다음은 개별 장면을 탐색한다. */
+.replay-mark.is-group {
+  width: 8px;
+  margin-left: -4px;
+}
+
 /* 누르기 쉽게 보이지 않는 여유를 둔다 */
 .replay-mark::before {
   content: "";
   position: absolute;
-  inset: -4px -5px;
+  inset: -4px -4px;
 }
 
 .replay-mark:hover,
@@ -1059,28 +1137,20 @@ body[data-screen="replay"] .touchpad {
 }
 
 .replay-analysis {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
 .replay-summary {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 2px var(--space-3);
+  gap: 2px var(--space-2);
   min-width: 0;
   margin: 0;
   color: var(--text-dim);
   font-size: var(--text-s);
-}
-
-.replay-buttons .btn[data-replay="back"],
-.replay-buttons .btn[data-replay="ahead"],
-.replay-buttons .btn[data-replay="step-back"],
-.replay-buttons .btn[data-replay="step"] {
-  font-family: var(--font-num);
 }
 
 /* ---- 결과 카드: 보드 안에 스크롤 없이 들어가게 ----
@@ -1181,7 +1251,19 @@ body.is-versus {
     gap: var(--space-3);
   }
 
+  body.is-versus .hud {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  body.is-versus .input-display {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
   body.is-versus .versus-panel {
+    grid-column: 2;
+    grid-row: 1 / span 2;
     padding-top: 0;
     border-top: 2px solid var(--border-strong);
   }
@@ -1360,7 +1442,7 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
 
 /* ---- 휴대폰 가로 화면: [정보·왼손 버튼 | 보드 | 오른손 버튼] ----
    높이가 낮으니 머리글을 줄이고, 터치 버튼을 보드 아래가 아니라 양옆에 둔다(보드가 화면 높이를 다 쓴다). */
-@media (orientation: landscape) and (max-height: 520px) {
+@media (orientation: landscape) and (max-height: 520px) and (pointer: coarse) {
   :root {
     --chrome-h: 64px;
     --board-ratio: calc(20 / 22);
@@ -1434,7 +1516,7 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
     align-self: start;
   }
 
-  body.touch-on:not([data-screen="replay"]) .touchpad {
+  body.touch-on:not(.gestures-mode):is([data-screen="play"], [data-screen="countdown"]) .touchpad {
     display: contents;
   }
 
@@ -1494,40 +1576,6 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
     min-width: 0;
   }
 
-  .replay-info,
-  .replay-note,
-  .replay-analysis {
-    font-size: var(--text-s);
-  }
-
-  .replay-analysis {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .replay-analysis .replay-summary {
-    grid-column: 1 / -1;
-    grid-row: 1;
-  }
-
-  .replay-buttons {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 4px;
-  }
-
-  .replay-buttons .btn {
-    font-size: var(--text-s);
-  }
-
-  .replay-buttons .btn[data-replay="race"] {
-    grid-column: span 2;
-  }
-
-  /* 낮은 화면에서는 프레임 단위 이동을 빼고 나머지만 */
-  .replay-buttons .btn[data-replay="step-back"],
-  .replay-buttons .btn[data-replay="step"] {
-    display: none;
-  }
-
   .input-display,
   .undo-piece {
     display: none !important;
@@ -1584,3 +1632,230 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
     font-size: var(--text-xs);
   }
 }
+
+/* 마우스 창에서는 높이가 바뀌어도 정보 칸은 보드 오른쪽에 둔다. */
+@media (pointer: fine) and (max-height: 700px) {
+  .hud > div {
+    padding-block: clamp(1px, calc((100dvh - 360px) / 60), 6px);
+  }
+
+  .hud dd {
+    font-size: clamp(16px, 3.5dvh, var(--text-3xl));
+  }
+
+  .race-board {
+    width: min(94px, max(0px, calc((100dvh - 535px) * 10 / 22)));
+  }
+}
+
+@media (pointer: fine) and (min-width: 721px),
+       (pointer: fine) and (min-width: 480px) and (max-height: 600px) {
+  body[data-screen="replay"] {
+    --replay-side: clamp(224px, 43cqi, 440px);
+    --board-inline-reserve: calc(var(--replay-side) + var(--space-3) + 2px);
+  }
+
+  body[data-screen="replay"] .stage {
+    --under-h: 0px;
+    grid-template-columns: auto var(--replay-side);
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "board hud" "board under";
+    justify-items: stretch;
+    gap: var(--space-2) var(--space-3);
+  }
+
+  body[data-screen="replay"] .stage .hud {
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-flow: row;
+    border-bottom: 0;
+  }
+
+  body[data-screen="replay"] .hud dt {
+    white-space: normal;
+  }
+
+  body[data-screen="replay"] .hud dd {
+    font-size: clamp(13px, 2.8cqi, 18px);
+  }
+
+  body[data-screen="replay"] .replay-bar {
+    min-width: 0;
+  }
+}
+
+@media (pointer: fine) and (max-height: 460px) {
+  :root {
+    --chrome-h: 80px;
+  }
+
+  body:not([data-screen="menu"]) .app {
+    padding-block: var(--space-2);
+    gap: var(--space-2);
+  }
+
+  body:not([data-screen="menu"]) .app-header {
+    height: 36px;
+  }
+}
+
+@media (pointer: fine) and (max-width: 600px),
+       (pointer: fine) and (max-height: 450px) {
+  .board-wrap:has(> .panel:not([hidden])) {
+    overflow: visible;
+  }
+
+  .board-wrap > .panel {
+    position: fixed;
+    z-index: 2;
+    padding: var(--space-2);
+  }
+
+}
+
+@media (max-width: 420px) {
+  .results-stats {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  body.is-versus .hud dt,
+  .versus-stats dt {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-height: 600px) {
+  .replay-bar {
+    gap: var(--space-1);
+  }
+
+  .replay-bar .btn {
+    min-height: 28px;
+  }
+}
+
+@media (pointer: fine) and (max-width: 720px) and (max-height: 460px) {
+  :root {
+    --chrome-h: 128px;
+  }
+}
+
+@media (max-width: 720px) {
+  .results-stats dt {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .results-card .actions .btn {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .results-card .actions kbd {
+    display: none;
+  }
+}
+
+/* 첫 판과 자주 쓰는 도구를 먼저 읽게 한다. */
+.home .welcome { padding-block: var(--space-2); }
+.active-rules { color: var(--text-dim); font-size: var(--text-s); }
+#mode-list .menu-row {
+  grid-template-columns: minmax(0, 1fr) auto 16px;
+  min-height: 54px;
+  padding-inline-start: var(--space-3);
+}
+#mode-list .menu-text { grid-column: 1; }
+#mode-list .mode-best { min-width: 0; }
+#mode-list .mode-best:empty { display: none; }
+#mode-list .menu-row > .icon { grid-column: 3; }
+
+.race-entry:not(:has(.race-mode:enabled)) #race-modes,
+.race-entry:has(.race-mode:enabled) .race-empty,
+.race-entry:not(:has(.race-mode:enabled)) .block-note:not(.race-empty),
+.mode-objective:empty,
+.inline-notice:empty { display: none; }
+.race-mode:disabled { display: none; }
+.mode-objective, .inline-notice {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--text-s);
+}
+.mode-objective { max-width: 100%; overflow-wrap: anywhere; }
+body.is-versus [data-hud="lines"] dd { color: var(--accent); }
+body[data-screen="results"] #action { display: none; }
+
+@media (min-width: 1000px) {
+  #mode-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #mode-list [data-mode="sprint40"] { grid-column: 1 / -1; }
+}
+
+@media (max-width: 680px) {
+  .home { display: flex; flex-direction: column; }
+  .home-main, .home-side { display: contents; }
+  .home-modes, .home .home-block, .home .welcome, .home .help-card { width: 100%; }
+  .home .rule-card { order: 1; }
+}
+
+@media (max-width: 600px) {
+  #mode-list .mode-best { grid-column: 1; }
+}
+
+@media (orientation: landscape) and (max-height: 520px) and (pointer: coarse) {
+  .race-panel .race-board { display: none; }
+
+  body:not([data-screen="replay"]) .stage-side:has(#race-panel:not([hidden])) {
+    display: contents;
+  }
+
+  .stage-side:has(#race-panel:not([hidden])) > .hud {
+    grid-area: hud;
+  }
+
+  #race-panel {
+    grid-area: rside;
+    align-self: start;
+  }
+}
+
+.results-content { display: contents; }
+
+@media (max-height: 500px), (max-width: 440px) {
+  #results.panel { padding: var(--space-2); }
+  .results-card {
+    max-height: 100%;
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .results-card .actions .btn {
+    min-height: 34px;
+    height: auto;
+    padding: 4px;
+    gap: 4px;
+    font-size: var(--text-s);
+    white-space: normal;
+  }
+
+  .results-content {
+    display: grid;
+    justify-items: center;
+    align-content: start;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: 0;
+    overflow: auto;
+    scrollbar-gutter: stable;
+    padding-bottom: var(--space-1);
+  }
+  .results-card #results-badge {
+    position: static;
+  }
+  .results-card #results-badge.is-invisible {
+    display: none;
+  }
+}
+
+#race-own-progress::-webkit-progress-value { background: var(--accent); }
+#race-progress::-webkit-progress-value { background: var(--text-dim); }
+#race-progress::-moz-progress-bar { background: var(--text-dim); }

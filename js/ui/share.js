@@ -32,10 +32,24 @@ export const createShareUI = ({ dialog, makeCode, makeLink, onSaveFile }) => {
         className: "btn btn-primary btn-small",
         id: "share-link",
       });
+      const linkInput = el("input", {
+        class: "text-input",
+        type: "url",
+        value: link,
+        readOnly: true,
+        hidden: true,
+        "aria-label": t("공유 링크"),
+      });
       copyLink.addEventListener("click", async () => {
-        notice.textContent = (await copy(link))
+        const copied = await copy(link);
+        notice.textContent = copied
           ? t("링크를 복사했어요. 받은 사람이 열면 바로 재생하고 이 기록과 달릴 수 있어요")
-          : t("복사하지 못했어요");
+          : t("자동 복사가 막혔어요. 선택된 링크를 직접 복사해 주세요.");
+        if (!copied) {
+          linkInput.hidden = false;
+          linkInput.focus();
+          linkInput.select();
+        }
       });
       const save = button({
         text: t("파일로 저장"),
@@ -57,8 +71,8 @@ export const createShareUI = ({ dialog, makeCode, makeLink, onSaveFile }) => {
           fieldRow({
             id: "share-link",
             label: t("공유 링크"),
-            hint: t("배포 주소에서 열었을 때 쓸모 있어요"),
-            control: el("span", { class: "inline-control" }, copyLink),
+            hint: t("받은 사람이 링크를 열면 바로 재생할 수 있어요."),
+            control: el("div", { class: "share-link-control" }, copyLink, linkInput),
           }),
           fieldRow({
             id: "share-file",
