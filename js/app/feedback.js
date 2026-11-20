@@ -3,15 +3,38 @@ import { clearName } from "../rules/scoring/guideline.js";
 import { formatScore } from "../modes/format.js";
 import { t } from "../i18n/index.js";
 
+const describeAttack = ({ cleared, tspin, lines, blocked, base, backToBack, combo, perfect }) => {
+  const outcome = [];
+  if (blocked) outcome.push(t("{n}줄 상쇄", { n: blocked }));
+  if (lines) outcome.push(t("{n}줄 보냄", { n: lines }));
+  if (!outcome.length) outcome.push(t("공격 0줄"));
+  const clear =
+    tspin === "mini"
+      ? t("미니 T스핀 {n}줄", { n: cleared })
+      : tspin === "full"
+        ? t("T스핀 {n}줄", { n: cleared })
+        : t("일반 {n}줄", { n: cleared });
+  const parts = [`${clear} +${base}`];
+  if (backToBack) parts.push(t("백투백 +{n}", { n: backToBack }));
+  if (combo) parts.push(t("콤보 +{n}", { n: combo }));
+  if (perfect) parts.push(t("퍼펙트 클리어 +{n}", { n: perfect }));
+  return { outcome, parts };
+};
+
 /**
  * @param {{
  *   actionEl: HTMLElement,
+ *   versusEl: HTMLElement,
  *   srStatus: HTMLElement,
  *   getSettings: () => any,
  *   describeLeft: () => { label: string, value: string } | null,
  * }} options  describeLeft: 줄을 지웠을 때 함께 읽을 "남은 양"(모드의 줄 칸)
  */
-export const createFeedback = ({ actionEl, srStatus, getSettings, describeLeft }) => {
+export const createFeedback = ({ actionEl, versusEl, srStatus, getSettings, describeLeft }) => {
+  const attackOutcome = versusEl.querySelector(".versus-feedback-outcome");
+  const attackParts = versusEl.querySelector(".versus-feedback-parts");
+  let explainedSingle = false;
+
   /** 보드 위에 큰 글씨로 잠깐 띄운다 @param {string[]} lines */
   const announceText = lines => {
     if (!lines.length) return;
@@ -66,8 +89,31 @@ export const createFeedback = ({ actionEl, srStatus, getSettings, describeLeft }
     requestAnimationFrame(() => (srStatus.textContent = text));
   };
 
+  const announceAttack = e => {
+    // 매번 싱글이 나올 때 알릴 필요는 없다. 미니 T스핀과 상쇄처럼 다른 결과는 매번 설명한다.
+    if (e.tspin === "none" && !e.lines && !e.blocked) {
+      if (explainedSingle) return "";
+      explainedSingle = true;
+    }
+    const { outcome, parts } = describeAttack(e);
+    attackOutcome.textContent = outcome.join(" · ");
+    attackParts.replaceChildren(
+      ...parts.map(part => {
+        const span = document.createElement("span");
+        span.textContent = part;
+        return span;
+      })
+    );
+    versusEl.classList.remove("is-shown");
+    void versusEl.offsetWidth;
+    versusEl.classList.add("is-shown");
+    return [...outcome, ...parts].join(" · ");
+  };
+
   /** 이벤트 → 진동·읽기 */
   const react = events => {
+    const attack = events.find(e => e.type === "attack");
+    const detail = attack ? announceAttack(attack) : "";
     for (const e of events) {
       if (e.type === "lock") {
         if (e.lines > 0) {
@@ -75,7 +121,7 @@ export const createFeedback = ({ actionEl, srStatus, getSettings, describeLeft }
           const name = clearName(e);
           const left = describeLeft();
           say(
-            [name || t("{n}줄 지움", { n: e.lines }), left ? `${left.label} ${left.value}` : ""]
+            [detail || name || t("{n}줄 지움", { n: e.lines }), left ? `${left.label} ${left.value}` : ""]
               .filter(Boolean)
               .join(" · ")
           );
@@ -88,7 +134,11 @@ export const createFeedback = ({ actionEl, srStatus, getSettings, describeLeft }
   };
 
   /** 떠 있는 액션 표시를 지운다(새 판·리플레이 이동 때) */
-  const clearAction = () => actionEl.classList.remove("is-shown");
+  const clearAction = () => {
+    actionEl.classList.remove("is-shown");
+    versusEl.classList.remove("is-shown");
+    explainedSingle = false;
+  };
 
   return { announce, announceText, clearAction, buzz, say, react };
 };

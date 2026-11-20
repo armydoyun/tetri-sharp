@@ -8,7 +8,7 @@ import { t } from "../i18n/index.js";
  * @param {{ dialog: HTMLDialogElement, getStats: () => Record<string, { win: number, loss: number }>, onPick: (level: any) => void }} options
  */
 export const createVersusUI = ({ dialog, getStats, onPick }) => {
-  const notice = el("p", { class: "notice-slot", role: "status" });
+  const notice = el("p", { class: "notice-slot", hidden: true });
   return {
     open() {
       const stats = getStats();
@@ -45,7 +45,6 @@ export const createVersusUI = ({ dialog, getStats, onPick }) => {
           return row;
         })
       );
-      notice.textContent = t("같은 블록 순서로 동시에 시작해요. 줄을 지우면 상대에게 쓰레기 줄을 보내요.");
       fillDialog(dialog, {
         title: t("CPU 대전"),
         body: el("div", {}, el("section", { class: "field-section" }, list)),

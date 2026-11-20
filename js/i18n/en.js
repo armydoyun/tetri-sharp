@@ -191,8 +191,15 @@ export const EN = {
   "초당 {pps}피스 · {hold}": "{pps} pieces/s · {hold}",
   "홀드 사용": "uses hold",
   "홀드 안 씀": "no hold",
-  "같은 블록 순서로 동시에 시작해요. 줄을 지우면 상대에게 쓰레기 줄을 보내요.":
-    "You both start with the same pieces. Clearing lines sends garbage to the other side.",
+  "{n}줄 상쇄": "{n} blocked",
+  "{n}줄 보냄": "{n} sent",
+  "공격 0줄": "No attack",
+  "일반 {n}줄": "{n}-line clear",
+  "미니 T스핀 {n}줄": "{n}-line mini T-spin",
+  "T스핀 {n}줄": "{n}-line T-spin",
+  "백투백 +{n}": "B2B +{n}",
+  "콤보 +{n}": "Combo +{n}",
+  "퍼펙트 클리어 +{n}": "Perfect clear +{n}",
   // ---- 오늘의 도전 ----
   "오늘의 도전": "Daily challenge",
   "오늘의 도전 · {date}": "Daily challenge · {date}",

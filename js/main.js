@@ -864,6 +864,7 @@ const finish = () => {
 // ---- 반응: 액션 표시(보드 위 큰 글씨) · 진동 · 화면 읽기 알림 ----
 const fb = createFeedback({
   actionEl: $("action"),
+  versusEl: $("versus-feedback"),
   srStatus: $("sr-status"),
   getSettings: () => settings,
   describeLeft: () => (game ? mode.hudLines(game.state) : null),
@@ -1766,7 +1767,9 @@ const tick = () => {
     if (!race.player.done) race.player.step();
     updateRaceProgress();
   }
-  for (const e of events) announce(e);
+  for (const e of events) {
+    if (!versus || e.type !== "lock" || !e.lines) announce(e);
+  }
   renderer.addEvents(events);
   sfx.events(events);
   feedback(events);
