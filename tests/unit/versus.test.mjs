@@ -54,6 +54,50 @@ test("보낸 줄은 먼저 내 받을 쓰레기를 상쇄하고, 남는 만큼 �
   assert.ok(got.some(e => e.type === "garbage" && e.rows === 3));
 });
 
+test("공격 설명은 실제 보너스, 상쇄한 줄, 보낸 줄을 함께 전달한다", () => {
+  const mode = versusMode(LEVELS[0]);
+  const game = createGame({ rules: MODERN, seed: 1, mode });
+  game.state.garbage.pending = 2;
+  const explain = clear => {
+    const events = [];
+    mode.onLock(game.state, lock(clear), events);
+    return events[0];
+  };
+  assert.deepEqual(explain({ lines: 1 }), {
+    type: "attack",
+    cleared: 1,
+    tspin: "none",
+    base: 0,
+    backToBack: 0,
+    combo: 0,
+    perfect: 0,
+    blocked: 0,
+    lines: 0,
+  });
+  assert.deepEqual(explain({ lines: 1, tspin: "mini", b2b: true, combo: 2 }), {
+    type: "attack",
+    cleared: 1,
+    tspin: "mini",
+    base: 0,
+    backToBack: 1,
+    combo: 1,
+    perfect: 0,
+    blocked: 2,
+    lines: 0,
+  });
+  assert.deepEqual(explain({ lines: 2, tspin: "full", b2b: true, perfect: true }), {
+    type: "attack",
+    cleared: 2,
+    tspin: "full",
+    base: 4,
+    backToBack: 1,
+    combo: 0,
+    perfect: 10,
+    blocked: 0,
+    lines: 15,
+  });
+});
+
 test("finishAs: 바깥에서 판을 끝내면 finish 이벤트, 두 번째는 무시", () => {
   const game = createGame({ rules: MODERN, seed: 1, mode: versusMode(LEVELS[0]) });
   game.step();

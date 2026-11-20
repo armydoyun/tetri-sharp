@@ -18,13 +18,16 @@ export const COMBO_ATTACK = Object.freeze([0, 0, 1, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5
 export const PERFECT_ATTACK = 10;
 
 /** 고정 이벤트 하나가 보내는 줄 수 */
-export const attackFor = ev => {
-  if (!ev.lines) return 0;
+const attackParts = ev => {
   const table = ATTACK[ev.tspin] ?? ATTACK.none;
   const base = table[Math.min(ev.lines, table.length - 1)] ?? 0;
   const combo = ev.combo >= 0 ? COMBO_ATTACK[Math.min(ev.combo, COMBO_ATTACK.length - 1)] : 0;
-  return base + (ev.b2b ? 1 : 0) + combo + (ev.perfect ? PERFECT_ATTACK : 0);
+  const backToBack = ev.b2b ? 1 : 0;
+  const perfect = ev.perfect ? PERFECT_ATTACK : 0;
+  return { base, combo, backToBack, perfect, total: base + combo + backToBack + perfect };
 };
+
+export const attackFor = ev => (ev.lines ? attackParts(ev).total : 0);
 
 /**
  * 난이도: pps = CPU가 1초에 놓는 피스 수, mistake = 가장 좋은 자리 대신 차선을 고를 확률(%),
@@ -58,16 +61,14 @@ export const versusMode = level => {
     onLock: (state, ev, events) => {
       const g = state.garbage;
       if (ev.lines > 0) {
-        let attack = attackFor(ev);
-        const blocked = Math.min(g.pending, attack);
+        const { total, ...parts } = attackParts(ev);
+        const blocked = Math.min(g.pending, total);
+        const sent = total - blocked;
         g.pending -= blocked;
         g.blocked += blocked;
-        attack -= blocked;
-        if (attack > 0) {
-          g.sent += attack;
-          g.outgoing += attack;
-          events.push({ type: "attack", lines: attack });
-        }
+        g.sent += sent;
+        g.outgoing += sent;
+        events.push({ type: "attack", lines: sent, cleared: ev.lines, tspin: ev.tspin, blocked, ...parts });
         return false;
       }
       receiveGarbage(state, events);

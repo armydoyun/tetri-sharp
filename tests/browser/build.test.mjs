@@ -44,8 +44,22 @@ test("결과는 파일 하나이고 바깥 파일을 참조하지 않는다", ()
   assert.ok(result.bytes < 1024 * 1024, `배포본 크기 ${result.bytes} bytes`);
 });
 
-const openPage = async (initScript = null, initArg = undefined, { locale = "ko-KR" } = {}) => {
+const openPage = async (initScript = null, initArg = undefined, { locale = "ko-KR", frameClock = false } = {}) => {
   const context = await browser.newContext({ locale, viewport: { width: 1280, height: 900 }, acceptDownloads: true });
+  if (frameClock) {
+    await context.addInitScript(() => {
+      let now = 0;
+      let callbacks = [];
+      Object.defineProperty(performance, "now", { value: () => now });
+      window.requestAnimationFrame = fn => callbacks.push(fn);
+      window.advanceFrame = () => {
+        now += 1000 / 60 + 0.0001;
+        const current = callbacks;
+        callbacks = [];
+        for (const callback of current) callback(now);
+      };
+    });
+  }
   if (initScript) await context.addInitScript(initScript, initArg);
   const blocked = [];
   await context.route("**/*", route => {
@@ -89,6 +103,22 @@ const choose = async (page, id, value) => {
 };
 const text = (page, id) => page.locator(`#${id}`).textContent();
 const visible = (page, id) => page.locator(`#${id}`).isVisible();
+const playReplayFrames = (page, inputs, from, to, delay = 0, topOut = false) =>
+  page.evaluate(
+    ({ from, to, delay, topOut, inputs }) => {
+      const codes = { 1: "ArrowLeft", 2: "ArrowRight", 8: "Space", 16: "ArrowUp" };
+      const pressed = new Map(inputs.map(([frame, , button]) => [frame, codes[button]]));
+      for (let i = 0; i < to - from + delay && document.body.dataset.screen === "play"; i++) {
+        const code = topOut ? "Space" : i >= delay && pressed.get(from + i - delay);
+        if (code) {
+          window.dispatchEvent(new KeyboardEvent("keydown", { code, cancelable: true }));
+          window.dispatchEvent(new KeyboardEvent("keyup", { code, cancelable: true }));
+        }
+        window.advanceFrame();
+      }
+    },
+    { from, to, delay, topOut, inputs }
+  );
 /** 메뉴에서 모드를 골라 카운트다운이 끝날 때까지 기다린다. */
 const startMode = async (page, id) => {
   await page.click(`[data-mode="${id}"]`);
@@ -1243,6 +1273,56 @@ test("오늘의 도전: 창에서 시작하고, 받은 코드(이름 포함)로 
   await linked.close();
 });
 
+test("CPU 대전: 첫 싱글의 공격 0줄과 콤보 공격 이유를 플레이 중 보여 준다", async () => {
+  const { replay } = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
+  const { context, page, errors } = await openPage(
+    seed => {
+      Math.random = () => seed / 2 ** 32;
+      localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off", announce: "on" } }));
+    },
+    replay.seed,
+    { locale: "en-US", frameClock: true }
+  );
+  try {
+    await page.click('[data-mode="versus"]');
+    assert.equal(await page.locator("#versus .notice-slot").isVisible(), false);
+    await page.click('#versus [data-level="easy"]');
+    await page.setViewportSize({ width: 560, height: 360 });
+    const rect = () => page.locator("#board").boundingBox();
+    const board = await rect();
+    const message = page.locator("#versus-feedback");
+    const outcome = message.locator(".versus-feedback-outcome");
+    const parts = () => message.locator(".versus-feedback-parts span").allTextContents();
+
+    await playReplayFrames(page, replay.inputs, 0, 21);
+    assert.equal(await outcome.textContent(), "No attack");
+    assert.deepEqual(await parts(), ["1-line clear +0"]);
+    assert.ok(await message.evaluate(el => Boolean((window.firstAttackAnimation = el.getAnimations()[0]))));
+    await playReplayFrames(page, replay.inputs, 21, 31);
+    assert.equal(await message.evaluate(el => el.getAnimations()[0] === window.firstAttackAnimation), true);
+
+    await playReplayFrames(page, replay.inputs, 31, 241);
+    assert.equal(await outcome.textContent(), "1 sent");
+    assert.deepEqual(await parts(), ["2-line clear +1"]);
+    assert.equal(await text(page, "versus-cpu-incoming"), "1");
+    await playReplayFrames(page, replay.inputs, 241, 255);
+    assert.deepEqual(await parts(), ["1-line clear +0", "Combo +1"]);
+    assert.match(await text(page, "sr-status"), /1 sent.*Combo \+1/);
+    assert.deepEqual(await rect(), board);
+    const box = await message.boundingBox();
+    assert.ok(box && box.x >= 0 && box.x + box.width <= 560 && box.y >= 0 && box.y + box.height <= 360);
+    await page.keyboard.press("KeyR");
+    await page.keyboard.press("KeyR");
+    assert.equal(await message.evaluate(el => el.classList.contains("is-shown")), false);
+    await playReplayFrames(page, replay.inputs, 0, 21);
+    assert.equal(await outcome.textContent(), "No attack");
+    assert.equal(await message.evaluate(el => el.classList.contains("is-shown")), true);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test("리플레이 탐색: 막대로 원하는 시점에 가고, 표시로 건너뛰며, 뒤로 가도 같은 판이 나온다", async () => {
   const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
   const { context, page, errors } = await openPage(replay => {
@@ -1371,41 +1451,15 @@ test("Sprint 구간 연습은 같은 시점부터 비교하고 재시도 후 리
       Math.random = () => seed / 2 ** 32;
       localStorage.setItem("tetrisharp:records", JSON.stringify({ "sprint40|modern": [pb] }));
       localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
-      let now = 0;
-      let callbacks = [];
-      Object.defineProperty(performance, "now", { value: () => now });
-      window.requestAnimationFrame = fn => {
-        return callbacks.push(fn);
-      };
-      window.advanceFrame = () => {
-        now += 1000 / 60 + 0.0001;
-        const current = callbacks;
-        callbacks = [];
-        for (const callback of current) callback(now);
-      };
     },
-    { seed: replay.seed, pb }
+    { seed: replay.seed, pb },
+    { frameClock: true }
   );
   try {
     const {
       splits: [start, end],
     } = record;
-    const playFrames = (from, to, delay = 0, topOut = false) =>
-      page.evaluate(
-        ({ from, to, delay, topOut, inputs }) => {
-          const codes = { 1: "ArrowLeft", 2: "ArrowRight", 8: "Space", 16: "ArrowUp" };
-          const pressed = new Map(inputs.map(([frame, , button]) => [frame, codes[button]]));
-          for (let i = 0; i < to - from + delay && document.body.dataset.screen === "play"; i++) {
-            const code = topOut ? "Space" : i >= delay && pressed.get(from + i - delay);
-            if (code) {
-              window.dispatchEvent(new KeyboardEvent("keydown", { code, cancelable: true }));
-              window.dispatchEvent(new KeyboardEvent("keyup", { code, cancelable: true }));
-            }
-            window.advanceFrame();
-          }
-        },
-        { from, to, delay, topOut, inputs: replay.inputs }
-      );
+    const playFrames = (from, to, delay, topOut) => playReplayFrames(page, replay.inputs, from, to, delay, topOut);
     await page.locator('[data-mode="sprint40"]').click({ timeout: 3000 });
     await playFrames(0, replay.result.frames);
     assert.equal(await visible(page, "results"), true);
