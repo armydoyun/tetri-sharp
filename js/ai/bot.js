@@ -90,12 +90,13 @@ export const placements = (board, rotation, type, startX, startY) => {
 
 /**
  * @param {{ game: ReturnType<typeof import("../core/engine.js").createGame>, rotation: any,
- *   level: { pps: number, mistake: number, hold: boolean }, seed?: number }} options
+ *   level: { pps: number, mistake: number, hold: boolean, holdMinGain?: number }, seed?: number }} options
  */
 export const createBot = ({ game, rotation, level, seed = 1 }) => {
   const rng = createRng((seed ^ 0x5bd1e995) >>> 0);
   const rules = game.rules;
   const framesPerPiece = Math.max(1, Math.round(60 / level.pps));
+  const holdMinGain = level.holdMinGain ?? 0.5;
   /** @type {null | { hold: boolean, rot: number, x: number }} */
   let plan = null;
   let pieceId = -1;
@@ -124,7 +125,7 @@ export const createBot = ({ game, rotation, level, seed = 1 }) => {
       const size = other === "I" ? 4 : other === "O" ? 2 : 3;
       const ox = Math.floor((WIDTH - size) / 2);
       const alt = placements(s.board, rotation, other, ox, a.y)[0];
-      if (alt && alt.score > best.score + 0.5) best = { hold: true, ...alt };
+      if (alt && alt.score > best.score + holdMinGain) best = { hold: true, ...alt };
     }
     plan = best;
     // 생각하는 시간: 한 피스에 쓸 프레임에서 움직이는 데 드는 프레임을 뺀 만큼

@@ -28,7 +28,7 @@ export const createVersusUI = ({ dialog, getStats, onPick }) => {
               el("small", {
                 text: t("초당 {pps}피스 · {hold}", {
                   pps: level.pps,
-                  hold: level.hold ? t("홀드 사용") : t("홀드 안 씀"),
+                  hold: !level.hold ? t("홀드 안 씀") : "holdMinGain" in level ? t("홀드 제한적 사용") : t("홀드 사용"),
                 }),
               })
             ),
