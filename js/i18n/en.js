@@ -2,8 +2,20 @@
 // tests/unit/i18n.test.mjs가 코드와 index.html의 한국어 문장이 모두 여기 있는지 확인한다.
 /** @type {Record<string, string>} */
 export const EN = {
+  "원래 판": "Original",
+  "이번 시도": "This attempt",
+  "구간 재시도": "Retry split",
+  "{from}–{to}줄 구간": "Lines {from}–{to}",
+  "구간 미완료": "Split incomplete",
+  "구간 완료": "Split complete",
+  "목표 {goal}줄 중 {n}줄까지 도달했어요.": "Reached {n} of {goal} lines.",
+  "원래 판과 같은 시간이에요.": "Same time as the original.",
+  "원래 판보다 {time}초 단축": "{time}s faster than the original",
+  "원래 판보다 {time}초 느림": "{time}s slower than the original",
+  "이번 연습 최고 · {time}": "Practice best · {time}",
   "장면 연습": "Practice scene",
   "장면 재시도": "Retry scene",
+  "구간 연습": "Split practice",
   리플레이로: "Back to replay",
   "장면 연습 종료": "Scene ended",
   "연습 시작점 · {time}": "Start point · {time}",

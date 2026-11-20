@@ -12,7 +12,7 @@ import {
   verifyReplay,
 } from "../../js/replay/replay.js";
 import { createStore, memoryBackend } from "../../js/storage/store.js";
-import { createSceneAttempt } from "../../js/replay/practice.js";
+import { createSceneAttempt, splitAttemptOutcome } from "../../js/replay/practice.js";
 import { createRng } from "../../js/core/rng.js";
 
 /** 무작위 입력으로 한 판을 두고 리플레이를 만든다. changeAt이면 그 프레임에 조작 설정을 바꾼다. */
@@ -222,4 +222,13 @@ test("Sprint 장면 연습: 생성 프레임의 홀드 이후 상태에서 분�
   }
   assert.equal(original.game.state.stats.pieces, 0);
   assert.equal(retry.state.stats.pieces, 7);
+});
+
+test("구간 연습은 실제 분기 프레임부터 시간을 재고 완료 전 막히면 비교하지 않는다", () => {
+  const outcome = (frame, lines, over = null) => splitAttemptOutcome({ frame, stats: { lines }, over }, 135, 20, 300);
+  assert.equal(outcome(250, 19), null);
+  assert.deepEqual(outcome(291, 21), { frames: 156, original: 165, delta: -9 });
+  assert.deepEqual(outcome(300, 20), { frames: 165, original: 165, delta: 0 });
+  assert.deepEqual(outcome(331, 20), { frames: 196, original: 165, delta: 31 });
+  assert.deepEqual(outcome(212, 18, "blockOut"), { frames: 77, original: 165, delta: null });
 });

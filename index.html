@@ -124,6 +124,13 @@
           <p id="mode-objective" class="mode-objective"></p>
           <div id="scene-practice-controls" class="scene-practice-controls" hidden>
             <p id="scene-practice-status" role="status"></p>
+            <div id="scene-split-progress" class="scene-split-progress" hidden>
+              <div class="scene-split-progress-head">
+                <label id="scene-split-lines" for="scene-split-meter"></label>
+                <span id="scene-split-elapsed" class="num"></span>
+              </div>
+              <progress id="scene-split-meter" value="0" max="1"></progress>
+            </div>
             <div class="scene-practice-actions">
               <button type="button" class="btn btn-small" data-action="scene-retry"><span data-icon="restart"></span><span class="btn-label">장면 재시도</span></button>
               <button type="button" class="btn btn-small btn-ghost" data-action="scene-exit"><span class="btn-label">리플레이로</span></button>
@@ -206,6 +213,25 @@
               </div>
             </div>
           </div>
+
+          <section id="scene-result" class="panel scene-result" tabindex="-1" aria-labelledby="scene-result-title" hidden>
+            <div class="panel-card scene-result-card">
+              <div class="scene-result-content">
+                <p id="scene-result-range" class="results-mode"></p>
+                <h2 id="scene-result-title" class="panel-title"></h2>
+                <dl class="scene-result-times">
+                  <div><dt>원래 판</dt><dd id="scene-result-original" class="num"></dd></div>
+                  <div><dt>이번 시도</dt><dd id="scene-result-attempt" class="num"></dd></div>
+                </dl>
+                <p id="scene-result-delta" role="status"></p>
+                <p id="scene-result-best" class="scene-result-best"></p>
+              </div>
+              <div class="actions-row scene-result-actions">
+                <button type="button" class="btn btn-primary" data-action="scene-retry"><span data-icon="restart"></span><span class="btn-label">구간 재시도</span></button>
+                <button type="button" class="btn" data-action="scene-exit"><span class="btn-label">리플레이로</span></button>
+              </div>
+            </div>
+          </section>
 
           <div id="results" class="panel" tabindex="-1" hidden>
             <div class="panel-card results-card">

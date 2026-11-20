@@ -24,3 +24,12 @@ export const createSceneAttempt = (replay, findMode, spawnFrame) => {
   game.state.das = { dir: 0, charge: 0, arrAcc: 0 };
   return game;
 };
+
+/** 같은 생성 시점을 기준으로 원래 판과 연습 시도의 소요 시간을 잰다. */
+export const splitAttemptOutcome = (state, startFrame, target, originalEndFrame) => {
+  const frames = state.frame - startFrame;
+  const original = originalEndFrame - startFrame;
+  if (state.stats.lines >= target) return { frames, original, delta: frames - original };
+  if (state.over) return { frames, original, delta: null };
+  return null;
+};

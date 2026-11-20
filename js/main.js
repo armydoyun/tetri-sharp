@@ -32,7 +32,7 @@ import {
   sanitizeReplay,
   verifyReplay,
 } from "./replay/replay.js";
-import { createSceneAttempt } from "./replay/practice.js";
+import { createSceneAttempt, splitAttemptOutcome } from "./replay/practice.js";
 import { recordKey } from "./storage/records.js";
 import { MODERN, PRESETS, PRESET_LIST } from "./rules/presets.js";
 import { makeCustomRules, sanitizeRuleBody } from "./rules/sanitize.js";
@@ -67,7 +67,13 @@ const GO_FRAMES = 20; // "GO!" — 이 동안에는 이미 플레이 중
 
 const $ = id => /** @type {HTMLElement} */ (document.getElementById(id));
 const canvas = /** @type {HTMLCanvasElement} */ ($("board"));
-const panels = { menu: $("menu"), pause: $("pause"), confirm: $("confirm"), results: $("results") };
+const panels = {
+  menu: $("menu"),
+  pause: $("pause"),
+  confirm: $("confirm"),
+  results: $("results"),
+  sceneResult: $("scene-result"),
+};
 const countdownEl = $("countdown");
 const hud = {
   timeLabel: $("hud-time-label"),
@@ -136,7 +142,8 @@ const addVersusResult = (levelId, won) => {
 
 /** @type {"menu" | "countdown" | "play" | "paused" | "results" | "replay"} */
 let screen = "menu";
-/** @type {{spawnFrame: number, focus: HTMLElement | null} | null} */
+/** @typedef {{from: number, to: number, endFrame: number}} SceneSplit */
+/** @type {{spawnFrame: number, split: SceneSplit | null, startFrame: number, best: number | null, ended: boolean} | null} */
 let scenePractice = null;
 /** 모드 찾기: 오늘의 도전(날짜별) + 나머지 */
 const findMode = id => findDaily(id) ?? findPuzzle(id) ?? findBaseMode(id);
@@ -168,12 +175,13 @@ let last = performance.now();
 // ---- 표시 도우미 ----
 
 const showPanel = name => {
+  if (name === "pause" && scenePractice?.split && scenePractice.ended) name = "sceneResult";
   for (const [key, el] of Object.entries(panels)) el.hidden = key !== name;
   // 결과 화면은 버튼이 아니라 패널 자체에 포커스를 둔다: 하드 드롭(Space)을 연타하다 끝났을 때
   // 그 입력이 "다시 하기"를 눌러 결과를 건너뛰지 않게. 다시 하기·메뉴는 단축키(R·Esc)나 클릭으로.
   const target =
-    name === "results"
-      ? panels.results
+    name === "results" || name === "sceneResult"
+      ? panels[name]
       : name && /** @type {HTMLElement | null} */ (panels[name].querySelector("button:not(:disabled)"));
   target?.focus();
   if (!name && document.activeElement instanceof HTMLElement) document.activeElement.blur();
@@ -412,6 +420,7 @@ $("daily").addEventListener("close", () => {
   if (screen === "menu") /** @type {HTMLElement | null} */ (document.querySelector('[data-mode="daily"]'))?.focus();
 });
 const updateHud = () => {
+  if (scenePractice?.split && game) updateSceneSplitProgress(game.state);
   const frame = game?.state.frame ?? 0;
   const stats = game?.state.stats ?? { pieces: 0, lines: 0 };
   const lines = game ? mode.hudLines(game.state) : { label: t("줄"), value: "0" };
@@ -448,7 +457,7 @@ const setScreen = next => {
   touch.setEnabled(next === "play" || next === "countdown");
   gestures.setEnabled((next === "play" || next === "countdown") && gesturesOn());
   document.body.classList.toggle("is-practice", Boolean(mode.practice) && next !== "menu");
-  $("session-title").textContent = next === "menu" ? "" : scenePractice ? t("장면 연습") : mode.name;
+  $("session-title").textContent = next === "menu" ? "" : scenePractice ? scenePracticeTitle() : mode.name;
   $("mode-objective").textContent =
     next === "menu" || next === "replay"
       ? ""
@@ -564,7 +573,7 @@ const pause = () => {
 $("pause-game").addEventListener("click", pause);
 
 const resume = () => {
-  if (screen !== "paused" || (scenePractice && game?.state.over)) return;
+  if (screen !== "paused" || scenePractice?.ended) return;
   confirming = null;
   showPanel(null);
   setScreen(pausedFrom);
@@ -695,13 +704,14 @@ const renderResultSplits = () => {
       ? () => {
           startReplay(replay, "results", "", true);
           const index = mode.splits.indexOf(slowest.to);
+          const endFrame = splits[index];
           seekReplay(splits[index - 1] ?? 0, true);
           // 구간 경계에 등장 대기가 있으면 다음 피스를 먼저 보여 준다.
-          if (player?.frame && !player.game.state.active) {
+          if (player && !player.game.state.active) {
             while (!player.done && !player.game.state.active) player.step();
             updateReplayBar();
           }
-          enterScenePractice();
+          enterScenePractice({ from: slowest.from, to: slowest.to, endFrame });
         }
       : null;
   details.querySelector("summary").textContent = slowest
@@ -1407,12 +1417,48 @@ const sceneControls = $("scene-practice-controls");
 const sceneStatus = $("scene-practice-status");
 const pauseResume = /** @type {HTMLButtonElement} */ (panels.pause.querySelector('[data-action="resume"]'));
 
+const sceneSplitProgress = $("scene-split-progress");
+const sceneSplitMeter = /** @type {HTMLProgressElement} */ ($("scene-split-meter"));
+
+const updateSceneSplitProgress = state => {
+  const split = scenePractice.split;
+  const cleared = Math.min(state.stats.lines, split.to);
+  $("scene-split-lines").textContent = t("{n} / {goal}줄", { n: cleared, goal: split.to });
+  $("scene-split-elapsed").textContent = formatTime(state.frame - scenePractice.startFrame);
+  sceneSplitMeter.value = cleared - split.from;
+};
+
+const showSceneOutcome = outcome => {
+  const { split } = scenePractice;
+  const { delta, frames, original } = outcome;
+  if (delta !== null) scenePractice.best = Math.min(scenePractice.best ?? frames, frames);
+  $("scene-result-range").textContent = t("{from}–{to}줄 구간", split);
+  $("scene-result-title").textContent = delta === null ? t("구간 미완료") : t("구간 완료");
+  $("scene-result-original").textContent = formatTime(original);
+  $("scene-result-attempt").textContent = delta === null ? "—" : formatTime(frames);
+  const feedback = $("scene-result-delta");
+  feedback.dataset.comparison = delta === null ? "incomplete" : delta < 0 ? "faster" : delta > 0 ? "slower" : "even";
+  feedback.textContent =
+    delta === null
+      ? t("목표 {goal}줄 중 {n}줄까지 도달했어요.", { goal: split.to, n: game.state.stats.lines })
+      : delta === 0
+        ? t("원래 판과 같은 시간이에요.")
+        : t(delta < 0 ? "원래 판보다 {time}초 단축" : "원래 판보다 {time}초 느림", {
+            time: (Math.abs(delta) / 60).toFixed(2),
+          });
+  $("scene-result-best").textContent =
+    scenePractice.best === null ? "" : t("이번 연습 최고 · {time}", { time: formatTime(scenePractice.best) });
+};
+
+const scenePracticeTitle = () => (scenePractice.split ? t("구간 연습") : t("장면 연습"));
+const sceneRetryLabel = () => (scenePractice.split ? t("구간 재시도") : t("장면 재시도"));
+
 const setScenePauseLabels = () => {
-  const ended = Boolean(scenePractice && game?.state.over);
+  const ended = Boolean(scenePractice?.ended);
   pauseResume.disabled = ended;
   panels.pause.querySelector(".panel-title").textContent = ended ? t("장면 연습 종료") : t("일시정지");
   panels.pause.querySelector('[data-action="retry"] .btn-label').textContent = scenePractice
-    ? t("장면 재시도")
+    ? sceneRetryLabel()
     : t("다시 시작");
   panels.pause.querySelector('[data-action="menu"] .btn-label').textContent = scenePractice
     ? t("리플레이로")
@@ -1422,12 +1468,21 @@ const setScenePauseLabels = () => {
 const resetSceneAttempt = () => {
   if (!scenePractice) return;
   const attempt = createSceneAttempt(playing, findMode, scenePractice.spawnFrame);
-  if (!attempt) {
+  const split = scenePractice.split;
+  if (
+    !attempt ||
+    (split &&
+      (attempt.state.stats.lines < split.from ||
+        attempt.state.stats.lines >= split.to ||
+        attempt.state.frame >= split.endFrame))
+  ) {
     exitScenePractice();
     replayNote.textContent = t("이 장면을 연습할 수 없어요. 다른 위치를 선택해 주세요.");
     return;
   }
   game = attempt;
+  scenePractice.startFrame = game.state.frame;
+  scenePractice.ended = false;
   game.setHandling(toEngineHandling(settings.handling));
   keyboard.releaseAll();
   touch.releaseAll();
@@ -1442,16 +1497,25 @@ const resetSceneAttempt = () => {
   setScreen("play");
   showModeHud({ hud: [] });
   setScenePauseLabels();
-  sceneStatus.textContent = t("연습 시작점 · {time}", { time: formatTime(scenePractice.spawnFrame) });
+  sceneControls.querySelector('[data-action="scene-retry"] .btn-label').textContent = sceneRetryLabel();
+  sceneStatus.textContent = split
+    ? t("{from}–{to}줄 구간", split)
+    : t("연습 시작점 · {time}", { time: formatTime(scenePractice.spawnFrame) });
+  sceneSplitProgress.hidden = !split;
+  if (split) {
+    sceneSplitMeter.max = split.to - split.from;
+    updateSceneSplitProgress(game.state);
+  }
   /** @type {HTMLElement | null} */ (sceneControls.querySelector('[data-action="scene-retry"]'))?.focus({
     preventScroll: true,
   });
 };
 
-const enterScenePractice = () => {
+/** @param {SceneSplit | null} split */
+const enterScenePractice = (split = null) => {
   if (!replayPaused || !canPracticeScene()) return;
-  scenePractice = { spawnFrame: player.spawnFrame, focus: replayPractice };
-  document.body.toggleAttribute("data-scene-practice", true);
+  scenePractice = { spawnFrame: player.spawnFrame, split, startFrame: 0, best: null, ended: false };
+  document.body.dataset.scenePractice = split ? "split" : "scene";
   replayBar.hidden = true;
   sceneControls.hidden = false;
   resetSceneAttempt();
@@ -1459,7 +1523,6 @@ const enterScenePractice = () => {
 
 const exitScenePractice = () => {
   if (!scenePractice || !player) return;
-  const { focus } = scenePractice;
   scenePractice = null;
   document.body.removeAttribute("data-scene-practice");
   sceneControls.hidden = true;
@@ -1474,7 +1537,7 @@ const exitScenePractice = () => {
   replayBar.hidden = false;
   renderTimelineMarks();
   updateReplayBar();
-  focus?.focus({ preventScroll: true });
+  replayPractice.focus({ preventScroll: true });
 };
 
 const advanceReplay = count => {
@@ -1672,7 +1735,14 @@ const tick = () => {
     renderer.addEvents(events);
     sfx.events(events);
     feedback(events);
-    if (game.state.over) {
+    const split = scenePractice.split;
+    const outcome = split && splitAttemptOutcome(game.state, scenePractice.startFrame, split.to, split.endFrame);
+    if (outcome || game.state.over) {
+      scenePractice.ended = true;
+      if (outcome) {
+        showSceneOutcome(outcome);
+        fb.clearAction();
+      }
       setScenePauseLabels();
       pause();
     }

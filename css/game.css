@@ -1927,3 +1927,142 @@ body[data-scene-practice] .race-panel {
     padding-inline: var(--space-1);
   }
 }
+
+/* 훈련 구간에서는 줄 진행과 시간을 한 줄에서 읽고, 조작 버튼은 아래에 둔다. */
+.scene-split-progress {
+  display: grid;
+  gap: var(--space-1);
+  padding-block: var(--space-1);
+}
+
+.scene-split-progress-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-2);
+  font-size: var(--text-s);
+}
+
+.scene-split-progress progress {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--accent);
+}
+
+.scene-result-card {
+  width: min(360px, 100%);
+  max-height: 100%;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.scene-result-content {
+  display: grid;
+  width: 100%;
+  min-height: 0;
+  gap: var(--space-2);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.scene-result-content .panel-title {
+  font-size: var(--text-2xl);
+  line-height: 1.2;
+}
+
+.scene-result-content p {
+  margin: 0;
+}
+
+.scene-result-times {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  border-block: 1px solid var(--border);
+  padding-block: var(--space-2);
+}
+
+.scene-result-times > div + div {
+  border-inline-start: 1px solid var(--border);
+}
+
+.scene-result-times dt,
+.scene-result-best {
+  color: var(--text-dim);
+  font-size: var(--text-s);
+}
+
+.scene-result-times dd {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-l);
+  font-weight: 700;
+}
+
+#scene-result-delta {
+  font-size: var(--text-m);
+  font-weight: 700;
+}
+
+#scene-result-delta[data-comparison="faster"] {
+  color: var(--accent);
+}
+
+.scene-result-best:empty {
+  display: none;
+}
+
+.scene-result-actions .btn {
+  min-width: 0;
+  min-height: 38px;
+  height: auto;
+  padding: var(--space-1) var(--space-2);
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  body[data-scene-practice="split"] {
+    --chrome-h: 248px;
+  }
+}
+
+@media (max-width: 390px) {
+  body[data-scene-practice="split"] .app-header {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  body[data-scene-practice="split"] .session-title {
+    font-size: var(--text-s);
+    letter-spacing: normal;
+    word-break: keep-all;
+  }
+}
+
+@media (max-width: 600px), (max-height: 500px) {
+  .board-wrap > .scene-result {
+    position: fixed;
+    z-index: 2;
+    padding: var(--space-2);
+  }
+}
+
+@media (orientation: landscape) and (max-height: 520px) and (pointer: coarse) {
+  body[data-scene-practice="split"] {
+    --chrome-h: 64px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 360px) and (pointer: coarse) {
+  body[data-scene-practice="split"] .scene-practice-actions {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  }
+
+  body[data-scene-practice="split"] .scene-practice-actions .btn {
+    min-height: 44px;
+    padding-inline: var(--space-1);
+    word-break: keep-all;
+  }
+}
