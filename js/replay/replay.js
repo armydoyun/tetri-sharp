@@ -5,6 +5,7 @@
 //   { app, v, date, seed, mode, rules, handling, inputs: [[i, held, pressed]...], changes: [[i, handling]...], result }
 //   i = step() 호출 순번(0부터). held는 바뀔 때까지 유지된다. changes는 게임 중 조작 설정을 바꾼 기록.
 import { createGame } from "../core/engine.js";
+import { settleBattleFrame } from "../modes/versus.js";
 import { PRESETS } from "../rules/presets.js";
 import { makeCustomRules } from "../rules/sanitize.js";
 
@@ -20,7 +21,7 @@ const decodeHandling = h => {
   return {
     das: num(Number(h?.das), 0, 120, 8),
     arr: num(Number(h?.arr), 0, 60, 0.6),
-    sdf: sdf === -1 ? Infinity : num(sdf, 1, 1000, 20),
+    sdf: sdf === -1 || sdf === Infinity ? Infinity : num(sdf, 1, 1000, 20),
   };
 };
 
@@ -81,7 +82,16 @@ export const createRecorder = ({ seed, mode, rules, handling }) => {
  */
 export const createPlayer = (replay, findMode, onSpawn) => {
   const mode = findMode(replay.mode);
-  const game = createGame({ rules: replay.rules, handling: replay.handling, seed: replay.seed, mode, onSpawn });
+  const game = createGame({
+    rules: replay.rules,
+    handling: decodeHandling(replay.handling),
+    seed: replay.seed,
+    mode,
+    onSpawn,
+  });
+  // 결과 화면에서만 사용하는 대전 기록은 CPU가 실제로 누른 입력도 저장한다.
+  const opponent = replay.cpu ? createPlayer(replay.cpu, findMode) : null;
+  let cpuEvents = [];
   let index = 0;
   let spawnFrame = 0;
   let cursor = 0;
@@ -91,6 +101,10 @@ export const createPlayer = (replay, findMode, onSpawn) => {
   return {
     game,
     mode,
+    cpu: opponent?.game ?? null,
+    get cpuEvents() {
+      return cpuEvents;
+    },
     /** 마지막 step()에 넣은 입력(분석용) */
     get input() {
       return lastInput;
@@ -108,7 +122,7 @@ export const createPlayer = (replay, findMode, onSpawn) => {
     },
     step() {
       while (change < replay.changes.length && replay.changes[change][0] <= index) {
-        game.setHandling(replay.changes[change][1]);
+        game.setHandling(decodeHandling(replay.changes[change][1]));
         change += 1;
       }
       let pressed = 0;
@@ -121,6 +135,10 @@ export const createPlayer = (replay, findMode, onSpawn) => {
       lastInput = { held, pressed };
       const pieceId = game.state.pieceId;
       const events = game.step({ held, pressed });
+      if (opponent) {
+        cpuEvents = opponent.step();
+        settleBattleFrame(game, opponent.game, events);
+      }
       if (game.state.pieceId !== pieceId) spawnFrame = index;
       return events;
     },
@@ -150,7 +168,7 @@ export const sanitizeReplay = (raw, findMode) => {
   const seed = Number(raw.seed);
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) return null;
   const mode = findMode(raw.mode);
-  if (!mode || mode.id !== raw.mode) return null;
+  if (!mode || mode.id !== raw.mode || mode.versus) return null;
   if (!Array.isArray(raw.inputs) || raw.inputs.length > MAX_INPUTS) return null;
   let prev = -1;
   const inputs = [];

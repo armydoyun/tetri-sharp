@@ -1265,9 +1265,9 @@ test("CPU 대전: 난이도를 골라 시작하면 CPU 보드가 함께 움직�
   assert.equal(await text(page, "results-title"), "패배");
   assert.match(await page.locator("#results-stats").textContent(), /전적0승 1패/);
   assert.equal(
-    await page.locator('#results [data-action="watch"]').isDisabled(),
+    await page.locator('#results [data-action="watch"]').isEnabled(),
     true,
-    "대전은 리플레이를 남기지 않는다"
+    "결과 화면에서 대전을 다시 볼 수 있다"
   );
   await page.keyboard.press("Escape");
   await page.click('[data-mode="versus"]');
@@ -1419,6 +1419,84 @@ test("CPU 대전: 첫 싱글의 공격 0줄과 콤보 공격 이유를 플레이
     await playReplayFrames(page, replay.inputs, 0, 21);
     assert.equal(await outcome.textContent(), "No attack");
     assert.equal(await message.evaluate(el => el.classList.contains("is-shown")), true);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("CPU 대전 리플레이: 양쪽 보드와 승패를 보고 공격 프레임으로 이동한다", async () => {
+  const { replay } = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
+  const { context, page, errors } = await openPage(
+    seed => {
+      Math.random = () => seed / 2 ** 32;
+      localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
+    },
+    replay.seed,
+    { locale: "en-US", frameClock: true }
+  );
+  try {
+    await page.click('[data-mode="versus"]');
+    await page.click('#versus [data-level="easy"]');
+    await playReplayFrames(page, replay.inputs, 0, 255);
+    await playReplayFrames(page, replay.inputs, 255, 755, 0, true);
+    const watch = page.locator('#results [data-action="watch"]');
+    assert.ok(await watch.isVisible());
+    const result = await text(page, "results-title");
+    await watch.click();
+    assert.equal(await visible(page, "board"), true);
+    assert.equal(await visible(page, "replay-cpu-board"), true);
+    const boardGroup = await page.locator(".board-wrap").boundingBox();
+    const controls = await page.locator("#replay-bar").boundingBox();
+    assert.ok(boardGroup.x + boardGroup.width + 8 <= controls.x);
+    assert.equal(await page.locator('[data-replay="share"]').isVisible(), false);
+
+    const progress = page.locator("#replay-progress");
+    const attack = page.locator(".replay-mark.is-sent").first();
+    await attack.click();
+    assert.equal(await progress.inputValue(), "241");
+    assert.equal(await text(page, "replay-cpu-pending"), "1");
+    assert.match(await text(page, "replay-battle-event"), /My board.*1 sent/);
+    const snapshot = () =>
+      page.evaluate(() => {
+        window.advanceFrame();
+        return ["board", "replay-cpu-board"].map(id => document.getElementById(id).toDataURL());
+      });
+    const boards = await snapshot();
+    await progress.fill(await progress.getAttribute("max"));
+    assert.equal(await text(page, "replay-status"), result);
+    await attack.click();
+    assert.deepEqual(await snapshot(), boards);
+
+    for (const [width, height] of [
+      [960, 360],
+      [560, 360],
+      [320, 480],
+    ]) {
+      await page.setViewportSize({ width, height });
+      const before = await page.locator("#board").boundingBox();
+      await page.locator('[data-board-view="cpu"]').click();
+      assert.equal(await visible(page, "board"), false);
+      assert.deepEqual(await page.locator("#replay-cpu-board").boundingBox(), before);
+      assert.equal(await progress.inputValue(), "241");
+      assert.equal(await page.locator('[data-board-view="cpu"]').getAttribute("aria-pressed"), "true");
+      assert.ok(
+        await page.evaluate(
+          () =>
+            document.documentElement.scrollWidth <= innerWidth &&
+            document.documentElement.scrollHeight <= innerHeight + 1
+        )
+      );
+      await page.locator('[data-board-view="own"]').click();
+    }
+    await page.locator('[data-replay="step"]').click();
+    assert.equal(await progress.inputValue(), "242");
+    await page.locator('[data-replay="step-back"]').click();
+    assert.equal(await progress.inputValue(), "241");
+    await page.keyboard.press("Escape");
+    assert.equal(await text(page, "results-title"), result);
+    assert.equal(await watch.evaluate(el => document.activeElement === el), true);
+    assert.equal(await page.evaluate(() => localStorage.getItem("tetrisharp:replay:last")), null);
     assert.deepEqual(errors, []);
   } finally {
     await context.close();

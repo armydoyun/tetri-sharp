@@ -6,20 +6,43 @@ import { createPlayer } from "./replay.js";
 import { createFinesseTracker } from "../modes/finesse.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
 import { clearName } from "../rules/scoring/guideline.js";
+import { t } from "../i18n/index.js";
 
 /** 오래 고민했다고 보는 기준: 중앙값의 2.5배이면서 1.5초 이상 */
 const SLOW_FACTOR = 2.5;
 const SLOW_MIN_FRAMES = 90;
 const MAX_FRAMES = 60 * 60 * 30; // 30분 넘는 판은 거기까지만 본다
+const battleKinds = /** @type {const} */ (["sent", "blocked", "received"]);
+
+/** @param {Marker[]} markers */
+const addBattleMarkers = (markers, frame, ownEvents, cpuEvents) => {
+  if (!ownEvents.length && !cpuEvents.length) return;
+  const notes = { sent: [], blocked: [], received: [] };
+  const collect = (side, events) => {
+    for (const e of events) {
+      if (e.type === "attack") {
+        if (e.lines) notes.sent.push(`${side} · ${t("{n}줄 보냄", { n: e.lines })}`);
+        if (e.blocked) notes.blocked.push(`${side} · ${t("{n}줄 상쇄", { n: e.blocked })}`);
+      } else if (e.type === "garbage") {
+        notes.received.push(`${side} · ${t("쓰레기 {n}줄 올라옴", { n: e.rows })}`);
+      }
+    }
+  };
+  collect(t("내 보드"), ownEvents);
+  collect(t("CPU 보드"), cpuEvents);
+  for (const kind of battleKinds) {
+    if (notes[kind].length) markers.push({ frame, kind, label: notes[kind].join(" / ") });
+  }
+};
 
 /**
- * @typedef {{ frame: number, kind: "finesse" | "slow" | "highlight", label: string, value?: number }} Marker
+ * @typedef {{ frame: number, kind: "finesse" | "slow" | "highlight" | "sent" | "blocked" | "received", label: string, value?: number }} Marker
  * @returns {{ markers: Marker[], finesse: { judged: number, faults: number }, slow: number, length: number }}
  */
 export const analyzeReplay = (replay, findMode) => {
   const player = createPlayer(replay, findMode);
   const game = player.game;
-  const tracker = createFinesseTracker(game, ROTATIONS[game.rules.rotation]);
+  const tracker = player.cpu ? null : createFinesseTracker(game, ROTATIONS[game.rules.rotation]);
   /** @type {Marker[]} */
   const markers = [];
   /** 피스마다 [나온 프레임, 놓인 프레임] */
@@ -30,8 +53,12 @@ export const analyzeReplay = (replay, findMode) => {
     const before = player.frame;
     const hadActive = Boolean(game.state.active);
     const events = player.step();
+    if (player.cpu) {
+      addBattleMarkers(markers, player.frame, events, player.cpuEvents);
+      continue;
+    }
     const { held, pressed } = player.input;
-    const extra = tracker.frame(held, pressed, hadActive, events);
+    const extra = tracker?.frame(held, pressed, hadActive, events) ?? 0;
     for (const e of events) {
       if (e.type !== "lock") continue;
       if (spawnedAt >= 0) pieces.push([spawnedAt, before]);
@@ -56,5 +83,5 @@ export const analyzeReplay = (replay, findMode) => {
     markers.push({ frame: a, kind: "slow", label: "", value: b - a });
   }
   markers.sort((x, y) => x.frame - y.frame);
-  return { markers, finesse: { ...tracker.result }, slow, length: player.frame };
+  return { markers, finesse: tracker ? { ...tracker.result } : { judged: 0, faults: 0 }, slow, length: player.frame };
 };
