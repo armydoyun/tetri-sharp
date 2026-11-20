@@ -1356,6 +1356,101 @@ test("내 Sprint 장면을 작은 창과 가로 터치에서 연습하고 리플
   }
 });
 
+test("Sprint 구간 연습은 같은 시점부터 비교하고 재시도 후 리플레이로 돌아간다", async () => {
+  const { replay, record } = JSON.parse(
+    fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8")
+  );
+  // 10–20줄이 이전 기록보다 가장 느린 구간이 되도록 이전 기록을 준비한다.
+  const pb = {
+    ...record,
+    frames: record.frames - 30,
+    splits: record.splits.map((frame, i) => (i ? frame - 30 : frame)),
+  };
+  const { context, page, errors } = await openPage(
+    ({ seed, pb }) => {
+      Math.random = () => seed / 2 ** 32;
+      localStorage.setItem("tetrisharp:records", JSON.stringify({ "sprint40|modern": [pb] }));
+      localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
+      let now = 0;
+      let callbacks = [];
+      Object.defineProperty(performance, "now", { value: () => now });
+      window.requestAnimationFrame = fn => {
+        return callbacks.push(fn);
+      };
+      window.advanceFrame = () => {
+        now += 1000 / 60 + 0.0001;
+        const current = callbacks;
+        callbacks = [];
+        for (const callback of current) callback(now);
+      };
+    },
+    { seed: replay.seed, pb }
+  );
+  try {
+    const {
+      splits: [start, end],
+    } = record;
+    const playFrames = (from, to, delay = 0, topOut = false) =>
+      page.evaluate(
+        ({ from, to, delay, topOut, inputs }) => {
+          const codes = { 1: "ArrowLeft", 2: "ArrowRight", 8: "Space", 16: "ArrowUp" };
+          const pressed = new Map(inputs.map(([frame, , button]) => [frame, codes[button]]));
+          for (let i = 0; i < to - from + delay && document.body.dataset.screen === "play"; i++) {
+            const code = topOut ? "Space" : i >= delay && pressed.get(from + i - delay);
+            if (code) {
+              window.dispatchEvent(new KeyboardEvent("keydown", { code, cancelable: true }));
+              window.dispatchEvent(new KeyboardEvent("keyup", { code, cancelable: true }));
+            }
+            window.advanceFrame();
+          }
+        },
+        { from, to, delay, topOut, inputs: replay.inputs }
+      );
+    await page.locator('[data-mode="sprint40"]').click({ timeout: 3000 });
+    await playFrames(0, replay.result.frames);
+    assert.equal(await visible(page, "results"), true);
+    const storage = () =>
+      page.evaluate(() => [localStorage.getItem("tetrisharp:replay:last"), localStorage.getItem("tetrisharp:records")]);
+    const original = await storage();
+
+    await page.locator("#results-splits summary").click();
+    const entry = page.locator("#results-practice-scene");
+    await entry.click();
+    assert.equal(await visible(page, "scene-split-meter"), true);
+    const result = page.locator("#scene-result");
+    const retry = result.locator('[data-action="scene-retry"]');
+    const exit = result.locator('[data-action="scene-exit"]');
+    const comparison = () => page.locator("#scene-result-delta").getAttribute("data-comparison");
+    assert.deepEqual(JSON.parse(original[0]).inputs, replay.inputs);
+    await playFrames(start, end, 18);
+    assert.equal(await comparison(), "slower", await text(page, "scene-result-delta"));
+    assert.equal(await text(page, "scene-result-original"), "0:02.02");
+    assert.equal(await text(page, "scene-result-attempt"), "0:02.32");
+    await page.setViewportSize({ width: 560, height: 320 });
+    for (const button of [retry, exit]) {
+      const box = await button.boundingBox();
+      assert.ok(box && box.x >= 0 && box.x + box.width <= 560 && box.y >= 0 && box.y + box.height <= 320);
+    }
+    await retry.click();
+    await playFrames(start, end);
+    assert.equal(await comparison(), "even");
+    const best = await text(page, "scene-result-best");
+    assert.match(best, /0:02\.02/);
+    await retry.click();
+    await playFrames(start, start + 500, 0, true);
+    assert.equal(await comparison(), "incomplete");
+    assert.equal(await text(page, "scene-result-best"), best);
+    await exit.click();
+    assert.equal(await page.locator("#replay-progress").inputValue(), String(start));
+    await page.locator('[data-replay="exit"]').click();
+    assert.equal(await entry.evaluate(el => document.activeElement === el), true);
+    assert.deepEqual(await storage(), original);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test("데스크톱 창 크기를 바꿔도 리플레이 조작과 플레이 배치를 유지한다", async () => {
   const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
   const { context, page, errors } = await openPage(
