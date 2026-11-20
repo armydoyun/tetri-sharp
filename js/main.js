@@ -1217,6 +1217,7 @@ let selectedMark = -1;
 /** @type {(ReturnType<typeof analyzeReplay> & { for: any }) | null} 지금 보는 리플레이의 분석 */
 let analysis = null;
 const replayTime = $("replay-time");
+const replayTimeValue = $("replay-time-value");
 const replayBattleView = $("replay-battle-view");
 const replayBattleTally = $("replay-battle-tally");
 const replayBattleEvent = $("replay-battle-event");
@@ -1232,7 +1233,7 @@ const updateReplayProgress = () => {
   replayProgress.max = String(length || 1);
   replayProgress.value = String(Math.min(frame, length || 1));
   replayProgress.style.setProperty("--fill", `${length ? (Math.min(frame, length) / length) * 100 : 0}%`);
-  replayTime.textContent = length ? `${formatTime(frame)} / ${formatTime(length)}` : formatTime(frame);
+  replayTimeValue.textContent = length ? `${formatTime(frame)} / ${formatTime(length)}` : formatTime(frame);
   if (player?.cpu) {
     $("replay-own-pending").textContent = String(player.game.state.garbage.pending);
     $("replay-cpu-pending").textContent = String(player.cpu.state.garbage.pending);
@@ -1357,6 +1358,7 @@ const seekMark = index => {
     replayBattleEvent.textContent = mark.label;
     replayBattleEvent.hidden = false;
   }
+  return true;
 };
 
 /** 지금 위치 또는 마지막으로 선택한 표시를 기준으로 앞뒤 장면을 본다. */
@@ -1368,7 +1370,7 @@ const jumpMark = dir => {
     dir > 0
       ? marks.findIndex(mark => (frame === 0 ? mark.frame >= frame : mark.frame > frame))
       : marks.findLastIndex(mark => mark.frame < frame);
-  seekMark(next);
+  return seekMark(next);
 };
 
 replayProgress.addEventListener("input", () => seekReplay(Number(replayProgress.value), true));
@@ -1419,6 +1421,10 @@ const startReplay = (replay, returnTo = screen, note = "", local = false) => {
   versusPanel.hidden = true;
   document.body.classList.remove("is-versus");
   if (analysis?.for !== replay) analysis = { ...analyzeReplay(replay, findMode), for: replay };
+  const length = replayLength();
+  const duration = formatTime(length);
+  // 경과 시간에도 전체 시간과 같은 자릿수를 확보해 진행 막대의 폭을 고정한다.
+  replayTime.dataset.widthSample = length ? `${duration} / ${duration}` : duration;
   acc = 0;
   renderer.clearEffects();
   replayCpuRenderer.clearEffects();
@@ -1629,7 +1635,7 @@ const tickReplay = () => {
 };
 
 for (const btn of replayBar.querySelectorAll("[data-replay]")) {
-  btn.addEventListener("click", () => {
+  btn.addEventListener("click", e => {
     const action = btn.getAttribute("data-replay");
     if (action === "toggle") replayPaused = !replayPaused;
     if (action === "speed") replaySpeed = SPEEDS[(SPEEDS.indexOf(replaySpeed) + 1) % SPEEDS.length];
@@ -1640,8 +1646,12 @@ for (const btn of replayBar.querySelectorAll("[data-replay]")) {
     if (action === "step-back") return seekReplay((player?.frame ?? 0) - 1, true);
     if (action === "back") return seekReplay((player?.frame ?? 0) - 300);
     if (action === "ahead") return seekReplay((player?.frame ?? 0) + 300);
-    if (action === "prev-mark") return jumpMark(-1);
-    if (action === "next-mark") return jumpMark(1);
+    if (action === "prev-mark" || action === "next-mark") {
+      if (jumpMark(action === "prev-mark" ? -1 : 1) && e instanceof MouseEvent && e.detail > 0) {
+        replayProgress.focus({ preventScroll: true });
+      }
+      return;
+    }
     if (action === "practice") return enterScenePractice();
     if (action === "share" && playing && !player?.cpu) return shareUI.open(playing, `${mode.name} · ${rules.name}`);
     if (action === "race" && playing) return raceReplay(playing);
@@ -1664,18 +1674,24 @@ window.addEventListener("keydown", e => {
     dailyUI.isOpen ||
     helpUI.isOpen ||
     puzzleUI.isOpen ||
-    shareUI.isOpen ||
-    e.repeat
+    shareUI.isOpen
   )
     return;
   if (scenePractice) {
-    if (e.code === "Escape") exitScenePractice();
+    if (!e.repeat && e.code === "Escape") exitScenePractice();
     return;
   }
-  const inBar = replayBar.contains(document.activeElement);
+  if (e.code === "Space" && !(document.activeElement instanceof HTMLButtonElement)) {
+    e.preventDefault();
+    if (!e.repeat && player && !player.done) {
+      replayPaused = !replayPaused;
+      updateReplayBar();
+    }
+    return;
+  }
+  if (e.repeat) return;
   if (e.code === "Escape") return stopReplay();
-  if (e.code === "Space" && !inBar) replayPaused = !replayPaused;
-  else if (["Digit1", "Digit2", "Digit4"].includes(e.code)) replaySpeed = Number(e.code.slice(5));
+  if (["Digit1", "Digit2", "Digit4"].includes(e.code)) replaySpeed = Number(e.code.slice(5));
   // ←→: 5초(Shift: 한 프레임), 막대에 포커스가 있으면 막대가 처리한다
   else if (document.activeElement !== replayProgress && (e.code === "ArrowLeft" || e.code === "ArrowRight")) {
     const dir = e.code === "ArrowLeft" ? -1 : 1;
