@@ -24,7 +24,7 @@ import {
 import { button, choice, choiceCards, el, fieldRow, fillDialog, rangeRow, slider, tabBar } from "./dom.js";
 import { COLOR_SWATCHES, PIECE_ORDER, THEMES, THEME_IDS, findTheme, paletteFor } from "../render/themes.js";
 import { keycap } from "./keycap.js";
-import { drawThemePreview } from "../render/preview.js";
+import { createThemePreview } from "../render/preview.js";
 import { t } from "../i18n/index.js";
 
 const HANDLING_ROWS = [
@@ -115,6 +115,16 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
   /** 키 입력을 기다리는 칸 */
   let capture = null;
   const notice = el("p", { class: "notice-slot", role: "status", id: "settings-notice" });
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  /** @type {ReturnType<typeof createThemePreview> | null} */
+  let playingPreview = null;
+  const stopThemePreview = () => {
+    playingPreview?.stop();
+    playingPreview = null;
+  };
+  reducedMotion.addEventListener("change", () => {
+    if (reducedMotion.matches) stopThemePreview();
+  });
 
   const update = patch => onChange({ ...getSettings(), ...patch });
 
@@ -374,6 +384,45 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
     ...(visual.palette === "custom" ? [colorPicker(visual)] : []),
   ];
 
+  const themeCards = visual => {
+    const demos = THEME_IDS.map(id => {
+      const theme = THEMES[id];
+      const preview = el("canvas", { class: "theme-preview", "aria-hidden": "true" });
+      return {
+        option: { value: id, title: theme.name, desc: theme.description, preview },
+        demo: createThemePreview(preview, theme, paletteFor(visual, theme)),
+      };
+    });
+    const cards = choiceCards({
+      id: "set-theme",
+      label: t("게임 테마"),
+      options: demos.map(({ option }) => option),
+      value: visual.theme,
+      onChange: v => setVisual("theme", v),
+    });
+    cards.querySelectorAll("button").forEach((card, index) => {
+      const { demo } = demos[index];
+      const play = () => {
+        if (reducedMotion.matches || playingPreview === demo) return;
+        stopThemePreview();
+        playingPreview = demo;
+        demo.play();
+      };
+      const stop = () => {
+        if (playingPreview === demo) stopThemePreview();
+      };
+      card.addEventListener("pointerenter", e => {
+        if (e.pointerType === "mouse") play();
+      });
+      card.addEventListener("pointerleave", stop);
+      card.addEventListener("focus", () => {
+        if (card.matches(":focus-visible")) play();
+      });
+      card.addEventListener("blur", stop);
+    });
+    return cards;
+  };
+
   const visualSection = () => {
     const visual = getSettings().visual;
     const scheme = getSettings().scheme;
@@ -423,19 +472,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
         label: t("게임 테마"),
         hint: t("격자 색과 블록의 색·모서리를 바꿔요"),
         className: "is-wide",
-        control: choiceCards({
-          id: "set-theme",
-          label: t("게임 테마"),
-          options: THEME_IDS.map(id => {
-            const theme = THEMES[id];
-            const palette = paletteFor(visual, theme);
-            const preview = el("canvas", { class: "theme-preview", "aria-hidden": "true" });
-            drawThemePreview(preview, theme, palette);
-            return { value: id, title: theme.name, desc: theme.description, preview };
-          }),
-          value: visual.theme,
-          onChange: v => setVisual("theme", v),
-        }),
+        control: themeCards(visual),
       }),
       ...visualAccessRows(visual),
       fieldRow({
@@ -613,6 +650,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
           : bindingSection(t === "keys" ? "key" : "pad");
 
   const render = () => {
+    stopThemePreview();
     const scroll = dialog.querySelector(".dialog-body")?.scrollTop ?? 0;
     const reset = button({ text: t("전체 설정 초기화"), iconName: "reset", id: "settings-reset" });
     reset.addEventListener("click", () => {
@@ -728,6 +766,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
     if (capture) e.preventDefault();
   });
   dialog.addEventListener("close", () => {
+    stopThemePreview();
     capture = null;
     notice.textContent = "";
     onClose?.();
