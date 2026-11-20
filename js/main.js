@@ -1229,39 +1229,44 @@ const MARK_LABELS = {
   highlight: m => m.label,
 };
 
-/** 가까운 표시를 묶어 클릭 영역이 겹치지 않게 한다. */
+/** 같은 줄에 있는 가까운 표시만 묶는다. 종류마다 별도 줄을 써서 서로 가리지 않는다. */
 const renderTimelineMarks = () => {
   const length = replayLength();
   const width = replayMarkers.clientWidth;
   const groups = [];
+  const lastOfKind = new Map();
   const marks = analysis?.markers ?? [];
   if (!length || !width) return;
   for (const [index, mark] of marks.entries()) {
     const x = (mark.frame / length) * width;
-    const last = groups.at(-1);
+    const last = lastOfKind.get(mark.kind);
     if (last && x - last.x < 18) last.count++;
-    else groups.push({ x, index, count: 1 });
+    else {
+      const group = { x, index, count: 1 };
+      groups.push(group);
+      lastOfKind.set(mark.kind, group);
+    }
   }
-  replayMarkers.replaceChildren(
-    ...groups.map(({ x, index, count }) => {
-      const mark = marks[index];
-      const b = document.createElement("button");
-      b.type = "button";
-      b.tabIndex = -1;
-      b.className = `replay-mark is-${mark.kind}`;
-      b.classList.toggle("is-group", count > 1);
-      b.style.left = `${(x / width) * 100}%`;
-      const firstLabel = MARK_LABELS[mark.kind](mark);
-      const label = count > 1 ? `${t("장면 {n}개", { n: count })} · ${firstLabel}` : firstLabel;
-      b.title = `${formatTime(mark.frame)} · ${label}`;
-      b.setAttribute("aria-label", b.title);
-      b.addEventListener("click", () => {
-        seekMark(index);
-        replayProgress.focus({ preventScroll: true });
-      });
-      return b;
-    })
-  );
+  const lanes = new Map(Object.keys(MARK_LABELS).map(kind => [kind, document.createElement("div")]));
+  for (const { x, index, count } of groups) {
+    const mark = marks[index];
+    const b = document.createElement("button");
+    b.type = "button";
+    b.tabIndex = -1;
+    b.className = `replay-mark is-${mark.kind}`;
+    b.classList.toggle("is-group", count > 1);
+    b.style.left = `${(x / width) * 100}%`;
+    const firstLabel = MARK_LABELS[mark.kind](mark);
+    const label = count > 1 ? `${t("장면 {n}개", { n: count })} · ${firstLabel}` : firstLabel;
+    b.title = `${formatTime(mark.frame)} · ${label}`;
+    b.setAttribute("aria-label", b.title);
+    b.addEventListener("click", () => {
+      seekMark(index);
+      replayProgress.focus({ preventScroll: true });
+    });
+    lanes.get(mark.kind).append(b);
+  }
+  replayMarkers.replaceChildren(...[...lanes.values()].filter(lane => lane.childElementCount));
 };
 
 new ResizeObserver(() => {

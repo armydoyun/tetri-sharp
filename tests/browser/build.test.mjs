@@ -679,6 +679,47 @@ test("게임 테마: 아홉 테마가 서로 다르게 그려지고, 설정에�
   await context.close();
 });
 
+test("게임 테마: 호버한 카드만 재생하고 벗어나거나 모션을 줄이면 정지한다", async () => {
+  const { context, page, errors } = await openPage();
+  try {
+    await page.click("#open-settings");
+    await page.click('.dialog-tabs [data-value="visual"]');
+    const card = page.locator('#set-theme [data-value="retro"]');
+    const canvas = card.locator("canvas");
+    const other = page.locator('#set-theme [data-value="modern"] canvas');
+    const snapshot = locator => locator.evaluate(c => c.toDataURL());
+    const still = await snapshot(canvas);
+    const stillOther = await snapshot(other);
+    const changed = () =>
+      page.waitForFunction(
+        initial => document.querySelector('#set-theme [data-value="retro"] canvas').toDataURL() !== initial,
+        still
+      );
+    await card.hover();
+    await changed();
+    assert.equal(await card.getAttribute("aria-pressed"), "false", "호버로 테마가 선택되지 않는다");
+    assert.equal(await snapshot(other), stillOther);
+    assert.equal(await page.locator("dialog[open]").count(), 1);
+    await page.locator("#settings-close").hover();
+    assert.equal(await snapshot(canvas), still);
+
+    await card.hover();
+    await changed();
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.waitForFunction(
+      initial => document.querySelector('#set-theme [data-value="retro"] canvas').toDataURL() === initial,
+      still
+    );
+    await page.locator("#settings-close").hover();
+    await card.hover();
+    await page.waitForTimeout(450);
+    assert.equal(await snapshot(canvas), still);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test("기록 화면: 표는 늘 10줄, 조건을 바꿔도 크기가 그대로, 저장된 기록이 1위에 보인다", async () => {
   const { context, page, errors } = await openPage(() => {
     const entry = {
@@ -1360,6 +1401,36 @@ test("리플레이 탐색: 막대로 원하는 시점에 가고, 표시로 건�
   assert.equal(await position(), first);
   assert.deepEqual(errors, []);
   await context.close();
+});
+
+test("리플레이 탐색: 피네스가 많은 판에서도 오래 고민과 주요 장면을 눌러 이동한다", async () => {
+  const replay = botDailyReplay("2026-11-20", 39);
+  const { context, page, errors } = await openPage(replay => {
+    localStorage.setItem("tetrisharp:replay:last", JSON.stringify(replay));
+  }, replay);
+  try {
+    await page.setViewportSize({ width: 560, height: 500 });
+    await page.click("#watch-last");
+    const finesse = page.locator(".replay-mark.is-finesse");
+    const slow = page.locator(".replay-mark.is-slow");
+    const highlight = page.locator(".replay-mark.is-highlight");
+    await slow.waitFor();
+    await highlight.waitFor();
+    const grouped = page.locator(".replay-mark.is-finesse.is-group");
+    assert.ok(await grouped.count());
+    assert.ok((await finesse.count()) > 0);
+    const y = locator => locator.first().evaluate(el => el.getBoundingClientRect().top);
+    assert.ok((await y(finesse)) < (await y(slow)) && (await y(slow)) < (await y(highlight)));
+    await slow.click();
+    const progress = page.locator("#replay-progress");
+    assert.equal(await progress.inputValue(), "7");
+    await highlight.click();
+    assert.equal(await progress.inputValue(), "2531");
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
 });
 
 test("내 Sprint 장면을 작은 창과 가로 터치에서 연습하고 리플레이 위치로 돌아간다", async () => {

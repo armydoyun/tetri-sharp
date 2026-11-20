@@ -466,7 +466,7 @@ body.touch-on {
 
 body[data-screen="replay"] {
   /* 정보 줄 + 진행 막대 + 분석 줄 + 버튼 두 줄 */
-  --replay-controls-h: 250px;
+  --replay-controls-h: 266px;
   --under-h: var(--replay-controls-h);
 }
 
@@ -476,7 +476,7 @@ body[data-screen="replay"]:has(.replay-note:not(:empty)) {
 
 @media (max-width: 720px) {
   body[data-screen="replay"] {
-    --replay-controls-h: 340px;
+    --replay-controls-h: 356px;
   }
 }
 
@@ -792,10 +792,13 @@ body[data-screen="paused"] .countdown {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-2);
-  align-items: center;
+  align-items: end;
   font-size: var(--text-s);
 }
 
+#replay-time {
+  line-height: 26px;
+}
 
 
 .replay-transport {
@@ -1109,9 +1112,8 @@ body[data-screen="replay"] .touchpad {
 
 /* ---- 리플레이 진행 막대(이동 가능) + 분석 표시 ---- */
 .replay-track {
-  display: block;
-  position: relative;
-  padding-top: 16px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-1);
 }
 
 .replay-track input {
@@ -1119,20 +1121,23 @@ body[data-screen="replay"] .touchpad {
   outline-offset: 0;
 }
 
-/* 막대 위 표시: 누를 수 있는 작은 기둥. 색으로 종류를 나눈다 */
+/* 막대 위 표시: 피네스, 오래 고민, 주요 장면 순으로 각 줄을 쓴다. */
 .replay-markers {
-  position: absolute;
-  inset: 0 8px auto;
-  height: 12px;
+  margin-inline: 8px;
   pointer-events: none;
+}
+
+.replay-markers > div {
+  position: relative;
+  height: 10px;
 }
 
 .replay-mark {
   appearance: none;
   position: absolute;
-  top: 0;
+  top: 1px;
   width: 4px;
-  height: 12px;
+  height: 7px;
   margin-left: -2px;
   padding: 0;
   border: 0;
@@ -1151,13 +1156,12 @@ body[data-screen="replay"] .touchpad {
 .replay-mark::before {
   content: "";
   position: absolute;
-  inset: -4px -4px;
+  inset: -1px -4px;
 }
 
 .replay-mark:hover,
 .replay-mark:focus-visible {
-  height: 14px;
-  top: -2px;
+  outline: 1px solid var(--text);
 }
 
 .replay-mark.is-finesse,
@@ -1673,10 +1677,11 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
   /* 리플레이: 보드 아래가 아니라 오른쪽 한 칸 전체(위아래 두 줄)에 조작을 모은다 */
   body[data-screen="replay"] {
     --under-h: 0px;
+    --board-inline-reserve: calc(120px + 41cqi + 2 * var(--space-3) + 2px);
   }
 
   body[data-screen="replay"] .stage {
-    grid-template-columns: minmax(120px, 160px) auto minmax(0, 1fr);
+    grid-template-columns: minmax(100px, 120px) auto minmax(0, 1fr);
     grid-template-areas:
       "hud board bar"
       ". board bar";
@@ -1687,6 +1692,18 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
     align-self: start;
     gap: var(--space-1, 4px);
     min-width: 0;
+    max-height: calc(100dvh - 60px);
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  .replay-info {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--bg);
   }
 
   .input-display,

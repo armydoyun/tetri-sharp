@@ -6,14 +6,14 @@ import { createBot } from "../../js/ai/bot.js";
 import { createRecorder } from "../../js/replay/replay.js";
 import { dailyMode } from "../../js/modes/daily.js";
 
-export const botDailyReplay = key => {
+export const botDailyReplay = (key, pauseAt = Infinity) => {
   const mode = dailyMode(key);
   const seed = mode.fixedSeed;
   const game = createGame({ rules: MODERN, seed, mode });
   const rec = createRecorder({ seed, mode, rules: MODERN, handling: game.handling });
   const bot = createBot({ game, rotation: ROTATIONS.srs, level: { pps: 3, mistake: 0, hold: true }, seed });
   for (let f = 0; f < 60 * 120 && !game.state.over; f++) {
-    const { held, pressed } = bot.input();
+    const { held, pressed } = f >= pauseAt && f < pauseAt + 120 ? { held: 0, pressed: 0 } : bot.input();
     rec.input(held, pressed);
     game.step({ held, pressed });
   }
