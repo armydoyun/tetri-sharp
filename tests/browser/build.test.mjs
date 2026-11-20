@@ -15,6 +15,12 @@ import { PUZZLES } from "../../js/modes/puzzles.js";
 import { botDailyReplay } from "../helpers/daily.mjs";
 import { dateKey } from "../../js/modes/daily.js";
 import { encodeReplayCode } from "../../js/replay/share.js";
+import { BTN, createGame } from "../../js/core/engine.js";
+import { createBot } from "../../js/ai/bot.js";
+import { ZEN } from "../../js/modes/index.js";
+import { MODERN } from "../../js/rules/presets.js";
+import { ROTATIONS } from "../../js/rules/rotation/index.js";
+import { createRecorder } from "../../js/replay/replay.js";
 
 let dir, html, result, server, url, browser;
 
@@ -1538,8 +1544,81 @@ test("리플레이 탐색: 막대로 원하는 시점에 가고, 표시로 건�
   assert.ok((await position()) >= first);
   await page.click('[data-replay="prev-mark"]');
   assert.equal(await position(), first);
+
+  const progress = page.locator("#replay-progress");
+  const toggleLabel = page.locator('[data-replay="toggle"] .replay-toggle-text');
+  for (const mark of [page.locator(".replay-mark").first(), page.locator('[data-replay="next-mark"]')]) {
+    await mark.click();
+    assert.equal(await toggleLabel.textContent(), "재생");
+    assert.equal(await progress.evaluate(el => el === document.activeElement), true);
+    const selected = await position();
+    await page.keyboard.press("Space");
+    await page.waitForFunction(frame => Number(document.getElementById("replay-progress").value) > frame, selected);
+    await page.keyboard.press("Space");
+    assert.equal(await toggleLabel.textContent(), "재생");
+  }
+  // 키보드로 버튼에 포커스한 경우 Space는 그 버튼을 실행한다.
+  const next = page.locator('[data-replay="next-mark"]');
+  await next.focus();
+  await page.keyboard.press("Space");
+  assert.equal(await toggleLabel.textContent(), "재생");
+  assert.equal(await next.evaluate(el => el === document.activeElement), true);
   assert.deepEqual(errors, []);
   await context.close();
+});
+
+test("리플레이 탐색: 10분을 넘어도 막대 폭과 버튼 가운데 정렬이 유지된다", async () => {
+  const options = { seed: 1, rules: MODERN, mode: ZEN };
+  const game = createGame(options);
+  const bot = createBot({ game, rotation: ROTATIONS.srs, level: { pps: 0.5, hold: true, mistake: 0 } });
+  const recorder = createRecorder({ ...options, handling: game.handling });
+  while (!game.state.over && game.state.frame < 36500) {
+    const input = game.state.frame < 36120 ? bot.input() : { held: 0, pressed: BTN.HARD };
+    recorder.input(input.held, input.pressed);
+    game.step(input);
+  }
+  assert.ok(game.state.over && game.state.frame > 36000);
+  const { context, page, errors } = await openPage(replay => {
+    localStorage.setItem("tetrisharp:replay:last", JSON.stringify(replay));
+  }, recorder.finish(game.state));
+  try {
+    await page.click("#watch-last");
+    const progress = page.locator("#replay-progress");
+    const layout = () =>
+      progress.evaluate(el => {
+        const { x, width } = el.getBoundingClientRect();
+        return [x, width];
+      });
+    for (const [width, height] of [
+      [960, 360],
+      [560, 500],
+      [320, 720],
+    ]) {
+      await page.setViewportSize({ width, height });
+      await progress.fill("35999");
+      assert.match(await text(page, "replay-time"), /^9:59\.98 \/ 10:/);
+      const before = await layout();
+      await page.click('[data-replay="step"]');
+      assert.match(await text(page, "replay-time"), /^10:00\.00 \/ 10:/);
+      assert.deepEqual(await layout(), before, `진행 막대 위치 · ${width}×${height}`);
+      const offCenter = await page.locator("#replay-bar .btn:visible").evaluateAll(buttons =>
+        buttons.flatMap(button => {
+          const btn = button.getBoundingClientRect();
+          return [...button.children]
+            .filter(child => {
+              const r = child.getBoundingClientRect();
+              return Math.abs(r.top + r.height / 2 - btn.top - btn.height / 2) > 0.5;
+            })
+            .map(() => button.dataset.replay);
+        })
+      );
+      assert.deepEqual(offCenter, [], `버튼 콘텐츠 가운데 정렬 · ${width}×${height}`);
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    }
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
 });
 
 test("리플레이 탐색: 피네스가 많은 판에서도 오래 고민과 주요 장면을 눌러 이동한다", async () => {
