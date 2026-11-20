@@ -1715,6 +1715,65 @@ test("Sprint 구간 연습은 같은 시점부터 비교하고 재시도 후 리
   }
 });
 
+test("리플레이 버튼의 글자와 아이콘은 버튼의 세로 중앙에 놓인다", async () => {
+  const { replay } = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
+  for (const locale of ["ko-KR", "en-US"]) {
+    const { context, page } = await openPage(
+      value => localStorage.setItem("tetrisharp:replay:last", JSON.stringify(value)),
+      replay,
+      { locale, frameClock: true }
+    );
+    try {
+      await page.locator("#watch-last").click();
+      const toggle = page.locator('[data-replay="toggle"]');
+      const checkCenters = async () => {
+        const buttons = await page.locator("#replay-bar button.btn:visible").evaluateAll(elements => {
+          const centerY = element => {
+            const { top, bottom } = element.getBoundingClientRect();
+            return (top + bottom) / 2;
+          };
+          return elements.map(button => ({
+            action: button.dataset.replay,
+            offsets: [...button.children].map(content => centerY(content) - centerY(button)),
+            fits: button.scrollWidth <= button.clientWidth + 1 && button.scrollHeight <= button.clientHeight + 1,
+            multiline: button.closest(".replay-transport")
+              ? [...button.children].some(
+                  content =>
+                    content.getBoundingClientRect().height > parseFloat(getComputedStyle(content).lineHeight) + 0.5
+                )
+              : false,
+          }));
+        });
+        for (const action of ["toggle", "back", "ahead", "speed", "step-back", "step", "restart", "share", "exit"]) {
+          assert.ok(
+            buttons.some(button => button.action === action),
+            action
+          );
+        }
+        for (const { action, offsets, fits, multiline } of buttons) {
+          assert.ok(offsets.length && offsets.every(offset => Math.abs(offset) <= 0.5), `${action}: ${offsets}`);
+          assert.ok(fits, action);
+          assert.equal(multiline, false, action);
+        }
+      };
+      for (const [width, height] of [
+        [1280, 800],
+        [960, 360],
+        [480, 560],
+        [440, 520],
+        [320, 480],
+      ]) {
+        await page.setViewportSize({ width, height });
+        await checkCenters();
+        await toggle.click();
+        await checkCenters();
+      }
+    } finally {
+      await context.close();
+    }
+  }
+});
+
 test("데스크톱 창 크기를 바꿔도 리플레이 조작과 플레이 배치를 유지한다", async () => {
   const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
   const { context, page, errors } = await openPage(
