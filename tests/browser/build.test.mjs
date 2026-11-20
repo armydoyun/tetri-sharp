@@ -1200,7 +1200,7 @@ test("화면 색: 시스템이 라이트여도 다크를 고르면 첫 화면이
 test("CPU 대전: 난이도를 골라 시작하면 CPU 보드가 함께 움직이고, 막히면 패배와 전적이 남는다", async () => {
   const { context, page, errors } = await openPage();
   await page.click('[data-mode="versus"]');
-  assert.equal(await page.locator("#versus .menu-row").count(), 4);
+  assert.equal(await page.locator("#versus .menu-row").count(), 7);
   await page.click('#versus [data-level="master"]');
   await page.waitForFunction(() => document.body.dataset.screen === "play", null, { timeout: 3000 });
   assert.equal(await visible(page, "versus-panel"), true);
@@ -1233,6 +1233,67 @@ test("CPU 대전: 난이도를 골라 시작하면 CPU 보드가 함께 움직�
   assert.equal(await page.locator('#versus [data-level="master"] .mode-best').textContent(), "0승 1패");
   assert.deepEqual(errors, []);
   await context.close();
+});
+
+test("CPU 대전: 낮은 창에서도 중간 난이도를 열 수 있고 기존 전적과 따로 저장한다", async () => {
+  const stages = ["easy", "easy-plus", "normal", "normal-plus", "hard", "hard-plus", "master"];
+  for (const { width, height, hasTouch, locale } of [
+    { width: 560, height: 320, hasTouch: false, locale: "ko-KR" },
+    { width: 667, height: 300, hasTouch: true, locale: "en-US" },
+    { width: 320, height: 480, hasTouch: true, locale: "en-US" },
+  ]) {
+    const context = await browser.newContext({ locale, viewport: { width, height }, hasTouch });
+    try {
+      await context.addInitScript(() => {
+        localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
+        localStorage.setItem("tetrisharp:versus:stats", JSON.stringify({ hard: { win: 3, loss: 1 } }));
+      });
+      const page = await context.newPage();
+      await page.goto(url);
+      await page.click('[data-mode="versus"]');
+      const dialog = page.locator("#versus");
+      const body = dialog.locator(".dialog-body");
+      const close = dialog.locator("#versus-close");
+      const rows = dialog.locator("[data-level]");
+      const next = rows.filter({ hasText: hasTouch ? "Hard+" : "어려움+" });
+      assert.deepEqual(await rows.evaluateAll(items => items.map(item => item.dataset.level)), stages);
+      assert.match(
+        await dialog.locator('[data-level="hard"] .mode-best').textContent(),
+        hasTouch ? /3W 1L/ : /3승 1패/
+      );
+      assert.equal(await next.locator(".mode-best").textContent(), "");
+      const closeBox = await close.boundingBox();
+      assert.ok(closeBox && closeBox.y >= 0 && closeBox.y + closeBox.height <= height);
+      const columnsFit = el => el.scrollWidth <= el.clientWidth + 1;
+      assert.ok(await body.evaluate(columnsFit));
+      if (hasTouch) {
+        await next.scrollIntoViewIfNeeded();
+      } else {
+        for (let i = 0; i < 5; i++) await page.keyboard.press("Tab");
+        assert.equal(await next.evaluate(el => el === document.activeElement), true);
+      }
+      assert.ok(await body.evaluate(el => el.scrollTop > 0));
+      assert.deepEqual(await close.boundingBox(), closeBox);
+      if (hasTouch) await next.tap();
+      else await page.keyboard.press("Enter");
+      assert.equal(await text(page, "versus-name"), hasTouch ? "CPU · Hard+" : "CPU · 어려움+");
+      assert.ok(
+        await page.locator(".app-header").evaluate(el => {
+          const title = el.querySelector(".session-title").getBoundingClientRect();
+          const header = el.getBoundingClientRect();
+          return title.top >= header.top && title.bottom <= header.bottom;
+        })
+      );
+      if (hasTouch) continue;
+
+      for (let i = 0; i < 60 && !(await visible(page, "results")); i++) await page.keyboard.press("Space");
+      await page.waitForFunction(() => document.body.dataset.screen === "results");
+      const stats = await page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:versus:stats")));
+      assert.deepEqual(stats, { hard: { win: 3, loss: 1 }, "hard-plus": { win: 0, loss: 1 } });
+    } finally {
+      await context.close();
+    }
+  }
 });
 
 test("오늘의 도전: 창에서 시작하고, 받은 코드(이름 포함)로 겨루며, #daily= 링크로 열면 코드가 채워진다", async () => {

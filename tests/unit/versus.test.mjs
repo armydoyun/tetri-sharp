@@ -10,6 +10,7 @@ import { findMode } from "../../js/modes/index.js";
 import { parseBackup } from "../../js/storage/backup.js";
 
 const lock = o => ({ type: "lock", lines: 0, tspin: "none", perfect: false, b2b: false, combo: -1, ...o });
+const levelById = id => LEVELS.find(level => level.id === id);
 
 test("공격 줄 수: 줄 삭제 종류 + B2B + 콤보 + 퍼펙트 클리어", () => {
   assert.equal(attackFor(lock({ lines: 1, combo: 0 })), 0);
@@ -136,14 +137,14 @@ test("봇은 PPS에 맞춰 피스를 놓고, 혼자 두면 오래 버틴다", ()
 });
 
 test("같은 시드면 봇도 똑같이 둔다(결정론)", () => {
-  const a = solo(LEVELS[2], 1800, 11);
-  const b = solo(LEVELS[2], 1800, 11);
+  const a = solo(levelById("hard"), 1800, 11);
+  const b = solo(levelById("hard"), 1800, 11);
   assert.deepEqual(Array.from(a.board.cells), Array.from(b.board.cells));
 });
 
 test("최강 봇은 쉬움 봇을 이긴다", () => {
   const easy = LEVELS[0];
-  const master = LEVELS[3];
+  const master = levelById("master");
   const a = createGame({ rules: MODERN, seed: 5, mode: versusMode(easy) });
   const b = createGame({ rules: MODERN, seed: 5, mode: versusMode(master) });
   const ba = createBot({ game: a, rotation: ROTATIONS.srs, level: easy, seed: 1 });
@@ -159,8 +160,13 @@ test("최강 봇은 쉬움 봇을 이긴다", () => {
 
 test("백업: 대전 전적도 옮기고 이상한 값은 버린다", () => {
   const parsed = parseBackup(
-    { app: "tetri-sharp", kind: "backup", v: 1, data: { "versus:stats": { hard: { win: 3, loss: -2 }, "x y": {} } } },
+    {
+      app: "tetri-sharp",
+      kind: "backup",
+      v: 1,
+      data: { "versus:stats": { hard: { win: 3, loss: -2 }, "hard-plus": { win: 1, loss: 2 }, "x y": {} } },
+    },
     findMode
   );
-  assert.deepEqual(parsed.data["versus:stats"], { hard: { win: 3, loss: 0 } });
+  assert.deepEqual(parsed.data["versus:stats"], { hard: { win: 3, loss: 0 }, "hard-plus": { win: 1, loss: 2 } });
 });

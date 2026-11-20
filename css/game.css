@@ -2158,12 +2158,14 @@ body[data-scene-practice] .race-panel {
 }
 
 @media (max-width: 390px) {
-  body[data-scene-practice="split"] .app-header {
+  body:is([data-scene-practice="split"], .is-versus) .app-header {
     grid-template-columns: auto minmax(0, 1fr) auto;
+    column-gap: var(--space-1);
   }
 
-  body[data-scene-practice="split"] .session-title {
+  body:is([data-scene-practice="split"], .is-versus) .session-title {
     font-size: var(--text-s);
+    line-height: 1.2;
     letter-spacing: normal;
     word-break: keep-all;
   }

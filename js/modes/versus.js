@@ -31,12 +31,15 @@ export const attackFor = ev => (ev.lines ? attackParts(ev).total : 0);
 
 /**
  * 난이도: pps = CPU가 1초에 놓는 피스 수, mistake = 가장 좋은 자리 대신 차선을 고를 확률(%),
- * hold = 홀드를 쓰는지.
+ * hold = 홀드를 쓰는지, holdMinGain = 홀드로 바꿀 때 필요한 최소 배치 점수 차이.
  */
 export const LEVELS = Object.freeze([
   Object.freeze({ id: "easy", name: t("쉬움"), pps: 0.7, mistake: 20, hold: false }),
+  Object.freeze({ id: "easy-plus", name: t("쉬움+"), pps: 0.95, mistake: 16, hold: true, holdMinGain: 3 }),
   Object.freeze({ id: "normal", name: t("보통"), pps: 1.2, mistake: 12, hold: true }),
+  Object.freeze({ id: "normal-plus", name: t("보통+"), pps: 1.6, mistake: 8, hold: true }),
   Object.freeze({ id: "hard", name: t("어려움"), pps: 2, mistake: 3, hold: true }),
+  Object.freeze({ id: "hard-plus", name: t("어려움+"), pps: 2.6, mistake: 1, hold: true }),
   Object.freeze({ id: "master", name: t("최강"), pps: 3.2, mistake: 0, hold: true }),
 ]);
 

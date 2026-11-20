@@ -457,7 +457,8 @@ const setScreen = next => {
   touch.setEnabled(next === "play" || next === "countdown");
   gestures.setEnabled((next === "play" || next === "countdown") && gesturesOn());
   document.body.classList.toggle("is-practice", Boolean(mode.practice) && next !== "menu");
-  $("session-title").textContent = next === "menu" ? "" : scenePractice ? scenePracticeTitle() : mode.name;
+  const modeTitle = mode.versus ? t("CPU · {level}", { level: mode.versus.name }) : mode.name;
+  $("session-title").textContent = next === "menu" ? "" : scenePractice ? scenePracticeTitle() : modeTitle;
   $("mode-objective").textContent =
     next === "menu" || next === "replay"
       ? ""
