@@ -86,9 +86,7 @@ export const versusMode = level => {
     }),
     record: Object.freeze({ metric: "frames", order: "asc" }),
     formatRecord: e => formatTime(e.frames),
-    // 상대(CPU)와 함께 돌아야 같은 결과가 나오므로 기록·리플레이는 남기지 않는다.
     isRecordable: () => false,
-    noReplay: true,
   });
   cache.set(level.id, mode);
   return mode;
@@ -111,4 +109,10 @@ export const exchangeGarbage = (a, b) => {
     ga.pending += gb.outgoing;
     gb.outgoing = 0;
   }
+};
+
+/** 양쪽 피스를 처리한 뒤 쓰레기를 교환한다. 같은 프레임에 둘 다 막히면 플레이어가 진다. */
+export const settleBattleFrame = (game, cpu, events) => {
+  exchangeGarbage(game, cpu);
+  if (cpu.state.over && !game.state.over) events.push(...game.finishAs(WIN));
 };

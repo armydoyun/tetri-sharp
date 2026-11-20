@@ -194,6 +194,12 @@
         <!-- 보드 주변 UI는 다크 표면을 사용한다. 플레이 격자의 색은 테마가 정한다. -->
         <div class="board-wrap surface-game">
           <canvas id="board" class="board" aria-label="보드"></canvas>
+          <canvas id="replay-cpu-board" class="board" aria-label="CPU 보드"></canvas>
+          <div class="replay-board-captions" aria-hidden="true"><span>내 보드</span><span>CPU 보드</span></div>
+          <div id="replay-battle-view" class="replay-battle-view" role="group" aria-label="리플레이 보드 선택" hidden>
+            <button type="button" class="btn btn-small" data-board-view="own" aria-pressed="true">내 보드</button>
+            <button type="button" class="btn btn-small" data-board-view="cpu" aria-pressed="false">CPU 보드</button>
+          </div>
           <div id="countdown" class="countdown" aria-live="assertive" hidden><span id="countdown-label"></span></div>
           <div id="action" class="action" aria-hidden="true"></div>
 
@@ -290,6 +296,10 @@
             <button type="button" class="btn btn-ghost" data-replay="exit"><span data-icon="close"></span><span>닫기</span></button>
           </div>
           <p id="replay-note" class="replay-note" role="status"></p>
+          <dl id="replay-battle-tally" class="replay-battle-tally" hidden>
+            <div><dt>내가 받을 쓰레기</dt><dd id="replay-own-pending" class="num">0</dd></div>
+            <div><dt>CPU가 받을 쓰레기</dt><dd id="replay-cpu-pending" class="num">0</dd></div>
+          </dl>
           <!-- 진행 막대: 눌러서 원하는 시점으로. 위에는 분석 표시(피네스 실수·오래 고민한 피스·주요 장면) -->
           <div class="replay-timeline">
             <div class="replay-track range">
@@ -299,7 +309,10 @@
             <span id="replay-time" class="num"></span>
           </div>
           <div class="replay-analysis">
-            <p id="replay-summary" class="replay-summary"></p>
+            <div class="replay-annotations">
+              <p id="replay-summary" class="replay-summary"></p>
+              <p id="replay-battle-event" class="replay-battle-event" role="status" hidden></p>
+            </div>
             <div class="replay-mark-controls">
               <span>장면</span>
               <button type="button" class="btn btn-ghost" data-replay="prev-mark" aria-label="이전 표시로" title="이전 표시로"><span data-icon="arrow-left"></span></button>

@@ -5,9 +5,19 @@ import { MODERN } from "../../js/rules/presets.js";
 import { ROTATIONS } from "../../js/rules/rotation/index.js";
 import { HEIGHT, WIDTH, createBoard, set } from "../../js/core/board.js";
 import { createBot, evaluate, placements } from "../../js/ai/bot.js";
-import { LEVELS, WIN, attackFor, exchangeGarbage, findVersus, versusMode } from "../../js/modes/versus.js";
+import {
+  LEVELS,
+  WIN,
+  attackFor,
+  exchangeGarbage,
+  findVersus,
+  settleBattleFrame,
+  versusMode,
+} from "../../js/modes/versus.js";
 import { findMode } from "../../js/modes/index.js";
 import { parseBackup } from "../../js/storage/backup.js";
+import { createPlayer, createRecorder, sanitizeReplay } from "../../js/replay/replay.js";
+import { analyzeReplay } from "../../js/replay/analyze.js";
 
 const lock = o => ({ type: "lock", lines: 0, tspin: "none", perfect: false, b2b: false, combo: -1, ...o });
 const levelById = id => LEVELS.find(level => level.id === id);
@@ -24,13 +34,86 @@ test("공격 줄 수: 줄 삭제 종류 + B2B + 콤보 + 퍼펙트 클리어", (
   assert.equal(attackFor(lock({ lines: 0 })), 0);
 });
 
-test("대전 모드는 id로 찾고, 기록·리플레이는 남기지 않는다", () => {
+test("대전 모드는 id로 찾고 기록표 순위를 만들지 않는다", () => {
   for (const level of LEVELS) {
     const mode = versusMode(level);
     assert.equal(findVersus(mode.id), mode);
     assert.equal(findMode(mode.id), mode);
-    assert.equal(mode.noReplay, true);
     assert.equal(mode.isRecordable({}), false);
+  }
+});
+
+test("대전 리플레이는 공격 프레임, 양쪽 보드와 쓰레기, 승패를 재현한다", () => {
+  const snapshot = ({ state, handling }) => {
+    const { board, active, queue, hold, garbage, frame, over } = state;
+    const { pending, sent, received, blocked, hole } = garbage;
+    return {
+      cells: board.cells.slice(),
+      active: structuredClone(active),
+      queue: [...queue],
+      hold,
+      pending,
+      sent,
+      received,
+      blocked,
+      hole,
+      frame,
+      over,
+      handling,
+    };
+  };
+  for (const [ownLevel, cpuLevel] of [
+    ["master", "easy"],
+    ["easy", "master"],
+  ]) {
+    const mode = versusMode(levelById(cpuLevel));
+    const options = { rules: MODERN, seed: 5, mode };
+    const own = createGame(options);
+    const cpu = createGame(options);
+    const recorders = [own, cpu].map(game => createRecorder({ ...options, handling: game.handling }));
+    const bots = [own, cpu].map((game, i) =>
+      createBot({ game, rotation: ROTATIONS.srs, level: levelById(i ? cpuLevel : ownLevel), seed: i + 1 })
+    );
+    const frames = new Map();
+    for (let i = 0; i < 60 * 300 && !own.state.over; i++) {
+      if (i === 90) {
+        const handling = { ...own.handling, sdf: Infinity };
+        own.setHandling(handling);
+        recorders[0].handlingChanged(handling);
+      }
+      const events = [own, cpu].map((game, side) => {
+        const input = bots[side].input();
+        recorders[side].input(input.held, input.pressed);
+        return game.step(input);
+      });
+      settleBattleFrame(own, cpu, events[0]);
+      if (
+        i % 60 === 0 ||
+        own.state.over ||
+        events.flat().some(e => e.type === "garbage" || (e.type === "attack" && (e.lines || e.blocked)))
+      ) {
+        frames.set(own.state.frame, [snapshot(own), snapshot(cpu)]);
+      }
+    }
+    assert.ok(own.state.over);
+    assert.equal(own.state.over === WIN, ownLevel === "master");
+    assert.ok(own.state.garbage.received + cpu.state.garbage.received > 0);
+    const replay = { ...recorders[0].finish(own.state), cpu: recorders[1].finish(cpu.state) };
+    const { markers } = analyzeReplay(replay, findMode);
+    assert.ok(markers.some(mark => mark.kind === "sent" && mark.label.includes("보냄")));
+    assert.ok(markers.some(mark => mark.kind === "received" && mark.label.includes("올라옴")));
+    if (ownLevel === "easy") assert.ok(markers.some(mark => mark.kind === "blocked" && mark.label.includes("상쇄")));
+    assert.equal(sanitizeReplay(replay, findMode), null);
+    // 새 플레이어를 만들어 임의 프레임까지 진행하는 것은 브라우저 되감기와 같다.
+    for (const target of [replay.result.frames, markers[0].frame]) {
+      const viewer = createPlayer(replay, findMode);
+      while (viewer.frame < target && !viewer.done) {
+        viewer.step();
+        if (frames.has(viewer.frame))
+          assert.deepEqual([snapshot(viewer.game), snapshot(viewer.cpu)], frames.get(viewer.frame));
+      }
+      assert.equal(viewer.frame, target);
+    }
   }
 });
 

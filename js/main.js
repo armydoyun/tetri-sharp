@@ -41,7 +41,7 @@ import { createSfx } from "./audio/sfx.js";
 import { createFinesseTracker } from "./modes/finesse.js";
 import { analyzeReplay } from "./replay/analyze.js";
 import { ROTATIONS } from "./rules/rotation/index.js";
-import { WIN, exchangeGarbage, versusMode } from "./modes/versus.js";
+import { WIN, settleBattleFrame, versusMode } from "./modes/versus.js";
 import { createBot } from "./ai/bot.js";
 import { createGestures } from "./input/gestures.js";
 import { createUndo } from "./modes/undo.js";
@@ -126,7 +126,10 @@ const cpuRenderer = createRenderer(/** @type {HTMLCanvasElement} */ ($("cpu-boar
   compact: true,
   getVisual: () => ({ ...settings.visual, effects: "off" }),
 });
-/** @type {null | { cpu: ReturnType<typeof createGame>, bot: ReturnType<typeof createBot> }} */
+const replayCpuRenderer = createRenderer(/** @type {HTMLCanvasElement} */ ($("replay-cpu-board")), {
+  getVisual: () => settings.visual,
+});
+/** @type {null | { cpu: ReturnType<typeof createGame>, bot: ReturnType<typeof createBot>, recorder: ReturnType<typeof createRecorder> }} */
 let versus = null;
 /** 난이도별 전적 */
 const versusStats = () => {
@@ -519,7 +522,11 @@ const start = (
   // 대전: CPU도 같은 시드(같은 블록 순서)로 시작한다. 상대와 함께라야 재현되므로 리플레이는 남기지 않는다.
   if (m.versus) {
     const cpu = createGame({ rules, seed, mode: m });
-    versus = { cpu, bot: createBot({ game: cpu, rotation: ROTATIONS[rules.rotation], level: m.versus, seed }) };
+    versus = {
+      cpu,
+      bot: createBot({ game: cpu, rotation: ROTATIONS[rules.rotation], level: m.versus, seed }),
+      recorder: createRecorder({ seed, mode: m, rules, handling: cpu.handling }),
+    };
     $("versus-name").textContent = t("CPU · {level}", { level: m.versus.name });
   } else versus = null;
   versusPanel.hidden = !versus;
@@ -782,11 +789,11 @@ const finish = () => {
   const nextPuzzle = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="next-puzzle"]'));
   nextPuzzle.hidden = !(mode.puzzle && state.over === "clear" && mode.puzzle.number < PUZZLES.length);
   lastReplay = recorder ? recorder.finish(state) : null;
-  for (const b of /** @type {NodeListOf<HTMLButtonElement>} */ (
-    panels.results.querySelectorAll('[data-action="watch"], [data-action="export"]')
-  ))
-    b.disabled = !lastReplay;
-  if (lastReplay) {
+  if (lastReplay && versus) lastReplay.cpu = versus.recorder.finish(versus.cpu.state);
+  /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="watch"]')).disabled = !lastReplay;
+  /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="export"]')).disabled =
+    !lastReplay || Boolean(versus);
+  if (lastReplay && !versus) {
     replays.saveLast(lastReplay);
     if (outcome && outcome.rank < MAX_RANKED)
       replays.saveRanked(recordKey(mode, rules), lastReplay, records.list(mode, rules));
@@ -1177,7 +1184,7 @@ for (const btn of document.querySelectorAll("[data-action]")) {
     if (action === "watch" && lastReplay) startReplay(lastReplay, "results", "", true);
     if (action === "stats" && game)
       statsUI.open(game.state, `${mode.name} · ${rules.name}`, !!mode.splits && splits.length > 0);
-    if (action === "export" && lastReplay) shareUI.open(lastReplay, `${mode.name} · ${rules.name}`);
+    if (action === "export" && lastReplay && !lastReplay.cpu) shareUI.open(lastReplay, `${mode.name} · ${rules.name}`);
   });
 }
 
@@ -1210,6 +1217,10 @@ let selectedMark = -1;
 /** @type {(ReturnType<typeof analyzeReplay> & { for: any }) | null} 지금 보는 리플레이의 분석 */
 let analysis = null;
 const replayTime = $("replay-time");
+const replayBattleView = $("replay-battle-view");
+const replayBattleTally = $("replay-battle-tally");
+const replayBattleEvent = $("replay-battle-event");
+const resetReplayBattleEvent = () => (replayBattleEvent.hidden = true);
 const replayStep = /** @type {HTMLButtonElement} */ (replayBar.querySelector('[data-replay="step"]'));
 const replayToggle = /** @type {HTMLButtonElement} */ (replayBar.querySelector('[data-replay="toggle"]'));
 
@@ -1222,12 +1233,19 @@ const updateReplayProgress = () => {
   replayProgress.value = String(Math.min(frame, length || 1));
   replayProgress.style.setProperty("--fill", `${length ? (Math.min(frame, length) / length) * 100 : 0}%`);
   replayTime.textContent = length ? `${formatTime(frame)} / ${formatTime(length)}` : formatTime(frame);
+  if (player?.cpu) {
+    $("replay-own-pending").textContent = String(player.game.state.garbage.pending);
+    $("replay-cpu-pending").textContent = String(player.cpu.state.garbage.pending);
+  }
 };
 
 const MARK_LABELS = {
   finesse: m => t("피네스 실수 +{n} · {piece}", { n: m.value, piece: m.label }),
   slow: m => t("오래 고민한 피스 · {s}초", { s: (m.value / 60).toFixed(1) }),
   highlight: m => m.label,
+  sent: m => m.label,
+  blocked: m => m.label,
+  received: m => m.label,
 };
 
 /** 같은 줄에 있는 가까운 표시만 묶는다. 종류마다 별도 줄을 써서 서로 가리지 않는다. */
@@ -1291,6 +1309,15 @@ const renderMarkers = () => {
           ...(analysis.finesse.faults ? [part("finesse", t("피네스 실수 {n}", { n: analysis.finesse.faults }))] : []),
           ...(analysis.slow ? [part("slow", t("오래 고민 {n}", { n: analysis.slow }))] : []),
           ...(highlights ? [part("highlight", t("주요 장면 {n}", { n: highlights }))] : []),
+          ...(player?.cpu
+            ? [
+                ["sent", t("전송")],
+                ["blocked", t("상쇄")],
+                ["received", t("수신")],
+              ]
+                .filter(([kind]) => markers.some(mark => mark.kind === kind))
+                .map(([kind, label]) => part(kind, label))
+            : []),
         ]
       : [])
   );
@@ -1307,6 +1334,7 @@ const renderMarkers = () => {
 const seekReplay = (target, pause = false) => {
   if (!playing || !player) return;
   selectedMark = -1;
+  resetReplayBattleEvent();
   const to = Math.max(0, Math.min(Math.round(target), replayLength() || target));
   if (to < player.frame) {
     player = createPlayer(playing, findMode);
@@ -1315,6 +1343,7 @@ const seekReplay = (target, pause = false) => {
   while (player.frame < to && !player.done) player.step();
   if (pause) replayPaused = true;
   renderer.clearEffects();
+  replayCpuRenderer.clearEffects();
   fb.clearAction();
   updateReplayBar();
 };
@@ -1322,8 +1351,12 @@ const seekReplay = (target, pause = false) => {
 const seekMark = index => {
   const mark = analysis?.markers[index];
   if (!mark) return;
-  seekReplay(mark.frame - 30, true);
+  seekReplay(player?.cpu ? mark.frame : mark.frame - 30, true);
   selectedMark = index;
+  if (player?.cpu) {
+    replayBattleEvent.textContent = mark.label;
+    replayBattleEvent.hidden = false;
+  }
 };
 
 /** 지금 위치 또는 마지막으로 선택한 표시를 기준으로 앞뒤 장면을 본다. */
@@ -1354,7 +1387,7 @@ const updateReplayBar = () => {
     ? t("재생")
     : t("일시정지");
   /** @type {HTMLElement} */ (replayBar.querySelector(".replay-speed")).textContent = `${replaySpeed}x`;
-  replayStatus.textContent = player?.done ? t("끝") : "";
+  replayStatus.textContent = player?.done ? (player.cpu ? mode.summary(game.state).title : t("끝")) : "";
   replayStep.disabled = !player || player.done;
   replayToggle.disabled = replayStep.disabled;
   for (const b of /** @type {NodeListOf<HTMLButtonElement>} */ (
@@ -1378,9 +1411,17 @@ const startReplay = (replay, returnTo = screen, note = "", local = false) => {
   mode = player.mode;
   rules = replay.rules;
   replayPaused = false;
+  const battle = Boolean(player.cpu);
+  if (entering && battle) selectReplayBoard("own");
+  document.body.toggleAttribute("data-battle-replay", battle);
+  replayBattleView.hidden = replayBattleTally.hidden = !battle;
+  resetReplayBattleEvent();
+  versusPanel.hidden = true;
+  document.body.classList.remove("is-versus");
   if (analysis?.for !== replay) analysis = { ...analyzeReplay(replay, findMode), for: replay };
   acc = 0;
   renderer.clearEffects();
+  replayCpuRenderer.clearEffects();
   fb.clearAction();
   countdownEl.hidden = true;
   showPanel(null);
@@ -1392,6 +1433,7 @@ const startReplay = (replay, returnTo = screen, note = "", local = false) => {
   $("replay-title").textContent = `${mode.name} · ${rules.name}`;
   renderMarkers();
   /** @type {HTMLButtonElement} */ (replayBar.querySelector('[data-replay="race"]')).hidden = !canRace(replay);
+  /** @type {HTMLButtonElement} */ (replayBar.querySelector('[data-replay="share"]')).hidden = battle;
   updateReplayBar();
   if (!entering && focus instanceof HTMLElement && replayBar.contains(focus)) focus.focus({ preventScroll: true });
   else replayToggle.focus({ preventScroll: true });
@@ -1405,7 +1447,13 @@ const stopReplay = () => {
   playing = null;
   ownReplay = false;
   replayBar.hidden = true;
+  replayBattleView.hidden = replayBattleTally.hidden = true;
+  document.body.removeAttribute("data-battle-replay");
+  document.body.removeAttribute("data-replay-board");
+  versusPanel.hidden = !versus;
+  document.body.classList.toggle("is-versus", Boolean(versus));
   renderer.clearEffects();
+  replayCpuRenderer.clearEffects();
   ({ game, mode, rules } = replayReturn);
   if (replayReturn.screen === "results") {
     showModeHud(mode);
@@ -1419,6 +1467,18 @@ const stopReplay = () => {
       replayReturn.focus.focus();
   }
 };
+
+const selectReplayBoard = view => {
+  document.body.dataset.replayBoard = view;
+  for (const b of replayBattleView.querySelectorAll("[data-board-view]")) {
+    b.setAttribute("aria-pressed", String(b.getAttribute("data-board-view") === view));
+  }
+};
+replayBattleView.addEventListener("click", e => {
+  if (!(e.target instanceof Element)) return;
+  const view = e.target.closest("[data-board-view]")?.getAttribute("data-board-view");
+  if (player?.cpu && view) selectReplayBoard(view);
+});
 
 const sceneControls = $("scene-practice-controls");
 const sceneStatus = $("scene-practice-status");
@@ -1550,11 +1610,13 @@ const exitScenePractice = () => {
 const advanceReplay = count => {
   if (!player || player.done) return;
   selectedMark = -1;
+  resetReplayBattleEvent();
   for (let i = 0; i < count && !player.done; i++) {
     const events = player.step();
     inputDisplay.show(player.input.held, player.input.pressed);
-    for (const e of events) announce(e);
+    if (!player.cpu) for (const e of events) announce(e);
     renderer.addEvents(events);
+    if (player.cpu) replayCpuRenderer.addEvents(player.cpuEvents);
     // 빨리 감기 중에는 소리를 겹쳐 내지 않는다.
     if (count === 1) sfx.events(events);
   }
@@ -1581,7 +1643,7 @@ for (const btn of replayBar.querySelectorAll("[data-replay]")) {
     if (action === "prev-mark") return jumpMark(-1);
     if (action === "next-mark") return jumpMark(1);
     if (action === "practice") return enterScenePractice();
-    if (action === "share" && playing) return shareUI.open(playing, `${mode.name} · ${rules.name}`);
+    if (action === "share" && playing && !player?.cpu) return shareUI.open(playing, `${mode.name} · ${rules.name}`);
     if (action === "race" && playing) return raceReplay(playing);
     if (action === "restart") return restartReplay();
     if (action === "exit") return stopReplay();
@@ -1761,10 +1823,10 @@ const tick = () => {
   const hadActive = Boolean(game.state.active);
   const events = game.step({ held, pressed });
   if (versus) {
-    versus.cpu.step(versus.bot.input());
-    exchangeGarbage(game, versus.cpu);
-    // CPU가 먼저 막히면 내가 이긴다(같은 프레임에 둘 다 막히면 진다).
-    if (versus.cpu.state.over && !game.state.over) events.push(...game.finishAs(WIN));
+    const cpuInput = versus.bot.input();
+    versus.recorder.input(cpuInput.held, cpuInput.pressed);
+    versus.cpu.step(cpuInput);
+    settleBattleFrame(game, versus.cpu, events);
   }
   const extra = finesse?.frame(held, pressed, hadActive, events) ?? 0;
   if (extra > 0 && mode.finesse) announceText([t("피네스 +{n}", { n: extra })]);
@@ -1798,8 +1860,9 @@ const loop = now => {
     acc -= FRAME_MS;
   }
   renderer.draw(game);
+  if (screen === "replay" && player?.cpu) replayCpuRenderer.draw(player.cpu);
   if (race && !scenePractice && screen !== "replay" && raceBoardVisible.matches) raceRenderer.draw(race.player.game);
-  if (versus && raceBoardVisible.matches) cpuRenderer.draw(versus.cpu);
+  if (versus && screen !== "replay" && raceBoardVisible.matches) cpuRenderer.draw(versus.cpu);
   updateHud();
   inputDisplay.paint();
   requestAnimationFrame(loop);
