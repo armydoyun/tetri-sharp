@@ -2,6 +2,28 @@
 // tests/unit/i18n.test.mjs가 코드와 index.html의 한국어 문장이 모두 여기 있는지 확인한다.
 /** @type {Record<string, string>} */
 export const EN = {
+  "쓰레기 줄이 남았어요": "Garbage rows remain",
+  "쓰레기 줄을 모두 지웠어요!": "All garbage cleared!",
+  "남은 쓰레기 줄": "Garbage rows left",
+  "배치가 달라졌어요. 처음부터 다시 하면 자리 힌트를 볼 수 있어요.":
+    "The board changed. Restart to see the placement hint.",
+  "현재 피스를 놓을 수 있는 자리예요.": "This is a placement for the current piece.",
+  "맨 위 쓰레기 줄의 열린 칸을 표시했어요.": "The empty cells in the top garbage row are marked.",
+  "주어진 피스로 회색 쓰레기 줄을 모두 지우세요.": "Clear every gray garbage row with the given pieces.",
+  "파내기 {n} / {total}": "Downstack {n} / {total}",
+  "서로 다른 네 구멍": "Four different holes",
+  "위에 남은 블록 피해 가기": "Work around leftover blocks",
+  "넓이가 다른 구멍": "Holes of different widths",
+  "좌우로 바뀌는 구멍": "Holes on opposite sides",
+  "벽 옆 세로 우물": "Vertical well by the wall",
+  "가운데 두 줄": "Two lines in the middle",
+  "같은 판에서 힌트를 보고 여러 번 연습할 수 있어요.": "Use hints and retry the same board.",
+  "고정된 판 6개 · 구멍과 다음 배치 힌트": "6 fixed boards with hole and placement hints",
+  "쓰레기 줄 파내기": "Downstack training",
+  "연습 목록": "Practice list",
+  "힌트 숨기기": "Hide hint",
+  "자리 힌트": "Placement hint",
+  힌트: "Hint",
   "다시 연습": "Try again",
   "추천 연습 · {from}–{to}줄": "Practice · Lines {from}–{to}",
   "추천 연습 · {piece} 피네스": "Practice · {piece} finesse",

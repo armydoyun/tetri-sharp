@@ -1469,6 +1469,31 @@ body.is-versus {
 }
 
 /* 연습 모드 되돌리기: 연습할 때만 정보 칸 아래에 */
+.downstack-controls {
+  display: none;
+}
+
+body.is-downstack[data-screen="play"] .downstack-controls {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.downstack-controls .btn {
+  min-width: 0;
+  height: auto;
+  white-space: normal;
+}
+
+#downstack-status {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--text-s);
+}
+
+#downstack-status:empty {
+  display: none;
+}
+
 .undo-piece {
   display: none;
   width: 100%;

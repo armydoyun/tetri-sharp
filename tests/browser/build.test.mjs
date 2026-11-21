@@ -925,7 +925,7 @@ test("규칙 공유: 편집기에서 코드를 붙여 넣으면 불러오고, #r
 test("연습: 메뉴에서 고르면 시작하고, 놓을 때마다 성공/시도를 센다", async () => {
   const { context, page, errors } = await openPage();
   await page.click("#open-practice");
-  assert.equal(await page.locator("#practice .menu-row").count(), 8);
+  assert.equal(await page.locator("#practice .menu-row").count(), 9);
   assert.equal(await page.locator('[data-drill="double"]').isVisible(), true);
   await page.click('[data-drill="tsd"]');
   await page.waitForFunction(() => document.body.dataset.screen === "play", null, {
@@ -939,6 +939,50 @@ test("연습: 메뉴에서 고르면 시작하고, 놓을 때마다 성공/시�
   });
   assert.deepEqual(errors, []);
   await context.close();
+});
+
+test("파내기 훈련: 단계 선택, 두 가지 힌트, 같은 판 재시작 후 힌트 없이 클리어", async () => {
+  const { context, page, errors } = await openPage(null, undefined, { frameClock: true });
+  const press = code =>
+    page.evaluate(key => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: key, cancelable: true }));
+      window.dispatchEvent(new KeyboardEvent("keyup", { code: key, cancelable: true }));
+      window.advanceFrame();
+    }, code);
+  await page.setViewportSize({ width: 390, height: 844 });
+  try {
+    await page.click("#open-practice");
+    await page.click('[data-drill="downstack"]');
+    assert.equal(await page.locator("[data-downstack]").count(), 6);
+    await page.click('[data-downstack="downstack-1"]');
+    await page.evaluate(() => window.advanceFrame());
+    const hint = page.locator("#downstack-hint");
+    assert.equal(await text(page, "hud-lines"), "2");
+    await hint.click();
+    assert.match(await text(page, "downstack-status"), /열린 칸/);
+    await hint.click();
+    assert.match(await text(page, "downstack-status"), /피스를 놓을 수 있는/);
+    await press("ArrowLeft");
+    await press("Space");
+    assert.equal(await text(page, "results-title"), "쓰레기 줄이 남았어요");
+
+    await page.click('#results [data-action="retry"]');
+    await page.evaluate(() => window.advanceFrame());
+    assert.equal(await text(page, "downstack-status"), "");
+    await hint.click();
+    await page.click("#downstack-retry");
+    await page.evaluate(() => window.advanceFrame());
+    assert.equal(await text(page, "downstack-status"), "");
+    assert.equal(await text(page, "hud-lines"), "2");
+    await press("Space");
+    assert.equal(await text(page, "results-title"), "쓰레기 줄을 모두 지웠어요!");
+    await page.click('#results [data-action="next-puzzle"]');
+    await page.evaluate(() => window.advanceFrame());
+    assert.equal(await text(page, "hud-lines"), "4");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
 });
 
 test("터치 버튼: 켜면 보드 아래에 보이고, 누르면 조작된다", async () => {

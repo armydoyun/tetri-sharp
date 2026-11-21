@@ -163,12 +163,13 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       ctx.globalAlpha = 1;
     }
 
-    if (game?.state.finesseTarget && active) {
+    const hintCells = game?.state.downstack?.hintCells ?? game?.state.finesseTarget;
+    if (hintCells?.length && active) {
       ctx.save();
       ctx.strokeStyle = theme.board.ink;
       ctx.lineWidth = Math.max(2, cell / 12);
       ctx.setLineDash([cell / 5, cell / 8]);
-      for (const [x, y] of game.state.finesseTarget) {
+      for (const [x, y] of hintCells) {
         ctx.strokeRect(bx + x * cell + 3, toY(y) + 3, cell - 6, cell - 6);
       }
       ctx.restore();

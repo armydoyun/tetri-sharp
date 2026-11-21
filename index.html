@@ -122,6 +122,13 @@
         <!-- 정보 칸: 모드마다 필요한 칸만(게임 시작 때 정해지고 게임 중에는 그대로) -->
         <div class="stage-side">
           <p id="mode-objective" class="mode-objective"></p>
+          <div class="downstack-controls">
+            <div class="actions-row">
+              <button id="downstack-hint" class="btn btn-small" type="button">힌트</button>
+              <button id="downstack-retry" class="btn btn-small" type="button">다시 시작</button>
+            </div>
+            <p id="downstack-status" role="status"></p>
+          </div>
           <div id="scene-practice-controls" class="scene-practice-controls" hidden>
             <p id="scene-practice-status" role="status"></p>
             <div id="scene-split-progress" class="scene-split-progress" hidden>
