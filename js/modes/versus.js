@@ -29,6 +29,26 @@ const attackParts = ev => {
 
 export const attackFor = ev => (ev.lines ? attackParts(ev).total : 0);
 
+/** 초기 쓰레기 상태와 고정 시 공격 처리는 대전과 훈련에서 같다. */
+export const setupBattleGarbage = (state, rng, pending = 0) => {
+  state.garbage = { pending, received: 0, blocked: 0, sent: 0, outgoing: 0, hole: rng.int(10), rng };
+};
+
+export const applyBattleLock = (state, ev, events) => {
+  const g = state.garbage;
+  if (ev.lines > 0) {
+    const { total, ...parts } = attackParts(ev);
+    const blocked = Math.min(g.pending, total);
+    const sent = total - blocked;
+    g.pending -= blocked;
+    g.blocked += blocked;
+    g.sent += sent;
+    g.outgoing += sent;
+    events.push({ type: "attack", lines: sent, cleared: ev.lines, tspin: ev.tspin, blocked, ...parts });
+  } else receiveGarbage(state, events);
+  return false;
+};
+
 /**
  * 난이도: pps = CPU가 1초에 놓는 피스 수, mistake = 가장 좋은 자리 대신 차선을 고를 확률(%),
  * hold = 홀드를 쓰는지, holdMinGain = 홀드로 바꿀 때 필요한 최소 배치 점수 차이.
@@ -58,25 +78,8 @@ export const versusMode = level => {
     rules: MODERN,
     versus: level,
     hud: Object.freeze(["time", "attack", "lines", "pieces", "pps"]),
-    setup: (state, rng) => {
-      state.garbage = { pending: 0, received: 0, blocked: 0, sent: 0, outgoing: 0, hole: rng.int(10), rng };
-    },
-    onLock: (state, ev, events) => {
-      const g = state.garbage;
-      if (ev.lines > 0) {
-        const { total, ...parts } = attackParts(ev);
-        const blocked = Math.min(g.pending, total);
-        const sent = total - blocked;
-        g.pending -= blocked;
-        g.blocked += blocked;
-        g.sent += sent;
-        g.outgoing += sent;
-        events.push({ type: "attack", lines: sent, cleared: ev.lines, tspin: ev.tspin, blocked, ...parts });
-        return false;
-      }
-      receiveGarbage(state, events);
-      return false;
-    },
+    setup: setupBattleGarbage,
+    onLock: applyBattleLock,
     check: () => null,
     hudLines: state => ({ label: t("받을 쓰레기"), value: String(state.garbage.pending) }),
     hudTime: state => ({ label: t("시간"), frames: state.frame }),

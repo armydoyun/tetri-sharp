@@ -1,4 +1,5 @@
 // 연습 고르기 대화상자: 종류를 누르면 바로 시작한다.
+import { BATTLE_LESSONS } from "../modes/battle-lessons.js";
 import { FINESSE_LESSONS } from "../modes/finesse-lessons.js";
 import { INTRO_LESSONS } from "../modes/intro-lessons.js";
 import { DOWNSTACK_LESSONS } from "../modes/downstack.js";
@@ -71,7 +72,13 @@ export const createPracticeUI = ({ dialog, onPick, progress, onStage }) => {
         description: t("이동·회전·홀드·첫 줄 지우기"),
         lessons: INTRO_LESSONS,
       };
-      const drills = [intro, ...DRILLS.flatMap(d => (d.id === "finesse" ? [downstack, lesson, d] : [d]))];
+      const battle = {
+        id: "battle-training",
+        name: t("CPU 대전 입문"),
+        description: t("공격·상쇄·반격을 한 수씩 연습"),
+        lessons: BATTLE_LESSONS,
+      };
+      const drills = [intro, battle, ...DRILLS.flatMap(d => (d.id === "finesse" ? [downstack, lesson, d] : [d]))];
       const list = el(
         "div",
         { class: "menu-list practice-list" },

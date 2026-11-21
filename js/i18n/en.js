@@ -2,6 +2,15 @@
 // tests/unit/i18n.test.mjs가 코드와 index.html의 한국어 문장이 모두 여기 있는지 확인한다.
 /** @type {Record<string, string>} */
 export const EN = {
+  "CPU 대전 입문": "CPU battle basics",
+  "공격·상쇄·반격을 한 수씩 연습": "Practice attacking, canceling and counterattacking one move at a time",
+  "공격 보내기": "Send an attack",
+  "I 피스로 4줄을 지워 공격을 보내세요.": "Clear four lines with the I piece to send an attack.",
+  "쓰레기 상쇄": "Cancel garbage",
+  "4줄을 지워 올라올 쓰레기 4줄을 모두 막으세요.": "Clear four lines to cancel all four incoming garbage lines.",
+  "상쇄 후 반격": "Cancel and counterattack",
+  "쓰레기 2줄을 막고 남은 공격 2줄을 보내세요.": "Cancel two incoming garbage lines and send the remaining two.",
+  "공격 {attack}줄 · 상쇄 {blocked}줄 · 상대에게 {sent}줄": "Attack {attack} · Canceled {blocked} · Sent {sent}",
   "막히기 전 다시 해보기": "Retry before top-out",
   "Survival 구조 연습": "Survival rescue practice",
   "구조 시도 결과": "Rescue attempt",
