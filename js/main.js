@@ -1443,13 +1443,14 @@ const seekReplay = (target, pause = false) => {
 
 const seekMark = index => {
   const mark = analysis?.markers[index];
-  if (!mark) return;
+  if (!mark) return false;
   seekReplay(player?.cpu ? mark.frame : mark.frame - 30, true);
   selectedMark = index;
   if (player?.cpu) {
     replayBattleEvent.textContent = mark.label;
     replayBattleEvent.hidden = false;
   }
+  return true;
 };
 
 /** 지금 위치 또는 마지막으로 선택한 표시를 기준으로 앞뒤 장면을 본다. */
@@ -1461,7 +1462,7 @@ const jumpMark = dir => {
     dir > 0
       ? marks.findIndex(mark => (frame === 0 ? mark.frame >= frame : mark.frame > frame))
       : marks.findLastIndex(mark => mark.frame < frame);
-  seekMark(next);
+  return seekMark(next);
 };
 
 replayProgress.addEventListener("input", () => seekReplay(Number(replayProgress.value), true));
@@ -1726,7 +1727,7 @@ const tickReplay = () => {
 };
 
 for (const btn of replayBar.querySelectorAll("[data-replay]")) {
-  btn.addEventListener("click", () => {
+  btn.addEventListener("click", e => {
     const action = btn.getAttribute("data-replay");
     if (action === "toggle") replayPaused = !replayPaused;
     if (action === "speed") replaySpeed = SPEEDS[(SPEEDS.indexOf(replaySpeed) + 1) % SPEEDS.length];
@@ -1737,8 +1738,12 @@ for (const btn of replayBar.querySelectorAll("[data-replay]")) {
     if (action === "step-back") return seekReplay((player?.frame ?? 0) - 1, true);
     if (action === "back") return seekReplay((player?.frame ?? 0) - 300);
     if (action === "ahead") return seekReplay((player?.frame ?? 0) + 300);
-    if (action === "prev-mark") return jumpMark(-1);
-    if (action === "next-mark") return jumpMark(1);
+    if (action === "prev-mark" || action === "next-mark") {
+      if (jumpMark(action === "prev-mark" ? -1 : 1) && e instanceof MouseEvent && e.detail > 0) {
+        replayProgress.focus({ preventScroll: true });
+      }
+      return;
+    }
     if (action === "practice") return enterScenePractice();
     if (action === "share" && playing && !player?.cpu) return shareUI.open(playing, `${mode.name} · ${rules.name}`);
     if (action === "race" && playing) return raceReplay(playing);
@@ -1761,18 +1766,24 @@ window.addEventListener("keydown", e => {
     dailyUI.isOpen ||
     helpUI.isOpen ||
     puzzleUI.isOpen ||
-    shareUI.isOpen ||
-    e.repeat
+    shareUI.isOpen
   )
     return;
   if (scenePractice) {
-    if (e.code === "Escape") exitScenePractice();
+    if (!e.repeat && e.code === "Escape") exitScenePractice();
     return;
   }
-  const inBar = replayBar.contains(document.activeElement);
+  if (e.code === "Space" && !(document.activeElement instanceof HTMLButtonElement)) {
+    e.preventDefault();
+    if (!e.repeat && player && !player.done) {
+      replayPaused = !replayPaused;
+      updateReplayBar();
+    }
+    return;
+  }
+  if (e.repeat) return;
   if (e.code === "Escape") return stopReplay();
-  if (e.code === "Space" && !inBar) replayPaused = !replayPaused;
-  else if (["Digit1", "Digit2", "Digit4"].includes(e.code)) replaySpeed = Number(e.code.slice(5));
+  if (["Digit1", "Digit2", "Digit4"].includes(e.code)) replaySpeed = Number(e.code.slice(5));
   // ←→: 5초(Shift: 한 프레임), 막대에 포커스가 있으면 막대가 처리한다
   else if (document.activeElement !== replayProgress && (e.code === "ArrowLeft" || e.code === "ArrowRight")) {
     const dir = e.code === "ArrowLeft" ? -1 : 1;

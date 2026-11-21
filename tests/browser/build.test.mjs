@@ -1632,6 +1632,28 @@ test("리플레이 탐색: 막대로 원하는 시점에 가고, 표시로 건�
   assert.ok((await position()) >= first);
   await page.click('[data-replay="prev-mark"]');
   assert.equal(await position(), first);
+  const progress = page.locator("#replay-progress");
+  const toggleLabel = page.locator('[data-replay="toggle"] .replay-toggle-text');
+  const next = page.locator('[data-replay="next-mark"]');
+  for (const mark of [page.locator(".replay-mark").first(), next]) {
+    await progress.fill("0");
+    await mark.click();
+    assert.equal(await toggleLabel.textContent(), "재생");
+    assert.ok(await progress.evaluate(el => el === document.activeElement));
+    const selected = await position();
+    await page.keyboard.press("Space");
+    await page.waitForFunction(frame => Number(document.getElementById("replay-progress").value) > frame, selected);
+    await page.keyboard.press("Space");
+    assert.equal(await toggleLabel.textContent(), "재생");
+  }
+
+  await progress.fill("0");
+  await next.focus();
+  await next.evaluate(el => el.addEventListener("click", () => (el.dataset.activated = "true"), { once: true }));
+  await page.keyboard.press("Space");
+  assert.equal(await next.getAttribute("data-activated"), "true");
+  assert.equal(await toggleLabel.textContent(), "재생");
+  assert.ok(await next.evaluate(el => el === document.activeElement));
   assert.deepEqual(errors, []);
   await context.close();
 });
