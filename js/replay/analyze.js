@@ -37,7 +37,8 @@ const addBattleMarkers = (markers, frame, ownEvents, cpuEvents) => {
 
 /**
  * @typedef {{ frame: number, kind: "finesse" | "slow" | "highlight" | "sent" | "blocked" | "received", label: string, value?: number }} Marker
- * @returns {{ markers: Marker[], finesse: { judged: number, faults: number }, slow: number, length: number }}
+ * @typedef {{ spawnFrame: number, cells: number[][], inputs: number, piece: string }} FinesseScene
+ * @returns {{ markers: Marker[], finesse: { judged: number, faults: number }, finesseScene: FinesseScene | null, slow: number, length: number }}
  */
 export const analyzeReplay = (replay, findMode) => {
   const player = createPlayer(replay, findMode);
@@ -47,11 +48,14 @@ export const analyzeReplay = (replay, findMode) => {
   const markers = [];
   /** 피스마다 [나온 프레임, 놓인 프레임] */
   const pieces = [];
+  /** @type {FinesseScene | null} */
+  let finesseScene = null;
   let spawnedAt = -1;
   let pieceId = -1;
   while (!player.done && player.frame < MAX_FRAMES) {
     const before = player.frame;
     const hadActive = Boolean(game.state.active);
+    const spawnFrame = player.spawnFrame;
     const events = player.step();
     if (player.cpu) {
       addBattleMarkers(markers, player.frame, events, player.cpuEvents);
@@ -62,7 +66,12 @@ export const analyzeReplay = (replay, findMode) => {
     for (const e of events) {
       if (e.type !== "lock") continue;
       if (spawnedAt >= 0) pieces.push([spawnedAt, before]);
-      if (extra > 0) markers.push({ frame: spawnedAt, kind: "finesse", label: e.piece, value: extra });
+      if (extra > 0) {
+        markers.push({ frame: Math.max(0, spawnedAt), kind: "finesse", label: e.piece, value: extra });
+        if (!finesseScene && replay.mode === "sprint40" && (hadActive || before === 0)) {
+          finesseScene = { spawnFrame, cells: e.cells, inputs: tracker.lastInputs, piece: e.piece };
+        }
+      }
       if ((e.lines > 0 && e.tspin !== "none") || e.lines >= 4 || e.perfect)
         markers.push({ frame: before, kind: "highlight", label: e.perfect ? "PERFECT CLEAR" : clearName(e) });
       spawnedAt = -1;
@@ -83,5 +92,11 @@ export const analyzeReplay = (replay, findMode) => {
     markers.push({ frame: a, kind: "slow", label: "", value: b - a });
   }
   markers.sort((x, y) => x.frame - y.frame);
-  return { markers, finesse: tracker ? { ...tracker.result } : { judged: 0, faults: 0 }, slow, length: player.frame };
+  return {
+    markers,
+    finesse: tracker ? { ...tracker.result } : { judged: 0, faults: 0 },
+    finesseScene,
+    slow,
+    length: player.frame,
+  };
 };

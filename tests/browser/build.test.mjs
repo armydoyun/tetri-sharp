@@ -1869,8 +1869,9 @@ test("Sprint 구간 연습은 같은 시점부터 비교하고 재시도 후 리
       page.evaluate(() => [localStorage.getItem("tetrisharp:replay:last"), localStorage.getItem("tetrisharp:records")]);
     const original = await storage();
 
-    await page.locator("#results-splits summary").click();
     const entry = page.locator("#results-practice-scene");
+    assert.match(await entry.textContent(), /추천 연습.*10–20줄/);
+    assert.equal(await page.locator("#results-splits").getAttribute("open"), null);
     await entry.click();
     assert.equal(await visible(page, "scene-split-meter"), true);
     const result = page.locator("#scene-result");
@@ -1901,6 +1902,41 @@ test("Sprint 구간 연습은 같은 시점부터 비교하고 재시도 후 리
     await page.locator('[data-replay="exit"]').click();
     assert.equal(await entry.evaluate(el => document.activeElement === el), true);
     assert.deepEqual(await storage(), original);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("Sprint 첫 결과에서 피네스 장면을 추천하고 같은 배치의 입력 횟수를 비교한다", async () => {
+  const { context, page, errors } = await openPage(
+    () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } })),
+    undefined,
+    { frameClock: true }
+  );
+  const input = inputs =>
+    page.evaluate(keys => {
+      for (const code of keys) {
+        window.dispatchEvent(new KeyboardEvent("keydown", { code, cancelable: true }));
+        window.dispatchEvent(new KeyboardEvent("keyup", { code, cancelable: true }));
+        window.advanceFrame();
+      }
+    }, inputs);
+  try {
+    await startMode(page, "sprint40");
+    await input(["ArrowLeft", "ArrowRight", ...Array(50).fill("Space")]);
+    const entry = page.locator("#results-practice-scene");
+    assert.match(await entry.textContent(), /추천 연습.*피네스/);
+    await entry.click();
+    assert.equal(await page.locator("body").getAttribute("data-scene-practice"), "finesse");
+    const result = page.locator("#scene-result");
+    await input(["ArrowLeft", "Space"]);
+    assert.equal(await text(page, "scene-result-title"), "목표와 다른 칸에 놓았어요");
+    await result.locator('[data-action="scene-retry"]').click();
+    await input(["Space"]);
+    assert.equal(await text(page, "scene-result-original"), "2회 입력");
+    assert.equal(await text(page, "scene-result-attempt"), "0회 입력");
+    assert.match(await text(page, "scene-result-delta"), /2회 적게/);
     assert.deepEqual(errors, []);
   } finally {
     await context.close();

@@ -2,6 +2,16 @@
 // tests/unit/i18n.test.mjs가 코드와 index.html의 한국어 문장이 모두 여기 있는지 확인한다.
 /** @type {Record<string, string>} */
 export const EN = {
+  "다시 연습": "Try again",
+  "추천 연습 · {from}–{to}줄": "Practice · Lines {from}–{to}",
+  "추천 연습 · {piece} 피네스": "Practice · {piece} finesse",
+  "{piece} 피네스 연습": "{piece} finesse practice",
+  "{n}회 입력": "{n} inputs",
+  "점선과 같은 위치에 놓아야 비교할 수 있어요.": "Match the outline to compare input counts.",
+  "원래 판과 입력 횟수가 같아요.": "Same input count as the original run.",
+  "원래 판보다 {n}회 적게 입력했어요.": "Used {n} fewer inputs than the original run.",
+  "원래 판보다 {n}회 더 입력했어요.": "Used {n} more inputs than the original run.",
+  "피네스 장면 연습": "Finesse scene practice",
   "최고 기록 다시 보기": "Watch personal best",
   "결과 코드를 만들지 못했어요": "Could not create the result code",
   "선택한 날짜의 최고 기록 리플레이": "Replay of your best run on this date",
