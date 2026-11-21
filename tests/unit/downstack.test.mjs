@@ -33,3 +33,20 @@ test("파내기 여섯 문제의 힌트로 모든 쓰레기 줄을 지울 수 �
     assert.equal(game.state.board.cells.includes(GARBAGE), false);
   }
 });
+
+test("원래 풀이를 벗어나도 현재 피스로 닿는 구멍을 찾는다", () => {
+  const mode = DOWNSTACK_LESSONS[2];
+  const game = createGame({ mode, rules: mode.rules, seed: 1 });
+  game.step();
+  for (let i = 0; i < 3; i++) game.step({ pressed: BTN.RIGHT });
+  game.step({ pressed: BTN.HARD });
+  assert.equal(game.state.downstack.remaining, 2);
+  mode.hint(game.state);
+  mode.hint(game.state);
+  assert.deepEqual(game.state.downstack.hintCells, [
+    [0, 38],
+    [1, 38],
+    [2, 38],
+    [3, 38],
+  ]);
+});

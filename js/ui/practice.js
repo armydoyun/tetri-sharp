@@ -1,37 +1,49 @@
 // 연습 고르기 대화상자: 종류를 누르면 바로 시작한다.
+import { FINESSE_LESSONS } from "../modes/finesse-lessons.js";
+import { INTRO_LESSONS } from "../modes/intro-lessons.js";
 import { DOWNSTACK_LESSONS } from "../modes/downstack.js";
 import { DRILLS } from "../modes/practice.js";
 import { button, el, fillDialog } from "./dom.js";
 import { icon } from "./icons.js";
 import { t } from "../i18n/index.js";
 
-/** @param {{ dialog: HTMLDialogElement, onPick: (drill: any) => void, onLesson: () => void, onDownstack: (mode: (typeof DOWNSTACK_LESSONS)[number]) => void }} options */
-export const createPracticeUI = ({ dialog, onPick, onLesson, onDownstack }) => {
+/** @param {{ dialog: HTMLDialogElement, onPick: (drill: any) => void, progress: ReturnType<typeof import("../storage/practice-progress.js").createPracticeProgress>, onStage: (mode: any) => void }} options */
+export const createPracticeUI = ({ dialog, onPick, progress, onStage }) => {
   const notice = el("p", { class: "notice-slot", role: "status" });
-  const openDownstack = () => {
-    const stages = DOWNSTACK_LESSONS.map(mode => {
+  const openStages = ({ name, lessons }) => {
+    const completed = progress.read();
+    const stages = lessons.map((mode, index) => {
+      const result = completed[mode.id];
       const stage = el(
         "button",
-        { type: "button", class: "menu-row", "data-downstack": mode.id },
+        {
+          type: "button",
+          class: "menu-row",
+          "data-practice-stage": mode.id,
+          "data-downstack": mode.downstack && mode.id,
+        },
+        el("span", { class: "menu-index num", text: String(index + 1).padStart(2, "0") }),
         el(
           "span",
           { class: "menu-text" },
-          el("strong", { text: mode.downstack.title }),
-          el("small", { text: mode.name })
+          el("strong", { text: mode.downstack?.title ?? mode.name }),
+          el("small", {
+            text: result === "no-hints" && mode.downstack ? t("힌트 없이 완료") : result ? t("완료") : mode.description,
+          })
         ),
         icon("chevron-right")
       );
       stage.addEventListener("click", () => {
         dialog.close();
-        onDownstack(mode);
+        onStage(mode);
       });
       return stage;
     });
     const back = button({ text: t("연습 목록") });
     back.addEventListener("click", () => ui.open());
-    notice.textContent = t("같은 판에서 힌트를 보고 여러 번 연습할 수 있어요.");
+    notice.textContent = t("원하는 단계를 골라 다시 연습할 수 있어요.");
     fillDialog(dialog, {
-      title: t("쓰레기 줄 파내기"),
+      title: name,
       body: el("div", {}, el("section", { class: "field-section menu-list practice-list" }, ...stages)),
       notice,
       actions: [back],
@@ -45,13 +57,21 @@ export const createPracticeUI = ({ dialog, onPick, onLesson, onDownstack }) => {
         id: "finesse-lesson",
         name: t("피네스 훈련"),
         description: t("목표 배치 10개 · 내 입력과 최소 입력 비교"),
+        lessons: FINESSE_LESSONS,
       };
       const downstack = {
         id: "downstack",
         name: t("쓰레기 줄 파내기"),
         description: t("고정된 판 6개 · 구멍과 다음 배치 힌트"),
+        lessons: DOWNSTACK_LESSONS,
       };
-      const drills = DRILLS.flatMap(d => (d.id === "finesse" ? [downstack, lesson, d] : [d]));
+      const intro = {
+        id: "intro",
+        name: t("기본 조작 연습"),
+        description: t("이동·회전·홀드·첫 줄 지우기"),
+        lessons: INTRO_LESSONS,
+      };
+      const drills = [intro, ...DRILLS.flatMap(d => (d.id === "finesse" ? [downstack, lesson, d] : [d]))];
       const list = el(
         "div",
         { class: "menu-list practice-list" },
@@ -65,10 +85,9 @@ export const createPracticeUI = ({ dialog, onPick, onLesson, onDownstack }) => {
               icon("chevron-right")
             );
             card.addEventListener("click", () => {
-              if (d === downstack) return openDownstack();
+              if ("lessons" in d) return openStages(d);
               dialog.close();
-              if (d === lesson) onLesson();
-              else onPick(d);
+              onPick(d);
             });
             return card;
           }

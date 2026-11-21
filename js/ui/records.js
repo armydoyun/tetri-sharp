@@ -1,5 +1,7 @@
 // 기록 화면(대화상자): 모드 × 규칙별 상위 10개, 1위 기록의 리플레이 보기.
 // 표는 늘 10줄이라 고르는 조건이 바뀌어도 대화상자 크기가 그대로다(원칙 2).
+import { recentSprintMedian } from "../storage/sprint-history.js";
+import { formatTime } from "../modes/format.js";
 import { PRESET_LIST } from "../rules/presets.js";
 import { recordKey } from "../storage/records.js";
 import { MAX_RANKED } from "../replay/replay.js";
@@ -16,23 +18,63 @@ const formatDate = iso => {
   return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())}`;
 };
 
+const renderSprintHistory = (runs, personalBest) => {
+  const median = recentSprintMedian(runs);
+  const maximum = Math.max(1, ...runs.filter(run => run.cleared).map(run => run.frames));
+  const bars = runs.map(({ frames, cleared }, index) => {
+    const value = cleared ? formatTime(frames) : t("미완주");
+    const label = t("{n}번째 판 · {value}", { n: index + 1, value });
+    const bar = el(
+      "li",
+      { class: cleared ? "" : "sprint-dnf", title: label },
+      el("span", { class: "sr-only", text: label })
+    );
+    bar.style.setProperty("--run-height", cleared ? `${Math.max(9, (frames / maximum) * 100)}%` : "9%");
+    return bar;
+  });
+  return el(
+    "details",
+    { class: "field-section sprint-history", id: "sprint-history" },
+    el("summary", { text: t("최근 20판") }),
+    el("p", {
+      text: t("개인 최고 {best} · 최근 완주 최대 5회의 중앙값 {median}", {
+        best: personalBest ? formatTime(personalBest.frames) : "—",
+        median: median === null ? "—" : formatTime(median),
+      }),
+    }),
+    runs.length
+      ? el(
+          "div",
+          {},
+          el("ol", { class: "sprint-history-chart" }, ...bars),
+          el("p", { text: t("왼쪽부터 오래된 순서 · 낮을수록 빠름 · 빈 막대는 미완주") })
+        )
+      : el("p", { text: t("이 기능이 추가된 뒤부터 최근 판이 쌓여요.") })
+  );
+};
+
 /**
  * @param {{
  *   dialog: HTMLDialogElement,
  *   modes: readonly any[],
  *   records: ReturnType<typeof import("../storage/records.js").createRecords>,
+ *   sprintHistory: ReturnType<typeof import("../storage/sprint-history.js").createSprintHistory>,
  *   replayFor: (key: string, entry: any) => any,
  *   onWatch: (replay: any) => void,
  * }} options
  */
-export const createRecordsUI = ({ dialog, modes, records, replayFor, onWatch }) => {
+export const createRecordsUI = ({ dialog, modes, records, sprintHistory, replayFor, onWatch }) => {
   let modeId = modes[0].id;
   let rulesId = "modern";
   const notice = el("p", { class: "notice-slot", role: "status", id: "records-notice" });
 
   /** 이 모드에서 고를 수 있는 규칙: 프리셋 + 기록이 있는 Custom 조합 */
   const ruleOptions = mode => {
-    const customs = records.rulesIdsFor(mode).filter(id => !PRESET_LIST.some(p => p.id === id));
+    const ids =
+      mode.id === "sprint40"
+        ? [...new Set([...records.rulesIdsFor(mode), ...sprintHistory.rulesIds()])]
+        : records.rulesIdsFor(mode);
+    const customs = ids.filter(id => !PRESET_LIST.some(p => p.id === id));
     return [...PRESET_LIST.map(p => [p.id, p.name]), ...customs.map(id => [id, `Custom ${id.slice(7)}`])];
   };
 
@@ -155,7 +197,8 @@ export const createRecordsUI = ({ dialog, modes, records, replayFor, onWatch }) 
       ),
       ...(list.length
         ? [el("table", { class: "records-table" }, el("thead", {}, head), el("tbody", {}, ...rows))]
-        : [empty])
+        : [empty]),
+      ...(mode.id === "sprint40" ? [renderSprintHistory(sprintHistory.list(rulesId), list[0])] : [])
     );
     const watchable = replays.filter(Boolean).length;
     notice.textContent = list.length

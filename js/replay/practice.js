@@ -19,6 +19,10 @@ export const createSceneAttempt = (replay, findMode, spawnFrame) => {
   if (!start || playback.game.state.over) return null;
   const { game } = playback;
   restoreState(game.state, start);
+  return withFreshInput(game);
+};
+
+const withFreshInput = game => {
   // 리플레이의 눌린 키와 횡이동 충전은 새 조작으로 가져오지 않는다.
   game.state.prevHeld = 0;
   game.state.das = { dir: 0, charge: 0, arrAcc: 0 };
@@ -32,4 +36,28 @@ export const splitAttemptOutcome = (state, startFrame, target, originalEndFrame)
   if (state.stats.lines >= target) return { frames, original, delta: frames - original };
   if (state.over) return { frames, original, delta: null };
   return null;
+};
+
+/** 게임 오버 전에 생성된 최근 네 피스 중 가장 앞의 생성 시점을 고른다. */
+export const findSurvivalRescue = (replay, findMode) => {
+  if (replay.mode !== "survival" || !replay.result.over) return null;
+  const spawns = [];
+  const playback = createPlayer(replay, findMode, () => {
+    if (spawns.at(-1) !== playback.frame) {
+      spawns.push(playback.frame);
+      if (spawns.length > 4) spawns.shift();
+    }
+  });
+  while (!playback.done) playback.step();
+  const { state } = playback.game;
+  if (!spawns.length || !state.over || state.frame !== replay.result.frames) return null;
+  return { spawnFrame: spawns[0], originalFrame: state.frame, originalBlocked: state.garbage.blocked };
+};
+
+// 쓰레기 타이머까지 정확히 맞추기 위해 생성 프레임을 끝까지 돌린다.
+export const createSurvivalAttempt = (replay, findMode, spawnFrame) => {
+  const player = createPlayer(replay, findMode);
+  while (player.frame < spawnFrame && !player.done) player.step();
+  if (player.done || !player.game.state.active) return null;
+  return withFreshInput(player.game);
 };

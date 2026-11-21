@@ -1,5 +1,6 @@
-import { HEIGHT, VISIBLE_ROWS, WIDTH, get, set } from "../core/board.js";
+import { HEIGHT, VISIBLE_ROWS, WIDTH, collides, get, set } from "../core/board.js";
 import { cellsOf, GARBAGE } from "../core/pieces.js";
+import { ROTATIONS } from "../rules/rotation/index.js";
 import { MODERN } from "../rules/presets.js";
 import { t } from "../i18n/index.js";
 
@@ -51,6 +52,49 @@ const garbageRows = board => {
   return rows;
 };
 
+// 현재 피스에서 이동·회전·소프트 드롭으로 닿는 고정 위치만 제안한다.
+const findOpening = (board, active, preferred, row) => {
+  if (!active || row === undefined) return [];
+  const rotation = ROTATIONS.srs;
+  const { type } = active;
+  const fits = (x, y, rot) => !collides(board, cellsOf(type, rot), x, y);
+  const holes = Array.from({ length: WIDTH }, (_, x) => get(board, x, row)).filter(value => !value).length;
+  const queue = [];
+  const seen = new Set();
+  const add = (x, y, rot) => {
+    const key = `${x},${y},${rot}`;
+    if (seen.has(key) || !fits(x, y, rot)) return;
+    seen.add(key);
+    queue.push({ x, y, rot });
+  };
+  add(active.x, active.y, active.rot);
+  let opening = [];
+  for (let i = 0; i < queue.length; i++) {
+    const { x, y, rot } = queue[i];
+    if (fits(x, y + 1, rot)) add(x, y + 1, rot);
+    else {
+      const cells = cellsOf(type, rot).map(([cx, cy]) => [x + cx, y + cy]);
+      const covered = cells.filter(([, cy]) => cy === row).length;
+      if (covered === holes) {
+        if (sameCells(preferred, cells)) return cells;
+        if (!opening.length) opening = cells;
+      }
+    }
+    add(x - 1, y, rot);
+    add(x + 1, y, rot);
+    for (const turns of [1, 2, 3]) {
+      const to = (rot + turns) % 4;
+      const kicks = rotation.kicks(type, rot, to, (cx, cy) => collides(board, [[cx, cy]], x, y));
+      for (const [dx, dy] of kicks) {
+        if (!fits(x + dx, y + dy, to)) continue;
+        add(x + dx, y + dy, to);
+        break;
+      }
+    }
+  }
+  return opening;
+};
+
 export const DOWNSTACK_LESSONS = Object.freeze(
   exercises.map(([title, moves], index) => {
     const total = moves.reduce((sum, move) => sum + move[3], 0);
@@ -77,7 +121,7 @@ export const DOWNSTACK_LESSONS = Object.freeze(
       hud: ["lines", "pieces"],
       setup: state => {
         state.puzzle = { placed: 0, need: moves.length };
-        state.downstack = { remaining: total, onPath: true, hintLevel: 0, hintCells: [] };
+        state.downstack = { remaining: total, usedHint: false, hintLevel: 0, hintCells: [] };
         for (let y = HEIGHT - total; y < HEIGHT; y++) {
           for (let x = 0; x < WIDTH; x++) set(state.board, x, y, GARBAGE);
         }
@@ -86,9 +130,8 @@ export const DOWNSTACK_LESSONS = Object.freeze(
         }
       },
       gravityFor: () => 0,
-      onLock: (state, event) => {
+      onLock: state => {
         const drill = state.downstack;
-        drill.onPath &&= sameCells(placements[state.puzzle.placed].cells, event.cells);
         state.puzzle.placed += 1;
         drill.remaining = garbageRows(state.board).length;
         drill.hintLevel = 0;
@@ -103,19 +146,22 @@ export const DOWNSTACK_LESSONS = Object.freeze(
       hint: state => {
         const drill = state.downstack;
         drill.hintLevel = (drill.hintLevel + 1) % 3;
+        if (drill.hintLevel) drill.usedHint = true;
+        const [top] = garbageRows(state.board);
         if (drill.hintLevel === 1) {
-          const [top] = garbageRows(state.board);
           drill.hintCells = Array.from({ length: WIDTH }, (_, x) => [x, top]).filter(
             ([x, y]) => !get(state.board, x, y)
           );
           return t("맨 위 쓰레기 줄의 열린 칸을 표시했어요.");
         }
-        if (drill.hintLevel === 2 && drill.onPath) {
-          drill.hintCells = placements[state.puzzle.placed].cells;
-          return t("현재 피스를 놓을 수 있는 자리예요.");
-        }
-        drill.hintCells = [];
-        return drill.hintLevel === 2 ? t("배치가 달라졌어요. 처음부터 다시 하면 자리 힌트를 볼 수 있어요.") : "";
+        drill.hintCells =
+          drill.hintLevel === 2
+            ? findOpening(state.board, state.active, placements[state.puzzle.placed].cells, top)
+            : [];
+        if (drill.hintLevel !== 2) return "";
+        return drill.hintCells.length
+          ? t("현재 피스를 놓을 수 있는 자리예요.")
+          : t("현재 피스로 맨 위 쓰레기 줄을 바로 지울 자리가 없어요.");
       },
       hudLines: state => ({ label: t("남은 쓰레기 줄"), value: String(state.downstack.remaining) }),
       hudTime: state => ({ label: t("시간"), frames: state.frame }),

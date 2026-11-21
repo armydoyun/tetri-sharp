@@ -13,7 +13,8 @@ import {
   survivalBlock,
   survivalInterval,
 } from "../../js/modes/index.js";
-import { createRecorder, verifyReplay } from "../../js/replay/replay.js";
+import { createSurvivalAttempt, findSurvivalRescue } from "../../js/replay/practice.js";
+import { createPlayer, createRecorder, verifyReplay } from "../../js/replay/replay.js";
 
 test("Survival은 모드 목록에 있고 id로 찾는다", () => {
   assert.ok(MODES.includes(SURVIVAL));
@@ -65,4 +66,36 @@ test("Survival 리플레이도 결과가 그대로 재현된다", () => {
   assert.ok(game.state.garbage.received > 0);
   const replay = JSON.parse(JSON.stringify(rec.finish(game.state)));
   assert.equal(verifyReplay(replay, findMode).ok, true);
+});
+
+test("구조 재시도는 같은 보드, 쓰레기 타이머와 다음 피스로 되돌아간다", () => {
+  const seed = 1234;
+  const game = createGame({ rules: MODERN, seed, mode: SURVIVAL });
+  const rec = createRecorder({ seed, mode: SURVIVAL, rules: MODERN, handling: game.handling });
+  for (let frame = 0; frame < 2000 && !game.state.over; frame++) {
+    const pressed = frame >= 1000 ? BTN.HARD : 0;
+    rec.input(0, pressed);
+    game.step({ pressed });
+  }
+  assert.ok(game.state.over);
+  const replay = rec.finish(game.state);
+  const rescue = findSurvivalRescue(replay, findMode);
+  assert.ok(rescue.spawnFrame < rescue.originalFrame);
+  const original = createPlayer(replay, findMode);
+  while (original.frame < rescue.spawnFrame) original.step();
+  const attempt = createSurvivalAttempt(replay, findMode, rescue.spawnFrame);
+  const second = createSurvivalAttempt(replay, findMode, rescue.spawnFrame);
+  const state = ({ state }) => {
+    const { board, active, garbage, queue } = state;
+    const { rng: _rng, ...pending } = garbage;
+    return { cells: board.cells, active, pending, queue };
+  };
+  assert.deepEqual(state(attempt), state(original.game));
+  assert.deepEqual(state(second), state(attempt));
+  assert.ok(attempt.state.garbage.received > 0);
+  for (let frame = 0; frame < 60 && !attempt.state.over; frame++) {
+    attempt.step({ pressed: BTN.HARD });
+    second.step({ pressed: BTN.HARD });
+  }
+  assert.deepEqual(state(second), state(attempt));
 });
