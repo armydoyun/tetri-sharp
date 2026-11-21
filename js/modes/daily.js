@@ -10,6 +10,17 @@ export const dateKey = (date = new Date()) => {
   return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`;
 };
 
+/** 오늘부터 최근 7일의 로컬 달력 날짜. */
+export const recentDailyKeys = (date = new Date()) => {
+  const day = new Date(date);
+  day.setHours(12, 0, 0, 0);
+  return Array.from({ length: 7 }, () => {
+    const key = dateKey(day);
+    day.setDate(day.getDate() - 1);
+    return key;
+  });
+};
+
 /** 날짜 → 32비트 시드(FNV-1a). 같은 날짜면 어디서나 같은 값 */
 export const dailySeed = key => {
   let h = 0x811c9dc5;

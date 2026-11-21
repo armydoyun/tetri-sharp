@@ -7,7 +7,7 @@ import { createTouch, touchVisible } from "./input/touch.js";
 import { compilePadmap, createGamepad } from "./input/gamepad.js";
 import { ACTIONS, compileKeymap, keyLabel } from "./input/keymap.js";
 import { MODES, RACE_MODES, SURVIVAL_MILESTONES, findMode as findBaseMode } from "./modes/index.js";
-import { dailyMode, dateKey, findDaily } from "./modes/daily.js";
+import { dailyMode, dateKey, findDaily, recentDailyKeys } from "./modes/daily.js";
 import { decodeReplayCode, encodeReplayCode, replayLink } from "./replay/share.js";
 import { createDailyUI } from "./ui/daily.js";
 import { formatScore, formatTime } from "./modes/format.js";
@@ -367,15 +367,17 @@ const versusRow = () => {
 
 // ---- 오늘의 도전 ----
 
-const today = () => {
-  const key = dateKey();
-  const m = dailyMode(key);
-  return { key, mode: m, best: records.best(m, MODERN), replay: replays.best(recordKey(m, MODERN)) };
+const dailyEntry = key => {
+  const mode = dailyMode(key);
+  const best = records.best(mode, MODERN);
+  return { mode, best, replay: best ? replays.forEntry(recordKey(mode, MODERN), best) : null };
 };
 
 /** 첫 화면 모드 목록 끝의 오늘의 도전 줄 */
 const dailyRow = () => {
-  const { key, best, mode: m } = today();
+  const key = dateKey();
+  const m = dailyMode(key);
+  const best = records.best(m, MODERN);
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "menu-row";
@@ -416,11 +418,12 @@ const raceFromCode = async text => {
 
 const dailyUI = createDailyUI({
   dialog: /** @type {HTMLDialogElement} */ ($("daily")),
-  getToday: today,
+  dates: recentDailyKeys,
+  getEntry: dailyEntry,
   makeCode: replay => encodeReplayCode(replay, records.playerName),
   makeLink: code => replayLink(code, location.href),
-  formatRecord: e => today().mode.formatRecord(e),
-  onStart: () => start(today().mode, MODERN),
+  onStart: mode => start(mode, MODERN),
+  onWatch: replay => startReplay(replay, "menu", "", true),
   onRace: raceFromCode,
 });
 $("daily").addEventListener("close", () => {

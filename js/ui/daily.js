@@ -5,15 +5,16 @@ import { t } from "../i18n/index.js";
 /**
  * @param {{
  *   dialog: HTMLDialogElement,
- *   getToday: () => { key: string, best: any, replay: any },
+ *   dates: () => string[],
+ *   getEntry: (date: string) => { mode: ReturnType<typeof import("../modes/daily.js").dailyMode>, best: any, replay: any },
  *   makeCode: (replay: any) => Promise<string>,
  *   makeLink: (code: string) => string,
- *   formatRecord: (entry: any) => string,
- *   onStart: () => void,
+ *   onStart: (mode: ReturnType<typeof import("../modes/daily.js").dailyMode>) => void,
+ *   onWatch: (replay: any) => void,
  *   onRace: (text: string) => Promise<string | null>,
  * }} options  onRace는 실패하면 알림 문구를 돌려준다
  */
-export const createDailyUI = ({ dialog, getToday, makeCode, makeLink, formatRecord, onStart, onRace }) => {
+export const createDailyUI = ({ dialog, dates, getEntry, makeCode, makeLink, onStart, onWatch, onRace }) => {
   const notice = el("p", { class: "notice-slot", role: "status", id: "daily-notice" });
 
   const copy = async text => {
@@ -25,22 +26,14 @@ export const createDailyUI = ({ dialog, getToday, makeCode, makeLink, formatReco
     }
   };
 
-  const render = async (pasted = "") => {
-    const { key, best, replay } = getToday();
-    const code = replay ? await makeCode(replay) : "";
-    const play = button({ text: t("도전하기"), iconName: "play", className: "btn btn-primary", id: "daily-start" });
-    play.addEventListener("click", () => {
-      dialog.close();
-      onStart();
-    });
-
+  const shareRows = async replay => {
+    const code = await makeCode(replay);
     const codeInput = el("input", {
       id: "daily-code",
       class: "text-input num",
       type: "text",
       value: code,
       readOnly: true,
-      placeholder: t("오늘 기록을 세우면 생겨요"),
     });
     const copyCode = button({ text: t("복사"), iconName: "copy", className: "btn btn-small", id: "daily-copy" });
     copyCode.disabled = !code;
@@ -57,6 +50,81 @@ export const createDailyUI = ({ dialog, getToday, makeCode, makeLink, formatReco
       notice.textContent = (await copy(makeLink(code)))
         ? t("링크를 복사했어요. 받은 사람이 열면 내 기록과 겨룰 수 있어요")
         : t("복사하지 못했어요");
+    });
+
+    return [
+      el("h3", { class: "daily-section", text: t("내 결과 공유") }),
+      el(
+        "section",
+        { class: "field-section" },
+        fieldRow({
+          id: "daily-code",
+          label: t("결과 코드"),
+          hint: t("선택한 날짜의 최고 기록 리플레이"),
+          control: el("span", { class: "inline-control" }, codeInput, copyCode),
+        }),
+        fieldRow({
+          id: "daily-link",
+          label: t("공유 링크"),
+          hint: t("배포 주소에서 열었을 때 쓸모 있어요"),
+          control: el("span", { class: "inline-control" }, copyLink),
+        })
+      ),
+    ];
+  };
+
+  const render = (pasted = "") => {
+    const keys = dates();
+    const picker = el(
+      "select",
+      { id: "daily-date", class: "text-input num", "aria-label": t("도전 날짜") },
+      ...keys.map((key, index) =>
+        el("option", { value: key, text: index === 0 ? t("오늘 · {date}", { date: key }) : key })
+      )
+    );
+    const best = el("span", { class: "daily-best num", id: "daily-best", "aria-live": "polite" });
+    const play = button({ text: t("도전하기"), iconName: "play", className: "btn btn-primary", id: "daily-start" });
+    const watch = button({
+      text: t("최고 기록 다시 보기"),
+      iconName: "play",
+      className: "btn btn-small",
+      id: "daily-watch",
+    });
+    const share = el("div");
+    /** @type {ReturnType<typeof getEntry>} */
+    let entry;
+    let version = 0;
+
+    const updateEntry = async () => {
+      const current = ++version;
+      entry = getEntry(picker.value);
+      best.textContent = entry.best
+        ? t("최고 기록 {record}", { record: entry.mode.formatRecord(entry.best) })
+        : t("이 날짜의 기록이 없어요");
+      watch.hidden = !entry.replay;
+      share.replaceChildren();
+      if (entry.replay) {
+        try {
+          const rows = await shareRows(entry.replay);
+          if (current === version) share.replaceChildren(...rows);
+        } catch {
+          if (current === version && dialog.open && share.isConnected)
+            notice.textContent = t("결과 코드를 만들지 못했어요");
+        }
+      }
+    };
+    picker.addEventListener("change", () => {
+      notice.textContent = "";
+      void updateEntry();
+    });
+    play.addEventListener("click", () => {
+      dialog.close();
+      onStart(entry.mode);
+    });
+    watch.addEventListener("click", () => {
+      if (!entry.replay) return;
+      dialog.close();
+      onWatch(entry.replay);
     });
 
     const pasteInput = /** @type {HTMLInputElement} */ (
@@ -106,37 +174,13 @@ export const createDailyUI = ({ dialog, getToday, makeCode, makeLink, formatReco
         el(
           "div",
           { class: "daily-today" },
-          el("strong", { class: "num", text: key }),
+          picker,
           el("small", { text: t("Sprint 40L · Modern · 모두 같은 블록 순서") }),
-          el("span", {
-            class: "daily-best num",
-            id: "daily-best",
-            text: best ? t("오늘 최고 기록 {record}", { record: formatRecord(best) }) : t("아직 오늘 기록이 없어요"),
-          })
+          best
         ),
-        play
+        el("div", { class: "daily-actions" }, play, watch)
       ),
-      ...(code
-        ? [
-            el("h3", { class: "daily-section", text: t("내 결과 공유") }),
-            el(
-              "section",
-              { class: "field-section" },
-              fieldRow({
-                id: "daily-code",
-                label: t("결과 코드"),
-                hint: t("오늘 최고 기록의 리플레이"),
-                control: el("span", { class: "inline-control" }, codeInput, copyCode),
-              }),
-              fieldRow({
-                id: "daily-link",
-                label: t("공유 링크"),
-                hint: t("배포 주소에서 열었을 때 쓸모 있어요"),
-                control: el("span", { class: "inline-control" }, copyLink),
-              })
-            ),
-          ]
-        : []),
+      share,
       el("h3", { class: "daily-section", text: t("받은 결과와 겨루기") }),
       el(
         "section",
@@ -150,13 +194,14 @@ export const createDailyUI = ({ dialog, getToday, makeCode, makeLink, formatReco
       )
     );
     fillDialog(dialog, { title: t("오늘의 도전"), body, notice, actions: [], closeId: "daily-close" });
+    void updateEntry();
   };
 
   return {
     /** @param {{ pasted?: string, message?: string }} [o] */
-    async open(o = {}) {
+    open(o = {}) {
       notice.textContent = o.message ?? "";
-      await render(o.pasted ?? "");
+      render(o.pasted ?? "");
       if (!dialog.open) dialog.showModal();
       /** @type {HTMLElement | null} */ (dialog.querySelector(o.pasted ? "#daily-race" : "#daily-start"))?.focus();
     },

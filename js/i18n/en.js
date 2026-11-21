@@ -2,6 +2,12 @@
 // tests/unit/i18n.test.mjs가 코드와 index.html의 한국어 문장이 모두 여기 있는지 확인한다.
 /** @type {Record<string, string>} */
 export const EN = {
+  "최고 기록 다시 보기": "Watch personal best",
+  "결과 코드를 만들지 못했어요": "Could not create the result code",
+  "선택한 날짜의 최고 기록 리플레이": "Replay of your best run on this date",
+  "이 날짜의 기록이 없어요": "No record for this date",
+  "오늘 · {date}": "Today · {date}",
+  "도전 날짜": "Challenge date",
   "다음 목표": "Next goal",
   달성: "Done",
   "{time} 구간 달성": "Reached {time}",
