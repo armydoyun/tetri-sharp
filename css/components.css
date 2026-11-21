@@ -493,15 +493,6 @@
     border-color var(--dur) var(--ease);
 }
 
-.menu-row[data-downstack] {
-  grid-template-columns: minmax(0, 1fr) 18px;
-  padding-inline-start: var(--space-3);
-}
-
-.menu-row[data-downstack] > .icon {
-  grid-area: 1 / 2;
-}
-
 .menu-row:hover,
 .menu-row:focus-visible {
   background: var(--surface-2);
@@ -1466,4 +1457,38 @@ body.touch-on :is(.btn, .btn-small, .key-slot, .select, .text-input, .choice > b
   flex-wrap: wrap;
   gap: 4px;
   margin-block-end: 8px;
+}
+
+.sprint-history summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.sprint-history p {
+  margin: var(--space-2) 0;
+  color: var(--text-dim);
+  font-size: var(--text-s);
+}
+
+.sprint-history-chart {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 3px;
+  align-items: end;
+  height: 72px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-bottom: 1px solid var(--border);
+}
+
+.sprint-history-chart li {
+  height: var(--run-height);
+  background: var(--accent);
+}
+
+.sprint-history-chart .sprint-dnf {
+  border: 1px solid var(--border-strong);
+  background: transparent;
 }

@@ -2,6 +2,34 @@
 // tests/unit/i18n.test.mjs가 코드와 index.html의 한국어 문장이 모두 여기 있는지 확인한다.
 /** @type {Record<string, string>} */
 export const EN = {
+  "막히기 전 다시 해보기": "Retry before top-out",
+  "Survival 구조 연습": "Survival rescue practice",
+  "구조 시도 결과": "Rescue attempt",
+  "원래 판보다 {time}초 더 버텼어요.": "Survived {time}s longer than the original.",
+  "원래 판보다 {time}초 덜 버텼어요.": "Survived {time}s less than the original.",
+  "막은 쓰레기 줄 차이 {n}": "Garbage blocked difference: {n}",
+  "현재 피스로 맨 위 쓰레기 줄을 바로 지울 자리가 없어요.":
+    "This piece has no placement that clears the top garbage row.",
+  "기본 조작 연습": "Basic controls practice",
+  "이동·회전·홀드·첫 줄 지우기": "Move, rotate, hold, and clear a line",
+  "한 칸 이동": "Move one cell",
+  "좌우 중 한 방향으로 피스를 옮겨 보세요.": "Move the piece left or right.",
+  "피스 회전": "Rotate a piece",
+  "피스를 한 번 돌려 보세요.": "Rotate the piece once.",
+  "홀드로 현재 피스를 맡겨 보세요.": "Use hold to store the current piece.",
+  "첫 줄 지우기": "Clear your first line",
+  "I 피스를 아래쪽 빈 네 칸에 놓아 한 줄을 채우세요.": "Place the I piece in the four empty cells to clear a line.",
+  "원하는 단계를 골라 다시 연습할 수 있어요.": "Choose any stage to practice again.",
+  완료: "Completed",
+  "힌트 없이 완료": "Completed without hints",
+  미완주: "Did not finish",
+  "{n}번째 판 · {value}": "Run {n} · {value}",
+  "최근 20판": "Last 20 runs",
+  "개인 최고 {best} · 최근 완주 최대 5회의 중앙값 {median}":
+    "Personal best {best} · Median of up to 5 recent finishes {median}",
+  "왼쪽부터 오래된 순서 · 낮을수록 빠름 · 빈 막대는 미완주":
+    "Oldest on the left · Shorter bars are faster · Outlined bars are unfinished",
+  "이 기능이 추가된 뒤부터 최근 판이 쌓여요.": "Recent runs appear after you play.",
   "쓰레기 줄이 남았어요": "Garbage rows remain",
   "쓰레기 줄을 모두 지웠어요!": "All garbage cleared!",
   "남은 쓰레기 줄": "Garbage rows left",

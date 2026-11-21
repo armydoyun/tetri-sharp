@@ -12,10 +12,11 @@ import { t } from "../i18n/index.js";
  *   isTouch: () => boolean,
  *   onOpenSettings: (tab: string) => void,
  *   onStart: () => void,
+ *   onIntro: () => void,
  *   canStart: () => boolean,
  * }} options
  */
-export const createHelpUI = ({ dialog, getSettings, isTouch, onOpenSettings, onStart, canStart }) => {
+export const createHelpUI = ({ dialog, getSettings, isTouch, onOpenSettings, onStart, onIntro, canStart }) => {
   const notice = el("p", { class: "notice-slot", role: "status" });
 
   const keyList = () => {
@@ -83,6 +84,11 @@ export const createHelpUI = ({ dialog, getSettings, isTouch, onOpenSettings, onS
       dialog.close();
       onStart();
     });
+    const intro = button({ text: t("기본 조작 연습"), iconName: "play" });
+    intro.addEventListener("click", () => {
+      dialog.close();
+      onIntro();
+    });
     const body = el(
       "div",
       {},
@@ -93,7 +99,7 @@ export const createHelpUI = ({ dialog, getSettings, isTouch, onOpenSettings, onS
           t("줄을 가득 채우면 지워져요. 블록이 위까지 차면 끝나요."),
           t("익숙해지면 연습에서 T-spin을, CPU 대전에서 공격과 방어를 익혀 보세요."),
         ]),
-        ...(canStart() ? [el("div", { class: "help-actions" }, start)] : [])
+        ...(canStart() ? [el("div", { class: "help-actions" }, intro, start)] : [])
       ),
       section(isTouch() ? t("터치 조작") : t("키보드 조작"), isTouch() ? touchList() : keyList()),
       section(

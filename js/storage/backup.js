@@ -1,6 +1,9 @@
 // 저장 데이터 백업: 이 브라우저에 쌓인 설정·기록·이름·Custom 규칙·리플레이를 JSON 파일 하나로 내보내고 다시 들인다.
 // 들일 때는 항목마다 원래 저장할 때와 같은 검사를 거친다. 알 수 없는 항목은 버린다.
 import { sanitizeSettings } from "./settings.js";
+import { PUZZLES } from "../modes/puzzles.js";
+import { PRACTICE_PROGRESS_KEY, sanitizePracticeProgress } from "./practice-progress.js";
+import { SPRINT_HISTORY_KEY, sanitizeSprintHistory } from "./sprint-history.js";
 import { isEntry } from "./records.js";
 import { sanitizeRuleBody } from "../rules/sanitize.js";
 import { sanitizeReplay } from "../replay/replay.js";
@@ -20,6 +23,9 @@ export const BACKUP_KEYS = Object.freeze([
   "replay:last",
   "replay:best",
   "versus:stats",
+  "puzzle:cleared",
+  PRACTICE_PROGRESS_KEY,
+  SPRINT_HISTORY_KEY,
 ]);
 
 const MAX_TABLES = 500;
@@ -52,6 +58,15 @@ export const parseBackup = (raw, findMode) => {
   let recordCount = 0;
   let replayCount = 0;
 
+  if (Array.isArray(src["puzzle:cleared"])) {
+    data["puzzle:cleared"] = [
+      ...new Set(src["puzzle:cleared"].filter(n => Number.isInteger(n) && n >= 1 && n <= PUZZLES.length)),
+    ];
+  }
+  if (src[PRACTICE_PROGRESS_KEY] !== undefined) {
+    data[PRACTICE_PROGRESS_KEY] = sanitizePracticeProgress(src[PRACTICE_PROGRESS_KEY]);
+  }
+  if (src[SPRINT_HISTORY_KEY] !== undefined) data[SPRINT_HISTORY_KEY] = sanitizeSprintHistory(src[SPRINT_HISTORY_KEY]);
   if (src.settings !== undefined) data.settings = sanitizeSettings(src.settings);
   if (isPlainObject(src.records)) {
     const records = {};
@@ -110,6 +125,12 @@ export const parseBackup = (raw, findMode) => {
 export const restoreBackup = (store, parsed) => {
   let ok = true;
   for (const key of BACKUP_KEYS) {
+    // 이전 버전의 백업에는 이 진행도 항목이 없으므로 기존 값을 보존한다.
+    if (
+      (key === "puzzle:cleared" || key === PRACTICE_PROGRESS_KEY || key === SPRINT_HISTORY_KEY) &&
+      !(key in parsed.data)
+    )
+      continue;
     const value = parsed.data[key] ?? (key === "settings" ? sanitizeSettings(null) : null);
     if (!store.set(key, value)) ok = false;
   }
