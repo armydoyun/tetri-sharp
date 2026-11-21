@@ -1151,10 +1151,15 @@ body.touch-on :is(.btn, .btn-small, .key-slot, .select, .text-input, .choice > b
   gap: 2px;
 }
 
-.daily-today strong {
-  font-family: var(--font-num);
-  font-size: var(--text-2xl);
-  font-weight: 800;
+.daily-today select {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.daily-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .daily-today small {

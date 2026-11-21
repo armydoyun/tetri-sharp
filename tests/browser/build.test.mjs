@@ -14,7 +14,7 @@ import { keysFor, solvePuzzle } from "../helpers/puzzle-solve.mjs";
 import { PUZZLES } from "../../js/modes/puzzles.js";
 import { botDailyReplay } from "../helpers/daily.mjs";
 import { dateKey } from "../../js/modes/daily.js";
-import { encodeReplayCode } from "../../js/replay/share.js";
+import { decodeReplayCode, encodeReplayCode } from "../../js/replay/share.js";
 
 let dir, html, result, server, url, browser;
 
@@ -1417,6 +1417,56 @@ test("오늘의 도전: 창에서 시작하고, 받은 코드(이름 포함)로 
   assert.equal(await p2.evaluate(() => location.hash), "", "주소의 해시는 지운다");
   assert.deepEqual(errors, []);
   await linked.close();
+});
+
+test("최근 도전: 날짜별 최고 기록을 다시 보고 같은 시드로 도전한다", async () => {
+  const date = "2026-11-19";
+  const replay = botDailyReplay(date);
+  assert.equal(replay.result.over, "clear");
+  const { context, page, errors } = await openPage(value => {
+    const key = `${value.mode}|modern`;
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
+    localStorage.setItem("tetrisharp:records", JSON.stringify({ [key]: [{ ...value.result, date: value.date }] }));
+    localStorage.setItem("tetrisharp:replay:best", JSON.stringify({ [key]: [value] }));
+  }, replay);
+  try {
+    await page.clock.setFixedTime(new Date(2026, 10, 21, 12));
+    const open = () => page.click('[data-mode="daily"]');
+    const picker = page.locator("#daily-date");
+    await open();
+    assert.equal(await picker.inputValue(), "2026-11-21");
+    assert.equal(await picker.locator("option").count(), 7);
+    assert.equal(await text(page, "daily-best"), "이 날짜의 기록이 없어요");
+    await picker.selectOption(date);
+    assert.match(await text(page, "daily-best"), /최고 기록/);
+    await page.locator("#daily-code").waitFor();
+    const shared = await decodeReplayCode(await page.locator("#daily-code").inputValue());
+    assert.equal(shared.mode, replay.mode);
+    assert.equal(shared.seed, replay.seed);
+    await picker.selectOption("2026-11-20");
+    assert.equal(await page.locator("#daily-watch").isVisible(), false);
+    assert.equal(await page.locator("#daily-code").count(), 0);
+
+    await picker.selectOption(date);
+    await page.click("#daily-watch");
+    assert.match(await text(page, "replay-title"), new RegExp(date));
+    await page.click('[data-replay="exit"]');
+    await open();
+    await picker.selectOption(date);
+    await page.click("#daily-start");
+    assert.match(await text(page, "session-title"), new RegExp(date));
+    for (let i = 0; i < 60 && !(await visible(page, "results")); i++) {
+      await page.keyboard.press("Space");
+      await page.waitForTimeout(20);
+    }
+    assert.ok(await visible(page, "results"));
+    const attempt = await page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:replay:last")));
+    assert.equal(attempt.mode, replay.mode);
+    assert.equal(attempt.seed, replay.seed);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
 });
 
 test("CPU 대전: 첫 싱글의 공격 0줄과 콤보 공격 이유를 플레이 중 보여 준다", async () => {

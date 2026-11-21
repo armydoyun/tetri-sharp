@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { dailyMode, dailySeed, dateKey, findDaily } from "../../js/modes/daily.js";
+import { dailyMode, dailySeed, dateKey, findDaily, recentDailyKeys } from "../../js/modes/daily.js";
 import { SPRINT_40, findMode as findBaseMode } from "../../js/modes/index.js";
 import { decodeReplayCode, encodeReplayCode, replayLink } from "../../js/replay/share.js";
 import { sanitizeReplay, verifyReplay } from "../../js/replay/replay.js";
@@ -13,6 +13,20 @@ test("날짜 키는 YYYY-MM-DD, 같은 날짜는 같은 시드·다른 날짜는
   assert.equal(dailySeed("2026-11-18"), dailySeed("2026-11-18"));
   assert.notEqual(dailySeed("2026-11-18"), dailySeed("2026-11-19"));
   assert.ok(Number.isInteger(dailySeed("2026-11-18")) && dailySeed("2026-11-18") >= 0);
+});
+
+test("최근 도전은 오늘부터 7일이며 월과 연도가 바뀌어도 날짜가 이어진다", () => {
+  const date = new Date(2026, 0, 2, 0, 15);
+  assert.deepEqual(recentDailyKeys(date), [
+    "2026-01-02",
+    "2026-01-01",
+    "2025-12-31",
+    "2025-12-30",
+    "2025-12-29",
+    "2025-12-28",
+    "2025-12-27",
+  ]);
+  assert.equal(dateKey(date), "2026-01-02");
 });
 
 test("오늘의 도전은 Sprint 40L 규칙에 시드만 고정한 모드이고 id로 찾는다", () => {
