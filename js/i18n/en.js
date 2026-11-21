@@ -4,6 +4,7 @@
 export const EN = {
   "만든 퍼즐": "Custom puzzle",
   "퍼즐 만들기": "Create puzzle",
+  "퍼즐 편집": "Edit puzzle",
   "퍼즐 편집·공유": "Edit or share puzzle",
   "시험 플레이": "Test play",
   "마지막 피스 빼기": "Remove last piece",

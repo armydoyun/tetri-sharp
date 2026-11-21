@@ -2091,7 +2091,7 @@ test("만든 퍼즐: 시험 플레이 성공 후에만 공유하고, 휴대폰�
     await page.keyboard.press("Space");
     await page.waitForFunction(() => document.body.dataset.screen === "results");
     assert.equal(await text(page, "results-title"), "실패");
-    await page.click("#results-edit-puzzle");
+    await page.click('#results [data-action="export"]');
     assert.ok(await share.isDisabled());
     await trial.click();
     await page.waitForFunction(() => document.body.dataset.screen === "play");
@@ -2099,7 +2099,7 @@ test("만든 퍼즐: 시험 플레이 성공 후에만 공유하고, 휴대폰�
     await page.waitForFunction(() => document.body.dataset.screen === "results");
     assert.equal(await text(page, "results-title"), "성공!");
     assert.equal(await page.locator('[data-action="next-puzzle"]').isVisible(), false);
-    await page.click("#results-edit-puzzle");
+    await page.click('#results [data-action="export"]');
     await share.click();
     const link = await page.locator("#custom-puzzle-link").inputValue();
     assert.match(link, /#puzzle=1\./);
@@ -2118,7 +2118,7 @@ test("만든 퍼즐: 시험 플레이 성공 후에만 공유하고, 휴대폰�
     await recipient.tap('[data-touch="HARD"]');
     await recipient.waitForFunction(() => document.body.dataset.screen === "results");
     assert.equal(await text(recipient, "results-title"), "Solved!");
-    assert.equal(await recipient.locator("#results-edit-puzzle").isVisible(), false);
+    assert.ok(await recipient.locator('#results [data-action="export"]').isDisabled());
     await recipient.tap('#results [data-action="retry"]');
     await recipient.waitForFunction(() => document.body.dataset.screen === "play");
     await recipient.tap('[data-touch="HARD"]');

@@ -789,14 +789,16 @@ const finish = () => {
   // 퍼즐: 깬 단계를 남기고, 깼으면 "다음 단계"를 보인다(마지막 단계면 다시 하기만)
   if (mode.puzzle?.number && state.over === "clear") puzzleProgress.markCleared(mode.puzzle.number);
   if (mode.trialCode && state.over === "clear") puzzleEditor.markCleared(mode.trialCode);
-  $("results-edit-puzzle").hidden = !mode.trialCode;
   const nextPuzzle = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="next-puzzle"]'));
   nextPuzzle.hidden = !(mode.puzzle?.number && state.over === "clear" && mode.puzzle.number < PUZZLES.length);
   lastReplay = recorder ? recorder.finish(state) : null;
   if (lastReplay && versus) lastReplay.cpu = versus.recorder.finish(versus.cpu.state);
   /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="watch"]')).disabled = !lastReplay;
-  /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="export"]')).disabled =
-    !lastReplay || Boolean(versus);
+  const exportButton = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="export"]'));
+  exportButton.disabled = !mode.trialCode && (!lastReplay || Boolean(versus));
+  exportButton.querySelector(".btn-label").textContent = mode.trialCode ? t("퍼즐 편집") : t("공유");
+  exportButton.setAttribute("aria-label", mode.trialCode ? t("퍼즐 편집·공유") : t("리플레이 공유"));
+  exportButton.title = mode.trialCode ? t("퍼즐 편집·공유") : t("리플레이 공유(링크·파일)");
   if (lastReplay && !versus) {
     replays.saveLast(lastReplay);
     if (outcome && outcome.rank < MAX_RANKED)
@@ -960,7 +962,8 @@ const puzzleUI = createPuzzleUI({
 $("open-puzzles").addEventListener("click", () => puzzleUI.open());
 $("puzzles").addEventListener("close", () => {
   if (!puzzleDialog.open && screen === "menu") $("open-puzzles").focus();
-  if (!puzzleDialog.open && screen === "results" && mode.trialCode) $("results-edit-puzzle").focus();
+  if (!puzzleDialog.open && screen === "results" && mode.trialCode)
+    /** @type {HTMLElement | null} */ (panels.results.querySelector('[data-action="export"]'))?.focus();
 });
 /** 첫 화면 "퍼즐" 줄의 진행도 */
 const renderPuzzleProgress = () => {
@@ -1190,7 +1193,6 @@ for (const btn of document.querySelectorAll("[data-action]")) {
     }
     if (action === "retry-seed" && mode.splits && lastReplay) start(mode, rules, null, lastReplay.seed);
     if (action === "race-best" && mode.splits) startRace(mode, rules);
-    if (action === "edit-puzzle" && mode.trialCode) puzzleEditor.open();
     if (action === "next-puzzle" && mode.puzzle?.number) {
       const next = PUZZLES[mode.puzzle.number] ?? puzzleProgress.next();
       start(puzzleMode(next), MODERN);
@@ -1202,7 +1204,10 @@ for (const btn of document.querySelectorAll("[data-action]")) {
     if (action === "watch" && lastReplay) startReplay(lastReplay, "results", "", true);
     if (action === "stats" && game)
       statsUI.open(game.state, `${mode.name} · ${rules.name}`, !!mode.splits && splits.length > 0);
-    if (action === "export" && lastReplay && !lastReplay.cpu) shareUI.open(lastReplay, `${mode.name} · ${rules.name}`);
+    if (action === "export") {
+      if (mode.trialCode) puzzleEditor.open();
+      else if (lastReplay && !lastReplay.cpu) shareUI.open(lastReplay, `${mode.name} · ${rules.name}`);
+    }
   });
 }
 
