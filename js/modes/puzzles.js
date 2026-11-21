@@ -93,15 +93,13 @@ export const KIND_NAMES = Object.freeze({
 
 const cache = new Map();
 
-/** 단계 → 모드 */
-export const puzzleMode = puzzle => {
-  if (cache.has(puzzle.number)) return cache.get(puzzle.number);
+export const makePuzzleMode = (puzzle, rules = MODERN) => {
   const need = puzzle.pieces.length;
-  const mode = Object.freeze({
-    id: `puzzle-${puzzle.number}`,
-    name: t("퍼즐 {n} · {kind}", { n: puzzle.number, kind: KIND_NAMES[puzzle.kind] }),
+  return Object.freeze({
+    id: puzzle.number ? `puzzle-${puzzle.number}` : "custom-puzzle",
+    name: puzzle.number ? t("퍼즐 {n} · {kind}", { n: puzzle.number, kind: KIND_NAMES[puzzle.kind] }) : t("만든 퍼즐"),
     description: KIND_NAMES[puzzle.kind],
-    rules: MODERN,
+    rules,
     puzzle,
     hud: Object.freeze(["time", "lines", "pieces"]),
     sequence: Object.freeze([...puzzle.pieces]),
@@ -122,15 +120,19 @@ export const puzzleMode = puzzle => {
     hudTime: state => ({ label: t("시간"), frames: state.frame }),
     summary: state => ({
       title: state.over === "clear" ? t("성공!") : t("실패"),
-      main: t("단계 {n}", { n: puzzle.number }),
+      main: puzzle.number ? t("단계 {n}", { n: puzzle.number }) : t("만든 퍼즐"),
     }),
     record: Object.freeze({ metric: "frames", order: "asc" }),
     formatRecord: () => "",
     isRecordable: () => false,
-    noReplay: false,
+    noReplay: !puzzle.number,
   });
-  cache.set(puzzle.number, mode);
-  return mode;
+};
+
+/** 단계 → 모드 */
+export const puzzleMode = puzzle => {
+  if (!cache.has(puzzle.number)) cache.set(puzzle.number, makePuzzleMode(puzzle));
+  return cache.get(puzzle.number);
 };
 
 export const findPuzzle = id => {

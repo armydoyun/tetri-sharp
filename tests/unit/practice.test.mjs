@@ -99,6 +99,7 @@ test("2줄 우물: O로 두 번 성공하면 연속 기록이 쌓이고 실패�
 // ---- 새 연습: T-spin Triple · 퍼펙트 클리어 마무리 · 피네스 ----
 import { placements } from "../helpers/solver.mjs";
 import { buildPcFinish, buildTst } from "../../js/modes/practice.js";
+import { FINESSE_LESSONS } from "../../js/modes/finesse-lessons.js";
 import { finesseCost, createFinesseTracker } from "../../js/modes/finesse.js";
 import { ROTATIONS } from "../../js/rules/rotation/index.js";
 import { clearLines as clearRows, createBoard as newBoard, place as placeCells } from "../../js/core/board.js";
@@ -160,6 +161,27 @@ test("피네스 최소 입력: 생성 자리 0, 벽까지 1, 회전 1, 한 칸 �
   assert.equal(finesseCost(srs, "O", cellsAt("O", 0, 5)), 1);
   // S는 0과 2가 같은 모양: 어느 쪽으로 판정해도 같은 최소값
   assert.equal(finesseCost(srs, "S", cellsAt("S", 2, 3)), 0);
+});
+
+test("피네스 훈련: 열 문제의 추천 입력을 실제 엔진에서 재현한다", () => {
+  assert.equal(FINESSE_LESSONS.length, 10);
+  for (const mode of FINESSE_LESSONS) {
+    const game = createGame({ mode, rules: mode.rules, seed: 1 });
+    const tracker = createFinesseTracker(game, ROTATIONS.srs);
+    const run = (held = 0, pressed = 0) => {
+      const hadActive = Boolean(game.state.active);
+      tracker.frame(held, pressed, hadActive, game.step({ held, pressed }));
+    };
+    run();
+    for (const { action, hold } of mode.lesson.path) {
+      run(BTN[action], BTN[action]);
+      if (hold) for (let frame = 0; frame < 60; frame++) run(BTN[action]);
+      run();
+    }
+    run(BTN.HARD, BTN.HARD);
+    assert.equal(game.state.over, "clear", mode.name);
+    assert.equal(tracker.lastInputs, mode.lesson.path.length, mode.name);
+  }
 });
 
 test("피네스 판정: 하드 드롭한 피스마다 최소보다 더 누른 입력을 센다", () => {

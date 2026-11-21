@@ -1,13 +1,13 @@
 // 퍼즐 단계 고르기 대화상자: 번호 칸 격자. 깬 단계는 체크, 다음에 할 단계는 강조.
 import { KIND_NAMES, PUZZLES } from "../modes/puzzles.js";
-import { el, fillDialog } from "./dom.js";
+import { button, el, fillDialog } from "./dom.js";
 import { icon } from "./icons.js";
 import { t } from "../i18n/index.js";
 
 /**
- * @param {{ dialog: HTMLDialogElement, progress: ReturnType<typeof import("../modes/puzzles.js").createPuzzleProgress>, onPick: (puzzle: any) => void }} options
+ * @param {{ dialog: HTMLDialogElement, progress: ReturnType<typeof import("../modes/puzzles.js").createPuzzleProgress>, onPick: (puzzle: any) => void, onCreate: () => void }} options
  */
-export const createPuzzleUI = ({ dialog, progress, onPick }) => {
+export const createPuzzleUI = ({ dialog, progress, onPick, onCreate }) => {
   const notice = el("p", { class: "notice-slot", role: "status" });
   return {
     open() {
@@ -46,6 +46,11 @@ export const createPuzzleUI = ({ dialog, progress, onPick }) => {
         done: cleared.size,
         total: PUZZLES.length,
       });
+      const create = button({ id: "puzzle-create", text: t("퍼즐 만들기") });
+      create.addEventListener("click", () => {
+        dialog.close();
+        onCreate();
+      });
       fillDialog(dialog, {
         title: t("퍼즐"),
         body: el(
@@ -58,7 +63,7 @@ export const createPuzzleUI = ({ dialog, progress, onPick }) => {
           grid
         ),
         notice,
-        actions: [],
+        actions: [create],
         closeId: "puzzle-close",
       });
       dialog.showModal();

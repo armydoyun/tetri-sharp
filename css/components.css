@@ -1414,3 +1414,42 @@ body.touch-on :is(.btn, .btn-small, .key-slot, .select, .text-input, .choice > b
 .key-head > :not(:first-child) { text-align: center; }
 #records[open] { height: min(810px, calc(100dvh - 16px)); }
 .puzzle-tile small { text-align: center; overflow-wrap: anywhere; line-height: 1.2; }
+
+.puzzle-editor-board {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 2px;
+  width: min(100%, 240px);
+  margin-inline: auto;
+}
+
+.puzzle-editor-cell {
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.puzzle-editor-cell[aria-pressed="true"] {
+  background: var(--accent);
+}
+
+.puzzle-editor-cell:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  z-index: 1;
+}
+
+.puzzle-editor-sequence {
+  margin-block: 12px 4px;
+}
+
+.puzzle-editor-pieces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-block-end: 8px;
+}
