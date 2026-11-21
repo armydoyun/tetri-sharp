@@ -163,6 +163,17 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       ctx.globalAlpha = 1;
     }
 
+    if (game?.state.finesseTarget && active) {
+      ctx.save();
+      ctx.strokeStyle = theme.board.ink;
+      ctx.lineWidth = Math.max(2, cell / 12);
+      ctx.setLineDash([cell / 5, cell / 8]);
+      for (const [x, y] of game.state.finesseTarget) {
+        ctx.strokeRect(bx + x * cell + 3, toY(y) + 3, cell - 6, cell - 6);
+      }
+      ctx.restore();
+    }
+
     effects.draw(ctx, { bx, cell, toY, cols: COLS }, now, theme.board.ink, visual.effects);
 
     // Survival: 대기 중인 쓰레기 줄을 보드 왼쪽 가장자리에 빨간 막대로

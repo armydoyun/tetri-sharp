@@ -688,6 +688,15 @@ body[data-screen="paused"] .countdown {
   text-align: left;
 }
 
+body.is-finesse-lesson .results-stats {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+}
+
+body.is-finesse-lesson .results-stats :is(dt, dd) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .results-splits summary {
   padding-block: var(--space-2);
   font-weight: 600;
@@ -796,10 +805,20 @@ body[data-screen="paused"] .countdown {
   font-size: var(--text-s);
 }
 
-#replay-time {
+.replay-clock {
+  display: grid;
+  justify-items: end;
   line-height: 26px;
+  white-space: nowrap;
 }
 
+.replay-clock > span {
+  grid-area: 1 / 1;
+}
+
+#replay-time-width {
+  visibility: hidden;
+}
 
 .replay-transport {
   display: grid;
@@ -1514,8 +1533,8 @@ body.gestures-mode {
   }
 }
 
-/* 퍼즐을 깼을 때 "다음 단계"는 결과 카드 버튼 맨 위 한 줄 전체 */
-.results-card [data-action="next-puzzle"] {
+/* 모드별 결과 동작은 기본 버튼 위 한 줄 전체를 쓴다. */
+.results-card :is([data-action="next-puzzle"], [data-action="survival-retry-seed"]) {
   grid-column: 1 / -1;
   order: -1;
 }

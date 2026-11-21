@@ -1,12 +1,12 @@
 // 진입점: 화면 흐름(메뉴 → 카운트다운 → 플레이 → 결과), 게임 루프, 입력, 설정, 기록을 연결한다.
 // 로직은 고정 60Hz로 진행하고 화면은 모니터 주사율대로 그린다.
-import { createGame } from "./core/engine.js";
+import { BTN, createGame } from "./core/engine.js";
 import { createRenderer } from "./render/canvas.js";
 import { createKeyboard } from "./input/keyboard.js";
 import { createTouch, touchVisible } from "./input/touch.js";
 import { compilePadmap, createGamepad } from "./input/gamepad.js";
-import { compileKeymap } from "./input/keymap.js";
-import { MODES, RACE_MODES, findMode as findBaseMode } from "./modes/index.js";
+import { ACTIONS, compileKeymap, keyLabel } from "./input/keymap.js";
+import { MODES, RACE_MODES, SURVIVAL_MILESTONES, findMode as findBaseMode } from "./modes/index.js";
 import { dailyMode, dateKey, findDaily } from "./modes/daily.js";
 import { decodeReplayCode, encodeReplayCode, replayLink } from "./replay/share.js";
 import { createDailyUI } from "./ui/daily.js";
@@ -38,6 +38,7 @@ import { MODERN, PRESETS, PRESET_LIST } from "./rules/presets.js";
 import { makeCustomRules, sanitizeRuleBody } from "./rules/sanitize.js";
 import { decodeRules } from "./rules/share.js";
 import { createSfx } from "./audio/sfx.js";
+import { FINESSE_LESSONS } from "./modes/finesse-lessons.js";
 import { createFinesseTracker } from "./modes/finesse.js";
 import { analyzeReplay } from "./replay/analyze.js";
 import { ROTATIONS } from "./rules/rotation/index.js";
@@ -80,6 +81,7 @@ const countdownEl = $("countdown");
 const hud = {
   timeLabel: $("hud-time-label"),
   time: $("hud-time"),
+  survivalGoal: $("hud-survival-goal"),
   score: $("hud-score"),
   level: $("hud-level"),
   linesLabel: $("hud-lines-label"),
@@ -424,6 +426,8 @@ const dailyUI = createDailyUI({
 $("daily").addEventListener("close", () => {
   if (screen === "menu") /** @type {HTMLElement | null} */ (document.querySelector('[data-mode="daily"]'))?.focus();
 });
+const formatSurvivalGoal = frames => formatTime(frames).split(".")[0];
+
 const updateHud = () => {
   if (scenePractice?.split && game) updateSceneSplitProgress(game.state);
   const frame = game?.state.frame ?? 0;
@@ -432,6 +436,11 @@ const updateHud = () => {
   const time = game ? mode.hudTime(game.state) : { label: t("시간"), frames: 0 };
   hud.timeLabel.textContent = time.label;
   hud.time.textContent = formatTime(time.frames);
+  if (mode.id === "survival") {
+    const next = SURVIVAL_MILESTONES.find(goal => frame < goal);
+    const goal = next ? formatSurvivalGoal(next) : t("달성");
+    if (hud.survivalGoal.textContent !== goal) hud.survivalGoal.textContent = goal;
+  }
   hud.score.textContent = formatScore(game?.state.score ?? 0);
   hud.level.textContent = game ? (mode.hudLevel?.(game.state) ?? String(game.state.level)) : "1";
   hud.linesLabel.textContent = lines.label;
@@ -461,7 +470,8 @@ const setScreen = next => {
   keyboard.setEnabled(next === "play" || next === "countdown");
   touch.setEnabled(next === "play" || next === "countdown");
   gestures.setEnabled((next === "play" || next === "countdown") && gesturesOn());
-  document.body.classList.toggle("is-practice", Boolean(mode.practice) && next !== "menu");
+  document.body.classList.toggle("is-practice", Boolean(mode.practice && !mode.lesson) && next !== "menu");
+  document.body.classList.toggle("is-finesse-lesson", Boolean(mode.lesson) && next !== "menu");
   const modeTitle = mode.versus ? t("CPU · {level}", { level: mode.versus.name }) : mode.name;
   $("session-title").textContent = next === "menu" ? "" : scenePractice ? scenePracticeTitle() : modeTitle;
   $("mode-objective").textContent =
@@ -764,6 +774,23 @@ const raceResultText = (state, best, friend = "") => {
       });
 };
 
+const survivalResultText = (frame, previousBest) => {
+  const reached = SURVIVAL_MILESTONES.findLast(goal => goal <= frame);
+  const goal = reached
+    ? t("{time} 구간 달성", { time: formatSurvivalGoal(reached) })
+    : t("첫 목표 {time} 미달성", { time: formatSurvivalGoal(SURVIVAL_MILESTONES[0]) });
+  if (!previousBest) return goal;
+
+  const delta = frame - previousBest.frames;
+  const comparison =
+    delta === 0
+      ? t("이전 최고와 같은 시간")
+      : t(delta > 0 ? "이전 최고보다 {n}초 더 버팀" : "이전 최고보다 {n}초 덜 버팀", {
+          n: (Math.abs(delta) / 60).toFixed(2),
+        });
+  return `${goal} · ${comparison}`;
+};
+
 const finish = () => {
   if (!game) return;
   const state = game.state;
@@ -784,14 +811,20 @@ const finish = () => {
     });
   }
   const best = records.best(mode, rules);
+  const survival = mode.id === "survival";
 
   if (mode.versus) addVersusResult(mode.versus.id, state.over === WIN);
   // 퍼즐: 깬 단계를 남기고, 깼으면 "다음 단계"를 보인다(마지막 단계면 다시 하기만)
   if (mode.puzzle?.number && state.over === "clear") puzzleProgress.markCleared(mode.puzzle.number);
   if (mode.trialCode && state.over === "clear") puzzleEditor.markCleared(mode.trialCode);
   const nextPuzzle = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="next-puzzle"]'));
-  nextPuzzle.hidden = !(mode.puzzle?.number && state.over === "clear" && mode.puzzle.number < PUZZLES.length);
+  const hasNext = mode.lesson
+    ? Boolean(FINESSE_LESSONS[mode.lesson.index + 1])
+    : mode.puzzle?.number && mode.puzzle.number < PUZZLES.length;
+  nextPuzzle.hidden = !(hasNext && state.over === "clear");
   lastReplay = recorder ? recorder.finish(state) : null;
+  const survivalRetry = $("survival-retry-seed");
+  survivalRetry.hidden = !survival || !lastReplay;
   if (lastReplay && versus) lastReplay.cpu = versus.recorder.finish(versus.cpu.state);
   /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="watch"]')).disabled = !lastReplay;
   const exportButton = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="export"]'));
@@ -810,12 +843,18 @@ const finish = () => {
   const summary = mode.summary(state);
   $("results-title").textContent = summary.title;
   $("results-main").textContent = summary.main;
-  say(`${summary.title} ${summary.main}`);
+  if (!mode.lesson && !survival) say(`${summary.title} ${summary.main}`);
   fb.clearAction();
   countdownEl.hidden = true;
   $("results-badge").classList.toggle("is-invisible", !outcome?.isBest);
 
-  $("race-result").textContent = race ? raceResultText(state, race.target.best, race.target.friend) : "";
+  const resultNote = survival
+    ? survivalResultText(state.frame, outcome ? outcome.previousBest : best)
+    : race
+      ? raceResultText(state, race.target.best, race.target.friend)
+      : "";
+  $("race-result").textContent = resultNote;
+  if (survival) say(`${summary.title} ${summary.main}. ${resultNote}`);
 
   const seconds = state.frame / 60;
   if (mode.versus && versus) {
@@ -861,6 +900,25 @@ const finish = () => {
     const delta = splitDelta(splits, resultPbSplits);
     if (delta !== null) rows.push([t("PB 대비"), formatDelta(delta)]);
     if (state.over === "clear") rows.splice(0, 1);
+  }
+  if (mode.lesson) {
+    const path = mode.lesson.path;
+    const steps = [...path, { action: "HARD" }].map(({ action, hold }) => {
+      const code = settings.keymap[action]?.[0];
+      const label = code ? keyLabel(code) : (ACTIONS.find(item => item.id === action)?.label ?? action);
+      return hold ? t("{key} 길게", { key: label }) : label;
+    });
+    const comparison = t("내 입력 {actual}회 · 최소 {minimum}회", {
+      actual: finesse.lastInputs,
+      minimum: path.length,
+    });
+    rows.splice(
+      0,
+      rows.length,
+      [t("이동·회전"), state.over === "clear" ? comparison : t("내 입력 {n}회", { n: finesse.lastInputs })],
+      [t("추천 입력"), steps.join(", ")]
+    );
+    say(`${summary.title}. ${rows[0][1]}. ${t("추천 입력")} ${rows[1][1]}`);
   }
   $("results-stats").replaceChildren(
     ...rows.flatMap(([k, v]) => {
@@ -937,6 +995,7 @@ $("edit-rules").addEventListener("click", () => rulesUI.open());
 const practiceUI = createPracticeUI({
   dialog: /** @type {HTMLDialogElement} */ ($("practice")),
   onPick: drill => start(practiceMode(drill)),
+  onLesson: () => start(FINESSE_LESSONS[0], FINESSE_LESSONS[0].rules),
 });
 $("open-practice").addEventListener("click", () => practiceUI.open());
 
@@ -1085,7 +1144,7 @@ const inputDisplay = createInputDisplay({ root: $("input-display"), isOn: () => 
 
 /** 연습 모드에서 바로 앞 피스로 되돌린다 */
 const undoPiece = () => {
-  if (!game || !mode.practice || (screen !== "play" && screen !== "paused")) return;
+  if (!game || !mode.practice || mode.lesson || (screen !== "play" && screen !== "paused")) return;
   if (!undo.undo(game.state)) {
     say(t("더 되돌릴 수 없어요"));
     return;
@@ -1191,8 +1250,16 @@ for (const btn of document.querySelectorAll("[data-action]")) {
       if (inProgress()) askConfirm("restart");
       else start(mode, rules, race?.target);
     }
-    if (action === "retry-seed" && mode.splits && lastReplay) start(mode, rules, null, lastReplay.seed);
+    if (
+      lastReplay &&
+      ((action === "retry-seed" && mode.splits) || (action === "survival-retry-seed" && mode.id === "survival"))
+    )
+      start(mode, rules, null, lastReplay.seed);
     if (action === "race-best" && mode.splits) startRace(mode, rules);
+    if (action === "next-puzzle" && mode.lesson) {
+      const next = FINESSE_LESSONS[mode.lesson.index + 1];
+      if (next) start(next, next.rules);
+    }
     if (action === "next-puzzle" && mode.puzzle?.number) {
       const next = PUZZLES[mode.puzzle.number] ?? puzzleProgress.next();
       start(puzzleMode(next), MODERN);
@@ -1442,6 +1509,10 @@ const startReplay = (replay, returnTo = screen, note = "", local = false) => {
   versusPanel.hidden = true;
   document.body.classList.remove("is-versus");
   if (analysis?.for !== replay) analysis = { ...analyzeReplay(replay, findMode), for: replay };
+  // 끝까지 갔을 때의 시간 표시만큼 처음부터 자리를 잡는다.
+  const length = replayLength();
+  const endTime = formatTime(length);
+  $("replay-time-width").textContent = length ? `${endTime} / ${endTime}` : endTime;
   acc = 0;
   renderer.clearEffects();
   replayCpuRenderer.clearEffects();
@@ -1819,8 +1890,9 @@ const tick = () => {
   if (screen === "replay") return tickReplay();
   if (screen !== "play" || !game) return;
   if (goTimer > 0 && --goTimer === 0) countdownEl.hidden = true;
-  const held = keyboard.held | pad.held | touch.held | gestures.held;
-  const pressed = keyboard.takePressed() | touch.takePressed() | gestures.takePressed();
+  const allowed = mode.lesson ? ~BTN.SOFT : -1;
+  const held = (keyboard.held | pad.held | touch.held | gestures.held) & allowed;
+  const pressed = (keyboard.takePressed() | touch.takePressed() | gestures.takePressed()) & allowed;
   if (scenePractice) {
     const events = game.step({ held, pressed });
     inputDisplay.show(held, pressed);
@@ -1840,7 +1912,7 @@ const tick = () => {
     }
     return;
   }
-  if (mode.practice) undo.track(game.state);
+  if (mode.practice && !mode.lesson) undo.track(game.state);
   inputDisplay.show(held, pressed);
   recorder?.input(held, pressed);
   const hadActive = Boolean(game.state.active);

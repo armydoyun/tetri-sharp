@@ -278,6 +278,7 @@ export const DIG = Object.freeze({
 // 줄을 못 지우고 고정하면 대기 중인 줄이 한꺼번에 아래에서 올라온다. 막힐 때까지 버틴 시간이 기록. ----
 
 export const SURVIVAL_LEVEL_FRAMES = 30 * 60;
+export const SURVIVAL_MILESTONES = Object.freeze([30, 60, 120, 180].map(seconds => seconds * 60));
 /** 쓰레기 한 줄이 쌓이기까지의 프레임(레벨이 오를수록 짧다) */
 export const survivalInterval = level => Math.max(60, 300 - (level - 1) * 20);
 /** 줄을 지웠을 때 막는 쓰레기 줄 수 */
@@ -285,7 +286,7 @@ export const survivalBlock = lockEvent => lockEvent.lines * (lockEvent.tspin ===
 /** @type {Mode} */
 export const SURVIVAL = Object.freeze({
   id: "survival",
-  hud: Object.freeze(["time", "level", "lines", "pieces", "pps"]),
+  hud: Object.freeze(["time", "goal", "level", "lines", "pieces", "pps"]),
   name: "Survival",
   description: t("올라오는 쓰레기 줄 버티기 · 줄을 지우면 막아요"),
   rules: MODERN,

@@ -5,10 +5,15 @@ import { PIECES } from "../core/pieces.js";
 import { BTN } from "../core/engine.js";
 
 const AIR_Y = 4; // 빈 공중(바닥·블록과 상관없는 높이)
+const ROTATE_ACTIONS = /** @type {const} */ ([
+  [1, "CW"],
+  [3, "CCW"],
+  [2, "R180"],
+]);
 const MOVE_BITS = BTN.LEFT | BTN.RIGHT | BTN.CW | BTN.CCW | BTN.R180;
 
 /** 칸 좌표 → 높이를 뺀 모양+가로 위치 키 */
-const keyOf = cells => {
+export const finessePlacement = cells => {
   const minY = Math.min(...cells.map(c => c[1]));
   return cells
     .map(([x, y]) => `${x},${y - minY}`)
@@ -18,47 +23,50 @@ const keyOf = cells => {
 
 /**
  * 빈 판에서 생성 위치 → 목표 칸까지의 최소 입력 수. 동작: 한 칸 이동, 벽까지 밀기(DAS), 회전 세 가지.
- * @param {{ cells: (type: string, rot: number) => number[][], spawnRotation: (type: string) => number, kicks: Function }} rotation
- * @param {string} type
+ * @param {import("../rules/rotation/index.js").Rotation} rotation
+ * @param {import("../core/pieces.js").PieceType} type
  * @param {number[][]} target  고정된 칸(보드 좌표)
- * @returns {number | null}  닿을 수 없으면 null
+ * @returns {{ action: string, hold?: boolean }[] | null}  닿을 수 없으면 null
  */
-export const finesseCost = (rotation, type, target) => {
-  const goal = keyOf(target);
+export const finessePath = (rotation, type, target) => {
+  const goal = finessePlacement(target);
   const cellsAt = (x, rot) => rotation.cells(type, rot).map(([cx, cy]) => [x + cx, AIR_Y + cy]);
   const fits = (x, rot) => cellsAt(x, rot).every(([cx]) => cx >= 0 && cx < WIDTH);
-  const start = { x: Math.floor((WIDTH - PIECES[type].size) / 2), rot: rotation.spawnRotation(type) };
-  const seen = new Map([[`${start.x},${start.rot}`, 0]]);
+  const start = { x: Math.floor((WIDTH - PIECES[type].size) / 2), rot: rotation.spawnRotation(type), path: [] };
+  const seen = new Set([`${start.x},${start.rot}`]);
   let frontier = [start];
   for (let cost = 0; frontier.length && cost <= 12; cost++) {
     const next = [];
     for (const s of frontier) {
-      if (keyOf(cellsAt(s.x, s.rot)) === goal) return cost;
+      if (finessePlacement(cellsAt(s.x, s.rot)) === goal) return s.path;
       const moves = [];
       for (const dx of [-1, 1]) {
-        if (fits(s.x + dx, s.rot)) moves.push({ x: s.x + dx, rot: s.rot });
+        const action = dx < 0 ? "LEFT" : "RIGHT";
+        if (fits(s.x + dx, s.rot)) moves.push({ x: s.x + dx, rot: s.rot, step: { action } });
         let x = s.x;
         while (fits(x + dx, s.rot)) x += dx;
-        moves.push({ x, rot: s.rot });
+        moves.push({ x, rot: s.rot, step: { action, hold: true } });
       }
-      for (const d of [1, 3, 2]) {
+      for (const [d, action] of ROTATE_ACTIONS) {
         const to = (s.rot + d) % 4;
         const kicks = rotation.kicks(type, s.rot, to, cx => s.x + cx < 0 || s.x + cx >= WIDTH);
         // 공중에서는 벽만 막으므로 위아래 킥은 상관없다. 엔진처럼 맞는 첫 킥을 쓴다.
         const kick = kicks.find(([dx]) => fits(s.x + dx, to));
-        if (kick) moves.push({ x: s.x + kick[0], rot: to });
+        if (kick) moves.push({ x: s.x + kick[0], rot: to, step: { action } });
       }
       for (const m of moves) {
         const k = `${m.x},${m.rot}`;
         if (seen.has(k)) continue;
-        seen.set(k, cost + 1);
-        next.push(m);
+        seen.add(k);
+        next.push({ x: m.x, rot: m.rot, path: [...s.path, m.step] });
       }
     }
     frontier = next;
   }
   return null;
 };
+
+export const finesseCost = (rotation, type, target) => finessePath(rotation, type, target)?.length ?? null;
 
 /** 새로 눌린 버튼 수 */
 const countBits = n => {
@@ -79,8 +87,12 @@ export const createFinesseTracker = (game, rotation) => {
   let prevHeld = 0;
   let inputs = 0;
   let soft = false;
+  let lastInputs = 0;
   return {
     result,
+    get lastInputs() {
+      return lastInputs;
+    },
     /**
      * @param {number} held
      * @param {number} pressed
@@ -100,6 +112,7 @@ export const createFinesseTracker = (game, rotation) => {
       if (held & BTN.SOFT) soft = true;
       const lock = events.find(e => e.type === "lock");
       if (!lock) return 0;
+      lastInputs = inputs;
       const hard = events.some(e => e.type === "hardDrop");
       let extra = 0;
       if (hard && !soft) {

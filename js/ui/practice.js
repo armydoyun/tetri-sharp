@@ -4,15 +4,21 @@ import { el, fillDialog } from "./dom.js";
 import { icon } from "./icons.js";
 import { t } from "../i18n/index.js";
 
-/** @param {{ dialog: HTMLDialogElement, onPick: (drill: any) => void }} options */
-export const createPracticeUI = ({ dialog, onPick }) => {
+/** @param {{ dialog: HTMLDialogElement, onPick: (drill: any) => void, onLesson: () => void }} options */
+export const createPracticeUI = ({ dialog, onPick, onLesson }) => {
   const notice = el("p", { class: "notice-slot", role: "status" });
   return {
     open() {
+      const lesson = {
+        id: "finesse-lesson",
+        name: t("피네스 훈련"),
+        description: t("목표 배치 10개 · 내 입력과 최소 입력 비교"),
+      };
+      const drills = DRILLS.flatMap(d => (d.id === "finesse" ? [lesson, d] : [d]));
       const list = el(
         "div",
         { class: "menu-list practice-list" },
-        ...[...DRILLS.filter(drill => drill.id === "free"), ...DRILLS.filter(drill => drill.id !== "free")].map(
+        ...[...drills.filter(drill => drill.id === "free"), ...drills.filter(drill => drill.id !== "free")].map(
           (d, i) => {
             const card = el(
               "button",
@@ -23,7 +29,8 @@ export const createPracticeUI = ({ dialog, onPick }) => {
             );
             card.addEventListener("click", () => {
               dialog.close();
-              onPick(d);
+              if (d === lesson) onLesson();
+              else onPick(d);
             });
             return card;
           }

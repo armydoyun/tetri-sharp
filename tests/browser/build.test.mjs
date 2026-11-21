@@ -925,7 +925,7 @@ test("규칙 공유: 편집기에서 코드를 붙여 넣으면 불러오고, #r
 test("연습: 메뉴에서 고르면 시작하고, 놓을 때마다 성공/시도를 센다", async () => {
   const { context, page, errors } = await openPage();
   await page.click("#open-practice");
-  assert.equal(await page.locator("#practice .menu-row").count(), 7);
+  assert.equal(await page.locator("#practice .menu-row").count(), 8);
   assert.equal(await page.locator('[data-drill="double"]').isVisible(), true);
   await page.click('[data-drill="tsd"]');
   await page.waitForFunction(() => document.body.dataset.screen === "play", null, {
@@ -1126,6 +1126,50 @@ test("전체 흐름: Survival 한 판 → 결과·새 기록 → 기록표 리�
   assert.equal(await page.locator("#watch-last").isDisabled(), false, "마지막 판 리플레이도 돌아온다");
   assert.deepEqual(errors, []);
   await context.close();
+});
+
+test("Survival 목표는 30초에 갱신되고, 같은 시드 재도전 결과는 이전 최고와 비교한다", async () => {
+  const { context, page, errors } = await openPage(
+    () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } })),
+    undefined,
+    { frameClock: true }
+  );
+  const topOut = () =>
+    page.evaluate(() => {
+      for (let i = 0; i < 80 && document.body.dataset.screen === "play"; i++) {
+        window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", cancelable: true }));
+        window.dispatchEvent(new KeyboardEvent("keyup", { code: "Space", cancelable: true }));
+        window.advanceFrame();
+      }
+    });
+  const last = () => page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:replay:last")));
+  try {
+    await startMode(page, "survival");
+    await topOut();
+    assert.equal(await text(page, "race-result"), "첫 목표 0:30 미달성");
+    const first = await last();
+    assert.equal(first.mode, "survival");
+    assert.ok(first.result.frames < 1800);
+
+    await page.click("#survival-retry-seed");
+    assert.equal(await page.locator("body").getAttribute("data-screen"), "play");
+    await page.evaluate(() => {
+      for (let i = 0; i < 1799; i++) window.advanceFrame();
+    });
+    assert.equal(await text(page, "hud-time"), "0:29.98");
+    assert.equal(await text(page, "hud-survival-goal"), "0:30");
+    await page.evaluate(() => window.advanceFrame());
+    assert.equal(await text(page, "hud-survival-goal"), "1:00");
+    await topOut();
+    const second = await last();
+    assert.equal(second.seed, first.seed);
+    assert.deepEqual(second.rules, first.rules);
+    const delta = ((second.result.frames - first.result.frames) / 60).toFixed(2);
+    assert.equal(await text(page, "race-result"), `0:30 구간 달성 · 이전 최고보다 ${delta}초 더 버팀`);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
 });
 
 test("효과음: 소리를 켜면 게임 중 오디오를 만들고, 끄면 만들지 않는다", async () => {
@@ -1540,6 +1584,82 @@ test("리플레이 탐색: 막대로 원하는 시점에 가고, 표시로 건�
   assert.equal(await position(), first);
   assert.deepEqual(errors, []);
   await context.close();
+});
+
+test("피네스 훈련: 같은 문제를 더 적은 입력으로 다시 풀고 다음 목표로 이동한다", async () => {
+  const { context, page, errors } = await openPage(() => {
+    localStorage.setItem(
+      "tetrisharp:settings",
+      JSON.stringify({
+        access: { countdown: "off" },
+        keymap: { LEFT: ["KeyF"], RIGHT: ["KeyJ"], HARD: ["Space"] },
+      })
+    );
+  });
+  try {
+    await page.click("#open-practice");
+    await page.click('[data-drill="finesse-lesson"]');
+    const play = () => page.waitForFunction(() => document.body.dataset.screen === "play");
+    const drop = async () => {
+      await page.keyboard.press("Space");
+      await page.waitForFunction(() => document.body.dataset.screen === "results");
+    };
+    const tap = async key => {
+      await page.keyboard.press(key);
+      await page.waitForTimeout(35);
+    };
+    await play();
+    await page.waitForTimeout(50);
+    assert.match(await text(page, "session-title"), /1 \/ 10/);
+    await drop();
+    await page.click('[data-action="next-puzzle"]');
+    await play();
+    await page.waitForTimeout(50);
+    await drop();
+    assert.equal(await text(page, "results-title"), "목표와 다른 칸에 놓았어요");
+    assert.equal(await page.locator('[data-action="next-puzzle"]').isVisible(), false);
+    assert.match(await text(page, "results-stats"), /F, Space/);
+    await page.click('#results [data-action="retry"]');
+    await play();
+    await page.waitForTimeout(50);
+    for (const key of ["KeyF", "KeyJ", "KeyF"]) await tap(key);
+    await drop();
+    assert.match(await text(page, "results-stats"), /내 입력 3회 · 최소 1회/);
+    await page.click('#results [data-action="retry"]');
+    await play();
+    await page.waitForTimeout(50);
+    assert.match(await text(page, "session-title"), /2 \/ 10/);
+    await tap("KeyF");
+    await drop();
+    assert.match(await text(page, "results-stats"), /내 입력 1회 · 최소 1회/);
+    assert.equal(await page.locator('[data-action="next-puzzle"]').isVisible(), true);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("리플레이 시간의 분 자릿수가 늘어도 타임라인 너비는 같다", async () => {
+  const { replay } = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
+  replay.mode = "practice-free";
+  replay.inputs = [];
+  replay.result.frames = 36_060;
+
+  const { context, page } = await openPage(value => {
+    localStorage.setItem("tetrisharp:replay:last", JSON.stringify(value));
+  }, replay);
+  try {
+    await page.click("#watch-last");
+    const progress = page.locator("#replay-progress");
+    await progress.fill("35999");
+    assert.equal(await text(page, "replay-time"), "9:59.98 / 10:01.00");
+    const before = await progress.boundingBox();
+    await progress.fill("36000");
+    assert.equal(await text(page, "replay-time"), "10:00.00 / 10:01.00");
+    assert.equal((await progress.boundingBox()).width, before.width);
+  } finally {
+    await context.close();
+  }
 });
 
 test("리플레이 탐색: 피네스가 많은 판에서도 오래 고민과 주요 장면을 눌러 이동한다", async () => {
