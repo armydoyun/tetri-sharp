@@ -803,7 +803,7 @@ body[data-screen="paused"] .countdown {
 
 .replay-transport {
   display: grid;
-  grid-template-columns: minmax(34px, 1fr) minmax(max-content, 2.5fr) repeat(2, minmax(34px, 1fr));
+  grid-template-columns: minmax(max-content, 1fr) minmax(max-content, 2.5fr) repeat(2, minmax(max-content, 1fr));
   gap: var(--space-1);
 }
 
@@ -823,17 +823,16 @@ body[data-screen="paused"] .countdown {
   outline-offset: 1px;
 }
 
+.replay-transport .btn {
+  white-space: nowrap;
+}
+
 .replay-bar .btn .icon,
 .replay-toggle-icon {
   display: block;
   flex: 0 0 14px;
   width: 14px;
   height: 14px;
-}
-
-/* 아이콘과 글자의 보이는 중심을 맞춘다. */
-.replay-bar .btn > span:not(.replay-toggle-icon) {
-  transform: translateY(2px);
 }
 
 .replay-bar .btn-ghost {
@@ -2283,6 +2282,7 @@ body[data-battle-replay] .replay-info {
 
 .replay-battle-view .btn {
   min-width: 0;
+  padding-block: 0;
   padding-inline: var(--space-1);
 }
 
