@@ -1715,7 +1715,7 @@ test("Sprint 구간 연습은 같은 시점부터 비교하고 재시도 후 리
   }
 });
 
-test("리플레이 버튼의 글자와 아이콘은 버튼의 세로 중앙에 놓인다", async () => {
+test("리플레이 버튼의 글자와 아이콘은 아래 턱을 뺀 버튼 면의 중앙에 놓인다", async () => {
   const { replay } = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
   for (const locale of ["ko-KR", "en-US"]) {
     const { context, page } = await openPage(
@@ -1732,17 +1732,21 @@ test("리플레이 버튼의 글자와 아이콘은 버튼의 세로 중앙에 �
             const { top, bottom } = element.getBoundingClientRect();
             return (top + bottom) / 2;
           };
-          return elements.map(button => ({
-            action: button.dataset.replay,
-            offsets: [...button.children].map(content => centerY(content) - centerY(button)),
-            fits: button.scrollWidth <= button.clientWidth + 1 && button.scrollHeight <= button.clientHeight + 1,
-            multiline: button.closest(".replay-transport")
-              ? [...button.children].some(
-                  content =>
-                    content.getBoundingClientRect().height > parseFloat(getComputedStyle(content).lineHeight) + 0.5
-                )
-              : false,
-          }));
+          return elements.map(button => {
+            const inset = getComputedStyle(button).boxShadow.match(/[-\d.]+px\s+([-\d.]+)px[^,]*inset/);
+            const faceCenter = centerY(button) + Number(inset?.[1] ?? 0) / 2;
+            return {
+              action: button.dataset.replay,
+              offsets: [...button.children].map(content => centerY(content) - faceCenter),
+              fits: button.scrollWidth <= button.clientWidth + 1 && button.scrollHeight <= button.clientHeight + 1,
+              multiline: button.closest(".replay-transport")
+                ? [...button.children].some(
+                    content =>
+                      content.getBoundingClientRect().height > parseFloat(getComputedStyle(content).lineHeight) + 0.5
+                  )
+                : false,
+            };
+          });
         });
         for (const action of ["toggle", "back", "ahead", "speed", "step-back", "step", "restart", "share", "exit"]) {
           assert.ok(
@@ -1765,7 +1769,13 @@ test("리플레이 버튼의 글자와 아이콘은 버튼의 세로 중앙에 �
       ]) {
         await page.setViewportSize({ width, height });
         await checkCenters();
-        await toggle.click();
+        await toggle.scrollIntoViewIfNeeded();
+        const { x, y, width: buttonWidth, height: buttonHeight } = await toggle.boundingBox();
+        await page.mouse.move(x + buttonWidth / 2, y + buttonHeight / 2);
+        await page.mouse.down();
+        assert.equal(await toggle.evaluate(el => el.matches(":active")), true);
+        await checkCenters();
+        await page.mouse.up();
         await checkCenters();
       }
     } finally {
