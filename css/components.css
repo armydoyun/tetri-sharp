@@ -493,6 +493,15 @@
     border-color var(--dur) var(--ease);
 }
 
+.menu-row[data-downstack] {
+  grid-template-columns: minmax(0, 1fr) 18px;
+  padding-inline-start: var(--space-3);
+}
+
+.menu-row[data-downstack] > .icon {
+  grid-area: 1 / 2;
+}
+
 .menu-row:hover,
 .menu-row:focus-visible {
   background: var(--surface-2);

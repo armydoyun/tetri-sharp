@@ -953,7 +953,23 @@ test("파내기 훈련: 단계 선택, 두 가지 힌트, 같은 판 재시작 �
   try {
     await page.click("#open-practice");
     await page.click('[data-drill="downstack"]');
-    assert.equal(await page.locator("[data-downstack]").count(), 6);
+    const stages = page.locator("[data-downstack]");
+    assert.equal(await stages.count(), 6);
+    for (const width of [390, 624, 1280]) {
+      await page.setViewportSize({ width, height: 844 });
+      assert.ok(
+        await stages.evaluateAll(rows =>
+          rows.every(row => {
+            const title = row.querySelector(".menu-text");
+            const chevron = row.querySelector(".icon");
+            const bounds = title.getBoundingClientRect();
+            return bounds.width > row.clientWidth * 0.65 && bounds.right <= chevron.getBoundingClientRect().left;
+          })
+        ),
+        `제목이 행의 가용 너비를 쓴다 · ${width}px`
+      );
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.click('[data-downstack="downstack-1"]');
     await page.evaluate(() => window.advanceFrame());
     const hint = page.locator("#downstack-hint");
