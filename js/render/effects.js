@@ -6,6 +6,65 @@ const REDUCED_CLEAR_MS = 175;
 const PRESS_AT = 0.2;
 const REBOUND_AT = 0.62;
 
+const drawAccentMark = (ctx, shape, x, y, size) => {
+  if (shape === "dash") {
+    ctx.fillRect(x - size, y - size * 0.2, size * 2, size * 0.4);
+    return;
+  }
+  ctx.beginPath();
+  if (shape === "dot") {
+    ctx.arc(x, y, size * 0.55, 0, Math.PI * 2);
+  } else {
+    ctx.moveTo(x - size * 0.65, y);
+    ctx.lineTo(x, y - size * 0.65);
+    ctx.lineTo(x + size * 0.65, y);
+    ctx.lineTo(x, y + size * 0.65);
+    ctx.closePath();
+  }
+  ctx.fill();
+};
+
+// 지워진 줄 안에서만 그린다. 테마의 기본 삭제 효과와 함께 사라진다.
+const drawClearAccents = (ctx, { rows, motion, spinColumn, b2b }, { bx, cell, toY, cols }, t) => {
+  if (!motion.accent || (rows.length !== 4 && spinColumn === null && !b2b)) return;
+  const envelope = 4 * t * (1 - t);
+  if (envelope <= 0) return;
+
+  const mark = (column, y) => drawAccentMark(ctx, motion.accent, bx + column * cell, y, cell * motion.accentSize);
+  ctx.globalAlpha = 0.38 * envelope;
+  if (rows.length === 4) {
+    const edge = 0.34 + t * 0.32;
+    for (const row of rows) {
+      const y = toY(row) + cell * 0.24;
+      mark(edge, y);
+      mark(cols - edge, y);
+    }
+  }
+
+  const top = toY(Math.min(...rows));
+  if (spinColumn !== null) {
+    // 회전한 피스 주변을 세 개의 작은 표시가 짧게 훑는다.
+    for (let i = 0; i < 3; i++) {
+      const angle = (i * 0.55 + t * 1.3) * Math.PI;
+      const column = Math.max(0.3, Math.min(cols - 0.3, spinColumn + 0.74 * Math.cos(angle)));
+      mark(column, top + cell * (0.5 + 0.31 * Math.sin(angle)));
+    }
+  }
+
+  if (b2b) {
+    // 같은 줄 양쪽에서 두 번째 표시가 살짝 늦게 따라온다.
+    const echo = Math.max(0, (t - 0.14) / 0.86);
+    for (const [index, alpha] of [envelope, 4 * echo * (1 - echo)].entries()) {
+      if (alpha <= 0) continue;
+      ctx.globalAlpha = 0.32 * alpha;
+      const column = 0.95 + index * 0.5;
+      const y = top + cell * 0.77;
+      mark(column, y);
+      mark(cols - column, y);
+    }
+  }
+};
+
 export const createEffects = () => {
   const landings = new Map();
   let clears = [];
@@ -30,7 +89,9 @@ export const createEffects = () => {
       if (e.type !== "lock") continue;
       if (e.lines > 0) {
         landings.clear();
-        clears.push({ rows: e.rows, start: now, motion });
+        const spin = (e.tspin === "full" || e.tspin === "mini") && e.cells?.length;
+        const spinColumn = spin ? e.cells.reduce((sum, [x]) => sum + x + 0.5, 0) / e.cells.length : null;
+        clears.push({ rows: e.rows, start: now, motion, spinColumn, b2b: Boolean(e.b2b) });
       } else if (full && e.cells?.length) {
         const floors = new Map();
         for (const [x, y] of e.cells) floors.set(x, Math.max(floors.get(x) ?? 0, y + 1));
@@ -93,12 +154,14 @@ export const createEffects = () => {
     ctx.restore();
   };
 
-  const draw = (ctx, { bx, cell, toY, cols }, now, color, level) => {
+  const draw = (ctx, geometry, now, color, level) => {
+    const { bx, cell, toY, cols } = geometry;
     if (!clears.length) return;
     const width = cols * cell;
     ctx.save();
     ctx.fillStyle = color;
-    for (const { rows, start, motion } of clears) {
+    for (const clear of clears) {
+      const { rows, start, motion } = clear;
       const full = level === "full";
       const duration = full ? motion.clearMs : REDUCED_CLEAR_MS;
       const t = Math.max(0, (now - start) / duration);
@@ -149,6 +212,7 @@ export const createEffects = () => {
           ctx.fillRect(bx, middle + offset - thickness / 2, width, thickness);
         }
       }
+      if (full) drawClearAccents(ctx, clear, geometry, t);
     }
     ctx.restore();
   };
