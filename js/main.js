@@ -38,6 +38,7 @@ import { MODERN, PRESETS, PRESET_LIST } from "./rules/presets.js";
 import { makeCustomRules, sanitizeRuleBody } from "./rules/sanitize.js";
 import { decodeRules } from "./rules/share.js";
 import { createSfx } from "./audio/sfx.js";
+import { DOWNSTACK_LESSONS } from "./modes/downstack.js";
 import { FINESSE_LESSONS } from "./modes/finesse-lessons.js";
 import { createFinesseTracker } from "./modes/finesse.js";
 import { analyzeReplay } from "./replay/analyze.js";
@@ -475,7 +476,11 @@ const setScreen = next => {
   keyboard.setEnabled(next === "play" || next === "countdown");
   touch.setEnabled(next === "play" || next === "countdown");
   gestures.setEnabled((next === "play" || next === "countdown") && gesturesOn());
-  document.body.classList.toggle("is-practice", Boolean(mode.practice && !mode.lesson) && next !== "menu");
+  document.body.classList.toggle(
+    "is-practice",
+    Boolean(mode.practice && !mode.lesson && !mode.downstack) && next !== "menu"
+  );
+  document.body.classList.toggle("is-downstack", Boolean(mode.downstack) && next !== "menu");
   document.body.classList.toggle("is-finesse-lesson", Boolean(mode.lesson) && next !== "menu");
   const modeTitle = mode.versus ? t("CPU · {level}", { level: mode.versus.name }) : mode.name;
   $("session-title").textContent = next === "menu" ? "" : scenePractice ? scenePracticeTitle() : modeTitle;
@@ -565,7 +570,8 @@ const start = (
   }
   pbSplits = target?.splits ?? resultPbSplits;
   acc = 0;
-  countdown = COUNTDOWN_FRAMES[settings.access.countdown] ?? READY_FRAMES;
+  countdown = m.downstack ? 0 : (COUNTDOWN_FRAMES[settings.access.countdown] ?? READY_FRAMES);
+  if (m.downstack) resetDownstackHint();
   goTimer = 0;
   undo.reset();
   showPanel(null);
@@ -839,9 +845,8 @@ const finish = () => {
   if (mode.puzzle?.number && state.over === "clear") puzzleProgress.markCleared(mode.puzzle.number);
   if (mode.trialCode && state.over === "clear") puzzleEditor.markCleared(mode.trialCode);
   const nextPuzzle = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="next-puzzle"]'));
-  const hasNext = mode.lesson
-    ? Boolean(FINESSE_LESSONS[mode.lesson.index + 1])
-    : mode.puzzle?.number && mode.puzzle.number < PUZZLES.length;
+  const nextLesson = nextPracticeLesson();
+  const hasNext = nextLesson || (mode.puzzle?.number && mode.puzzle.number < PUZZLES.length);
   nextPuzzle.hidden = !(hasNext && state.over === "clear");
   lastReplay = recorder ? recorder.finish(state) : null;
   const survivalRetry = $("survival-retry-seed");
@@ -1013,10 +1018,39 @@ $("active-rules").addEventListener("click", e => {
 });
 $("edit-rules").addEventListener("click", () => rulesUI.open());
 
+const nextPracticeLesson = () =>
+  mode.downstack
+    ? DOWNSTACK_LESSONS[mode.downstack.index + 1]
+    : mode.lesson
+      ? FINESSE_LESSONS[mode.lesson.index + 1]
+      : null;
+const downstackHint = $("downstack-hint");
+const resetDownstackHint = () => {
+  downstackHint.textContent = t("힌트");
+  $("downstack-status").textContent = "";
+};
+const downstackRetry = $("downstack-retry");
+for (const control of [downstackHint, downstackRetry]) {
+  // 버튼에 키보드 포커스가 있으면 Space는 버튼을 실행한다.
+  control.addEventListener("keydown", event => {
+    if (event.code === "Space") event.stopPropagation();
+  });
+}
+downstackHint.addEventListener("click", event => {
+  if (!mode.downstack || screen !== "play" || !game) return;
+  $("downstack-status").textContent = mode.hint(game.state);
+  downstackHint.textContent = t(["힌트", "자리 힌트", "힌트 숨기기"][game.state.downstack.hintLevel]);
+  if (event.detail > 0) downstackHint.blur();
+});
+downstackRetry.addEventListener("click", () => {
+  if (mode.downstack && screen === "play") start(mode, rules);
+});
+
 const practiceUI = createPracticeUI({
   dialog: /** @type {HTMLDialogElement} */ ($("practice")),
   onPick: drill => start(practiceMode(drill)),
   onLesson: () => start(FINESSE_LESSONS[0], FINESSE_LESSONS[0].rules),
+  onDownstack: lesson => start(lesson, lesson.rules),
 });
 $("open-practice").addEventListener("click", () => practiceUI.open());
 
@@ -1165,7 +1199,7 @@ const inputDisplay = createInputDisplay({ root: $("input-display"), isOn: () => 
 
 /** 연습 모드에서 바로 앞 피스로 되돌린다 */
 const undoPiece = () => {
-  if (!game || !mode.practice || mode.lesson || (screen !== "play" && screen !== "paused")) return;
+  if (!game || !mode.practice || mode.lesson || mode.downstack || (screen !== "play" && screen !== "paused")) return;
   if (!undo.undo(game.state)) {
     say(t("더 되돌릴 수 없어요"));
     return;
@@ -1277,8 +1311,8 @@ for (const btn of document.querySelectorAll("[data-action]")) {
     )
       start(mode, rules, null, lastReplay.seed);
     if (action === "race-best" && mode.splits) startRace(mode, rules);
-    if (action === "next-puzzle" && mode.lesson) {
-      const next = FINESSE_LESSONS[mode.lesson.index + 1];
+    if (action === "next-puzzle" && (mode.lesson || mode.downstack)) {
+      const next = nextPracticeLesson();
       if (next) start(next, next.rules);
     }
     if (action === "next-puzzle" && mode.puzzle?.number) {
@@ -1985,7 +2019,7 @@ const tick = () => {
     }
     return;
   }
-  if (mode.practice && !mode.lesson) undo.track(game.state);
+  if (mode.practice && !mode.lesson && !mode.downstack) undo.track(game.state);
   inputDisplay.show(held, pressed);
   recorder?.input(held, pressed);
   const hadActive = Boolean(game.state.active);
@@ -1996,6 +2030,7 @@ const tick = () => {
     versus.cpu.step(cpuInput);
     settleBattleFrame(game, versus.cpu, events);
   }
+  if (mode.downstack && events.some(event => event.type === "lock")) resetDownstackHint();
   const extra = finesse?.frame(held, pressed, hadActive, events) ?? 0;
   if (extra > 0 && mode.finesse) announceText([t("피네스 +{n}", { n: extra })]);
   if (mode.splits) splits = advanceSplits(mode.splits, splits, game.state.stats.lines, game.state.frame);
