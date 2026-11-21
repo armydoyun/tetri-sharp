@@ -190,6 +190,36 @@ test("줄 삭제는 스튜디오에서 가운데로부터, 페이퍼에서 왼�
   assert.equal(marks[2].length, 2);
 });
 
+test("특수 줄 삭제는 테마별 강조를 그리되 줄임·끄기와 기존 수명을 따른다", () => {
+  const quad = { ...lockEvent, lines: 4, rows: [36, 37, 38, 39] };
+  const spin = { ...clearEvent, piece: "T", tspin: "full" };
+  const mini = { ...spin, tspin: "mini" };
+  const chain = { ...quad, b2b: true };
+  const draws = (event, motion, level = "full", now = motion.clearMs / 2) => {
+    const calls = [];
+    const fx = createEffects();
+    fx.add([event], level, 0, motion);
+    fx.prune(now, level);
+    fx.draw(fakeCtx(calls), { bx: 0, cell: 10, toY: row => row * 10, cols: 10 }, now, "#fff", level);
+    return calls;
+  };
+  for (const { motion } of Object.values(THEMES)) {
+    const plain = { ...motion, accent: null };
+    assert.deepEqual(draws(clearEvent, motion), draws(clearEvent, plain));
+    assert.deepEqual(draws({ ...lockEvent, tspin: "full" }, motion), []);
+    for (const event of [quad, spin, mini, chain]) {
+      assert.ok(draws(event, motion).length > draws(event, plain).length);
+      assert.deepEqual(draws(event, motion, "reduced"), draws(event, plain, "reduced"));
+      assert.deepEqual(draws(event, motion, "off"), []);
+      assert.deepEqual(draws(event, motion, "full", motion.clearMs), []);
+    }
+    assert.ok(draws(chain, motion).length > draws(quad, motion).length);
+  }
+  assert.ok(draws(spin, THEMES.midnight.motion).some(([name]) => name === "arc"));
+  assert.ok(draws(spin, THEMES.stone.motion).some(([name]) => name === "lineTo"));
+  assert.ok(draws(spin, studio).every(([name]) => name !== "arc" && name !== "lineTo"));
+});
+
 test("미끄러짐: 같은 피스는 짧게 따라가고, 새 피스나 0ms는 바로 그 자리", () => {
   const s = createSlide();
   assert.deepEqual(s.at(1, 3, 20, 0, 50), { x: 3, y: 20 }, "처음 나타날 때는 바로");
