@@ -1534,7 +1534,7 @@ body.gestures-mode {
 }
 
 /* 모드별 결과 동작은 기본 버튼 위 한 줄 전체를 쓴다. */
-.results-card :is([data-action="next-puzzle"], [data-action="survival-retry-seed"]) {
+.results-card :is([data-action="next-puzzle"], [data-action="survival-retry-seed"], #results-practice-scene) {
   grid-column: 1 / -1;
   order: -1;
 }
@@ -2204,18 +2204,18 @@ body[data-scene-practice] .race-panel {
 }
 
 @media (max-width: 720px) {
-  body[data-scene-practice="split"] {
+  body:is([data-scene-practice="split"], [data-scene-practice="finesse"]) {
     --chrome-h: 248px;
   }
 }
 
 @media (max-width: 390px) {
-  body:is([data-scene-practice="split"], .is-versus) .app-header {
+  body:is([data-scene-practice="split"], [data-scene-practice="finesse"], .is-versus) .app-header {
     grid-template-columns: auto minmax(0, 1fr) auto;
     column-gap: var(--space-1);
   }
 
-  body:is([data-scene-practice="split"], .is-versus) .session-title {
+  body:is([data-scene-practice="split"], [data-scene-practice="finesse"], .is-versus) .session-title {
     font-size: var(--text-s);
     line-height: 1.2;
     letter-spacing: normal;
@@ -2232,17 +2232,17 @@ body[data-scene-practice] .race-panel {
 }
 
 @media (orientation: landscape) and (max-height: 520px) and (pointer: coarse) {
-  body[data-scene-practice="split"] {
+  body:is([data-scene-practice="split"], [data-scene-practice="finesse"]) {
     --chrome-h: 64px;
   }
 }
 
 @media (orientation: landscape) and (max-height: 360px) and (pointer: coarse) {
-  body[data-scene-practice="split"] .scene-practice-actions {
+  body:is([data-scene-practice="split"], [data-scene-practice="finesse"]) .scene-practice-actions {
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
   }
 
-  body[data-scene-practice="split"] .scene-practice-actions .btn {
+  body:is([data-scene-practice="split"], [data-scene-practice="finesse"]) .scene-practice-actions .btn {
     min-height: 44px;
     padding-inline: var(--space-1);
     word-break: keep-all;

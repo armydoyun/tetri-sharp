@@ -150,8 +150,10 @@ const addVersusResult = (levelId, won) => {
 /** @type {"menu" | "countdown" | "play" | "paused" | "results" | "replay"} */
 let screen = "menu";
 /** @typedef {{from: number, to: number, endFrame: number}} SceneSplit */
-/** @type {{spawnFrame: number, split: SceneSplit | null, startFrame: number, best: number | null, ended: boolean} | null} */
+/** @typedef {import("./replay/analyze.js").FinesseScene} FinesseScene */
+/** @type {{spawnFrame: number, split: SceneSplit | null, target: FinesseScene | null, startFrame: number, best: number | null, ended: boolean} | null} */
 let scenePractice = null;
+let sceneFinesse = null;
 /** 모드 찾기: 오늘의 도전(날짜별) + 나머지 */
 const findMode = id => findDaily(id) ?? findPuzzle(id) ?? findBaseMode(id);
 let mode = findMode(store.get("lastMode", null));
@@ -182,7 +184,7 @@ let last = performance.now();
 // ---- 표시 도우미 ----
 
 const showPanel = name => {
-  if (name === "pause" && scenePractice?.split && scenePractice.ended) name = "sceneResult";
+  if (name === "pause" && (scenePractice?.split || scenePractice?.target) && scenePractice.ended) name = "sceneResult";
   for (const [key, el] of Object.entries(panels)) el.hidden = key !== name;
   // 결과 화면은 버튼이 아니라 패널 자체에 포커스를 둔다: 하드 드롭(Space)을 연타하다 끝났을 때
   // 그 입력이 "다시 하기"를 눌러 결과를 건너뛰지 않게. 다시 하기·메뉴는 단축키(R·Esc)나 클릭으로.
@@ -675,6 +677,9 @@ const renderResultSplits = () => {
   const details = /** @type {HTMLDetailsElement} */ ($("results-splits"));
   details.hidden = !mode.splits;
   details.open = false;
+  const practice = $("results-practice-scene");
+  practice.hidden = true;
+  practice.onclick = null;
   if (!mode.splits) return;
 
   const { rows, slowest } = analyzeSplits(mode.splits, splits, resultPbSplits);
@@ -720,23 +725,36 @@ const renderResultSplits = () => {
         ? ""
         : t("완료한 비교 구간에서 잃은 시간이 없어요.");
   $("results-split-note").textContent = note;
-  const practice = $("results-practice-scene");
-  practice.hidden = !slowest || !replay;
-  practice.onclick =
-    slowest && replay
-      ? () => {
-          startReplay(replay, "results", "", true);
-          const index = mode.splits.indexOf(slowest.to);
-          const endFrame = splits[index];
-          seekReplay(splits[index - 1] ?? 0, true);
-          // 구간 경계에 등장 대기가 있으면 다음 피스를 먼저 보여 준다.
-          if (player && !player.game.state.active) {
-            while (!player.done && !player.game.state.active) player.step();
-            updateReplayBar();
-          }
-          enterScenePractice({ from: slowest.from, to: slowest.to, endFrame });
+  if (replay && mode.id === "sprint40") {
+    let target = null;
+    if (!slowest && rows.every(row => row.delta === null)) {
+      if (analysis?.for !== replay) analysis = { ...analyzeReplay(replay, findMode), for: replay };
+      target = analysis.finesseScene;
+    }
+    if (slowest || target) {
+      practice.hidden = false;
+      practice.querySelector(".btn-label").textContent = slowest
+        ? t("추천 연습 · {from}–{to}줄", slowest)
+        : t("추천 연습 · {piece} 피네스", { piece: target.piece });
+      practice.onclick = () => {
+        startReplay(replay, "results", "", true);
+        if (target) {
+          seekReplay(target.spawnFrame, true);
+          enterScenePractice(null, target);
+          return;
         }
-      : null;
+        const index = mode.splits.indexOf(slowest.to);
+        const endFrame = splits[index];
+        seekReplay(splits[index - 1] ?? 0, true);
+        // 구간 경계에 등장 대기가 있으면 다음 피스를 먼저 보여 준다.
+        if (player && !player.game.state.active) {
+          while (!player.done && !player.game.state.active) player.step();
+          updateReplayBar();
+        }
+        enterScenePractice({ from: slowest.from, to: slowest.to, endFrame });
+      };
+    }
+  }
   details.querySelector("summary").textContent = slowest
     ? t("구간 기록 · {from}–{to}줄 {delta}초", {
         from: slowest.from,
@@ -1615,7 +1633,29 @@ const showSceneOutcome = outcome => {
     scenePractice.best === null ? "" : t("이번 연습 최고 · {time}", { time: formatTime(scenePractice.best) });
 };
 
-const scenePracticeTitle = () => (scenePractice.split ? t("구간 연습") : t("장면 연습"));
+const showFinesseSceneOutcome = (lock, inputs) => {
+  const target = scenePractice.target;
+  const same =
+    lock?.piece === target.piece && target.cells.every(([x, y]) => lock.cells.some(([cx, cy]) => cx === x && cy === y));
+  const delta = target.inputs - inputs;
+  $("scene-result-range").textContent = t("{piece} 피네스 연습", { piece: target.piece });
+  $("scene-result-title").textContent = same ? t("목표에 놓았어요") : t("목표와 다른 칸에 놓았어요");
+  $("scene-result-original").textContent = t("{n}회 입력", { n: target.inputs });
+  $("scene-result-attempt").textContent = t("{n}회 입력", { n: inputs });
+  const feedback = $("scene-result-delta");
+  feedback.dataset.comparison = !same ? "incomplete" : delta > 0 ? "faster" : delta < 0 ? "slower" : "even";
+  feedback.textContent = !same
+    ? t("점선과 같은 위치에 놓아야 비교할 수 있어요.")
+    : delta === 0
+      ? t("원래 판과 입력 횟수가 같아요.")
+      : t(delta > 0 ? "원래 판보다 {n}회 적게 입력했어요." : "원래 판보다 {n}회 더 입력했어요.", {
+          n: Math.abs(delta),
+        });
+  $("scene-result-best").textContent = "";
+};
+
+const scenePracticeTitle = () =>
+  scenePractice.target ? t("피네스 장면 연습") : scenePractice.split ? t("구간 연습") : t("장면 연습");
 const sceneRetryLabel = () => (scenePractice.split ? t("구간 재시도") : t("장면 재시도"));
 
 const setScenePauseLabels = () => {
@@ -1646,6 +1686,9 @@ const resetSceneAttempt = () => {
     return;
   }
   game = attempt;
+  const target = scenePractice.target;
+  if (target) game.state.finesseTarget = target.cells;
+  sceneFinesse = target ? createFinesseTracker(game, ROTATIONS[rules.rotation]) : null;
   scenePractice.startFrame = game.state.frame;
   scenePractice.ended = false;
   game.setHandling(toEngineHandling(settings.handling));
@@ -1663,9 +1706,11 @@ const resetSceneAttempt = () => {
   showModeHud({ hud: [] });
   setScenePauseLabels();
   sceneControls.querySelector('[data-action="scene-retry"] .btn-label').textContent = sceneRetryLabel();
-  sceneStatus.textContent = split
-    ? t("{from}–{to}줄 구간", split)
-    : t("연습 시작점 · {time}", { time: formatTime(scenePractice.spawnFrame) });
+  sceneStatus.textContent = target
+    ? t("점선 칸에 맞춘 뒤 하드 드롭하세요.")
+    : split
+      ? t("{from}–{to}줄 구간", split)
+      : t("연습 시작점 · {time}", { time: formatTime(scenePractice.spawnFrame) });
   sceneSplitProgress.hidden = !split;
   if (split) {
     sceneSplitMeter.max = split.to - split.from;
@@ -1676,11 +1721,18 @@ const resetSceneAttempt = () => {
   });
 };
 
-/** @param {SceneSplit | null} split */
-const enterScenePractice = (split = null) => {
+/** @param {SceneSplit | null} split @param {FinesseScene | null} target */
+const enterScenePractice = (split = null, target = null) => {
   if (!replayPaused || !canPracticeScene()) return;
-  scenePractice = { spawnFrame: player.spawnFrame, split, startFrame: 0, best: null, ended: false };
-  document.body.dataset.scenePractice = split ? "split" : "scene";
+  scenePractice = {
+    spawnFrame: target?.spawnFrame ?? player.spawnFrame,
+    split,
+    target,
+    startFrame: 0,
+    best: null,
+    ended: false,
+  };
+  document.body.dataset.scenePractice = target ? "finesse" : split ? "split" : "scene";
   replayBar.hidden = true;
   sceneControls.hidden = false;
   resetSceneAttempt();
@@ -1689,6 +1741,7 @@ const enterScenePractice = (split = null) => {
 const exitScenePractice = () => {
   if (!scenePractice || !player) return;
   scenePractice = null;
+  sceneFinesse = null;
   document.body.removeAttribute("data-scene-practice");
   sceneControls.hidden = true;
   game = player.game;
@@ -1904,21 +1957,27 @@ const tick = () => {
   if (screen === "replay") return tickReplay();
   if (screen !== "play" || !game) return;
   if (goTimer > 0 && --goTimer === 0) countdownEl.hidden = true;
-  const allowed = mode.lesson ? ~BTN.SOFT : -1;
+  const allowed = scenePractice?.target ? ~(BTN.HOLD | BTN.SOFT) : mode.lesson ? ~BTN.SOFT : -1;
   const held = (keyboard.held | pad.held | touch.held | gestures.held) & allowed;
   const pressed = (keyboard.takePressed() | touch.takePressed() | gestures.takePressed()) & allowed;
   if (scenePractice) {
+    const hadActive = Boolean(game.state.active);
     const events = game.step({ held, pressed });
     inputDisplay.show(held, pressed);
     renderer.addEvents(events);
     sfx.events(events);
     feedback(events);
+    sceneFinesse?.frame(held, pressed, hadActive, events);
+    const lock = scenePractice.target && events.find(event => event.type === "lock");
     const split = scenePractice.split;
     const outcome = split && splitAttemptOutcome(game.state, scenePractice.startFrame, split.to, split.endFrame);
-    if (outcome || game.state.over) {
+    if (outcome || lock || game.state.over) {
       scenePractice.ended = true;
       if (outcome) {
         showSceneOutcome(outcome);
+        fb.clearAction();
+      } else if (scenePractice.target) {
+        showFinesseSceneOutcome(lock, sceneFinesse.lastInputs);
         fb.clearAction();
       }
       setScenePauseLabels();
