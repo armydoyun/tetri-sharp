@@ -819,6 +819,17 @@ body[data-screen="paused"] .countdown {
   overflow-wrap: anywhere;
 }
 
+/* 아래 턱을 뺀 버튼 면의 중앙에 글자와 아이콘을 함께 놓는다. */
+:is(.replay-bar, .replay-battle-view) .btn:not(.btn-ghost) {
+  --replay-ledge: var(--ledge);
+  padding-block: calc(var(--space-1) - var(--replay-ledge) / 2)
+    calc(var(--space-1) + var(--replay-ledge) / 2);
+}
+
+:is(.replay-bar, .replay-battle-view) .btn:not(.btn-ghost):active:not(:disabled) {
+  --replay-ledge: 1px;
+}
+
 .replay-bar .btn:focus-visible {
   outline-offset: 1px;
 }
@@ -2282,7 +2293,6 @@ body[data-battle-replay] .replay-info {
 
 .replay-battle-view .btn {
   min-width: 0;
-  padding-block: 0;
   padding-inline: var(--space-1);
 }
 
