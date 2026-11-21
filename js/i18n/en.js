@@ -2,6 +2,22 @@
 // tests/unit/i18n.test.mjs가 코드와 index.html의 한국어 문장이 모두 여기 있는지 확인한다.
 /** @type {Record<string, string>} */
 export const EN = {
+  "만든 퍼즐": "Custom puzzle",
+  "퍼즐 만들기": "Create puzzle",
+  "퍼즐 편집·공유": "Edit or share puzzle",
+  "시험 플레이": "Test play",
+  "마지막 피스 빼기": "Remove last piece",
+  "피스를 추가하세요": "Add pieces",
+  "시험 플레이에서 판을 비우면 링크를 공유할 수 있어요.": "Clear the board in a test play to unlock sharing.",
+  "퍼즐을 풀었어요. 이제 링크를 공유할 수 있어요.": "Puzzle cleared. You can now share the link.",
+  "{row}행 {col}열": "Row {row}, column {col}",
+  "퍼즐 링크를 복사했어요.": "Puzzle link copied.",
+  "칸을 눌러 블록을 채우거나 지우세요. Modern 규칙, 홀드 없이 판 비우기.":
+    "Select cells to add or remove blocks. Clear the board with Modern rules and no hold.",
+  "시작 보드": "Starting board",
+  "피스 순서": "Piece sequence",
+  "피스 추가 (최대 {n}개)": "Add pieces (up to {n})",
+  "링크의 퍼즐을 읽을 수 없었어요.": "Could not read the puzzle link.",
   "원래 판": "Original",
   "이번 시도": "This attempt",
   "구간 재시도": "Retry split",

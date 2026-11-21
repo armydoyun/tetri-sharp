@@ -47,6 +47,8 @@ import { createGestures } from "./input/gestures.js";
 import { createUndo } from "./modes/undo.js";
 import { createHelpUI } from "./ui/help.js";
 import { PUZZLES, createPuzzleProgress, findPuzzle, puzzleMode } from "./modes/puzzles.js";
+import { customPuzzleMode, decodePuzzle } from "./modes/custom-puzzle.js";
+import { createPuzzleEditor } from "./ui/puzzle-editor.js";
 import { createPuzzleUI } from "./ui/puzzles.js";
 import { createShareUI } from "./ui/share.js";
 import { createVersusUI } from "./ui/versus.js";
@@ -510,7 +512,7 @@ const start = (
   confirming = null;
   if (screen === "replay") stopReplay();
   mode = m;
-  if (!m.practice) store.set("lastMode", m.id);
+  if (!m.practice && m.id !== "custom-puzzle") store.set("lastMode", m.id);
   rules = selectedRules;
   runPlayerName = records.playerName;
   const seed = target?.replay.seed ?? retrySeed ?? m.fixedSeed ?? (Math.random() * 2 ** 32) >>> 0;
@@ -785,9 +787,11 @@ const finish = () => {
 
   if (mode.versus) addVersusResult(mode.versus.id, state.over === WIN);
   // 퍼즐: 깬 단계를 남기고, 깼으면 "다음 단계"를 보인다(마지막 단계면 다시 하기만)
-  if (mode.puzzle && state.over === "clear") puzzleProgress.markCleared(mode.puzzle.number);
+  if (mode.puzzle?.number && state.over === "clear") puzzleProgress.markCleared(mode.puzzle.number);
+  if (mode.trialCode && state.over === "clear") puzzleEditor.markCleared(mode.trialCode);
+  $("results-edit-puzzle").hidden = !mode.trialCode;
   const nextPuzzle = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="next-puzzle"]'));
-  nextPuzzle.hidden = !(mode.puzzle && state.over === "clear" && mode.puzzle.number < PUZZLES.length);
+  nextPuzzle.hidden = !(mode.puzzle?.number && state.over === "clear" && mode.puzzle.number < PUZZLES.length);
   lastReplay = recorder ? recorder.finish(state) : null;
   if (lastReplay && versus) lastReplay.cpu = versus.recorder.finish(versus.cpu.state);
   /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="watch"]')).disabled = !lastReplay;
@@ -936,14 +940,27 @@ $("open-practice").addEventListener("click", () => practiceUI.open());
 
 // ---- 퍼즐 ----
 const puzzleProgress = createPuzzleProgress(store);
+const puzzleDialog = /** @type {HTMLDialogElement} */ ($("puzzles"));
+const playCustomPuzzle = (code, trial = false) => {
+  const puzzle = decodePuzzle(code);
+  if (!puzzle) {
+    showMenuNotice(t("링크의 퍼즐을 읽을 수 없었어요."));
+    return;
+  }
+  const custom = customPuzzleMode(puzzle);
+  start({ ...custom, trialCode: trial ? code : null }, custom.rules);
+};
+const puzzleEditor = createPuzzleEditor({ dialog: puzzleDialog, onTry: code => playCustomPuzzle(code, true) });
 const puzzleUI = createPuzzleUI({
-  dialog: /** @type {HTMLDialogElement} */ ($("puzzles")),
+  dialog: puzzleDialog,
+  onCreate: () => puzzleEditor.open(),
   progress: puzzleProgress,
   onPick: p => start(puzzleMode(p), MODERN),
 });
 $("open-puzzles").addEventListener("click", () => puzzleUI.open());
 $("puzzles").addEventListener("close", () => {
-  if (screen === "menu") /** @type {HTMLElement | null} */ ($("open-puzzles"))?.focus();
+  if (!puzzleDialog.open && screen === "menu") $("open-puzzles").focus();
+  if (!puzzleDialog.open && screen === "results" && mode.trialCode) $("results-edit-puzzle").focus();
 });
 /** 첫 화면 "퍼즐" 줄의 진행도 */
 const renderPuzzleProgress = () => {
@@ -1173,7 +1190,8 @@ for (const btn of document.querySelectorAll("[data-action]")) {
     }
     if (action === "retry-seed" && mode.splits && lastReplay) start(mode, rules, null, lastReplay.seed);
     if (action === "race-best" && mode.splits) startRace(mode, rules);
-    if (action === "next-puzzle" && mode.puzzle) {
+    if (action === "edit-puzzle" && mode.trialCode) puzzleEditor.open();
+    if (action === "next-puzzle" && mode.puzzle?.number) {
       const next = PUZZLES[mode.puzzle.number] ?? puzzleProgress.next();
       start(puzzleMode(next), MODERN);
     }
@@ -1943,8 +1961,12 @@ renderKeyHelp();
 // 링크로 규칙을 받았으면 Custom 규칙 기준으로 키 안내를 다시 그린 뒤 메뉴를 연다.
 if (importRulesFromLink()) renderKeyHelp();
 toMenu(true);
-importDailyFromLink();
-importReplayFromLink();
+const puzzleHash = takeLinkHash("puzzle");
+if (puzzleHash) playCustomPuzzle(new URLSearchParams(puzzleHash.slice(1)).get("puzzle"));
+else {
+  importDailyFromLink();
+  importReplayFromLink();
+}
 requestAnimationFrame(loop);
 
 // 설치형 앱(GitHub Pages 배포본): 매니페스트가 걸려 있을 때만 서비스 워커를 등록한다.

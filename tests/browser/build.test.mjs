@@ -2064,6 +2064,76 @@ test("퍼즐: 단계를 풀면 성공·다음 단계로 이어지고, 첫 화면
   await context.close();
 });
 
+test("만든 퍼즐: 시험 플레이 성공 후에만 공유하고, 휴대폰에서 링크를 열어 풀 수 있다", async () => {
+  const { context, page, errors } = await openPage(() => {
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
+    Object.defineProperty(navigator, "clipboard", { value: undefined });
+  });
+  const mobile = await browser.newContext({
+    locale: "en",
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+  });
+  try {
+    await page.click("#open-puzzles");
+    await page.click("#puzzle-create");
+    const trial = page.locator("#puzzle-trial");
+    const share = page.locator("#puzzle-copy");
+    assert.ok(await trial.isDisabled());
+    for (const cell of [190, 191, 192, 197, 198, 199]) await page.click(`[data-cell="${cell}"]`);
+    await page.click('#puzzles [data-piece="I"]');
+    assert.ok(await share.isDisabled());
+    await trial.click();
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    await page.keyboard.press("ArrowLeft");
+    await page.waitForTimeout(50);
+    await page.keyboard.press("Space");
+    await page.waitForFunction(() => document.body.dataset.screen === "results");
+    assert.equal(await text(page, "results-title"), "실패");
+    await page.click("#results-edit-puzzle");
+    assert.ok(await share.isDisabled());
+    await trial.click();
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    await page.keyboard.press("Space");
+    await page.waitForFunction(() => document.body.dataset.screen === "results");
+    assert.equal(await text(page, "results-title"), "성공!");
+    assert.equal(await page.locator('[data-action="next-puzzle"]').isVisible(), false);
+    await page.click("#results-edit-puzzle");
+    await share.click();
+    const link = await page.locator("#custom-puzzle-link").inputValue();
+    assert.match(link, /#puzzle=1\./);
+    await page.click('[data-cell="190"]');
+    await page.click('[data-cell="190"]');
+    assert.ok(await share.isDisabled(), "편집 뒤 원상복구해도 다시 시험해야 한다");
+    assert.deepEqual(errors, []);
+
+    await mobile.addInitScript(() => {
+      localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
+    });
+    const recipient = await mobile.newPage();
+    await recipient.goto(link);
+    await recipient.waitForFunction(() => document.body.dataset.screen === "play");
+    assert.equal(await text(recipient, "session-title"), "Custom puzzle");
+    await recipient.tap('[data-touch="HARD"]');
+    await recipient.waitForFunction(() => document.body.dataset.screen === "results");
+    assert.equal(await text(recipient, "results-title"), "Solved!");
+    assert.equal(await recipient.locator("#results-edit-puzzle").isVisible(), false);
+    await recipient.tap('#results [data-action="retry"]');
+    await recipient.waitForFunction(() => document.body.dataset.screen === "play");
+    await recipient.tap('[data-touch="HARD"]');
+    await recipient.waitForFunction(() => document.body.dataset.screen === "results");
+    assert.equal(await text(recipient, "results-title"), "Solved!");
+    const invalid = await mobile.newPage();
+    await invalid.goto(`${url}#puzzle=invalid`);
+    assert.equal(await invalid.locator("body").getAttribute("data-screen"), "menu");
+    assert.equal(await text(invalid, "menu-notice"), "Could not read the puzzle link.");
+  } finally {
+    await mobile.close();
+    await context.close();
+  }
+});
+
 test("리플레이 링크: #replay= 로 열면 바로 재생하고, '이 기록과 달리기'로 같은 블록 순서로 달린다", async () => {
   const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
   const code = await encodeReplayCode(fixture.replay, "친구");
