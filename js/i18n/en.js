@@ -266,6 +266,10 @@ export const EN = {
   "{n} / {goal}줄": "{n} / {goal} lines",
   "{n}점": "{n} pts",
   "레벨 {n}": "Level {n}",
+  "레벨 {n} · {grade}": "Level {n} · {grade}",
+  마스터: "Master",
+  초단: "1st dan",
+  "{n}급": "Grade {n}",
 
   // ---- 게임 화면 ----
   "게임 화면": "Game",

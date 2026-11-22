@@ -184,6 +184,17 @@ export const masterGravity = level => {
 
 const MASTER_MAX = 999;
 
+/**
+ * Master 등급: 도달한 레벨만으로 정한다(표시 전용 — 진행·점수·리플레이와 무관).
+ * 0~899는 100마다 9급 → 1급, 900~998은 초단, 999에 닿으면 마스터.
+ */
+export const masterGrade = level =>
+  level >= MASTER_MAX
+    ? t("마스터")
+    : level >= 900
+      ? t("초단")
+      : t("{n}급", { n: 9 - Math.floor(Math.max(0, level) / 100) });
+
 /** @type {Mode} */
 export const MASTER = Object.freeze({
   id: "master",
@@ -207,10 +218,10 @@ export const MASTER = Object.freeze({
   hudTime: elapsed,
   summary: state => ({
     title: state.over === "clear" ? t("완료!") : t("게임 오버"),
-    main: t("레벨 {n}", { n: state.level }),
+    main: t("레벨 {n} · {grade}", { n: state.level, grade: masterGrade(state.level) }),
   }),
   record: Object.freeze({ metric: "level", order: "desc" }),
-  formatRecord: e => t("레벨 {n}", { n: e.level ?? 0 }),
+  formatRecord: e => t("레벨 {n} · {grade}", { n: e.level ?? 0, grade: masterGrade(e.level ?? 0) }),
   isRecordable: state => state.level > 0,
 });
 

@@ -78,3 +78,16 @@ test("Endless: 10줄마다 빨라지고 레벨 20에서 멈춘다. 이전 규칙
   assert.equal(findMode("zen"), ZEN, "저장된 리플레이·기록은 이전 규칙으로 다시 계산한다");
   assert.equal(ZEN.gravityFor, undefined, "이전 규칙은 중력이 레벨 1 고정 그대로");
 });
+
+test("Master 등급: 100레벨마다 9급 → 1급, 900부터 초단, 999는 마스터", async () => {
+  const { MASTER, masterGrade } = await import("../../js/modes/index.js");
+  assert.equal(masterGrade(0), "9급");
+  assert.equal(masterGrade(99), "9급");
+  assert.equal(masterGrade(100), "8급");
+  assert.equal(masterGrade(899), "1급");
+  assert.equal(masterGrade(900), "초단");
+  assert.equal(masterGrade(998), "초단");
+  assert.equal(masterGrade(999), "마스터");
+  assert.equal(MASTER.formatRecord({ level: 512 }), "레벨 512 · 4급");
+  assert.equal(MASTER.summary({ level: 999, over: "clear" }).main, "레벨 999 · 마스터");
+});
