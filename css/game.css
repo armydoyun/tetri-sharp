@@ -506,7 +506,8 @@ body[data-screen="replay"]:has(.replay-note:not(:empty)) {
 
 .board {
   --board-height: calc(100vh - var(--chrome-h) - var(--under-h));
-  --board-width: min(640px, calc(100cqi - var(--board-inline-reserve)), max(80px, calc(var(--board-height) * var(--board-ratio))));
+  /* 상한 880px: 큰 화면에서도 앱 폭(1120px) 안에 정보 칸과 함께 들어간다. 높이가 모자라면 높이에 맞춘다 */
+  --board-width: min(880px, calc(100cqi - var(--board-inline-reserve)), max(80px, calc(var(--board-height) * var(--board-ratio))));
   display: block;
   width: var(--board-width);
   height: calc(var(--board-width) / var(--board-ratio));

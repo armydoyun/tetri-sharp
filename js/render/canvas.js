@@ -33,11 +33,15 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
   let cell = 0;
   let side = 0;
   let gridPath = new Path2D();
-  /** devicePixelRatio를 반영해 캔버스 해상도를 정하고 셀 크기를 정수로 맞춘다(번짐 방지). */
+  /**
+   * devicePixelRatio를 반영해 캔버스 해상도를 정하고 셀 크기를 정수로 맞춘다(번짐 방지).
+   * 넓은 화면에서 캔버스가 기본 셀(28px)보다 크게 보이면 보이는 크기에 맞춰 그린다 — 늘려 보이면 흐려진다.
+   */
   const fit = () => {
     const dpr = window.devicePixelRatio || 1;
-    const next = Math.max(8, Math.round((compact ? 14 : CSS_CELL) * dpr));
     const nextSide = compact ? 0 : narrow.matches ? 3 : 5;
+    const shown = compact ? 0 : canvas.clientWidth / (COLS + nextSide * 2);
+    const next = Math.max(8, Math.round((compact ? 14 : Math.max(CSS_CELL, shown)) * dpr));
     if (next === cell && nextSide === side) return false;
     cell = next;
     side = nextSide;
