@@ -277,7 +277,7 @@ const saveRun = (force = true) => {
   if (store.set(SUSPENDED_RUN_KEY, snapshot)) {
     savedRunId = entry.id;
     lastSavedStep = entry.steps;
-    if (screen === "paused") $("resume-save-status").textContent = t("이 기기에 저장됐어요.");
+    if (screen === "paused") $("resume-save-status").textContent = t("창을 닫아도 이 판은 이 기기에 남아요.");
   } else {
     // 재시도 간격을 유지하고, 일시정지·창 닫기 때는 다시 시도한다.
     lastSavedStep = entry.steps;

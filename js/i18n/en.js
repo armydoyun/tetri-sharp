@@ -3,7 +3,7 @@
 /** @type {Record<string, string>} */
 export const EN = {
   "이어서 하기": "Continue saved game",
-  "이 기기에 저장됐어요.": "Game saved on this device.",
+  "창을 닫아도 이 판은 이 기기에 남아요.": "This game stays on this device even if you close the window.",
   "{mode} · {time} · {lines}줄": "{mode} · {time} · {lines} lines",
   "저장된 판을 지우고 새 판을 시작할까요?": "Replace the saved game and start a new one?",
   "저장된 판을 불러오는 중…": "Restoring your saved game…",
@@ -285,7 +285,7 @@ export const EN = {
   계속하기: "Keep playing",
   "다시 시작할까요?": "Restart?",
   "첫 화면으로 갈까요?": "Go back to home?",
-  "진행 중인 판은 기록되지 않고 사라져요.": "The game in progress won't be saved.",
+  "진행 중인 판은 저장되지 않고 사라져요.": "The game in progress won't be saved.",
   "다시 시작": "Restart",
   "첫 화면으로": "Back to home",
   "터치 조작": "Touch controls",
