@@ -252,6 +252,8 @@ export const EN = {
   "레벨 999까지 · 500부터 20G": "Up to level 999 · 20G from 500",
   "쓰레기 {n}줄을 가장 빨리 파내기": "Dig out {n} garbage lines as fast as you can",
   "올라오는 쓰레기 줄 버티기 · 줄을 지우면 막아요": "Survive rising garbage · clearing lines blocks it",
+  "Endless (이전 규칙)": "Endless (old rules)",
+  "10줄마다 빨라지며 막힐 때까지": "Speeds up every 10 lines until you top out",
   "막힐 때까지 끝없이": "Play until you top out",
   "남은 줄": "Lines left",
   "남은 시간": "Time left",

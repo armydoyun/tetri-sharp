@@ -145,7 +145,7 @@ test("이어서 하기: 일곱 기본 모드에서 새로고침 뒤 같은 보�
     }, n);
   const snapshot = () => page.locator("#board").evaluate(canvas => canvas.toDataURL());
   try {
-    for (const id of ["sprint40", "marathon", "ultra", "master", "dig", "survival", "zen"]) {
+    for (const id of ["sprint40", "marathon", "ultra", "master", "dig", "survival", "endless"]) {
       await page.click(`[data-mode="${id}"]`);
       await advance(24);
       await page.keyboard.press("Space");
@@ -331,7 +331,7 @@ test("이어서 하기: 새 판을 취소한 뒤 Sprint를 완주하면 기록�
     await playReplayFrames(page, replay.inputs, 0, 241);
     await page.reload();
     const confirmation = page.waitForEvent("dialog").then(dialog => dialog.dismiss());
-    await page.click('[data-mode="zen"]');
+    await page.click('[data-mode="endless"]');
     await confirmation;
     assert.equal(await visible(page, "continue-run"), true);
     await page.click("#continue-run");
@@ -453,7 +453,7 @@ test("메뉴 → Sprint 40L: 하드 드롭·홀드·일시정지·재시작", as
 
 test("로고: 게임 중이면 물은 뒤 첫 화면으로, 결과 화면에서는 바로 첫 화면으로", async () => {
   const { context, page, errors } = await openPage();
-  await startMode(page, "zen");
+  await startMode(page, "endless");
   await page.keyboard.press("Space");
   await page.click("#go-home");
   assert.equal(await visible(page, "confirm"), true);
@@ -465,7 +465,7 @@ test("로고: 게임 중이면 물은 뒤 첫 화면으로, 결과 화면에서�
   assert.equal(await visible(page, "menu"), true);
 
   // 끝난 판: 묻지 않는다. 결과 화면의 R도 바로 다시 시작
-  await startMode(page, "zen");
+  await startMode(page, "endless");
   for (let i = 0; i < 40; i++) await page.keyboard.press("Space");
   await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
   await page.keyboard.press("KeyR");
@@ -476,7 +476,7 @@ test("로고: 게임 중이면 물은 뒤 첫 화면으로, 결과 화면에서�
   await page.keyboard.press("Escape");
   await page.click('#pause [data-action="menu"]');
   await page.click('[data-confirm="ok"]');
-  await startMode(page, "zen");
+  await startMode(page, "endless");
   for (let i = 0; i < 40; i++) await page.keyboard.press("Space");
   await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
   await page.click("#go-home");
@@ -487,7 +487,7 @@ test("로고: 게임 중이면 물은 뒤 첫 화면으로, 결과 화면에서�
 
 test("막히면 결과 화면이 뜨고, Space 연타로 건너뛰지 않으며, Esc로 메뉴", async () => {
   const { context, page, errors } = await openPage();
-  await startMode(page, "zen");
+  await startMode(page, "endless");
   for (let i = 0; i < 40; i++) await page.keyboard.press("Space");
   await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
   assert.equal(await text(page, "results-title"), "게임 오버");
@@ -648,7 +648,7 @@ test("Custom 규칙: 편집 내용이 저장되고 기록표 id가 바뀌며, �
 
 test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파일 저장 → 메뉴에서 열기", async () => {
   const { context, page, errors } = await openPage();
-  await startMode(page, "zen");
+  await startMode(page, "endless");
   for (let i = 0; i < 40; i++) await page.keyboard.press(i % 3 ? "Space" : "ArrowLeft");
   await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 5000 });
   const pieces = await text(page, "hud-pieces");
@@ -688,7 +688,7 @@ test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파�
   assert.equal(await page.locator('#share input[type="url"]').evaluate(el => el === document.activeElement), true);
   const [download] = await Promise.all([page.waitForEvent("download"), page.click("#share-file")]);
   await page.click("#share-close");
-  assert.match(download.suggestedFilename(), /^tetri-sharp-zen-.*\.json$/);
+  assert.match(download.suggestedFilename(), /^tetri-sharp-endless-.*\.json$/);
   const file = await download.path();
   const saved = JSON.parse(fs.readFileSync(file, "utf8"));
   assert.equal(saved.app, "tetri-sharp");
@@ -872,7 +872,7 @@ test("레이아웃 고정: 설정 알림이 생겨도 버튼이 움직이지 않
   assert.deepEqual(await rects(page, sels), before);
   await page.click("#settings-close");
 
-  await startMode(page, "zen");
+  await startMode(page, "endless");
   for (let i = 0; i < 40; i++) await page.keyboard.press("Space");
   await page.waitForFunction(() => !document.getElementById("results")?.hidden);
   const badge = await rects(page, ["#results-badge"]);
@@ -1144,7 +1144,7 @@ test("게임패드 버튼 바꾸기: 설정에서 칸을 누르고 패드 버튼
 
 test("통계: 결과 화면에서 열면 이번 판 통계가 보인다", async () => {
   const { context, page, errors } = await openPage();
-  await startMode(page, "zen");
+  await startMode(page, "endless");
   for (let i = 0; i < 40; i++) await page.keyboard.press("Space");
   await page.waitForFunction(() => !document.getElementById("results")?.hidden);
   await page.click('[data-action="stats"]');
@@ -1840,7 +1840,7 @@ test("효과음: 소리를 켜면 게임 중 오디오를 만들고, 끄면 만�
   await page.click('.dialog-tabs [data-value="visual"]');
   await page.locator("#set-volume").fill("0");
   await page.click("#settings-close");
-  await startMode(page, "zen");
+  await startMode(page, "endless");
   await page.keyboard.press("Space");
   await page.waitForTimeout(100);
   assert.equal(await count(), 0, "끄면 오디오를 만들지 않는다");
@@ -2760,7 +2760,7 @@ test("게임 중 화면: 기본은 늘 어둡고, '화면 색 따르기'를 고�
       return 0.2126 * r + 0.7152 * g + 0.0722 * b;
     }, sel);
   };
-  await startMode(page, "zen");
+  await startMode(page, "endless");
   assert.ok((await lum("body")) < 40, "기본: 게임 중에는 어둡다");
   assert.ok((await lum(".board-wrap")) < 40);
   await page.keyboard.press("Escape");
@@ -2878,7 +2878,7 @@ test("편의: 카운트다운 '없음'이면 바로 시작하고, 연습에서�
   await page.keyboard.press("Escape");
   await page.click('#pause [data-action="menu"]');
   await page.click('[data-confirm="ok"]');
-  await page.click('[data-mode="zen"]');
+  await page.click('[data-mode="endless"]');
   await page.waitForFunction(() => document.body.dataset.screen === "play");
   assert.equal(await visible(page, "undo-piece"), false, "연습이 아니면 되돌리기 없음");
   assert.deepEqual(errors, []);
@@ -2893,7 +2893,7 @@ test("편의: 제스처 방식이면 보드 아래 버튼 대신 보드를 튕�
   const page = await context.newPage();
   await page.goto(url);
   await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
-  await startMode(page, "zen");
+  await startMode(page, "endless");
   assert.equal(await visible(page, "touchpad"), false, "버튼은 감춘다");
   // 아래로 빠르게 튕기기 → 하드 드롭
   await page.evaluate(() => {

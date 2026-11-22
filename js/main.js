@@ -6,7 +6,7 @@ import { createKeyboard } from "./input/keyboard.js";
 import { createTouch, touchVisible } from "./input/touch.js";
 import { compilePadmap, createGamepad } from "./input/gamepad.js";
 import { ACTIONS, compileKeymap, keyLabel } from "./input/keymap.js";
-import { MODES, RACE_MODES, SURVIVAL_MILESTONES, findMode as findBaseMode } from "./modes/index.js";
+import { MODES, RACE_MODES, RECORD_MODES, SURVIVAL_MILESTONES, findMode as findBaseMode } from "./modes/index.js";
 import { dailyMode, dateKey, findDaily, recentDailyKeys } from "./modes/daily.js";
 import { decodeReplayCode, encodeReplayCode, replayLink } from "./replay/share.js";
 import { createDailyUI } from "./ui/daily.js";
@@ -1297,7 +1297,7 @@ $("stats").addEventListener("close", () => {
 
 const recordsUI = createRecordsUI({
   dialog: /** @type {HTMLDialogElement} */ ($("records")),
-  modes: MODES,
+  modes: RECORD_MODES,
   records,
   sprintHistory,
   replayFor: (key, entry) => replays.forEntry(key, entry),

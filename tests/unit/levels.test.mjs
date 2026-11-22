@@ -59,3 +59,22 @@ test("형식", () => {
   assert.equal(formatTime(-5), "0:00.00");
   assert.equal(formatScore(1234567), "1,234,567");
 });
+
+test("Endless: 10줄마다 빨라지고 레벨 20에서 멈춘다. 이전 규칙(zen)은 메뉴에 없지만 찾을 수 있다", async () => {
+  const { ENDLESS, ENDLESS_MAX_LEVEL, MODES, RECORD_MODES, ZEN, findMode } = await import("../../js/modes/index.js");
+  const g = createGame({ rules: ENDLESS.rules, seed: 1, mode: ENDLESS });
+  g.step();
+  assert.equal(g.state.level, 1);
+  g.state.stats.lines = 9;
+  const ev = clearOneLine(g);
+  assert.ok(ev.some(e => e.type === "levelUp" && e.level === 2));
+  assert.equal(ENDLESS.levelFor({ stats: { lines: 500 } }), ENDLESS_MAX_LEVEL);
+  assert.ok(ENDLESS.gravityFor({ level: ENDLESS_MAX_LEVEL }) >= 20, "끝에서는 20G 가까이");
+  assert.ok(ENDLESS.gravityFor({ level: 2 }) > ENDLESS.gravityFor({ level: 1 }));
+
+  assert.ok(MODES.includes(ENDLESS));
+  assert.ok(!MODES.includes(ZEN), "이전 규칙은 메뉴에서 뺀다");
+  assert.ok(RECORD_MODES.includes(ZEN), "기록 화면에서는 고를 수 있다");
+  assert.equal(findMode("zen"), ZEN, "저장된 리플레이·기록은 이전 규칙으로 다시 계산한다");
+  assert.equal(ZEN.gravityFor, undefined, "이전 규칙은 중력이 레벨 1 고정 그대로");
+});
