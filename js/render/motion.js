@@ -3,9 +3,10 @@
 
 const easeOut = t => 1 - (1 - t) * (1 - t);
 
-/** @returns {{ at: (id: number, x: number, y: number, now: number, durationMs: number) => { x: number, y: number }, reset: () => void }} */
+/** @returns {{ at: (id: number, x: number, y: number, now: number, durationMs: number, rotation?: number) => { x: number, y: number }, reset: () => void }} */
 export const createSlide = () => {
   let id = -1;
+  let rotation = 0;
   let from = { x: 0, y: 0 };
   let to = { x: 0, y: 0 };
   let start = 0;
@@ -20,19 +21,22 @@ export const createSlide = () => {
 
   return {
     /** 지금 그릴 위치(칸 단위, 소수 가능) */
-    at(nextId, x, y, now, durationMs) {
-      const jump = Math.abs(x - to.x) > 1 || Math.abs(y - to.y) > 1;
-      if (nextId !== id || durationMs <= 0 || jump) {
+    at(nextId, x, y, now, durationMs, nextRotation = 0) {
+      const jump = Math.abs(x - to.x) > 1 || y !== to.y;
+      if (nextId !== id || rotation !== nextRotation || durationMs <= 0 || jump) {
         id = nextId;
+        rotation = nextRotation;
         from = to = { x, y };
         duration = 0;
         return to;
       }
       if (x !== to.x || y !== to.y) {
-        from = shown(now);
+        const current = shown(now);
+        // 빠른 연타에도 한 칸 이상 뒤처지지 않게 한다.
+        from = { x: Math.max(x - 1, Math.min(x + 1, current.x)), y };
         to = { x, y };
         start = now;
-        duration = durationMs;
+        duration = Math.min(durationMs, 34);
       }
       return shown(now);
     },

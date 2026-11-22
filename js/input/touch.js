@@ -13,7 +13,7 @@ const SYSTEM = Object.fromEntries(ACTIONS.filter(a => a.system).map(a => [a.id, 
  * @param {{ root: HTMLElement, onSystem: (action: string) => void, vibrate?: () => boolean }} options
  */
 export const createTouch = ({ root, onSystem, vibrate = () => true }) => {
-  /** 손가락(pointerId) → 동작 id */
+  /** @type {Map<number, { id: string, button: HTMLElement }>} */
   const fingers = new Map();
   let held = 0;
   let pending = [0];
@@ -21,22 +21,26 @@ export const createTouch = ({ root, onSystem, vibrate = () => true }) => {
 
   const recompute = () => {
     held = 0;
-    for (const id of fingers.values()) held |= BIT[id] || 0;
+    for (const { id } of fingers.values()) held |= BIT[id] || 0;
   };
 
   const release = e => {
-    if (!fingers.has(e.pointerId)) return;
-    const el = /** @type {HTMLElement | null} */ (root.querySelector(`[data-touch="${fingers.get(e.pointerId)}"]`));
-    el?.classList.remove("is-down");
+    const finger = fingers.get(e.pointerId);
+    if (!finger) return;
     fingers.delete(e.pointerId);
+    if (![...fingers.values()].some(other => other.button === finger.button)) finger.button.classList.remove("is-down");
     recompute();
   };
 
   root.addEventListener("pointerdown", e => {
     const button = /** @type {HTMLElement | null} */ (/** @type {HTMLElement} */ (e.target).closest("[data-touch]"));
-    if (!button) return;
-    e.preventDefault();
+    if (!button || e.button !== 0 || fingers.has(e.pointerId)) return;
     const id = button.dataset.touch ?? "";
+    if (!SYSTEM[id] && (!enabled || !BIT[id])) return;
+    e.preventDefault();
+    const alreadyHeld = Boolean(held & BIT[id]);
+    fingers.set(e.pointerId, { id, button });
+    recompute();
     try {
       button.setPointerCapture(e.pointerId);
     } catch {
@@ -50,14 +54,14 @@ export const createTouch = ({ root, onSystem, vibrate = () => true }) => {
       /* 무시 */
     }
     if (SYSTEM[id]) return onSystem(SYSTEM[id]);
-    if (!enabled || !BIT[id]) return;
-    fingers.set(e.pointerId, id);
-    recompute();
+    if (alreadyHeld) return;
     const last = pending.length - 1;
     if (pending[last] & BIT[id]) pending.push(BIT[id]);
     else pending[last] |= BIT[id];
   });
-  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) root.addEventListener(type, release);
+  root.addEventListener("lostpointercapture", release);
+  // 캡처를 지원하지 않는 환경에서도 버튼 밖으로 손을 떼면 해제한다.
+  for (const type of ["pointerup", "pointercancel"]) window.addEventListener(type, release, true);
   // 길게 누를 때 뜨는 메뉴·확대를 막는다
   root.addEventListener("contextmenu", e => e.preventDefault());
 

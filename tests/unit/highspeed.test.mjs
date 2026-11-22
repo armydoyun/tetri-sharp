@@ -10,6 +10,28 @@ import { createStore, memoryBackend } from "../../js/storage/store.js";
 const game = (rules = {}, mode) =>
   createGame({ rules: { ...MODERN, gravity: 0, ...rules }, handling: { das: 8, arr: 2, sdf: 20 }, seed: 4, mode });
 
+test("빠른 방향 전환, 홀드 연타와 회전·하드 드롭이 기존 순서로 처리된다", () => {
+  const g = game({}, { sequence: ["J", "T", "I"] });
+  g.step();
+  const x = g.state.active.x;
+  g.step({ held: BTN.LEFT, pressed: BTN.LEFT });
+  assert.equal(g.state.active.x, x - 1);
+  g.step({ held: BTN.LEFT | BTN.RIGHT, pressed: BTN.RIGHT });
+  assert.equal(g.state.active.x, x);
+  g.step({ pressed: BTN.HOLD });
+  assert.equal(g.state.active.type, "T");
+  g.step({ pressed: BTN.HOLD });
+  assert.equal(g.state.hold, "J");
+  assert.equal(g.state.tally.holds, 1);
+
+  const events = g.step({ pressed: BTN.CW | BTN.HARD });
+  assert.ok(events.findIndex(event => event.type === "rotate") < events.findIndex(event => event.type === "lock"));
+  const locked = events.find(event => event.type === "lock");
+  assert.equal(locked.piece, "T");
+  assert.equal(new Set(locked.cells.map(([, y]) => y)).size, 3);
+  assert.equal(g.state.active.type, "I");
+});
+
 test("IRS: 생성 순간 회전 키를 누르고 있으면 돌린 채로 나오고, 같은 프레임에 두 번 돌지 않는다", () => {
   const g = game();
   const ev = g.step({ held: BTN.CW });

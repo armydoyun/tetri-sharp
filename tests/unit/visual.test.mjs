@@ -220,6 +220,15 @@ test("특수 줄 삭제는 테마별 강조를 그리되 줄임·끄기와 기�
   assert.ok(draws(spin, studio).every(([name]) => name !== "arc" && name !== "lineTo"));
 });
 
+test("연속 삭제로 같은 줄이 겹치면 새로운 효과만 남긴다", () => {
+  const fx = createEffects();
+  fx.add([clearEvent], "full", 0, studio);
+  fx.add([clearEvent], "full", 40, studio);
+  const calls = [];
+  fx.draw(fakeCtx(calls), { bx: 0, cell: 10, toY: y => y * 10, cols: 10 }, 75, "#fff", "full");
+  assert.equal(calls.filter(([name]) => name === "fillRect").length, 1);
+});
+
 test("미끄러짐: 같은 피스는 짧게 따라가고, 새 피스나 0ms는 바로 그 자리", () => {
   const s = createSlide();
   assert.deepEqual(s.at(1, 3, 20, 0, 50), { x: 3, y: 20 }, "처음 나타날 때는 바로");
@@ -232,13 +241,17 @@ test("미끄러짐: 같은 피스는 짧게 따라가고, 새 피스나 0ms는 �
   assert.deepEqual(s.at(2, 1, 5, 221, 0), { x: 1, y: 5 }, "0ms면 칸 단위");
 });
 
-test("미끄러지는 중에 또 움직이면 지금 보이는 자리에서 이어서 간다(튀지 않음)", () => {
+test("빠른 이동은 한 칸 이상 뒤처지지 않고 회전·낙하는 즉시 반영한다", () => {
   const s = createSlide();
   s.at(1, 0, 0, 0, 50);
   s.at(1, 1, 0, 10, 50);
-  const before = s.at(1, 1, 0, 30, 50).x;
   const after = s.at(1, 2, 0, 30, 50).x;
-  assert.equal(after, before, "방향이 바뀌는 순간 위치가 이어진다");
+  assert.equal(after, 1);
+  assert.deepEqual(s.at(1, 1, 0, 34, 50, 1), { x: 1, y: 0 }, "회전 후 이전 방향의 잔여 이동은 없앤다");
+  assert.deepEqual(s.at(1, 1, 1, 37, 50, 1), { x: 1, y: 1 }, "한 칸 낙하도 즉시 그린다");
+  s.at(1, 2, 1, 38, 50, 1);
+  const before = s.at(1, 2, 1, 48, 50, 1);
+  assert.deepEqual(s.at(1, 1, 1, 48, 50, 1), before, "한 칸 안에서 방향을 바꿀 때는 부드럽게 잇는다");
 });
 
 test("시각 설정 보정과 예전 형식 옮기기", () => {
