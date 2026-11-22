@@ -1309,9 +1309,10 @@ body.touch-on :is(.btn, .btn-small, .key-slot, .select, .text-input, .choice > b
 }
 
 /* ---- 퍼즐 단계 격자 ---- */
+/* 퍼즐 30단계가 마지막 줄에 덩그러니 남지 않게 30을 나누는 열 수: 넓으면 6열(5줄), 좁으면 3열 */
 .puzzle-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: var(--space-2);
   padding: var(--space-2) 0 var(--space-4);
 }
@@ -1457,6 +1458,17 @@ body.touch-on :is(.btn, .btn-small, .key-slot, .select, .text-input, .choice > b
 .key-head > :not(:first-child) { text-align: center; }
 #records[open] { height: min(810px, calc(100dvh - 16px)); }
 .puzzle-tile small { text-align: center; overflow-wrap: anywhere; line-height: 1.2; }
+
+@media (max-width: 560px) {
+  .puzzle-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  /* 세 칸이면 "T-spin Double"이 한 줄로는 타일 가장자리에 닿는다 → 띄어쓰기에서 두 줄 */
+  .puzzle-tile small {
+    white-space: normal;
+  }
+}
 
 .puzzle-editor-board {
   display: grid;
