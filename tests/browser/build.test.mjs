@@ -2720,8 +2720,9 @@ test("게임 중 화면: 기본은 늘 어둡고, '화면 색 따르기'를 고�
   assert.ok((await lum(".board-wrap")) > 200, "보드 둘레도 밝다");
   await page.reload();
   await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
-  await startMode(page, "zen");
-  assert.ok((await lum("body")) > 200, "새로고침 후에도 유지");
+  await page.click("#continue-run");
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  assert.ok((await lum("body")) > 200, "이어 할 때도 저장한 화면 색 유지");
   await context.close();
 });
 
