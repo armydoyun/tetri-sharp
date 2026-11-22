@@ -138,6 +138,9 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       }
     }
 
+    // 다음 피스와 고스트는 줄 삭제 효과보다 위에 그린다.
+    effects.draw(ctx, { bx, cell, toY, cols: COLS }, now, theme.board.ink, visual.effects);
+
     if (active) {
       const color = palette[CELL_ID[active.type]];
       const cells = game.activeCells();
@@ -147,17 +150,32 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
         for (const [x, y] of cells) theme.ghost(ctx, bx + x * cell, toY(y + gy - active.y), cell, color, visual.ghost);
       }
       // 그리는 위치는 효과 설정에 따라 짧게 미끄러질 수 있다(효과 "전체"일 때만).
-      const shown = slide.at(game.state.pieceId, active.x, active.y, now, motion ? theme.motion.slideMs : 0);
+      const shown = slide.at(
+        game.state.pieceId,
+        active.x,
+        active.y,
+        now,
+        motion ? theme.motion.slideMs : 0,
+        active.rot
+      );
       const ox = (shown.x - active.x) * cell;
-      const oy = (shown.y - active.y) * cell;
       // 고정까지 남은 시간만큼 살짝 어두워진다.
       const lock = game.state.lock;
       const delay = game.rules.lock.delay;
-      ctx.globalAlpha = lock.timer > 0 && delay > 0 ? 1 - 0.4 * Math.min(1, lock.timer / delay) : 1;
+      ctx.globalAlpha = lock.timer > 0 && delay > 0 ? 1 - 0.18 * Math.min(1, lock.timer / delay) : 1;
       for (const [x, y] of cells) {
         if (y >= VISIBLE_TOP - MARGIN_TOP) {
-          theme.block(ctx, bx + x * cell + ox, toY(y) + oy, cell, color);
-          if (pattern) drawMark(ctx, bx + x * cell + ox, toY(y) + oy, cell, CELL_ID[active.type], color);
+          const px = bx + x * cell + ox;
+          const py = toY(y);
+          theme.block(ctx, px, py, cell, color);
+          if (pattern) drawMark(ctx, px, py, cell, CELL_ID[active.type], color);
+          if (!cells.some(([cx, cy]) => cx === x && cy === y - 1)) {
+            ctx.save();
+            ctx.fillStyle = theme.board.ink;
+            ctx.globalAlpha *= 0.72;
+            ctx.fillRect(px + cell * 0.2, py + cell * 0.15, cell * 0.6, Math.max(1, cell * 0.055));
+            ctx.restore();
+          }
         }
       }
       ctx.globalAlpha = 1;
@@ -176,14 +194,15 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       ctx.restore();
     }
 
-    effects.draw(ctx, { bx, cell, toY, cols: COLS }, now, theme.board.ink, visual.effects);
-
-    // Survival: 대기 중인 쓰레기 줄을 보드 왼쪽 가장자리에 빨간 막대로
+    // 대기 중인 쓰레기는 한 줄씩 구분한다. CPU의 좁은 캔버스에서는 안쪽에 그린다.
     const pending = Math.min(VISIBLE_ROWS, game?.state.garbage?.pending ?? 0);
     if (pending > 0) {
       const w = Math.max(2, Math.round(cell * 0.18));
       ctx.fillStyle = "#e5484d";
-      ctx.fillRect(bx - w - 1, by + (VISIBLE_ROWS - pending) * cell, w, pending * cell);
+      const x = compact ? bx + 1 : bx - w - 1;
+      for (let row = VISIBLE_ROWS - pending; row < VISIBLE_ROWS; row++) {
+        ctx.fillRect(x, by + row * cell + 1, w, cell - 2);
+      }
     }
 
     if (!game || compact) return;

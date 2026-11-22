@@ -1040,6 +1040,12 @@ body[data-screen="replay"] .touchpad {
   transition: background-color var(--dur) var(--ease);
 }
 
+.touchpad [data-touch="HARD"]:not(.is-down) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .touchpad button.is-down {
   background: var(--accent);
   border-color: var(--accent-ledge);

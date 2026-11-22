@@ -1175,6 +1175,61 @@ test("터치 버튼: 켜면 보드 아래에 보이고, 누르면 조작된다",
   await context.close();
 });
 
+test("터치 입력: 두 손가락과 버튼 밖 해제를 처리하고 낮은 가로 대전에서도 드롭한다", async () => {
+  const context = await browser.newContext({ locale: "ko-KR", viewport: { width: 390, height: 844 }, hasTouch: true });
+  await context.addInitScript(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ touch: "on", access: { countdown: "off" } }))
+  );
+  const page = await context.newPage();
+  try {
+    await page.goto(url);
+    await startMode(page, "sprint40");
+    const left = page.locator('[data-touch="LEFT"]');
+    await left.evaluate(button => {
+      const send = (target, type, pointerId) =>
+        target.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId, pointerType: "touch", button: 0 }));
+      send(button, "pointerdown", 101);
+      send(button, "pointerdown", 102);
+      send(document.body, "pointerup", 101);
+    });
+    assert.ok(await left.evaluate(button => button.classList.contains("is-down")));
+    await page.evaluate(() =>
+      document.body.dispatchEvent(new PointerEvent("pointercancel", { bubbles: true, pointerId: 102 }))
+    );
+    assert.equal(await left.evaluate(button => button.classList.contains("is-down")), false);
+    await page.tap('[data-touch="PAUSE"]');
+    assert.equal(await visible(page, "pause"), true);
+    await page.click('#pause [data-action="menu"]');
+    await page.click('[data-confirm="ok"]');
+
+    await page.setViewportSize({ width: 667, height: 300 });
+    await page.tap('[data-mode="versus"]');
+    await page.tap('#versus [data-level="easy"]');
+    const drop = page.locator('[data-touch="HARD"]');
+    const box = await drop.boundingBox();
+    assert.ok(box && box.height >= 44 && box.y >= 0 && box.y + box.height <= 300);
+    await drop.tap();
+    await page.waitForFunction(() => Number(document.getElementById("hud-pieces")?.textContent) > 0);
+    await page.tap('[data-touch="PAUSE"]');
+    assert.equal(await visible(page, "pause"), true);
+    await page.click('#pause [data-action="resume"]');
+    await drop.evaluate(button => {
+      for (let i = 0; i < 40; i++) {
+        for (const type of ["pointerdown", "pointerup"]) {
+          button.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 200, pointerType: "touch" }));
+        }
+      }
+    });
+    await page.locator("#results").waitFor({ timeout: 5000 });
+    for (const action of ["retry", "menu"]) {
+      const button = await page.locator(`#results [data-action="${action}"]`).boundingBox();
+      assert.ok(button && button.y >= 0 && button.y + button.height <= 300);
+    }
+  } finally {
+    await context.close();
+  }
+});
+
 test("글자 잘림 없음: 첫 화면·설정 모든 탭·규칙 편집 모든 탭·기록·연습에서 넘치는 글자가 없다(데스크톱·휴대폰)", async () => {
   /** 글자가 칸보다 넓어 잘리거나(…) 넘치는 요소들 */
   const overflowing = page =>

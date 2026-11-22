@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SOUND_NAMES, soundsFor } from "../../js/audio/sfx.js";
+import { SOUND_NAMES, createSfx, soundsFor } from "../../js/audio/sfx.js";
 import { createGame } from "../../js/core/engine.js";
 import { MODERN } from "../../js/rules/presets.js";
 import { DEFAULT_SETTINGS, sanitizeSettings } from "../../js/storage/settings.js";
@@ -55,4 +55,46 @@ test("효과음 크기 설정: 기본은 음소거(0), 0~100으로 맞춘다", (
   assert.equal(sanitizeSettings({ volume: 0 }).volume, 0);
   assert.equal(sanitizeSettings({ volume: 400 }).volume, 100);
   assert.equal(sanitizeSettings({ volume: "x" }).volume, 0);
+});
+
+test("같은 프레임의 클리어는 조작과 하드 드롭보다 앞에 들리도록 섞는다", () => {
+  const previous = globalThis.AudioContext;
+  const peaks = [];
+  const parameter = { setValueAtTime() {}, exponentialRampToValueAtTime() {} };
+  const source = { connect() {}, start() {}, stop() {}, frequency: parameter };
+  globalThis.AudioContext = class {
+    currentTime = 0;
+    sampleRate = 10;
+    createBuffer() {
+      return { getChannelData: () => new Float32Array(2) };
+    }
+    createGain() {
+      return {
+        connect() {},
+        gain: {
+          ...parameter,
+          exponentialRampToValueAtTime(value) {
+            if (value > 0.0001) peaks.push(value);
+          },
+        },
+      };
+    }
+    createOscillator() {
+      return { ...source };
+    }
+    createBufferSource() {
+      return { ...source };
+    }
+  };
+  try {
+    const sfx = createSfx({ getVolume: () => 100 });
+    sfx.events([{ type: "move" }, { type: "rotate" }, { type: "hardDrop" }]);
+    const actionPeaks = peaks.splice(0);
+    sfx.events([{ type: "move" }, { type: "rotate" }, { type: "hardDrop" }, { type: "lock", lines: 1, tspin: "none" }]);
+    assert.ok(actionPeaks.every((peak, i) => peaks[i] < peak));
+    assert.ok(peaks.at(-1) > Math.max(...peaks.slice(0, -1)));
+  } finally {
+    if (previous === undefined) delete globalThis.AudioContext;
+    else globalThis.AudioContext = previous;
+  }
 });

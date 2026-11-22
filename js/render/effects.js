@@ -89,6 +89,11 @@ export const createEffects = () => {
       if (e.type !== "lock") continue;
       if (e.lines > 0) {
         landings.clear();
+        // 같은 화면 줄에서 여러 삭제 효과가 겹쳐 밝아지지 않게 한다.
+        clears = clears.flatMap(clear => {
+          const rows = clear.rows.filter(row => !e.rows.includes(row));
+          return rows.length ? [{ ...clear, rows }] : [];
+        });
         const spin = (e.tspin === "full" || e.tspin === "mini") && e.cells?.length;
         const spinColumn = spin ? e.cells.reduce((sum, [x]) => sum + x + 0.5, 0) / e.cells.length : null;
         clears.push({ rows: e.rows, start: now, motion, spinColumn, b2b: Boolean(e.b2b) });

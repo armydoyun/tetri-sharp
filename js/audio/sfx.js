@@ -46,9 +46,9 @@ const note = n => 440 * Math.pow(2, (n - 69) / 12);
  * @type {Record<string, Array<[number, number, number, OscillatorType | "noise", number, number?]>>}
  */
 const SOUNDS = {
-  move: [[0, 1600, 0.018, "square", 0.05]],
-  rotate: [[0, 1100, 0.035, "triangle", 0.12, 1500]],
-  kick: [[0, 900, 0.05, "triangle", 0.14, 1600]],
+  move: [[0, 1600, 0.018, "square", 0.032]],
+  rotate: [[0, 1100, 0.035, "triangle", 0.078, 1500]],
+  kick: [[0, 900, 0.05, "triangle", 0.095, 1600]],
   hold: [[0, 520, 0.07, "sine", 0.16, 780]],
   lock: [[0, 190, 0.05, "triangle", 0.22, 120]],
   hardDrop: [
@@ -149,7 +149,7 @@ export const createSfx = ({ getVolume }) => {
   };
 
   /** @param {string} name */
-  const play = name => {
+  const play = (name, mix = 1) => {
     const volume = getVolume();
     const parts = SOUNDS[name];
     if (!parts || volume <= 0) return;
@@ -162,7 +162,7 @@ export const createSfx = ({ getVolume }) => {
       const start = t0 + at;
       const env = ac.createGain();
       env.gain.setValueAtTime(0.0001, start);
-      env.gain.exponentialRampToValueAtTime(gain, start + 0.005);
+      env.gain.exponentialRampToValueAtTime(gain * mix, start + 0.005);
       env.gain.exponentialRampToValueAtTime(0.0001, start + dur);
       env.connect(master);
       /** @type {AudioScheduledSourceNode} */
@@ -189,7 +189,12 @@ export const createSfx = ({ getVolume }) => {
     /** 엔진 이벤트 한 프레임 분량을 소리로 */
     events(events) {
       if (!events.length || getVolume() <= 0) return;
-      for (const name of soundsFor(events)) play(name);
+      const clearing = events.some(event => event.type === "lock" && event.lines > 0);
+      for (const name of soundsFor(events)) {
+        // 줄 삭제 멜로디가 같은 프레임의 조작·착지 소리에 묻히지 않게 한다.
+        const movement = name === "move" || name === "rotate" || name === "kick" || name === "hardDrop";
+        play(name, clearing && movement ? 0.42 : 1);
+      }
     },
   };
 };
