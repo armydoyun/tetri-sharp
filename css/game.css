@@ -982,6 +982,11 @@ body.is-finesse-lesson .results-stats :is(dt, dd) {
     grid-column: span 2;
   }
 
+  /* "최고 기록 대비"는 이름이 길어 한 칸(약 60px)에 들어가지 않는다 → 두 칸 폭 */
+  .hud > [data-hud="split"] {
+    grid-column: span 2;
+  }
+
   .hud > div:last-child {
     border-right: 0;
   }
@@ -2250,6 +2255,24 @@ body[data-scene-practice] .race-panel {
 @media (max-width: 720px) {
   body:is([data-scene-practice="split"], [data-scene-practice="finesse"], [data-scene-practice="rescue"]) {
     --chrome-h: 248px;
+  }
+}
+
+/* 좁은 휴대폰: 게임 중 머리글 제목이 "Sprint / 40L"처럼 단어 중간 폭에서 꺾여 머리글이 커지지 않게 작게.
+   긴 제목(연습 이름 등)은 단어 단위로만 두 줄이 된다. */
+@media (max-width: 390px) {
+  /* 게임 중에는 T 표식만 남겨 제목 자리를 만든다(버튼의 title·aria는 그대로) */
+  body:not([data-screen="menu"]) .logo-btn {
+    gap: 0;
+    font-size: 0;
+  }
+
+  body:not([data-screen="menu"]) .session-title {
+    min-width: 0;
+    font-size: var(--text-s);
+    line-height: 1.2;
+    letter-spacing: normal;
+    word-break: keep-all;
   }
 }
 
