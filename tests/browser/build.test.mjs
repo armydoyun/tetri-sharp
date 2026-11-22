@@ -353,6 +353,54 @@ test("이어서 하기: 새 판을 취소한 뒤 Sprint를 완주하면 기록�
   }
 });
 
+test("보드가 멈추면 다시 그리지 않고, 남은 효과와 화면 크기 변경은 반영한다", async () => {
+  const { context, page, errors } = await openPage(
+    () => {
+      localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
+      window.boardPaints = 0;
+      const clearRect = CanvasRenderingContext2D.prototype.clearRect;
+      CanvasRenderingContext2D.prototype.clearRect = function (...args) {
+        if (this.canvas.id === "board") window.boardPaints++;
+        return clearRect.apply(this, args);
+      };
+    },
+    undefined,
+    { frameClock: true }
+  );
+  const advance = count =>
+    page.evaluate(count => {
+      for (let i = 0; i < count; i++) window.advanceFrame();
+      return window.boardPaints;
+    }, count);
+  const image = () => page.locator("#board").evaluate(canvas => canvas.toDataURL());
+  try {
+    const menuPaints = await advance(1);
+    assert.equal(menuPaints, 1);
+    assert.equal(await advance(12), menuPaints);
+
+    await startMode(page, "sprint40");
+    await advance(1);
+    const beforeDrop = await image();
+    await page.keyboard.press("Space");
+    const dropPaints = await advance(1);
+    assert.notEqual(await image(), beforeDrop);
+    await page.click("#pause-game");
+    const settledPaints = await advance(30);
+    assert.ok(settledPaints > dropPaints, "일시정지 직전의 착지 효과를 마무리한다");
+    const settled = await image();
+    assert.equal(await advance(12), settledPaints);
+    assert.equal(await image(), settled);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await advance(1), settledPaints + 1);
+    assert.notEqual(await image(), settled);
+    assert.equal(await advance(12), settledPaints + 1);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test("메뉴 → Sprint 40L: 하드 드롭·홀드·일시정지·재시작", async () => {
   const { context, page, errors } = await openPage();
   assert.equal(await visible(page, "menu"), true, "처음에는 모드 선택 화면");
