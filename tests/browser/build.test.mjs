@@ -925,7 +925,7 @@ test("규칙 공유: 편집기에서 코드를 붙여 넣으면 불러오고, #r
 test("연습: 메뉴에서 고르면 시작하고, 놓을 때마다 성공/시도를 센다", async () => {
   const { context, page, errors } = await openPage();
   await page.click("#open-practice");
-  assert.equal(await page.locator("#practice .menu-row").count(), 10);
+  assert.equal(await page.locator("#practice .menu-row").count(), 11);
   assert.equal(await page.locator('[data-drill="double"]').isVisible(), true);
   await page.click('[data-drill="tsd"]');
   await page.waitForFunction(() => document.body.dataset.screen === "play", null, {
@@ -1053,6 +1053,47 @@ test("입문 코스 완료 표시와 수동 Sprint 시도 기록을 볼 수 있�
     assert.equal(await page.locator("#sprint-history .sprint-dnf").count(), 1);
     assert.equal(await page.locator(".sprint-history-chart li").count(), 3);
     assert.match(await text(page, "sprint-history"), /중앙값 1:10\.00/);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("CPU 대전 입문: 즉시 재시도하고 공격·상쇄·전송 수를 비교한다", async () => {
+  const { context, page, errors } = await openPage(null, undefined, { frameClock: true });
+  const play = codes =>
+    page.evaluate(keys => {
+      for (const code of keys) {
+        window.dispatchEvent(new KeyboardEvent("keydown", { code, cancelable: true }));
+        window.dispatchEvent(new KeyboardEvent("keyup", { code, cancelable: true }));
+        window.advanceFrame();
+      }
+    }, codes);
+  try {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.click("#open-practice");
+    await page.click('[data-drill="battle-training"]');
+    assert.equal(await page.locator("[data-practice-stage]").count(), 3);
+    await page.click('[data-practice-stage="battle-lesson-1"]');
+    assert.equal(await page.locator("body").getAttribute("data-screen"), "play");
+    await play(["ArrowUp", "ArrowLeft", "Space"]);
+    assert.equal(await text(page, "race-result"), "공격 4줄 · 상쇄 0줄 · 상대에게 4줄");
+
+    await page.click('#results [data-action="next-puzzle"]');
+    await page.evaluate(() => window.advanceFrame());
+    assert.equal(await text(page, "hud-lines"), "4");
+    await play(["Space"]);
+    assert.equal(await text(page, "results-title"), "실패");
+    assert.match(await text(page, "results-stats"), /받은 쓰레기4/);
+    await page.click('#results [data-action="retry"]');
+    assert.equal(await page.locator("body").getAttribute("data-screen"), "play");
+    await play(["ArrowUp", ...Array(4).fill("ArrowLeft"), "Space"]);
+    assert.equal(await text(page, "race-result"), "공격 4줄 · 상쇄 4줄 · 상대에게 0줄");
+
+    await page.click('#results [data-action="next-puzzle"]');
+    await play(["ArrowUp", ...Array(3).fill("ArrowRight"), "Space"]);
+    assert.equal(await text(page, "race-result"), "공격 4줄 · 상쇄 2줄 · 상대에게 2줄");
+    assert.equal(await page.locator('#results [data-action="next-puzzle"]').isVisible(), false);
     assert.deepEqual(errors, []);
   } finally {
     await context.close();

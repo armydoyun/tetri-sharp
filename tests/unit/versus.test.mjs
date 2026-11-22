@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createGame } from "../../js/core/engine.js";
+import { BTN, createGame } from "../../js/core/engine.js";
 import { MODERN } from "../../js/rules/presets.js";
 import { ROTATIONS } from "../../js/rules/rotation/index.js";
 import { HEIGHT, WIDTH, createBoard, set } from "../../js/core/board.js";
@@ -14,6 +14,7 @@ import {
   settleBattleFrame,
   versusMode,
 } from "../../js/modes/versus.js";
+import { BATTLE_LESSONS } from "../../js/modes/battle-lessons.js";
 import { findMode } from "../../js/modes/index.js";
 import { parseBackup } from "../../js/storage/backup.js";
 import { createPlayer, createRecorder, sanitizeReplay } from "../../js/replay/replay.js";
@@ -21,6 +22,42 @@ import { analyzeReplay } from "../../js/replay/analyze.js";
 
 const lock = o => ({ type: "lock", lines: 0, tspin: "none", perfect: false, b2b: false, combo: -1, ...o });
 const levelById = id => LEVELS.find(level => level.id === id);
+
+test("대전 입문 세 문제는 기존 공격 규칙으로 전송·상쇄를 연습한다", () => {
+  for (const [index, [hole, blocked, sent]] of [
+    [4, 0, 4],
+    [1, 4, 0],
+    [8, 2, 2],
+  ].entries()) {
+    const mode = BATTLE_LESSONS[index];
+    const create = () => createGame({ mode, rules: mode.rules, seed: mode.fixedSeed });
+    const game = create();
+    assert.equal(game.state.garbage.pending, blocked);
+    game.step();
+    game.step({ pressed: BTN.CW });
+    const start = game.activeCells()[0][0];
+    for (let i = 0; i < Math.abs(hole - start); i++) {
+      game.step({ pressed: hole < start ? BTN.LEFT : BTN.RIGHT });
+    }
+    const events = game.step({ pressed: BTN.HARD });
+    assert.equal(game.state.over, "clear");
+    assert.equal(events.find(event => event.type === "lock").perfect, false);
+    const attack = events.find(event => event.type === "attack");
+    assert.equal(attack.base, 4);
+    assert.equal(attack.blocked, blocked);
+    assert.equal(attack.lines, sent);
+    assert.equal(game.state.garbage.pending, 0);
+
+    const miss = create();
+    miss.step({ pressed: BTN.HARD });
+    assert.equal(miss.state.over, "fail");
+    assert.equal(miss.state.garbage.received, blocked);
+    assert.equal(miss.state.garbage.sent, 0);
+    const retry = create();
+    assert.equal(retry.state.garbage.pending, blocked);
+    assert.deepEqual(retry.state.board.cells, create().state.board.cells);
+  }
+});
 
 test("공격 줄 수: 줄 삭제 종류 + B2B + 콤보 + 퍼펙트 클리어", () => {
   assert.equal(attackFor(lock({ lines: 1, combo: 0 })), 0);

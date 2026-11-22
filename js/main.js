@@ -44,6 +44,7 @@ import { makeCustomRules, sanitizeRuleBody } from "./rules/sanitize.js";
 import { decodeRules } from "./rules/share.js";
 import { createSfx } from "./audio/sfx.js";
 import { DOWNSTACK_LESSONS } from "./modes/downstack.js";
+import { BATTLE_LESSONS } from "./modes/battle-lessons.js";
 import { INTRO_LESSONS } from "./modes/intro-lessons.js";
 import { createPracticeProgress } from "./storage/practice-progress.js";
 import { createSprintHistory } from "./storage/sprint-history.js";
@@ -491,10 +492,7 @@ const setScreen = next => {
   keyboard.setEnabled(next === "play" || next === "countdown");
   touch.setEnabled(next === "play" || next === "countdown");
   gestures.setEnabled((next === "play" || next === "countdown") && gesturesOn());
-  document.body.classList.toggle(
-    "is-practice",
-    Boolean(mode.practice && !mode.lesson && !mode.downstack && !mode.intro) && next !== "menu"
-  );
+  document.body.classList.toggle("is-practice", Boolean(mode.practice && !isGuidedPractice()) && next !== "menu");
   document.body.classList.toggle("is-downstack", Boolean(mode.downstack) && next !== "menu");
   document.body.classList.toggle("is-finesse-lesson", Boolean(mode.lesson) && next !== "menu");
   const modeTitle = mode.versus ? t("CPU · {level}", { level: mode.versus.name }) : mode.name;
@@ -585,7 +583,7 @@ const start = (
   }
   pbSplits = target?.splits ?? resultPbSplits;
   acc = 0;
-  countdown = m.downstack ? 0 : (COUNTDOWN_FRAMES[settings.access.countdown] ?? READY_FRAMES);
+  countdown = m.downstack || m.battleLesson ? 0 : (COUNTDOWN_FRAMES[settings.access.countdown] ?? READY_FRAMES);
   if (m.downstack) resetDownstackHint();
   goTimer = 0;
   undo.reset();
@@ -840,7 +838,7 @@ const finish = () => {
   countdownEl.hidden = true;
   if (mode.id === "sprint40" && state.stats.pieces > 0)
     sprintHistory.add(rules.id, state.frame, state.over === "clear");
-  if (state.over === "clear" && (mode.downstack || mode.lesson || mode.intro)) {
+  if (state.over === "clear" && isGuidedPractice()) {
     practiceProgress.mark(mode.id, state.downstack?.usedHint);
   }
 
@@ -891,18 +889,24 @@ const finish = () => {
   const summary = mode.summary(state);
   $("results-title").textContent = summary.title;
   $("results-main").textContent = summary.main;
-  if (!mode.lesson && !survival) say(`${summary.title} ${summary.main}`);
+  if (!mode.lesson && !survival && !mode.battleLesson) say(`${summary.title} ${summary.main}`);
   fb.clearAction();
   countdownEl.hidden = true;
   $("results-badge").classList.toggle("is-invisible", !outcome?.isBest);
 
-  const resultNote = survival
-    ? survivalResultText(state.frame, outcome ? outcome.previousBest : best)
-    : race
-      ? raceResultText(state, race.target.best, race.target.friend)
-      : "";
+  const resultNote = mode.battleLesson
+    ? t("공격 {attack}줄 · 상쇄 {blocked}줄 · 상대에게 {sent}줄", {
+        attack: state.garbage.blocked + state.garbage.sent,
+        blocked: state.garbage.blocked,
+        sent: state.garbage.sent,
+      })
+    : survival
+      ? survivalResultText(state.frame, outcome ? outcome.previousBest : best)
+      : race
+        ? raceResultText(state, race.target.best, race.target.friend)
+        : "";
   $("race-result").textContent = resultNote;
-  if (survival) say(`${summary.title} ${summary.main}. ${resultNote}`);
+  if (survival || mode.battleLesson) say(`${summary.title} ${summary.main}. ${resultNote}`);
 
   const seconds = state.frame / 60;
   if (mode.versus && versus) {
@@ -948,6 +952,9 @@ const finish = () => {
     const delta = splitDelta(splits, resultPbSplits);
     if (delta !== null) rows.push([t("PB 대비"), formatDelta(delta)]);
     if (state.over === "clear") rows.splice(0, 1);
+  }
+  if (mode.battleLesson) {
+    rows.splice(0, rows.length, [t("받은 쓰레기"), String(state.garbage.received)]);
   }
   if (mode.lesson) {
     const path = mode.lesson.path;
@@ -1040,14 +1047,17 @@ $("active-rules").addEventListener("click", e => {
 });
 $("edit-rules").addEventListener("click", () => rulesUI.open());
 
+const isGuidedPractice = () => mode.lesson || mode.downstack || mode.intro || mode.battleLesson;
 const nextPracticeLesson = () =>
-  mode.intro
-    ? INTRO_LESSONS[mode.intro]
-    : mode.downstack
-      ? DOWNSTACK_LESSONS[mode.downstack.index + 1]
-      : mode.lesson
-        ? FINESSE_LESSONS[mode.lesson.index + 1]
-        : null;
+  mode.battleLesson
+    ? BATTLE_LESSONS[mode.battleLesson]
+    : mode.intro
+      ? INTRO_LESSONS[mode.intro]
+      : mode.downstack
+        ? DOWNSTACK_LESSONS[mode.downstack.index + 1]
+        : mode.lesson
+          ? FINESSE_LESSONS[mode.lesson.index + 1]
+          : null;
 const downstackHint = $("downstack-hint");
 const resetDownstackHint = () => {
   downstackHint.textContent = t("힌트");
@@ -1224,15 +1234,7 @@ const inputDisplay = createInputDisplay({ root: $("input-display"), isOn: () => 
 
 /** 연습 모드에서 바로 앞 피스로 되돌린다 */
 const undoPiece = () => {
-  if (
-    !game ||
-    !mode.practice ||
-    mode.lesson ||
-    mode.downstack ||
-    mode.intro ||
-    (screen !== "play" && screen !== "paused")
-  )
-    return;
+  if (!game || !mode.practice || isGuidedPractice() || (screen !== "play" && screen !== "paused")) return;
   if (!undo.undo(game.state)) {
     say(t("더 되돌릴 수 없어요"));
     return;
@@ -1345,7 +1347,7 @@ for (const btn of document.querySelectorAll("[data-action]")) {
     )
       start(mode, rules, null, lastReplay.seed);
     if (action === "race-best" && mode.splits) startRace(mode, rules);
-    if (action === "next-puzzle" && (mode.lesson || mode.downstack || mode.intro)) {
+    if (action === "next-puzzle" && isGuidedPractice()) {
       const next = nextPracticeLesson();
       if (next) start(next, next.rules);
     }
@@ -2092,7 +2094,7 @@ const tick = () => {
     }
     return;
   }
-  if (mode.practice && !mode.lesson && !mode.downstack && !mode.intro) undo.track(game.state);
+  if (mode.practice && !isGuidedPractice()) undo.track(game.state);
   inputDisplay.show(held, pressed);
   recorder?.input(held, pressed);
   const hadActive = Boolean(game.state.active);
