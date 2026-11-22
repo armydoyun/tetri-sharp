@@ -201,6 +201,7 @@ export const EN = {
   "시작!": "Go!",
   준비: "Ready",
   "다음 피스": "Next",
+  다음: "Next",
   취소: "Cancel",
   // ---- 첫 화면 ----
   "Tetri# — 규칙을 직접 조합하는 낙하 블록 퍼즐.": "Tetri# — a falling-block puzzle where you mix the rules.",
