@@ -358,11 +358,11 @@ export const EN = {
   // ---- 오늘의 도전 ----
   "오늘의 도전": "Daily challenge",
   "오늘의 도전 · {date}": "Daily challenge · {date}",
-  "날마다 바뀌는 같은 블록 순서로 40줄 · 결과를 공유해 겨루기":
-    "40 lines with a piece order that changes every day · share your result to compete",
-  "모두 같은 블록 순서로 40줄": "40 lines, same pieces for everyone",
+  "{mode} · 날마다 바뀌는 같은 블록 순서 · 결과를 공유해 겨루기":
+    "{mode} with a piece order that changes every day · share your result to compete",
+  "{mode} · 모두 같은 블록 순서": "{mode}, same pieces for everyone",
   도전하기: "Play today's challenge",
-  "Sprint 40L · Modern · 모두 같은 블록 순서": "Sprint 40L · Modern · same pieces for everyone",
+  "{mode} · Modern · 모두 같은 블록 순서": "{mode} · Modern · same pieces for everyone",
   "오늘 최고 기록 {record}": "Today's best {record}",
   "아직 오늘 기록이 없어요": "No result today yet",
   "내 결과 공유": "Share my result",

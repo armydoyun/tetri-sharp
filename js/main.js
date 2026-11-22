@@ -513,7 +513,7 @@ const dailyRow = () => {
   const name = document.createElement("strong");
   name.textContent = t("오늘의 도전");
   const desc = document.createElement("small");
-  desc.textContent = `${key} · ${t("모두 같은 블록 순서로 40줄")}`;
+  desc.textContent = `${key} · ${t("{mode} · 모두 같은 블록 순서", { mode: m.baseName })}`;
   text.append(name, desc);
   const pb = document.createElement("span");
   pb.className = "mode-best num";
@@ -529,11 +529,12 @@ const raceFromCode = async text => {
   const replay = raw && sanitizeReplay(raw, findMode);
   if (!replay) return t("읽을 수 없는 코드예요");
   const m = findDaily(replay.mode);
-  if (!m || replay.rules.id !== MODERN.id || replay.result.over !== "clear")
+  // 끝까지 간 결과만(Sprint·Dig는 완료, Ultra는 시간 종료 — 모드의 달리기 완주 조건)
+  if (!m || replay.rules.id !== MODERN.id || replay.result.over !== (m.race?.finish ?? "clear"))
     return t("오늘의 도전을 끝까지 간 결과 코드만 겨룰 수 있어요");
   let targetSplits = [];
   const verified = verifyReplay(replay, findMode, state => {
-    targetSplits = advanceSplits(m.splits, targetSplits, state.stats.lines, state.frame);
+    if (m.splits) targetSplits = advanceSplits(m.splits, targetSplits, state.stats.lines, state.frame);
   });
   if (!verified.ok) return t("이 코드는 결과를 다시 만들 수 없어요. 다른 버전일 수 있어요");
   const r = replay.result;

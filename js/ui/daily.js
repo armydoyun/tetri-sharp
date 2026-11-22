@@ -91,6 +91,8 @@ export const createDailyUI = ({ dialog, dates, getEntry, makeCode, makeLink, onS
     });
     picker.classList.add("num", "daily-date");
     const best = el("span", { class: "daily-best num", id: "daily-best", "aria-live": "polite" });
+    // 고른 날짜의 모드(날마다 바뀐다)
+    const modeLine = el("small", { id: "daily-mode" });
     const play = button({ text: t("도전하기"), iconName: "play", className: "btn btn-primary", id: "daily-start" });
     const watch = button({
       text: t("최고 기록 다시 보기"),
@@ -106,6 +108,7 @@ export const createDailyUI = ({ dialog, dates, getEntry, makeCode, makeLink, onS
     const updateEntry = async () => {
       const current = ++version;
       entry = getEntry(pickedDate);
+      modeLine.textContent = t("{mode} · Modern · 모두 같은 블록 순서", { mode: entry.mode.baseName });
       best.textContent = entry.best
         ? t("최고 기록 {record}", { record: entry.mode.formatRecord(entry.best) })
         : t("이 날짜의 기록이 없어요");
@@ -175,13 +178,7 @@ export const createDailyUI = ({ dialog, dates, getEntry, makeCode, makeLink, onS
       el(
         "section",
         { class: "field-section daily-head" },
-        el(
-          "div",
-          { class: "daily-today" },
-          picker,
-          el("small", { text: t("Sprint 40L · Modern · 모두 같은 블록 순서") }),
-          best
-        ),
+        el("div", { class: "daily-today" }, picker, modeLine, best),
         el("div", { class: "daily-actions" }, play, watch)
       ),
       share,

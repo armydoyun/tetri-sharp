@@ -3170,3 +3170,29 @@ test("처음 안내 줄에서 소리를 켜고 끌 수 있고, 설정의 효과�
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("오늘의 도전: 날마다 바뀌는 모드가 첫 화면·대화상자·게임에 그대로 나온다", async () => {
+  const context = await browser.newContext({ locale: "ko-KR", viewport: { width: 1280, height: 900 } });
+  await context.addInitScript(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  const page = await context.newPage();
+  const errors = [];
+  page.on("pageerror", e => errors.push(e.message));
+  await page.clock.setFixedTime(new Date(2026, 11, 2, 12));
+  await page.goto(url);
+  assert.match(await page.locator('[data-mode="daily"]').textContent(), /2026-12-02 · Ultra · 모두 같은 블록 순서/);
+  await page.click('[data-mode="daily"]');
+  assert.equal(await text(page, "daily-mode"), "Ultra · Modern · 모두 같은 블록 순서");
+  await choose(page, "daily-date", "2026-11-30");
+  assert.equal(await text(page, "daily-mode"), "Sprint 40L · Modern · 모두 같은 블록 순서", "시작일 전은 Sprint");
+  await choose(page, "daily-date", "2026-12-02");
+  await page.click("#daily-start");
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  // 정보 칸은 시작할 때 모드로 정해진다: Ultra는 점수 칸이 있고 Sprint의 "최고 기록 대비" 칸은 없다
+  const shown = cell => page.locator(`.hud [data-hud="${cell}"]`).evaluate(el => !el.classList.contains("is-off"));
+  assert.equal(await shown("score"), true, "Ultra 정보 칸");
+  assert.equal(await shown("split"), false);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
