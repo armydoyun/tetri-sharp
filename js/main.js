@@ -763,6 +763,10 @@ const askConfirm = kind => {
   confirming = kind;
   const restart = kind === "restart";
   panels.confirm.querySelector(".confirm-cancel-text").textContent = confirmWasPaused ? t("취소") : t("계속하기");
+  // "계속하기"는 판으로 돌아가니 재생 표시, "취소"는 일시정지 화면으로 돌아가니 뒤로 표시
+  /** @type {HTMLElement} */ (panels.confirm.querySelector(".confirm-cancel-icon")).replaceChildren(
+    icon(confirmWasPaused ? "arrow-left" : "play")
+  );
   $("confirm-title").textContent = restart ? t("다시 시작할까요?") : t("첫 화면으로 갈까요?");
   const ok = /** @type {HTMLElement} */ (panels.confirm.querySelector('[data-confirm="ok"]'));
   /** @type {HTMLElement} */ (ok.querySelector(".confirm-ok-icon")).replaceChildren(icon(restart ? "restart" : "menu"));
