@@ -1473,7 +1473,7 @@ body.is-versus {
   display: none;
 }
 
-body.is-downstack[data-screen="play"] .downstack-controls {
+body.has-lesson-hints[data-screen="play"] .downstack-controls {
   display: grid;
   gap: var(--space-1);
 }

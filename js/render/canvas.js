@@ -163,7 +163,8 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       ctx.globalAlpha = 1;
     }
 
-    const hintCells = game?.state.downstack?.hintCells ?? game?.state.finesseTarget;
+    const hintCells =
+      game?.state.downstack?.hintCells ?? game?.state.buildLesson?.hintCells ?? game?.state.finesseTarget;
     if (hintCells?.length && active) {
       ctx.save();
       ctx.strokeStyle = theme.board.ink;

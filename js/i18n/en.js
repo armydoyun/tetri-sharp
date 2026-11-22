@@ -2,6 +2,19 @@
 // tests/unit/i18n.test.mjs가 코드와 index.html의 한국어 문장이 모두 여기 있는지 확인한다.
 /** @type {Record<string, string>} */
 export const EN = {
+  "빌드 연습": "Build practice",
+  "4줄 우물과 T스핀 자리를 직접 만들기": "Build a four-line well and a T-spin setup",
+  "4줄 우물 만들기": "Build a four-line well",
+  "오른쪽 한 열을 남기고 쌓은 뒤 I 피스로 4줄을 지우세요.":
+    "Leave the right column open, then clear four lines with the I piece.",
+  "마지막 I 피스를 위해 점선 열을 비워 두세요.": "Keep the outlined column open for the final I piece.",
+  "T스핀 더블 자리 만들기": "Build a T-spin Double setup",
+  "왼쪽 빈 열을 채우고 지붕을 만든 뒤 T를 돌려 2줄을 지우세요.":
+    "Fill the left column, build the roof, then rotate T into place to clear two lines.",
+  "마지막 T가 들어갈 점선 칸을 비워 두세요.": "Keep the outlined cells open for the final T piece.",
+  "T를 세로로 내린 뒤 지붕 아래로 돌려 넣으세요.": "Lower T vertically, then rotate it under the roof.",
+  "이 배치에서는 준비된 자리 힌트를 쓸 수 없어요. 계속 쌓거나 같은 판을 다시 시작할 수 있어요.":
+    "The suggested placement is unavailable on this board. Keep building or restart.",
   "CPU 대전 입문": "CPU battle basics",
   "공격·상쇄·반격을 한 수씩 연습": "Practice attacking, canceling and counterattacking one move at a time",
   "공격 보내기": "Send an attack",
