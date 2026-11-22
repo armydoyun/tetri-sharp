@@ -290,3 +290,66 @@ test("백업: 대전 전적도 옮기고 이상한 값은 버린다", () => {
   );
   assert.deepEqual(parsed.data["versus:stats"], { hard: { win: 3, loss: 0 }, "hard-plus": { win: 1, loss: 2 } });
 });
+
+test("봇 밀어 넣기: 위가 막힌 처마 아래 빈칸은 바닥에서 옆으로 밀어 채운다", () => {
+  // 아래 두 줄은 0~2열만 비었고, 0열 바로 위(처마)가 막혀 있다.
+  // O를 곧장 떨어뜨려 0~1열에 넣을 수는 없고, 1~2열로 떨어뜨린 뒤 왼쪽으로 한 칸 밀어야 한다.
+  const board = createBoard();
+  for (let x = 3; x < WIDTH; x++) {
+    set(board, x, HEIGHT - 1, 8);
+    set(board, x, HEIGHT - 2, 8);
+  }
+  set(board, 0, HEIGHT - 3, 8);
+  const straight = placements(board, ROTATIONS.srs, "O", 4, HEIGHT - 22);
+  const tucked = placements(board, ROTATIONS.srs, "O", 4, HEIGHT - 22, { tucks: true });
+  const slide = tucked.find(p => p.x === 1 && p.slide === -1);
+  assert.ok(slide, "1~2열로 떨어뜨린 뒤 왼쪽으로 미는 후보");
+  assert.ok(!straight.some(p => p.slide), "기본 후보에는 밀기가 없다");
+  assert.ok(slide.score > straight.find(p => p.x === 1).score, "처마 아래를 채우는 쪽이 낫다");
+});
+
+test("봇 T-spin: T-spin Double 자리에서 T를 돌려 넣고, 엔진도 T-spin Double로 판정한다", async () => {
+  const { buildTsd } = await import("../../js/modes/practice.js");
+  const { VISIBLE_TOP } = await import("../../js/core/engine.js");
+  for (const roofLeft of [true, false]) {
+    const mode = versusMode(levelById("master"));
+    const game = createGame({ rules: MODERN, seed: 4, mode });
+    game.step();
+    buildTsd(game.state.board, 3, roofLeft);
+    game.state.active = { type: "T", rot: 0, x: 3, y: VISIBLE_TOP, lastAction: null, kick: 0 };
+    game.state.holdUsed = true;
+    const best = placements(game.state.board, ROTATIONS.srs, "T", 3, VISIBLE_TOP, { tucks: true, spins: true })[0];
+    assert.equal(best.tspin, "full", `가장 좋은 자리는 T-spin (지붕 ${roofLeft ? "왼쪽" : "오른쪽"})`);
+    const bot = createBot({ game, rotation: ROTATIONS.srs, level: levelById("master"), seed: 1 });
+    const id = game.state.pieceId;
+    let lock = null;
+    for (let f = 0; f < 600 && game.state.pieceId === id && !game.state.over; f++) {
+      lock = game.step(bot.input()).find(e => e.type === "lock") ?? lock;
+    }
+    assert.ok(lock, "피스를 놓는다");
+    assert.equal(lock.tspin, "full");
+    assert.equal(lock.lines, 2);
+  }
+});
+
+test("봇 밀어 넣기를 엔진에서 실제로 해낸다: 내리고, 밀고, 떨어뜨린다", async () => {
+  const { VISIBLE_TOP } = await import("../../js/core/engine.js");
+  const { get } = await import("../../js/core/board.js");
+  const level = levelById("normal");
+  const game = createGame({ rules: MODERN, seed: 4, mode: versusMode(level) });
+  game.step();
+  const b = game.state.board;
+  for (let x = 3; x < WIDTH; x++) {
+    set(b, x, HEIGHT - 1, 8);
+    set(b, x, HEIGHT - 2, 8);
+  }
+  set(b, 0, HEIGHT - 3, 8);
+  game.state.active = { type: "O", rot: 0, x: 4, y: VISIBLE_TOP, lastAction: null, kick: 0 };
+  game.state.holdUsed = true;
+  const bot = createBot({ game, rotation: ROTATIONS.srs, level: { ...level, mistake: 0 }, seed: 1 });
+  const id = game.state.pieceId;
+  for (let f = 0; f < 600 && game.state.pieceId === id && !game.state.over; f++) game.step(bot.input());
+  // O가 0~1열 아래 두 줄에 들어가면 그 두 줄은 2열만 남는다(지워지지 않음)
+  assert.notEqual(get(b, 0, HEIGHT - 1), 0, "처마 아래 맨 아래 칸이 찼다");
+  assert.notEqual(get(b, 0, HEIGHT - 2), 0);
+});

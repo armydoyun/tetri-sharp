@@ -26,10 +26,18 @@ export const createVersusUI = ({ dialog, getStats, onPick }) => {
               { class: "menu-text" },
               el("strong", { text: level.name }),
               el("small", {
-                text: t("초당 {pps}피스 · {hold}", {
-                  pps: level.pps,
-                  hold: !level.hold ? t("홀드 안 씀") : "holdMinGain" in level ? t("홀드 제한적 사용") : t("홀드 사용"),
-                }),
+                // 난이도 차이: 속도·홀드에 더해 바닥에서 밀어 넣기, T-spin을 쓰는지
+                text: [
+                  t("초당 {pps}피스 · {hold}", {
+                    pps: level.pps,
+                    hold: !level.hold
+                      ? t("홀드 안 씀")
+                      : "holdMinGain" in level
+                        ? t("홀드 제한적 사용")
+                        : t("홀드 사용"),
+                  }),
+                  ...("spins" in level ? [t("T-spin")] : "tucks" in level ? [t("밀어 넣기")] : []),
+                ].join(" · "),
               })
             ),
             el("span", {

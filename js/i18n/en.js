@@ -344,6 +344,8 @@ export const EN = {
   "홀드 사용": "uses hold",
   "홀드 제한적 사용": "selective hold",
   "홀드 안 씀": "no hold",
+  "밀어 넣기": "tucks",
+  "T-spin": "T-spins",
   "{n}줄 상쇄": "{n} blocked",
   "{n}줄 보냄": "{n} sent",
   "공격 0줄": "No attack",
