@@ -3046,3 +3046,86 @@ test("리플레이 링크: #replay= 로 열면 바로 재생하고, '이 기록�
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+// 실제 휴대폰 흉내(isMobile → pointer: coarse). hasTouch만 켠 창에서는 드러나지 않던 잘림을 잡는다.
+test("휴대폰: 일시정지·결과 카드가 잘리지 않고, 리플레이 보드는 알아볼 수 있는 크기다", async () => {
+  const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
+  for (const [width, height] of [
+    [320, 568],
+    [390, 664],
+    [750, 342],
+  ]) {
+    const where = `${width}×${height}`;
+    const context = await browser.newContext({
+      locale: "ko-KR",
+      viewport: { width, height },
+      hasTouch: true,
+      isMobile: true,
+    });
+    await context.addInitScript(({ replay, record }) => {
+      localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
+      localStorage.setItem("tetrisharp:replay:last", JSON.stringify(replay));
+      localStorage.setItem("tetrisharp:records", JSON.stringify({ "sprint40|modern": [record] }));
+    }, fixture);
+    const page = await context.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push(e.message));
+    await page.goto(url);
+    assert.equal(await page.evaluate(() => matchMedia("(pointer: coarse)").matches), true);
+
+    /** 버튼이 화면 안에 다 보이고, 가운데를 누르면 그 버튼이 눌리는가 */
+    const reachable = selector =>
+      page.$$eval(selector, els =>
+        els
+          .filter(el => el.checkVisibility())
+          .map(el => {
+            const r = el.getBoundingClientRect();
+            const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+            const inside = r.left >= -1 && r.top >= -1 && r.right <= innerWidth + 1 && r.bottom <= innerHeight + 1;
+            return inside && !!hit && el.contains(hit) ? "" : el.textContent.trim();
+          })
+          .filter(Boolean)
+      );
+    /** 글자가 한 줄을 넘게 꺾인 버튼 라벨 */
+    const wrappedLabels = selector =>
+      page.$$eval(selector, els =>
+        els
+          .filter(el => el.checkVisibility())
+          .filter(el => el.getBoundingClientRect().height > parseFloat(getComputedStyle(el).lineHeight) * 1.5)
+          .map(el => el.textContent.trim())
+      );
+
+    await page.tap('[data-mode="sprint40"]');
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    await page.tap('[data-touch="PAUSE"]');
+    await page.waitForFunction(() => document.body.dataset.screen === "paused");
+    assert.deepEqual(await reachable("#pause .btn"), [], `일시정지 버튼이 다 보인다 · ${where}`);
+
+    await page.tap('#pause [data-action="menu"]');
+    assert.deepEqual(await reachable("#confirm .btn"), [], `확인 버튼이 다 보인다 · ${where}`);
+    await page.tap('[data-confirm="cancel"]');
+    await page.tap('#pause [data-action="resume"]');
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    for (let i = 0; i < 40 && (await page.evaluate(() => document.body.dataset.screen)) !== "results"; i++)
+      await page.tap('[data-touch="HARD"]').catch(() => {});
+    await page.waitForFunction(() => document.body.dataset.screen === "results");
+    assert.deepEqual(await reachable("#results .actions .btn"), [], `결과 버튼이 다 보인다 · ${where}`);
+    assert.deepEqual(
+      await wrappedLabels("#results .actions .btn-label"),
+      [],
+      `결과 버튼 글자가 꺾이지 않는다 · ${where}`
+    );
+    assert.equal(await page.locator("#results-stats").isVisible(), true, `결과 통계가 보인다 · ${where}`);
+
+    await page.goto(url);
+    await page.tap("#watch-last");
+    await page.waitForFunction(() => document.body.dataset.screen === "replay");
+    await page.waitForTimeout(100);
+    const board = await page.locator("#board").boundingBox();
+    assert.ok(board.width >= 110 && board.height >= 150, `리플레이 보드 ${board.width}×${board.height} · ${where}`);
+    await page.locator('[data-replay="share"]').scrollIntoViewIfNeeded();
+    assert.deepEqual(await reachable(".replay-bar .btn"), [], `리플레이 조작이 스크롤로 다 닿는다 · ${where}`);
+    assert.deepEqual(errors, []);
+    await context.close();
+  }
+});

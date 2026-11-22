@@ -1630,6 +1630,13 @@ new ResizeObserver(() => {
   if (screen === "replay") renderTimelineMarks();
 }).observe(replayMarkers);
 
+// 리플레이 조작 줄의 실제 높이: 휴대폰 세로에서 보드가 남는 높이를 정확히 쓰게 한다(css/game.css).
+// 조작 줄 높이는 언어·화면 폭에 따라 240~300px로 달라 고정값으로 빼면 보드가 너무 작아지거나 화면을 넘친다.
+new ResizeObserver(() => {
+  const h = replayBar.hidden ? 0 : Math.ceil(replayBar.getBoundingClientRect().height);
+  if (h) document.body.style.setProperty("--replay-bar-h", `${h}px`);
+}).observe(replayBar);
+
 const renderMarkers = () => {
   renderTimelineMarks();
   const markers = analysis?.markers ?? [];
