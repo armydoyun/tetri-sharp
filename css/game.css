@@ -1922,8 +1922,9 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
   }
 }
 
-@media (pointer: fine) and (max-width: 600px),
-       (pointer: fine) and (max-height: 450px) {
+/* 좁거나 낮은 화면: 일시정지·확인·결과 카드를 작은 보드에 가두지 않고 화면 전체를 덮는다.
+   마우스든 터치든 같다(터치 휴대폰에서 카드가 보드 밖으로 잘려 버튼을 못 누르던 문제). */
+@media (max-width: 600px), (max-height: 500px) {
   .board-wrap:has(> .panel:not([hidden])) {
     overflow: visible;
   }
