@@ -108,7 +108,7 @@ body[data-screen="menu"] .stage {
 }
 
 /* ================= 첫 화면 =================
-   넓은 화면: [규칙·모드 | 도구] 두 칸. 좁으면 한 칸(규칙 → 모드 → 도구). */
+   넓은 화면: [모드·규칙 | 도구] 두 칸. 좁으면 한 칸(모드 → 규칙 → 도구). */
 
 .home {
   width: min(1120px, 100%);
@@ -294,6 +294,18 @@ body[data-screen="menu"] .stage {
 
 /* 터치 버튼을 쓸 때는 키보드 조작법을 숨긴다(설정으로만 바뀐다) */
 body.touch-on .help-card {
+  display: none;
+}
+
+/* 마우스·트랙패드가 없는 기기(휴대폰)에서는 첫 화면에도 키보드 조작법을 두지 않는다 */
+@media not (any-pointer: fine) {
+  .help-card {
+    display: none;
+  }
+}
+
+/* 첫 화면 알림 줄은 알릴 것이 있을 때만 자리를 차지한다(비어 있으면 조작법이 홀로 떨어져 보인다) */
+.menu-notice:empty {
   display: none;
 }
 
@@ -2022,7 +2034,6 @@ body[data-screen="results"] #action { display: none; }
   .home { display: flex; flex-direction: column; }
   .home-main, .home-side { display: contents; }
   .home-modes, .home .home-block, .home .welcome, .home .help-card { width: 100%; }
-  .home .rule-card { order: 1; }
 }
 
 @media (max-width: 600px) {

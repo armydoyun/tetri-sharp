@@ -513,7 +513,7 @@ const dailyRow = () => {
   const name = document.createElement("strong");
   name.textContent = t("오늘의 도전");
   const desc = document.createElement("small");
-  desc.textContent = `${key} · ${t("모두 같은 블록 순서로 40줄 · 결과를 공유해 겨루기")}`;
+  desc.textContent = `${key} · ${t("모두 같은 블록 순서로 40줄")}`;
   text.append(name, desc);
   const pb = document.createElement("span");
   pb.className = "mode-best num";
@@ -638,7 +638,11 @@ const toMenu = (initial = false) => {
   showPanel("menu");
   // 이어 할 판이 있으면 Enter로 복원하고, 없으면 마지막 모드에 포커스를 둔다.
   const defaultMode = /** @type {HTMLElement | null} */ (panels.menu.querySelector(`[data-mode="${mode.id}"]`));
-  (continueRun.hidden ? defaultMode : continueRun)?.focus({ preventScroll: initial });
+  // 처음 열 때는 포커스만 두고(Enter로 바로 시작) 테두리는 그리지 않는다 — "골라 둔 모드"처럼 보이지 않게.
+  // 게임에서 돌아올 때는 키보드로 오가는 중일 수 있으니 브라우저가 정한 대로 보인다.
+  (continueRun.hidden ? defaultMode : continueRun)?.focus(
+    /** @type {FocusOptions} */ ({ preventScroll: initial, ...(initial ? { focusVisible: false } : {}) })
+  );
 };
 
 const showModeHud = (m, replay = false) => {
