@@ -16,12 +16,21 @@ const TYPES = {
   ".svg": "image/svg+xml",
 };
 let dir, server, base, browser;
+let shellStatus = 200;
 
 before(async () => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), "tetrisharp-pages-"));
   await buildPages({ outDir: dir });
   server = http.createServer((req, res) => {
     const name = req.url === "/" ? "index.html" : decodeURIComponent(req.url.split("?")[0].slice(1));
+    if (name === "index.html" && shellStatus !== 200) {
+      res.writeHead(shellStatus, { "Content-Type": "text/html" });
+      return res.end("<title>Unavailable</title>");
+    }
+    if (name === "other.html") {
+      res.writeHead(200, { "Content-Type": "text/html" });
+      return res.end("<title>Other page</title>");
+    }
     const file = path.join(dir, name);
     if (!file.startsWith(dir) || !fs.existsSync(file)) {
       res.writeHead(404);
@@ -57,22 +66,43 @@ test("배포본 파일: index.html·매니페스트·아이콘·서비스 워커
   assert.match(fs.readFileSync(path.join(dir, "sw.js"), "utf8"), /const VERSION = "[0-9a-f]{12}"/);
 });
 
-test("한 번 열면 서비스 워커가 저장해 두고, 인터넷이 끊겨도 다시 열린다", async () => {
+test("설치 캐시로 서버 장애와 오프라인 상태에서도 기록·리플레이·Sprint에 접근한다", async () => {
   const context = await browser.newContext({ locale: "ko-KR" });
-  const page = await context.newPage();
+  const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
   const errors = [];
-  page.on("pageerror", e => errors.push(e.message));
-  await page.goto(base);
-  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
-  await page.evaluate(() => navigator.serviceWorker.ready);
-  // 서비스 워커가 페이지를 맡을 때까지(첫 방문은 claim으로)
-  await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller), null, { timeout: 5000 });
+  const ready = page => page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  try {
+    const page = await context.newPage();
+    page.on("pageerror", e => errors.push(e.message));
+    await page.goto(base);
+    await ready(page);
+    await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller), null, { timeout: 5000 });
+    await page.evaluate(({ record, replay }) => {
+      localStorage.setItem("tetrisharp:records", JSON.stringify({ "sprint40|modern": [record] }));
+      localStorage.setItem("tetrisharp:replay:last", JSON.stringify(replay));
+    }, fixture);
 
-  await context.setOffline(true);
-  await page.reload();
-  await page.waitForFunction(() => document.documentElement.dataset.ready === "1", null, { timeout: 5000 });
-  assert.equal(await page.title(), "Tetri#");
-  assert.equal(await page.locator("#menu").isVisible(), true, "인터넷 없이 메뉴까지 뜬다");
-  assert.deepEqual(errors, []);
-  await context.close();
+    shellStatus = 503;
+    await page.reload();
+    await ready(page);
+    await page.goto(new URL("other.html", base).href);
+    assert.equal(await page.title(), "Other page");
+    await page.close();
+
+    await context.setOffline(true);
+    const offline = await context.newPage();
+    offline.on("pageerror", e => errors.push(e.message));
+    await offline.goto(new URL("index.html", base).href);
+    await ready(offline);
+    assert.match(await offline.locator('[data-mode="sprint40"] .mode-best').textContent(), /최고 기록/);
+    await offline.click("#watch-last");
+    assert.equal(await offline.locator("#replay-bar").isVisible(), true);
+    await offline.click('[data-replay="exit"]');
+    await offline.click('[data-mode="sprint40"]');
+    await offline.waitForFunction(() => document.body.dataset.screen === "play");
+    assert.deepEqual(errors, []);
+  } finally {
+    shellStatus = 200;
+    await context.close();
+  }
 });

@@ -569,10 +569,13 @@ export const EN = {
   "읽을 수 없는 백업 파일이에요.": "Can't read this backup file.",
   "백업{when}에는 기록 {records}개, 리플레이 {replays}개가 있어요.":
     "The backup{when} has {records} records and {replays} replays.",
-  "지금 이 브라우저의 설정·기록·리플레이를 백업 내용으로 바꿀까요?":
-    "Replace the settings, records and replays in this browser with the backup?",
+  "퍼즐 완료 {puzzles}개 · 훈련 완료 {practice}개 · Sprint 시도 {attempts}개":
+    "Puzzles cleared {puzzles} · Practice stages cleared {practice} · Sprint runs {attempts}",
+  "백업에 포함되지 않은 연습·퍼즐·Sprint 진행도는 유지돼요.":
+    "Practice, puzzle and Sprint progress missing from the backup will be kept.",
+  "백업을 저장하지 못했어요. 기존 데이터는 그대로예요.": "Could not save the backup. Your existing data is intact.",
+  "이 브라우저에 저장된 데이터를 백업 내용으로 바꿀까요?": "Replace the data stored in this browser with the backup?",
   "백업을 불러왔어요 · 기록 {records}개, 리플레이 {replays}개": "Backup loaded · {records} records, {replays} replays",
-  "일부를 저장하지 못했어요. 저장 공간을 확인해 주세요.": "Some data couldn't be saved. Check your browser storage.",
 
   // ---- 기록 화면 ----
   "이름 없음": "No name",

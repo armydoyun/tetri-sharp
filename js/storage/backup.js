@@ -47,7 +47,7 @@ const shortText = v => (typeof v === "string" ? v.slice(0, MAX_TEXT) : undefined
 
 /**
  * 파일에서 읽은 값을 검사해 저장해도 되는 항목만 남긴다. 백업 파일이 아니면 null.
- * @returns {null | { date: string, data: Record<string, any>, summary: { records: number, replays: number } }}
+ * @returns {null | { date: string, data: Record<string, any>, summary: { records: number, replays: number, puzzles: number, practice: number, attempts: number } }}
  */
 export const parseBackup = (raw, findMode) => {
   if (!isPlainObject(raw) || raw.app !== APP || raw.kind !== BACKUP_KIND || raw.v !== BACKUP_VERSION) return null;
@@ -114,7 +114,13 @@ export const parseBackup = (raw, findMode) => {
   return {
     date: typeof raw.date === "string" ? raw.date.slice(0, 40) : "",
     data,
-    summary: { records: recordCount, replays: replayCount },
+    summary: {
+      records: recordCount,
+      replays: replayCount,
+      puzzles: data["puzzle:cleared"]?.length ?? 0,
+      practice: Object.keys(data[PRACTICE_PROGRESS_KEY] ?? {}).length,
+      attempts: Object.values(data[SPRINT_HISTORY_KEY] ?? {}).reduce((count, attempts) => count + attempts.length, 0),
+    },
   };
 };
 
@@ -123,7 +129,7 @@ export const parseBackup = (raw, findMode) => {
  * @returns {boolean} 모두 저장했으면 true
  */
 export const restoreBackup = (store, parsed) => {
-  let ok = true;
+  const values = {};
   for (const key of BACKUP_KEYS) {
     // 이전 버전의 백업에는 이 진행도 항목이 없으므로 기존 값을 보존한다.
     if (
@@ -131,8 +137,7 @@ export const restoreBackup = (store, parsed) => {
       !(key in parsed.data)
     )
       continue;
-    const value = parsed.data[key] ?? (key === "settings" ? sanitizeSettings(null) : null);
-    if (!store.set(key, value)) ok = false;
+    values[key] = parsed.data[key] ?? (key === "settings" ? sanitizeSettings(null) : null);
   }
-  return ok;
+  return store.setMany(values);
 };

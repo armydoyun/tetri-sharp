@@ -34,7 +34,9 @@ export const setupBackup = ({
   });
 
   importButton.addEventListener("click", () => fileInput.click());
+  let request = 0;
   fileInput.addEventListener("change", async () => {
+    const current = ++request;
     const file = fileInput.files?.[0];
     fileInput.value = "";
     if (!file || !canImport()) return;
@@ -44,11 +46,12 @@ export const setupBackup = ({
     } catch {
       parsed = null;
     }
+    if (current !== request || !canImport()) return;
     if (!parsed) {
       notify(t("읽을 수 없는 백업 파일이에요."));
       return;
     }
-    const { records: count, replays: replayCount } = parsed.summary;
+    const { records: count, replays: replayCount, puzzles, practice, attempts } = parsed.summary;
     const when = parsed.date ? ` (${parsed.date.slice(0, 10)})` : "";
     const message =
       t("백업{when}에는 기록 {records}개, 리플레이 {replays}개가 있어요.", {
@@ -57,14 +60,17 @@ export const setupBackup = ({
         replays: replayCount,
       }) +
       "\n" +
-      t("지금 이 브라우저의 설정·기록·리플레이를 백업 내용으로 바꿀까요?");
+      t("퍼즐 완료 {puzzles}개 · 훈련 완료 {practice}개 · Sprint 시도 {attempts}개", { puzzles, practice, attempts }) +
+      "\n" +
+      t("백업에 포함되지 않은 연습·퍼즐·Sprint 진행도는 유지돼요.") +
+      "\n" +
+      t("이 브라우저에 저장된 데이터를 백업 내용으로 바꿀까요?");
     if (!confirmImport(message)) return;
-    const ok = restoreBackup(store, parsed);
+    if (!restoreBackup(store, parsed)) {
+      notify(t("백업을 저장하지 못했어요. 기존 데이터는 그대로예요."));
+      return;
+    }
     onRestored();
-    notify(
-      ok
-        ? t("백업을 불러왔어요 · 기록 {records}개, 리플레이 {replays}개", { records: count, replays: replayCount })
-        : t("일부를 저장하지 못했어요. 저장 공간을 확인해 주세요.")
-    );
+    notify(t("백업을 불러왔어요 · 기록 {records}개, 리플레이 {replays}개", { records: count, replays: replayCount }));
   });
 };

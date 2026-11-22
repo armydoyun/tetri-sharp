@@ -6,6 +6,7 @@ import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 import { build } from "../../tools/build.mjs";
 import { launchOptions } from "../helpers/browser.mjs";
@@ -1385,6 +1386,105 @@ test("전체 흐름: Survival 한 판 → 결과·새 기록 → 기록표 리�
   assert.equal(await page.locator("#watch-last").isDisabled(), false, "마지막 판 리플레이도 돌아온다");
   assert.deepEqual(errors, []);
   await context.close();
+});
+
+test("단일 HTML 파일을 처음부터 오프라인에서 열어 Sprint를 시작한다", async t => {
+  const context = await browser.newContext({ locale: "ko-KR", offline: true });
+  try {
+    const page = await context.newPage();
+    try {
+      await page.goto(pathToFileURL(path.join(dir, "index.html")).href);
+    } catch (error) {
+      if (!error.message.includes("ERR_BLOCKED_BY_ADMINISTRATOR")) throw error;
+      return t.skip("Chromium 관리 정책에서 file: 탐색을 막습니다.");
+    }
+    await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+    await startMode(page, "sprint40");
+  } finally {
+    await context.close();
+  }
+});
+
+test("네트워크 없이 단일 HTML에서 이전 백업을 확인하고 안전하게 복원한다", async () => {
+  const context = await browser.newContext({ locale: "ko-KR", offline: true });
+  const { replay, record } = JSON.parse(
+    fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8")
+  );
+  const backup = {
+    app: "tetri-sharp",
+    kind: "backup",
+    v: 1,
+    date: "2026-01-01T00:00:00Z",
+    data: {
+      settings: { access: { countdown: "off" } },
+      records: { "sprint40|modern": [record] },
+      "replay:best": { "sprint40|modern": replay },
+      "replay:last": replay,
+    },
+  };
+  const file = { name: "old-backup.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(backup)) };
+  const ready = page => page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  const best = page => page.locator('[data-mode="sprint40"] .mode-best').textContent();
+  const errors = [];
+  const extraRequests = [];
+  await context.route("**/*", route => {
+    if (route.request().url() === url) return route.fulfill({ contentType: "text/html; charset=utf-8", body: html });
+    extraRequests.push(route.request().url());
+    return route.abort();
+  });
+  try {
+    const page = await context.newPage();
+    page.on("pageerror", error => errors.push(error.message));
+    await page.goto(url);
+    await ready(page);
+    await startMode(page, "sprint40");
+    await page.reload();
+    await ready(page);
+
+    await page.evaluate(() => localStorage.setItem("tetrisharp:practice:progress", '{"intro-1":"clear"}'));
+    await page.setInputFiles("#backup-file", { ...file, buffer: Buffer.from("{") });
+    await page.waitForFunction(() => document.getElementById("menu-notice")?.textContent.includes("읽을 수 없는"));
+
+    await page.evaluate(() => {
+      const setItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (key, value) {
+        if (key === "tetrisharp:restore") throw new DOMException("quota", "QuotaExceededError");
+        return setItem.call(this, key, value);
+      };
+    });
+
+    const messages = [];
+    page.on("dialog", async dialog => {
+      messages.push(dialog.message());
+      await dialog.accept();
+    });
+    await page.setInputFiles("#backup-file", file);
+    await page.waitForFunction(() => document.getElementById("menu-notice")?.textContent.includes("저장하지 못했어요"));
+    assert.match(messages[0], /기록 1개, 리플레이 2개/);
+    assert.match(messages[0], /퍼즐 완료 0개 · 훈련 완료 0개 · Sprint 시도 0개/);
+    assert.equal(await best(page), "");
+    assert.equal(await page.locator("#watch-last").isDisabled(), true);
+
+    await page.reload();
+    await ready(page);
+    await page.setInputFiles("#backup-file", file);
+    await page.waitForFunction(() => document.getElementById("menu-notice")?.textContent.includes("백업을 불러왔어요"));
+    await page.reload();
+    await ready(page);
+    assert.match(await best(page), /최고 기록/);
+    assert.equal(
+      await page.evaluate(() => localStorage.getItem("tetrisharp:practice:progress")),
+      '{"intro-1":"clear"}'
+    );
+    await page.click("#watch-last");
+    assert.equal(await visible(page, "replay-bar"), true);
+    await page.click('[data-replay="exit"]');
+    await startMode(page, "sprint40");
+    assert.deepEqual(errors, []);
+    assert.deepEqual(extraRequests, []);
+  } finally {
+    await context.close();
+  }
 });
 
 test("Survival 목표는 30초에 갱신되고, 같은 시드 재도전 결과는 이전 최고와 비교한다", async () => {
