@@ -1,6 +1,7 @@
 // 오늘의 도전 대화상자: 도전하기 · 내 결과 공유(코드·링크) · 받은 코드로 겨루기
 import { button, el, fieldRow, fillDialog } from "./dom.js";
 import { t } from "../i18n/index.js";
+import { dropdown } from "./select.js";
 
 /**
  * @param {{
@@ -75,13 +76,20 @@ export const createDailyUI = ({ dialog, dates, getEntry, makeCode, makeLink, onS
 
   const render = (pasted = "") => {
     const keys = dates();
-    const picker = el(
-      "select",
-      { id: "daily-date", class: "text-input num", "aria-label": t("도전 날짜") },
-      ...keys.map((key, index) =>
-        el("option", { value: key, text: index === 0 ? t("오늘 · {date}", { date: key }) : key })
-      )
-    );
+    // 날짜 고르기: 브라우저 기본 <select> 대신 다른 대화상자와 같은 드롭다운(docs/DESIGN_SYSTEM.md)
+    let pickedDate = keys[0];
+    const picker = dropdown({
+      id: "daily-date",
+      label: t("도전 날짜"),
+      options: keys.map((key, index) => ({ value: key, label: index === 0 ? t("오늘 · {date}", { date: key }) : key })),
+      value: pickedDate,
+      onChange: value => {
+        pickedDate = value;
+        notice.textContent = "";
+        void updateEntry();
+      },
+    });
+    picker.classList.add("num", "daily-date");
     const best = el("span", { class: "daily-best num", id: "daily-best", "aria-live": "polite" });
     const play = button({ text: t("도전하기"), iconName: "play", className: "btn btn-primary", id: "daily-start" });
     const watch = button({
@@ -97,7 +105,7 @@ export const createDailyUI = ({ dialog, dates, getEntry, makeCode, makeLink, onS
 
     const updateEntry = async () => {
       const current = ++version;
-      entry = getEntry(picker.value);
+      entry = getEntry(pickedDate);
       best.textContent = entry.best
         ? t("최고 기록 {record}", { record: entry.mode.formatRecord(entry.best) })
         : t("이 날짜의 기록이 없어요");
@@ -113,10 +121,6 @@ export const createDailyUI = ({ dialog, dates, getEntry, makeCode, makeLink, onS
         }
       }
     };
-    picker.addEventListener("change", () => {
-      notice.textContent = "";
-      void updateEntry();
-    });
     play.addEventListener("click", () => {
       dialog.close();
       onStart(entry.mode);
@@ -133,7 +137,7 @@ export const createDailyUI = ({ dialog, dates, getEntry, makeCode, makeLink, onS
         class: "text-input num",
         type: "text",
         value: pasted,
-        placeholder: t("TD1-로 시작하는 코드나 링크"),
+        placeholder: t("TD1- 코드나 링크"),
         autocomplete: "off",
         spellcheck: false,
       })

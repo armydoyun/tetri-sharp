@@ -1164,7 +1164,7 @@ body.touch-on :is(.btn, .btn-small, .key-slot, .select, .text-input, .choice > b
   gap: 2px;
 }
 
-.daily-today select {
+.daily-today .select {
   width: fit-content;
   max-width: 100%;
 }
@@ -1205,6 +1205,17 @@ body.touch-on :is(.btn, .btn-small, .key-slot, .select, .text-input, .choice > b
 @media (max-width: 560px) {
   .daily-head {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 좁은 휴대폰: 받은 코드 칸이 옆 버튼에 밀려 안내 글자가 잘리지 않게 칸을 한 줄 다 쓰고 버튼은 아래로 */
+@media (max-width: 420px) {
+  .inline-control:has(> #daily-paste) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .inline-control:has(> #daily-paste) > .btn {
+    justify-self: start;
   }
 }
 

@@ -2086,26 +2086,30 @@ test("최근 도전: 날짜별 최고 기록을 다시 보고 같은 시드로 �
     await page.clock.setFixedTime(new Date(2026, 10, 21, 12));
     const open = () => page.click('[data-mode="daily"]');
     const picker = page.locator("#daily-date");
+    const pick = value => choose(page, "daily-date", value);
     await open();
-    assert.equal(await picker.inputValue(), "2026-11-21");
-    assert.equal(await picker.locator("option").count(), 7);
+    assert.equal(await picker.getAttribute("data-value"), "2026-11-21");
+    await picker.click();
+    assert.equal(await page.locator("#daily-date-list [role=option]").count(), 7);
+    await page.keyboard.press("Escape");
+    assert.equal(await visible(page, "daily"), true, "Esc는 목록만 닫는다");
     assert.equal(await text(page, "daily-best"), "이 날짜의 기록이 없어요");
-    await picker.selectOption(date);
+    await pick(date);
     assert.match(await text(page, "daily-best"), /최고 기록/);
     await page.locator("#daily-code").waitFor();
     const shared = await decodeReplayCode(await page.locator("#daily-code").inputValue());
     assert.equal(shared.mode, replay.mode);
     assert.equal(shared.seed, replay.seed);
-    await picker.selectOption("2026-11-20");
+    await pick("2026-11-20");
     assert.equal(await page.locator("#daily-watch").isVisible(), false);
     assert.equal(await page.locator("#daily-code").count(), 0);
 
-    await picker.selectOption(date);
+    await pick(date);
     await page.click("#daily-watch");
     assert.match(await text(page, "replay-title"), new RegExp(date));
     await page.click('[data-replay="exit"]');
     await open();
-    await picker.selectOption(date);
+    await pick(date);
     await page.click("#daily-start");
     assert.match(await text(page, "session-title"), new RegExp(date));
     for (let i = 0; i < 60 && !(await visible(page, "results")); i++) {

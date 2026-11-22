@@ -367,7 +367,7 @@ export const EN = {
   "받은 결과와 겨루기": "Race a result you received",
   "받은 코드": "Received code",
   "같은 날 같은 블록 순서로 상대 리플레이와 함께 달려요": "Race their replay with the same pieces",
-  "TD1-로 시작하는 코드나 링크": "A code starting with TD1- or a link",
+  "TD1- 코드나 링크": "TD1- code or link",
   겨루기: "Race",
   상대: "Opponent",
   "{name}의 기록": "{name}'s run",
