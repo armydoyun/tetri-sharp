@@ -880,6 +880,8 @@ const renderResultSplits = () => {
         ? ""
         : t("완료한 비교 구간에서 잃은 시간이 없어요.");
   $("results-split-note").textContent = note;
+  // 첫 구간(10줄)에 닿기 전에 끝났으면 머리줄뿐인 빈 표 대신 안내만 보인다
+  /** @type {HTMLTableElement} */ ($("results-splits").querySelector("table")).hidden = rows.length === 0;
   if (replay && mode.id === "sprint40") {
     let target = null;
     if (!slowest && rows.every(row => row.delta === null)) {
