@@ -515,6 +515,20 @@
   font-weight: 700;
 }
 
+/* 번호가 있는 목록(연습·CPU 대전 등): 번호는 제목 줄 높이에 맞춘다.
+   가운데 정렬이면 설명이 두 줄일 때 번호가 제목과 설명 사이에 떠 보인다. 화살표만 가운데. */
+.menu-row:has(> .menu-index) {
+  align-items: start;
+}
+
+.menu-row:has(> .menu-index) > .menu-index {
+  line-height: calc(var(--text-xl) * 1.2);
+}
+
+.menu-row:has(> .menu-index) > .icon {
+  align-self: center;
+}
+
 .menu-row:hover .menu-index,
 .menu-row:focus-visible .menu-index {
   color: var(--accent);

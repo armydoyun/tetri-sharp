@@ -610,8 +610,8 @@ export const EN = {
   "아직 기록이 없어요": "No records yet",
 
   // ---- 연습 ----
-  "중력이 없어요. 소프트 드롭으로 내려 자리에 맞춰 돌려 넣으세요. 기록은 남지 않아요.":
-    "No gravity. Soft drop to bring the piece down, then rotate it into place. No records are kept.",
+  "중력이 없어요. 소프트 드롭으로 내려 돌려 넣으세요. 끝낸 연습은 완료로 표시돼요.":
+    "No gravity. Soft drop the piece and rotate it into place. Finished drills are marked done.",
   "좌우가 바뀌는 T-spin Double 자리에 T를 돌려 넣기": "Spin a T into a T-spin Double slot that switches sides",
   "지붕 아래로 T를 돌려 넣어 세 줄 지우기 · 좌우가 바뀌어요":
     "Spin a T under the overhang to clear three lines · switches sides",

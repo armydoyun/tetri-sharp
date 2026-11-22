@@ -117,7 +117,7 @@ export const createPracticeUI = ({ dialog, onPick, progress, onStage }) => {
           }
         )
       );
-      notice.textContent = t("중력이 없어요. 소프트 드롭으로 내려 자리에 맞춰 돌려 넣으세요. 기록은 남지 않아요.");
+      notice.textContent = t("중력이 없어요. 소프트 드롭으로 내려 돌려 넣으세요. 끝낸 연습은 완료로 표시돼요.");
       fillDialog(dialog, {
         title: t("연습"),
         body: el("div", {}, el("section", { class: "field-section" }, list)),
