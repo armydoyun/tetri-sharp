@@ -12,6 +12,13 @@ import { decodeReplayCode, encodeReplayCode, replayLink } from "./replay/share.j
 import { createDailyUI } from "./ui/daily.js";
 import { formatScore, formatTime } from "./modes/format.js";
 import { createStore } from "./storage/store.js";
+import {
+  createRunJournal,
+  readSuspendedRun,
+  replayRunJournal,
+  runFingerprint,
+  SUSPENDED_RUN_KEY,
+} from "./storage/suspended-run.js";
 import { loadSettings, sanitizeSettings, saveSettings, toEngineHandling } from "./storage/settings.js";
 import { createRecords } from "./storage/records.js";
 import { createSettingsUI } from "./ui/settings.js";
@@ -77,6 +84,7 @@ const MAX_CATCH_UP_MS = 250; // 시간이 크게 튀면(탭 복귀 등) 한꺼�
 const READY_FRAMES = 40; // "READY"
 /** 카운트다운 길이 설정 → 프레임 */
 const COUNTDOWN_FRAMES = { normal: READY_FRAMES, short: 15, off: 0 };
+const SAVE_INTERVAL = 600; // 강제 종료에 대비해 10초마다 저장한다.
 const GO_FRAMES = 20; // "GO!" — 이 동안에는 이미 플레이 중
 
 const $ = id => /** @type {HTMLElement} */ (document.getElementById(id));
@@ -193,6 +201,94 @@ let goTimer = 0;
 let finesse = null;
 let acc = 0;
 let last = performance.now();
+
+// ---- 이어서 하기 ----
+let runJournal = null;
+let savedRunId = null;
+let lastSavedStep = -1;
+let restoringRun = false;
+const continueRun = /** @type {HTMLButtonElement} */ ($("continue-run"));
+const savedRun = () => readSuspendedRun(store.get(SUSPENDED_RUN_KEY, null));
+const getRunMode = entry => {
+  if (entry.mode === "custom-puzzle") {
+    const puzzle = decodePuzzle(entry.puzzle);
+    return puzzle
+      ? { ...customPuzzleMode(puzzle), puzzleCode: entry.puzzle, trialCode: entry.trial ? entry.puzzle : null }
+      : null;
+  }
+  const found =
+    [INTRO_LESSONS, BATTLE_LESSONS, BUILD_LESSONS, DOWNSTACK_LESSONS, FINESSE_LESSONS]
+      .flat()
+      .find(item => item.id === entry.mode) ?? findMode(entry.mode);
+  return found.id === entry.mode ? found : null;
+};
+const renderContinue = () => {
+  const entry = savedRun();
+  const m = entry && getRunMode(entry);
+  continueRun.hidden = !m;
+  if (m)
+    $("continue-run-info").textContent = t("{mode} · {time} · {lines}줄", {
+      mode: m.name,
+      time: formatTime(entry.frame),
+      lines: entry.lines,
+    });
+};
+const beginJournal = (seed, target, scene = null) => {
+  if (restoringRun) return;
+  savedRunId = savedRun()?.id ?? null;
+  lastSavedStep = -1;
+  runJournal = createRunJournal({
+    id: Array.from(crypto.getRandomValues(new Uint32Array(4))).join("-"),
+    mode: mode.id,
+    seed,
+    rules,
+    handling: settings.handling,
+    name: runPlayerName,
+    target,
+    puzzle: mode.puzzleCode,
+    trial: Boolean(mode.trialCode),
+    scene,
+    resultPbSplits,
+    pbSplits,
+  });
+};
+const saveRun = (force = true) => {
+  if (restoringRun || !runJournal || !game || game.state.over || scenePractice?.ended) return;
+  const entry = runJournal.entry;
+  if (!force && entry.steps - lastSavedStep < SAVE_INTERVAL) return;
+  const current = savedRun();
+  if ((current?.id ?? null) !== savedRunId) {
+    lastSavedStep = entry.steps;
+    if (screen === "paused") $("resume-save-status").textContent = t("다른 창에서 저장된 판이 바뀌었어요.");
+    return;
+  }
+  const snapshot = {
+    ...entry,
+    frame: game.state.frame,
+    lines: game.state.stats.lines,
+    fingerprint: runFingerprint(game, scenePractice ? null : (versus?.cpu ?? race?.player.game)),
+  };
+  if (store.set(SUSPENDED_RUN_KEY, snapshot)) {
+    savedRunId = entry.id;
+    lastSavedStep = entry.steps;
+    if (screen === "paused") $("resume-save-status").textContent = t("이 기기에 저장됐어요.");
+  } else {
+    // 재시도 간격을 유지하고, 일시정지·창 닫기 때는 다시 시도한다.
+    lastSavedStep = entry.steps;
+    if (screen === "paused")
+      $("resume-save-status").textContent = t("저장 공간을 확인해 주세요. 이번 진행을 저장하지 못했어요.");
+  }
+};
+const clearRun = () => {
+  if (runJournal && savedRun()?.id === runJournal.entry.id) store.set(SUSPENDED_RUN_KEY, null);
+  runJournal = null;
+};
+const canReplaceRun = () => {
+  const current = savedRun();
+  return (
+    !current || (runJournal && current.id === savedRunId) || window.confirm(t("저장된 판을 지우고 새 판을 시작할까요?"))
+  );
+};
 
 // ---- 표시 도우미 ----
 
@@ -521,12 +617,12 @@ const toMenu = (initial = false) => {
   setScreen("menu");
   countdownEl.hidden = true;
   renderMenu();
+  renderContinue();
   /** @type {HTMLButtonElement} */ ($("watch-last")).disabled = !replays.last();
   showPanel("menu");
-  // 마지막으로 한 모드에 포커스를 둔다 → Enter로 바로 시작.
-  /** @type {HTMLElement | null} */ (panels.menu.querySelector(`[data-mode="${mode.id}"]`))?.focus({
-    preventScroll: initial,
-  });
+  // 이어 할 판이 있으면 Enter로 복원하고, 없으면 마지막 모드에 포커스를 둔다.
+  const defaultMode = /** @type {HTMLElement | null} */ (panels.menu.querySelector(`[data-mode="${mode.id}"]`));
+  (continueRun.hidden ? defaultMode : continueRun)?.focus({ preventScroll: initial });
 };
 
 const showModeHud = (m, replay = false) => {
@@ -541,19 +637,21 @@ const start = (
   m,
   selectedRules = currentRules(),
   target = null,
-  retrySeed = /** @type {number | undefined} */ (undefined)
+  retrySeed = /** @type {number | undefined} */ (undefined),
+  restored = null
 ) => {
+  if (restoringRun ? !restored : !canReplaceRun()) return;
   confirming = null;
   if (screen === "replay") stopReplay();
   mode = m;
-  if (!m.practice && m.id !== "custom-puzzle") store.set("lastMode", m.id);
+  if (!restoringRun && !m.practice && m.id !== "custom-puzzle") store.set("lastMode", m.id);
   rules = selectedRules;
-  runPlayerName = records.playerName;
+  runPlayerName = restored?.name ?? records.playerName;
   const seed = target?.replay.seed ?? retrySeed ?? m.fixedSeed ?? (Math.random() * 2 ** 32) >>> 0;
   $("race-label").textContent = target?.friend ? t("{name}의 기록", { name: target.friend }) : t("내 최고 기록");
   race = target ? { target, player: createPlayer(target.replay, findMode) } : null;
   racePanel.hidden = !race;
-  game = createGame({ rules, handling: toEngineHandling(settings.handling), seed, mode: m });
+  game = createGame({ rules, handling: toEngineHandling(restored?.handling ?? settings.handling), seed, mode: m });
   updateRaceProgress();
   // 대전: CPU도 같은 시드(같은 블록 순서)로 시작한다. 상대와 함께라야 재현되므로 리플레이는 남기지 않는다.
   if (m.versus) {
@@ -583,6 +681,10 @@ const start = (
     }
   }
   pbSplits = target?.splits ?? resultPbSplits;
+  if (restored) {
+    resultPbSplits = restored.resultPbSplits;
+    pbSplits = restored.pbSplits;
+  }
   acc = 0;
   countdown = hasLessonHints(m) || m.battleLesson ? 0 : (COUNTDOWN_FRAMES[settings.access.countdown] ?? READY_FRAMES);
   if (hasLessonHints(m)) resetLessonHint();
@@ -598,6 +700,9 @@ const start = (
   countdownEl.dataset.phase = "ready";
   $("countdown-label").textContent = t("준비");
   // 카운트다운 "없음": 바로 시작
+  if (restoringRun) return;
+  beginJournal(seed, target);
+  saveRun();
   if (countdown <= 0) {
     countdownEl.hidden = true;
     setScreen("play");
@@ -609,10 +714,13 @@ const start = (
 let pausedFrom = /** @type {"play" | "countdown"} */ ("play");
 
 const pause = () => {
+  if (restoringRun) return;
   if (screen !== "play" && screen !== "countdown") return;
   pausedFrom = screen;
   setScreen("paused");
   showPanel("pause");
+  $("resume-save-status").textContent = "";
+  saveRun();
 };
 
 $("pause-game").addEventListener("click", pause);
@@ -664,7 +772,14 @@ const acceptConfirm = () => {
   if (!kind) return;
   confirming = null;
   if (kind === "restart") start(mode, rules, race?.target);
-  else toMenu();
+  else {
+    clearRun();
+    if (scenePractice) {
+      exitScenePractice();
+      stopReplay();
+    }
+    toMenu();
+  }
 };
 
 for (const btn of panels.confirm.querySelectorAll("[data-confirm]")) {
@@ -835,6 +950,7 @@ const survivalResultText = (frame, previousBest) => {
 const finish = () => {
   if (!game) return;
   const state = game.state;
+  clearRun();
   setScreen("results");
   countdownEl.hidden = true;
   if (mode.id === "sprint40" && state.stats.pieces > 0)
@@ -1014,8 +1130,9 @@ const settingsUI = createSettingsUI({
     applyTouch();
     applyScheme();
     if (game && screen !== "replay") {
-      game.setHandling(toEngineHandling(settings.handling));
-      recorder?.handlingChanged(game.handling);
+      applyRunHandling(settings.handling);
+      runJournal?.action("handling", settings.handling);
+      saveRun();
     }
     renderKeyHelp();
   },
@@ -1050,7 +1167,7 @@ $("edit-rules").addEventListener("click", () => rulesUI.open());
 
 const hasLessonHints = m => Boolean(m.downstack || m.buildLesson);
 const lessonHintState = state => state.downstack ?? state.buildLesson;
-const isGuidedPractice = () => mode.lesson || hasLessonHints(mode) || mode.intro || mode.battleLesson;
+const isGuidedPractice = (m = mode) => m.lesson || hasLessonHints(m) || m.intro || m.battleLesson;
 const nextPracticeLesson = () =>
   mode.buildLesson
     ? BUILD_LESSONS[mode.buildLesson]
@@ -1075,10 +1192,14 @@ for (const control of [downstackHint, downstackRetry]) {
     if (event.code === "Space") event.stopPropagation();
   });
 }
-downstackHint.addEventListener("click", event => {
-  if (!hasLessonHints(mode) || screen !== "play" || !game?.state.active) return;
+const applyLessonHint = () => {
   $("downstack-status").textContent = mode.hint(game.state);
   downstackHint.textContent = t(["힌트", "자리 힌트", "힌트 숨기기"][lessonHintState(game.state).hintLevel]);
+};
+downstackHint.addEventListener("click", event => {
+  if (!hasLessonHints(mode) || screen !== "play" || !game?.state.active) return;
+  applyLessonHint();
+  runJournal?.action("hint");
   if (event.detail > 0) downstackHint.blur();
 });
 downstackRetry.addEventListener("click", () => {
@@ -1103,7 +1224,7 @@ const playCustomPuzzle = (code, trial = false) => {
     return;
   }
   const custom = customPuzzleMode(puzzle);
-  start({ ...custom, trialCode: trial ? code : null }, custom.rules);
+  start({ ...custom, puzzleCode: code, trialCode: trial ? code : null }, custom.rules);
 };
 const puzzleEditor = createPuzzleEditor({ dialog: puzzleDialog, onTry: code => playCustomPuzzle(code, true) });
 const puzzleUI = createPuzzleUI({
@@ -1162,6 +1283,7 @@ $("records").addEventListener("close", () => {
 });
 
 const handleSystem = (action, code = "") => {
+  if (restoringRun) return;
   if (
     settingsUI.isOpen ||
     rulesUI.isOpen ||
@@ -1244,6 +1366,7 @@ const undoPiece = () => {
     say(t("더 되돌릴 수 없어요"));
     return;
   }
+  runJournal?.action("undo");
   renderer.clearEffects();
   announceText([t("되돌리기")]);
   say(t("한 피스 되돌렸어요"));
@@ -1376,7 +1499,15 @@ for (const btn of document.querySelectorAll("[data-action]")) {
 
 // 창이 포커스를 잃으면 keyup을 못 받는다 → 자동 일시정지.
 window.addEventListener("blur", pause);
-document.addEventListener("visibilitychange", () => document.hidden && pause());
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) return;
+  if (screen === "paused") saveRun();
+  else pause();
+});
+window.addEventListener("pagehide", () => saveRun());
+window.addEventListener("storage", () => {
+  if (screen === "menu") renderContinue();
+});
 
 // ---- 리플레이 ----
 
@@ -1769,7 +1900,7 @@ const setScenePauseLabels = () => {
     : t("첫 화면으로");
 };
 
-const resetSceneAttempt = () => {
+const resetSceneAttempt = (restored = null) => {
   if (!scenePractice) return;
   const attempt = scenePractice.rescue
     ? createSurvivalAttempt(playing, findMode, scenePractice.spawnFrame)
@@ -1792,7 +1923,7 @@ const resetSceneAttempt = () => {
   sceneFinesse = target ? createFinesseTracker(game, ROTATIONS[rules.rotation]) : null;
   scenePractice.startFrame = game.state.frame;
   scenePractice.ended = false;
-  if (!scenePractice.rescue) game.setHandling(toEngineHandling(settings.handling));
+  if (!scenePractice.rescue) game.setHandling(toEngineHandling(restored?.handling ?? settings.handling));
   keyboard.releaseAll();
   touch.releaseAll();
   gestures.setEnabled(false);
@@ -1812,6 +1943,18 @@ const resetSceneAttempt = () => {
     : split
       ? t("{from}–{to}줄 구간", split)
       : t("연습 시작점 · {time}", { time: formatTime(scenePractice.spawnFrame) });
+  if (!restoringRun) {
+    beginJournal(playing.seed, null, {
+      source: playing,
+      returnFrame: player.frame,
+      spawnFrame: scenePractice.spawnFrame,
+      split: scenePractice.split,
+      target: scenePractice.target,
+      rescue: scenePractice.rescue,
+      best: scenePractice.best,
+    });
+    saveRun();
+  }
   sceneSplitProgress.hidden = !split;
   if (split) {
     sceneSplitMeter.max = split.to - split.from;
@@ -1823,25 +1966,27 @@ const resetSceneAttempt = () => {
 };
 
 /** @param {SceneSplit | null} split @param {FinesseScene | null} target */
-const enterScenePractice = (split = null, target = null, rescue = null) => {
+const enterScenePractice = (split = null, target = null, rescue = null, restored = null) => {
   if (!replayPaused || !(canPracticeScene() || (rescue && player && !player.done))) return;
+  if (!restoringRun && !canReplaceRun()) return;
   scenePractice = {
-    spawnFrame: rescue?.spawnFrame ?? target?.spawnFrame ?? player.spawnFrame,
+    spawnFrame: restored?.scene.spawnFrame ?? rescue?.spawnFrame ?? target?.spawnFrame ?? player.spawnFrame,
     split,
     target,
     rescue,
     startFrame: 0,
-    best: null,
+    best: restored?.scene.best ?? null,
     ended: false,
   };
   document.body.dataset.scenePractice = rescue ? "rescue" : target ? "finesse" : split ? "split" : "scene";
   replayBar.hidden = true;
   sceneControls.hidden = false;
-  resetSceneAttempt();
+  resetSceneAttempt(restored);
 };
 
 const exitScenePractice = () => {
   if (!scenePractice || !player) return;
+  clearRun();
   scenePractice = null;
   sceneFinesse = null;
   document.body.removeAttribute("data-scene-practice");
@@ -2050,6 +2195,153 @@ setupBackup({
 
 // ---- 루프 ----
 
+const applyRunHandling = handling => {
+  game.setHandling(toEngineHandling(handling));
+  if (!scenePractice) recorder?.handlingChanged(game.handling);
+};
+
+const advanceRun = (held, pressed, reconstructing = false) => {
+  if (scenePractice) {
+    const hadActive = Boolean(game.state.active);
+    const events = game.step({ held, pressed });
+    sceneFinesse?.frame(held, pressed, hadActive, events);
+    const lock = scenePractice.target && events.find(event => event.type === "lock");
+    const split = scenePractice.split;
+    const outcome = split && splitAttemptOutcome(game.state, scenePractice.startFrame, split.to, split.endFrame);
+    const ended = Boolean(outcome || lock || game.state.over);
+    if (ended) scenePractice.ended = true;
+    if (reconstructing) return;
+    inputDisplay.show(held, pressed);
+    renderer.addEvents(events);
+    sfx.events(events);
+    feedback(events);
+    if (ended) {
+      clearRun();
+      if (outcome) {
+        showSceneOutcome(outcome);
+        fb.clearAction();
+      } else if (scenePractice.target) {
+        showFinesseSceneOutcome(lock, sceneFinesse.lastInputs);
+        fb.clearAction();
+      } else if (scenePractice.rescue) {
+        showRescueOutcome();
+        fb.clearAction();
+      }
+      setScenePauseLabels();
+      pause();
+    }
+    return;
+  }
+  if (mode.practice && !isGuidedPractice()) undo.track(game.state);
+  recorder?.input(held, pressed);
+  const hadActive = Boolean(game.state.active);
+  const events = game.step({ held, pressed });
+  if (versus) {
+    const cpuInput = versus.bot.input();
+    versus.recorder.input(cpuInput.held, cpuInput.pressed);
+    versus.cpu.step(cpuInput);
+    settleBattleFrame(game, versus.cpu, events);
+  }
+  if (hasLessonHints(mode) && events.some(event => event.type === "lock")) resetLessonHint();
+  const extra = finesse?.frame(held, pressed, hadActive, events) ?? 0;
+  if (!reconstructing && extra > 0 && mode.finesse) announceText([t("피네스 +{n}", { n: extra })]);
+  if (mode.splits) splits = advanceSplits(mode.splits, splits, game.state.stats.lines, game.state.frame);
+  if (race) {
+    if (!race.player.done) race.player.step();
+    if (!reconstructing) updateRaceProgress();
+  }
+  if (reconstructing) return;
+  inputDisplay.show(held, pressed);
+  for (const e of events) {
+    if (!versus || e.type !== "lock" || !e.lines) announce(e);
+  }
+  renderer.addEvents(events);
+  sfx.events(events);
+  feedback(events);
+  if (events.some(e => e.type === "gameOver" || e.type === "finish")) finish();
+};
+
+const restoreRun = async () => {
+  if (screen !== "menu" || restoringRun) return;
+  const entry = savedRun();
+  const m = entry && getRunMode(entry);
+  if (!m) return;
+  const initialHandling = sanitizeSettings({ handling: entry.handling }).handling;
+  restoringRun = true;
+  document.body.inert = true;
+  let success = false;
+  try {
+    if (entry.scene) {
+      const source = sanitizeReplay(entry.scene.source, findMode);
+      if (!source || source.mode !== m.id) throw new Error("scene");
+      startReplay(source, "menu", "", true);
+      seekReplay(entry.scene.returnFrame, true);
+      const { split, target, rescue } = entry.scene;
+      enterScenePractice(split, target, rescue, { ...entry, handling: initialHandling });
+      if (!scenePractice) throw new Error("scene");
+    } else {
+      const savedRules =
+        m.puzzle || isGuidedPractice(m) ? m.rules : (PRESETS[entry.rules.id] ?? makeCustomRules(entry.rules));
+      const replay = entry.target && sanitizeReplay(entry.target.replay, findMode);
+      if (entry.target && (!replay || replay.mode !== m.id)) throw new Error("race");
+      start(m, savedRules, replay ? { ...entry.target, replay } : null, entry.seed, {
+        ...entry,
+        handling: initialHandling,
+      });
+    }
+    countdownEl.hidden = false;
+    countdownEl.dataset.phase = "ready";
+    $("countdown-label").textContent = t("저장된 판을 불러오는 중…");
+    await replayRunJournal(entry, {
+      applyAction(kind, value) {
+        if (kind === "handling") applyRunHandling(sanitizeSettings({ handling: value }).handling);
+        if (kind === "undo" && !undo.undo(game.state)) throw new Error("undo");
+        if (kind === "hint") applyLessonHint();
+      },
+      applyInput(held, pressed) {
+        advanceRun(held, pressed, true);
+        if (game.state.over || scenePractice?.ended) throw new Error("finished");
+      },
+    });
+    if (
+      savedRun()?.id !== entry.id ||
+      runFingerprint(game, scenePractice ? null : (versus?.cpu ?? race?.player.game)) !== entry.fingerprint
+    )
+      throw new Error("checkpoint");
+    if (m.trialCode) puzzleEditor.load(m.trialCode);
+    savedRunId = entry.id;
+    runJournal = createRunJournal(null, {
+      ...entry,
+      id: Array.from(crypto.getRandomValues(new Uint32Array(4))).join("-"),
+    });
+    lastSavedStep = -1;
+    success = true;
+  } catch {
+    if (scenePractice) exitScenePractice();
+    stopReplay();
+    toMenu();
+    countdownEl.hidden = true;
+    showMenuNotice(t("저장된 판을 이어서 할 수 없어요."));
+  } finally {
+    document.body.inert = false;
+    restoringRun = false;
+  }
+  if (!success) return;
+  if (race) updateRaceProgress();
+  if (scenePractice?.split) updateSceneSplitProgress(game.state);
+  renderer.clearEffects();
+  acc = 0;
+  last = performance.now();
+  countdown = COUNTDOWN_FRAMES[settings.access.countdown] ?? READY_FRAMES;
+  countdownEl.hidden = !countdown;
+  $("countdown-label").textContent = t("준비");
+  setScreen(countdown ? "countdown" : "play");
+  $("pause-game").focus({ preventScroll: true });
+  saveRun();
+};
+
+continueRun.addEventListener("click", restoreRun);
+
 const tick = () => {
   if (screen === "countdown") {
     keyboard.takePressed(); // 카운트다운 중 누른 키는 버린다(누르고 있는 키는 시작하자마자 반영).
@@ -2071,64 +2363,18 @@ const tick = () => {
   const allowed = scenePractice?.target ? ~(BTN.HOLD | BTN.SOFT) : mode.lesson ? ~BTN.SOFT : -1;
   const held = (keyboard.held | pad.held | touch.held | gestures.held) & allowed;
   const pressed = (keyboard.takePressed() | touch.takePressed() | gestures.takePressed()) & allowed;
-  if (scenePractice) {
-    const hadActive = Boolean(game.state.active);
-    const events = game.step({ held, pressed });
-    inputDisplay.show(held, pressed);
-    renderer.addEvents(events);
-    sfx.events(events);
-    feedback(events);
-    sceneFinesse?.frame(held, pressed, hadActive, events);
-    const lock = scenePractice.target && events.find(event => event.type === "lock");
-    const split = scenePractice.split;
-    const outcome = split && splitAttemptOutcome(game.state, scenePractice.startFrame, split.to, split.endFrame);
-    if (outcome || lock || game.state.over) {
-      scenePractice.ended = true;
-      if (outcome) {
-        showSceneOutcome(outcome);
-        fb.clearAction();
-      } else if (scenePractice.target) {
-        showFinesseSceneOutcome(lock, sceneFinesse.lastInputs);
-        fb.clearAction();
-      } else if (scenePractice.rescue) {
-        showRescueOutcome();
-        fb.clearAction();
-      }
-      setScenePauseLabels();
-      pause();
-    }
-    return;
-  }
-  if (mode.practice && !isGuidedPractice()) undo.track(game.state);
-  inputDisplay.show(held, pressed);
-  recorder?.input(held, pressed);
-  const hadActive = Boolean(game.state.active);
-  const events = game.step({ held, pressed });
-  if (versus) {
-    const cpuInput = versus.bot.input();
-    versus.recorder.input(cpuInput.held, cpuInput.pressed);
-    versus.cpu.step(cpuInput);
-    settleBattleFrame(game, versus.cpu, events);
-  }
-  if (hasLessonHints(mode) && events.some(event => event.type === "lock")) resetLessonHint();
-  const extra = finesse?.frame(held, pressed, hadActive, events) ?? 0;
-  if (extra > 0 && mode.finesse) announceText([t("피네스 +{n}", { n: extra })]);
-  if (mode.splits) splits = advanceSplits(mode.splits, splits, game.state.stats.lines, game.state.frame);
-  if (race) {
-    if (!race.player.done) race.player.step();
-    updateRaceProgress();
-  }
-  for (const e of events) {
-    if (!versus || e.type !== "lock" || !e.lines) announce(e);
-  }
-  renderer.addEvents(events);
-  sfx.events(events);
-  feedback(events);
-  if (events.some(e => e.type === "gameOver" || e.type === "finish")) finish();
+  runJournal?.input(held, pressed);
+  advanceRun(held, pressed);
+  saveRun(false);
 };
 
 let padCount = 0;
 const loop = now => {
+  if (restoringRun) {
+    last = now;
+    requestAnimationFrame(loop);
+    return;
+  }
   pad.poll();
   // gamepadconnected 이벤트는 버튼을 한 번 눌러야 오는 브라우저가 있어 개수 변화로도 확인한다.
   if (pad.connected !== padCount) {

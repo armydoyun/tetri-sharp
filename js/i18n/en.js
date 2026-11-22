@@ -2,6 +2,16 @@
 // tests/unit/i18n.test.mjs가 코드와 index.html의 한국어 문장이 모두 여기 있는지 확인한다.
 /** @type {Record<string, string>} */
 export const EN = {
+  "이어서 하기": "Continue saved game",
+  "이 기기에 저장됐어요.": "Game saved on this device.",
+  "{mode} · {time} · {lines}줄": "{mode} · {time} · {lines} lines",
+  "저장된 판을 지우고 새 판을 시작할까요?": "Replace the saved game and start a new one?",
+  "저장된 판을 불러오는 중…": "Restoring your saved game…",
+  "저장된 판을 이어서 할 수 없어요.": "Could not continue the saved game.",
+  "저장 공간을 확인해 주세요. 이번 진행을 저장하지 못했어요.":
+    "Could not save this progress. Check your browser storage.",
+  "다른 창에서 저장된 판이 바뀌었어요.": "The saved game changed in another window.",
+
   "빌드 연습": "Build practice",
   "4줄 우물과 T스핀 자리를 직접 만들기": "Build a four-line well and a T-spin setup",
   "4줄 우물 만들기": "Build a four-line well",
