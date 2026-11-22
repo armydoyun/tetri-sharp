@@ -27,18 +27,25 @@ self.addEventListener("activate", event => {
 
 self.addEventListener("fetch", event => {
   const { request } = event;
-  if (request.method !== "GET" || new URL(request.url).origin !== self.location.origin) return;
+  const url = new URL(request.url);
+  if (request.method !== "GET" || url.origin !== self.location.origin) return;
   if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          const copy = response.clone();
-          caches.open(CACHE).then(cache => cache.put("./index.html", copy));
-          return response;
-        })
-        .catch(() => caches.match("./index.html"))
-    );
+    const scope = new URL(self.registration.scope);
+    if (url.pathname !== scope.pathname && url.pathname !== new URL("index.html", scope).pathname) return;
+    event.respondWith(openGame(request));
     return;
   }
   event.respondWith(caches.match(request).then(hit => hit ?? fetch(request)));
 });
+
+async function openGame(request) {
+  let response;
+  try {
+    response = await fetch(request);
+    if (response.ok && /^text\/html\b/i.test(response.headers.get("Content-Type") ?? "")) return response;
+  } catch {
+    // 오프라인일 때도 설치 단계에서 저장한 게임을 연다.
+  }
+  const cache = await caches.open(CACHE);
+  return (await cache.match("./index.html")) ?? response ?? Response.error();
+}

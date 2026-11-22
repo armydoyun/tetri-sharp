@@ -3,19 +3,15 @@
 //
 // 언어는 모듈을 읽는 순간 한 번 정한다(모드 이름처럼 시작할 때 만들어 두는 글자도 같은 언어가 되게).
 // 설정에서 언어를 바꾸면 페이지를 다시 불러온다. Node(테스트)에서는 늘 한국어.
+import { createStore } from "../storage/store.js";
 import { EN } from "./en.js";
 
 export const LANG_OPTIONS = Object.freeze(["auto", "ko", "en"]);
 
-/** 저장된 설정의 언어(auto · ko · en) — 저장소 모듈을 거치지 않고 직접 읽는다(가장 먼저 읽히는 모듈이라) */
+/** 저장된 설정의 언어(auto · ko · en) */
 const savedLang = () => {
-  try {
-    const raw = globalThis.localStorage?.getItem("tetrisharp:settings");
-    const lang = raw ? JSON.parse(raw)?.lang : null;
-    return LANG_OPTIONS.includes(lang) ? lang : "auto";
-  } catch {
-    return "auto";
-  }
+  const lang = createStore().get("settings", null)?.lang;
+  return LANG_OPTIONS.includes(lang) ? lang : "auto";
 };
 
 /** auto → 브라우저 언어가 한국어면 ko, 아니면 en */
