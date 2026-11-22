@@ -974,7 +974,7 @@
 }
 
 .records-table :is(th, td):nth-child(2) {
-  width: 22%;
+  width: 16%;
   text-align: left;
 }
 
@@ -982,12 +982,24 @@
   font-weight: 800;
 }
 
+/* 기록 칸은 숫자 칸보다 넓게: Master는 "레벨 999 · 마스터"처럼 등급까지 적는다.
+   좁은 화면에서는 그래도 모자라 단어 사이에서 두 줄로 꺾는다(줄 높이 42px에 두 줄이 들어간다). */
+.records-table :is(th, td):nth-child(3) {
+  width: 21%;
+}
+
+.records-table td:nth-child(3) {
+  white-space: normal;
+  line-height: 1.2;
+}
+
 .records-table :is(th, td):nth-child(7) {
   width: 92px;
 }
 
+/* 리플레이 "▷ 보기 / ▷ Watch" 버튼(영어 84px) + 칸 안쪽 여백 */
 .records-table :is(th, td):last-child {
-  width: 84px;
+  width: 100px;
 }
 
 .records-table td.record-player {
@@ -1037,6 +1049,16 @@
 
   .records-table :is(th, td):last-child {
     width: 68px;
+  }
+
+  /* "▷ 보기"는 68px 칸을 넘어 대화상자 밖으로 잘린다 → 재생 표시만(이름은 aria-label "n위 리플레이 보기") */
+  .records-table td:last-child .btn-label {
+    display: none;
+  }
+
+  .records-table td:last-child .btn {
+    min-width: 44px;
+    padding-inline: var(--space-2);
   }
 }
 
