@@ -1463,7 +1463,7 @@ const dismissWelcome = () => {
 welcome.hidden = Boolean(store.get("welcomeSeen", false));
 $("welcome-open").addEventListener("click", () => {
   dismissWelcome();
-  helpUI.open();
+  helpUI.open({ fromWelcome: true });
 });
 $("welcome-close").addEventListener("click", dismissWelcome);
 $("open-help").addEventListener("click", () => {
