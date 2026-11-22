@@ -70,16 +70,24 @@ export const createStatsUI = ({ dialog }) => {
       const rows = statRows(state);
       const clears = rows.clears.filter(([, value]) => value !== "0");
       const zero = rows.clears.filter(([, value]) => value === "0");
+      // 한 번도 없었던 종류는 접어 둔다. 줄을 아예 안 지웠으면 빈 표 대신 그렇다고 말한다.
       const clearance = zero.length
         ? el(
             "div",
             {},
-            table(t("줄 삭제"), clears),
+            clears.length
+              ? table(t("줄 삭제"), clears)
+              : el(
+                  "section",
+                  { class: "field-section" },
+                  el("h3", { text: t("줄 삭제") }),
+                  el("p", { class: "field-help", text: t("이번 판에서 지운 줄이 없어요.") })
+                ),
             el(
               "details",
               { class: "stat-details" },
-              el("summary", { text: t("0회 항목 보기") }),
-              table(t("0회 항목"), zero)
+              el("summary", { text: t("나오지 않은 종류 {n}개 보기", { n: zero.length }) }),
+              table(t("나오지 않은 종류"), zero)
             )
           )
         : table(t("줄 삭제"), clears);
