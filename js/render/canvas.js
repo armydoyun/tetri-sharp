@@ -47,7 +47,7 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     canvas.style.aspectRatio = `${cols} / ${ROWS}`;
     if (labels) {
       labels.width = canvas.width;
-      labels.height = cell;
+      labels.height = 2 * cell;
       labelCtx.font = `600 ${Math.round(cell * 0.46)}px system-ui, sans-serif`;
       labelCtx.textBaseline = "top";
     }
@@ -266,10 +266,11 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       // 글자 모양과 색이 바뀔 때만 새로 그려 두고, 피스가 움직일 때는 그대로 사용한다.
       labelCtx.clearRect(0, 0, labels.width, labels.height);
       labelCtx.fillStyle = getComputedStyle(canvas).color || "#b1b9b0";
-      if (game.rules.hold.enabled) labelCtx.fillText(t("홀드"), sidePad, 0);
-      if (game.rules.previewCount > 0) labelCtx.fillText(t("다음 피스"), nx, 0);
+      // 일부 글꼴은 top 기준선 위에도 글자가 조금 나오므로 윗줄을 남겨 둔다.
+      if (game.rules.hold.enabled) labelCtx.fillText(t("홀드"), sidePad, cell);
+      if (game.rules.previewCount > 0) labelCtx.fillText(t("다음 피스"), nx, cell);
     }
-    ctx.drawImage(labels, 0, by);
+    ctx.drawImage(labels, 0, by - cell);
     if (game.rules.hold.enabled) {
       if (hold) preview(theme, palette, game, hold, sidePad, by + cell, small, holdUsed);
     }
