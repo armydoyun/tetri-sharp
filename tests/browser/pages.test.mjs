@@ -100,6 +100,13 @@ test("설치 캐시로 서버 장애와 오프라인 상태에서도 기록·리
     await offline.click('[data-replay="exit"]');
     await offline.click('[data-mode="sprint40"]');
     await offline.waitForFunction(() => document.body.dataset.screen === "play");
+    await offline.keyboard.press("Space");
+    await offline.waitForFunction(() => Number(document.getElementById("hud-pieces").textContent) === 1);
+    await offline.reload();
+    await ready(offline);
+    await offline.click("#continue-run");
+    await offline.waitForFunction(() => document.body.dataset.screen === "play");
+    assert.equal(await offline.locator("#hud-pieces").textContent(), "1");
     assert.deepEqual(errors, []);
   } finally {
     shellStatus = 200;

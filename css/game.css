@@ -189,6 +189,18 @@ body[data-screen="menu"] .stage {
   text-align: right;
 }
 
+#continue-run {
+  width: 100%;
+  margin-bottom: var(--space-2);
+  flex-wrap: wrap;
+  justify-content: space-between;
+  text-align: left;
+}
+
+#resume-save-status:empty {
+  display: none;
+}
+
 #mode-list .menu-row[data-mode="sprint40"] {
   border-left-color: var(--accent);
 }

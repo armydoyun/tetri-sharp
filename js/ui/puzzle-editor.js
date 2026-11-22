@@ -1,7 +1,7 @@
 import { WIDTH } from "../core/board.js";
 import { PIECE_TYPES } from "../core/pieces.js";
 import { t } from "../i18n/index.js";
-import { encodePuzzle, MAX_PUZZLE_PIECES, PUZZLE_CELLS } from "../modes/custom-puzzle.js";
+import { decodePuzzle, encodePuzzle, MAX_PUZZLE_PIECES, PUZZLE_CELLS } from "../modes/custom-puzzle.js";
 import { button, el, fillDialog } from "./dom.js";
 
 /** @param {{ dialog: HTMLDialogElement, onTry: (code: string) => void }} options */
@@ -11,6 +11,13 @@ export const createPuzzleEditor = ({ dialog, onTry }) => {
   let cleared = null;
 
   return {
+    load(code) {
+      const puzzle = decodePuzzle(code);
+      if (!puzzle) return;
+      cells.set(puzzle.cells);
+      pieces = puzzle.pieces;
+      cleared = null;
+    },
     markCleared(code) {
       if (code === encodePuzzle({ cells, pieces })) cleared = code;
     },

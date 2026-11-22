@@ -36,6 +36,9 @@
               <h2 id="mode-title" class="section-title">플레이 모드</h2>
               <a id="active-rules" class="active-rules" href="#rules-title"></a>
             </div>
+            <button id="continue-run" class="btn btn-primary" type="button" hidden>
+              <span>이어서 하기</span><small id="continue-run-info"></small>
+            </button>
             <div id="mode-list" class="menu-list"></div>
           </section>
 
@@ -214,6 +217,7 @@
           <div id="pause" class="panel" hidden>
             <div class="panel-card">
               <h2 class="panel-title">일시정지</h2>
+              <p id="resume-save-status" role="status"></p>
               <div class="actions">
                 <button type="button" class="btn btn-primary" data-action="resume"><span data-icon="play"></span><span class="btn-label">계속</span><kbd><kbd class="keycap">Esc</kbd></kbd></button>
                 <button type="button" class="btn" data-action="retry"><span data-icon="restart"></span><span class="btn-label">다시 시작</span><kbd data-key="RESTART"></kbd></button>
