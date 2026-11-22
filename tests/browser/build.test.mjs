@@ -3129,3 +3129,23 @@ test("휴대폰: 일시정지·결과 카드가 잘리지 않고, 리플레이 �
     await context.close();
   }
 });
+
+test("리플레이: 끝까지 보면 재생 단추가 '다시 재생'이 되고, 누르면 처음부터 재생한다", async () => {
+  const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
+  const { context, page, errors } = await openPage(({ replay }) => {
+    localStorage.setItem("tetrisharp:replay:last", JSON.stringify(replay));
+  }, fixture);
+  const toggle = page.locator('[data-replay="toggle"]');
+  const label = toggle.locator(".replay-toggle-text");
+  const progress = page.locator("#replay-progress");
+  await page.click("#watch-last");
+  await page.waitForFunction(() => document.body.dataset.screen === "replay");
+  await progress.fill(await progress.getAttribute("max"));
+  await page.waitForFunction(() => document.querySelector(".replay-toggle-text")?.textContent === "다시 재생");
+  assert.equal(await toggle.isEnabled(), true);
+  await toggle.click();
+  assert.ok(Number(await progress.inputValue()) < 60, "처음부터 다시 재생한다");
+  assert.equal(await label.textContent(), "일시정지");
+  assert.deepEqual(errors, []);
+  await context.close();
+});

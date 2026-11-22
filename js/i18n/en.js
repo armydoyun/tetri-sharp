@@ -546,6 +546,7 @@ export const EN = {
   // ---- 리플레이 ----
   "리플레이 진행률": "Replay progress",
   재생: "Play",
+  "다시 재생": "Play again",
   끝: "End",
   "재생 속도 바꾸기": "Change playback speed",
   "한 프레임": "One frame",

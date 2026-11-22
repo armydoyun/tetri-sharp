@@ -1726,16 +1726,20 @@ const canPracticeScene = () => ownReplay && playing?.mode === "sprint40" && play
 
 const updateReplayBar = () => {
   replayPractice.disabled = !replayPaused || !canPracticeScene();
+  // 끝까지 본 뒤에는 재생 단추가 "다시 재생"(처음부터)이 된다. 흐려진 "일시정지"로 남지 않게.
+  const ended = Boolean(player?.done);
   /** @type {HTMLElement} */ (replayBar.querySelector(".replay-toggle-icon")).replaceChildren(
-    icon(replayPaused ? "play" : "pause")
+    icon(ended ? "restart" : replayPaused ? "play" : "pause")
   );
-  /** @type {HTMLElement} */ (replayBar.querySelector(".replay-toggle-text")).textContent = replayPaused
-    ? t("재생")
-    : t("일시정지");
+  /** @type {HTMLElement} */ (replayBar.querySelector(".replay-toggle-text")).textContent = ended
+    ? t("다시 재생")
+    : replayPaused
+      ? t("재생")
+      : t("일시정지");
   /** @type {HTMLElement} */ (replayBar.querySelector(".replay-speed")).textContent = `${replaySpeed}x`;
   replayStatus.textContent = player?.done ? (player.cpu ? mode.summary(game.state).title : t("끝")) : "";
   replayStep.disabled = !player || player.done;
-  replayToggle.disabled = replayStep.disabled;
+  replayToggle.disabled = !player;
   for (const b of /** @type {NodeListOf<HTMLButtonElement>} */ (
     replayBar.querySelectorAll('[data-replay="back"], [data-replay="step-back"]')
   ))
@@ -2066,7 +2070,10 @@ const tickReplay = () => {
 for (const btn of replayBar.querySelectorAll("[data-replay]")) {
   btn.addEventListener("click", e => {
     const action = btn.getAttribute("data-replay");
-    if (action === "toggle") replayPaused = !replayPaused;
+    if (action === "toggle") {
+      if (player?.done) return restartReplay();
+      replayPaused = !replayPaused;
+    }
     if (action === "speed") replaySpeed = SPEEDS[(SPEEDS.indexOf(replaySpeed) + 1) % SPEEDS.length];
     if (action === "step") {
       replayPaused = true;
@@ -2112,7 +2119,8 @@ window.addEventListener("keydown", e => {
   }
   if (e.code === "Space" && !(document.activeElement instanceof HTMLButtonElement)) {
     e.preventDefault();
-    if (!e.repeat && player && !player.done) {
+    if (!e.repeat && player?.done) restartReplay();
+    else if (!e.repeat && player) {
       replayPaused = !replayPaused;
       updateReplayBar();
     }
