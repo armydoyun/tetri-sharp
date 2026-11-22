@@ -14,6 +14,10 @@ body {
   font-size: var(--text-l);
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
+  /* 한국어는 어절 단위로만 줄을 바꾼다("홀드 제한 / 적 사용"처럼 낱말 중간에서 꺾이지 않게).
+     칸보다 긴 낱말만 예외로 끊는다(넘치지 않게). 영어에는 영향이 없다. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 /* 스크롤바 자리를 늘 비워 둔다: 조작법을 펼치는 등 페이지 길이가 바뀌어 스크롤바가 생기거나 없어져도
