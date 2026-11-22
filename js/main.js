@@ -120,8 +120,8 @@ const applyScheme = () => {
   // 게임 화면: 늘 어둡게(기본) 또는 화면 색 따르기 — css/tokens.css
   document.body.dataset.gameSurface = settings.gameSurface;
   document.body.classList.toggle("show-inputs", settings.visual.inputs === "on");
+  refreshBoardColors();
 };
-applyScheme();
 
 const renderer = createRenderer(canvas, { getVisual: () => settings.visual });
 const sfx = createSfx({ getVolume: () => settings.volume });
@@ -133,7 +133,7 @@ const raceBoard = /** @type {HTMLCanvasElement} */ ($("race-board"));
 const raceBoardVisible = window.matchMedia("(width > 720px)");
 const raceRenderer = createRenderer(raceBoard, {
   compact: true,
-  getVisual: () => ({ ...settings.visual, effects: "off" }),
+  getVisual: () => settings.visual,
 });
 let race = null;
 
@@ -141,11 +141,17 @@ let race = null;
 const versusPanel = $("versus-panel");
 const cpuRenderer = createRenderer(/** @type {HTMLCanvasElement} */ ($("cpu-board")), {
   compact: true,
-  getVisual: () => ({ ...settings.visual, effects: "off" }),
+  getVisual: () => settings.visual,
 });
 const replayCpuRenderer = createRenderer(/** @type {HTMLCanvasElement} */ ($("replay-cpu-board")), {
   getVisual: () => settings.visual,
 });
+const refreshBoardColors = () => {
+  renderer.invalidate();
+  replayCpuRenderer.invalidate();
+};
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", refreshBoardColors);
+applyScheme();
 /** @type {null | { cpu: ReturnType<typeof createGame>, bot: ReturnType<typeof createBot>, recorder: ReturnType<typeof createRecorder> }} */
 let versus = null;
 /** 난이도별 전적 */
@@ -279,16 +285,20 @@ const raceTargetFor = (m, ruleSet) => {
   return { replay, best };
 };
 
+const setText = (element, text) => {
+  if (element.textContent !== text) element.textContent = text;
+};
+
 const updateRaceProgress = () => {
   if (!race || !game) return;
   const p = mode.race.progress(race.player.game.state);
-  raceProgress.max = p.max;
-  raceProgress.value = p.value;
-  raceLabel.textContent = race.player.done ? mode.formatRecord(race.target.best) : p.text;
+  if (raceProgress.max !== p.max) raceProgress.max = p.max;
+  if (raceProgress.value !== p.value) raceProgress.value = p.value;
+  setText(raceLabel, race.player.done ? mode.formatRecord(race.target.best) : p.text);
   const own = mode.race.progress(game.state);
-  raceOwnProgress.max = own.max;
-  raceOwnProgress.value = own.value;
-  $("race-own-label").textContent = own.text;
+  if (raceOwnProgress.max !== own.max) raceOwnProgress.max = own.max;
+  if (raceOwnProgress.value !== own.value) raceOwnProgress.value = own.value;
+  setText($("race-own-label"), own.text);
 };
 
 const startRace = (m, selected = currentRules()) => {
@@ -451,38 +461,44 @@ $("daily").addEventListener("close", () => {
 });
 const formatSurvivalGoal = frames => formatTime(frames).split(".")[0];
 
+let lastHud;
 const updateHud = () => {
-  if (scenePractice?.split && game) updateSceneSplitProgress(game.state);
   const frame = game?.state.frame ?? 0;
+  if (lastHud?.game === game && lastHud.frame === frame && lastHud.mode === mode && lastHud.screen === screen) return;
+  lastHud = { game, frame, mode, screen };
+  if (scenePractice?.split && game) updateSceneSplitProgress(game.state);
   const stats = game?.state.stats ?? { pieces: 0, lines: 0 };
   const lines = game ? mode.hudLines(game.state) : { label: t("줄"), value: "0" };
   const time = game ? mode.hudTime(game.state) : { label: t("시간"), frames: 0 };
-  hud.timeLabel.textContent = time.label;
-  hud.time.textContent = formatTime(time.frames);
+  setText(hud.timeLabel, time.label);
+  setText(hud.time, formatTime(time.frames));
   if (mode.id === "survival") {
     const next = SURVIVAL_MILESTONES.find(goal => frame < goal);
     const goal = next ? formatSurvivalGoal(next) : t("달성");
-    if (hud.survivalGoal.textContent !== goal) hud.survivalGoal.textContent = goal;
+    setText(hud.survivalGoal, goal);
   }
-  hud.score.textContent = formatScore(game?.state.score ?? 0);
-  hud.level.textContent = game ? (mode.hudLevel?.(game.state) ?? String(game.state.level)) : "1";
-  hud.linesLabel.textContent = lines.label;
-  hud.lines.textContent = lines.value;
-  hud.pieces.textContent = String(stats.pieces);
-  hud.attack.textContent = String(game?.state.garbage?.sent ?? 0);
+  setText(hud.score, formatScore(game?.state.score ?? 0));
+  setText(hud.level, game ? (mode.hudLevel?.(game.state) ?? String(game.state.level)) : "1");
+  setText(hud.linesLabel, lines.label);
+  setText(hud.lines, lines.value);
+  setText(hud.pieces, String(stats.pieces));
+  setText(hud.attack, String(game?.state.garbage?.sent ?? 0));
   if (versus) {
-    $("versus-cpu-sent").textContent = String(versus.cpu.state.garbage.sent);
-    $("versus-cpu-incoming").textContent = String(versus.cpu.state.garbage.pending);
+    setText($("versus-cpu-sent"), String(versus.cpu.state.garbage.sent));
+    setText($("versus-cpu-incoming"), String(versus.cpu.state.garbage.pending));
   }
   const practice = game?.state.practice;
-  hud.streak.textContent = practice ? `${practice.streak} / ${practice.bestStreak}` : "0 / 0";
+  setText(hud.streak, practice ? `${practice.streak} / ${practice.bestStreak}` : "0 / 0");
   const fin = game?.state.finesse;
-  hud.finesse.textContent = fin ? `${fin.faults} / ${fin.judged}` : "0 / 0";
-  hud.pps.textContent = frame ? (stats.pieces / (frame / 60)).toFixed(2) : "0.00";
+  setText(hud.finesse, fin ? `${fin.faults} / ${fin.judged}` : "0 / 0");
+  setText(hud.pps, frame ? (stats.pieces / (frame / 60)).toFixed(2) : "0.00");
   const delta = game && mode.splits ? splitDelta(splits, pbSplits) : null;
-  hud.split.textContent = formatDelta(delta);
-  if (delta === null) delete hud.split.dataset.ahead;
-  else hud.split.dataset.ahead = String(delta < 0);
+  setText(hud.split, formatDelta(delta));
+  const ahead = delta === null ? undefined : String(delta < 0);
+  if (hud.split.dataset.ahead !== ahead) {
+    if (ahead === undefined) delete hud.split.dataset.ahead;
+    else hud.split.dataset.ahead = ahead;
+  }
 };
 
 // ---- 화면 흐름 ----
@@ -1406,7 +1422,9 @@ const replayTime = $("replay-time");
 const replayBattleView = $("replay-battle-view");
 const replayBattleTally = $("replay-battle-tally");
 const replayBattleEvent = $("replay-battle-event");
-const resetReplayBattleEvent = () => (replayBattleEvent.hidden = true);
+const resetReplayBattleEvent = () => {
+  if (!replayBattleEvent.hidden) replayBattleEvent.hidden = true;
+};
 const replayStep = /** @type {HTMLButtonElement} */ (replayBar.querySelector('[data-replay="step"]'));
 const replayToggle = /** @type {HTMLButtonElement} */ (replayBar.querySelector('[data-replay="toggle"]'));
 
@@ -1415,13 +1433,16 @@ const replayLength = () => playing?.result?.frames || analysis?.length || 0;
 const updateReplayProgress = () => {
   const frame = player?.frame ?? 0;
   const length = replayLength();
-  replayProgress.max = String(length || 1);
-  replayProgress.value = String(Math.min(frame, length || 1));
-  replayProgress.style.setProperty("--fill", `${length ? (Math.min(frame, length) / length) * 100 : 0}%`);
-  replayTime.textContent = length ? `${formatTime(frame)} / ${formatTime(length)}` : formatTime(frame);
+  const max = String(length || 1);
+  if (replayProgress.max !== max) replayProgress.max = max;
+  const value = String(Math.min(frame, length || 1));
+  if (replayProgress.value !== value) replayProgress.value = value;
+  const fill = `${length ? (Math.min(frame, length) / length) * 100 : 0}%`;
+  if (replayProgress.style.getPropertyValue("--fill") !== fill) replayProgress.style.setProperty("--fill", fill);
+  setText(replayTime, length ? `${formatTime(frame)} / ${formatTime(length)}` : formatTime(frame));
   if (player?.cpu) {
-    $("replay-own-pending").textContent = String(player.game.state.garbage.pending);
-    $("replay-cpu-pending").textContent = String(player.cpu.state.garbage.pending);
+    setText($("replay-own-pending"), String(player.game.state.garbage.pending));
+    setText($("replay-cpu-pending"), String(player.cpu.state.garbage.pending));
   }
 };
 

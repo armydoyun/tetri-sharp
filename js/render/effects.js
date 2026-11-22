@@ -223,6 +223,9 @@ export const createEffects = () => {
   };
 
   return {
+    get active() {
+      return landings.size > 0 || clears.length > 0 || drops.length > 0;
+    },
     add,
     drawDrops,
     prune,

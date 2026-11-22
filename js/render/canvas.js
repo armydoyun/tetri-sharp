@@ -23,6 +23,8 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
   const effects = createEffects();
   const slide = createSlide();
   const emptyBoard = createBoard();
+  const labels = compact ? null : document.createElement("canvas");
+  const labelCtx = labels?.getContext("2d");
 
   // 좁은 화면(휴대폰 세로)이면 홀드·넥스트 칸을 줄인다. 휴대폰 가로는 넓은 배치(css/game.css와 같은 조건)
   const narrow = window.matchMedia(
@@ -30,18 +32,39 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
   );
   let cell = 0;
   let side = 0;
+  let gridPath = new Path2D();
   /** devicePixelRatio를 반영해 캔버스 해상도를 정하고 셀 크기를 정수로 맞춘다(번짐 방지). */
   const fit = () => {
     const dpr = window.devicePixelRatio || 1;
     const next = Math.max(8, Math.round((compact ? 14 : CSS_CELL) * dpr));
     const nextSide = compact ? 0 : narrow.matches ? 3 : 5;
-    if (next === cell && nextSide === side) return;
+    if (next === cell && nextSide === side) return false;
     cell = next;
     side = nextSide;
     const cols = COLS + side * 2;
     canvas.width = cols * cell;
     canvas.height = ROWS * cell;
     canvas.style.aspectRatio = `${cols} / ${ROWS}`;
+    if (labels) {
+      labels.width = canvas.width;
+      labels.height = cell;
+      labelCtx.font = `600 ${Math.round(cell * 0.46)}px system-ui, sans-serif`;
+      labelCtx.textBaseline = "top";
+    }
+    const bx = side * cell;
+    const by = MARGIN_TOP * cell;
+    const width = COLS * cell;
+    const height = VISIBLE_ROWS * cell;
+    gridPath = new Path2D();
+    for (let x = 1; x < COLS; x++) {
+      gridPath.moveTo(bx + x * cell + 0.5, by);
+      gridPath.lineTo(bx + x * cell + 0.5, by + height);
+    }
+    for (let y = 1; y < VISIBLE_ROWS; y++) {
+      gridPath.moveTo(bx, by + y * cell + 0.5);
+      gridPath.lineTo(bx + width, by + y * cell + 0.5);
+    }
+    return true;
   };
 
   /** 미리보기 상자(4×2칸) 가운데에 피스를 그린다. */
@@ -61,15 +84,6 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     ctx.globalAlpha = 1;
   };
 
-  /** "Hold"·"Next" 글자색: 캔버스의 CSS 글자색(게임 화면 표면에 맞춘다) */
-  let labelColor = "#b1b9b0";
-  const label = (text, x, y) => {
-    ctx.fillStyle = labelColor;
-    ctx.font = `600 ${Math.round(cell * 0.46)}px system-ui, sans-serif`;
-    ctx.textBaseline = "top";
-    ctx.fillText(text, x, y);
-  };
-
   /** 이번 그리기에서 블록 무늬를 그릴지(접근성 설정) */
   let pattern = false;
 
@@ -81,40 +95,80 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     ctx.lineWidth = 1;
     if (lines) {
       ctx.strokeStyle = grid;
-      ctx.beginPath();
-      for (let x = 1; x < COLS; x++) {
-        ctx.moveTo(bx + x * cell + 0.5, by);
-        ctx.lineTo(bx + x * cell + 0.5, by + height);
-      }
-      for (let y = 1; y < VISIBLE_ROWS; y++) {
-        ctx.moveTo(bx, by + y * cell + 0.5);
-        ctx.lineTo(bx + width, by + y * cell + 0.5);
-      }
-      ctx.stroke();
+      ctx.stroke(gridPath);
     }
     ctx.strokeStyle = edge;
     ctx.strokeRect(bx + 0.5, by + 0.5, width - 1, height - 1);
   };
 
+  const previousCells = new Uint8Array(emptyBoard.cells.length);
+  const emptyQueue = [];
+  let previous = [];
+  let invalidated = true;
+  let animating = false;
+
   /**
    * @param {ReturnType<typeof import("../core/engine.js").createGame> | null} game  null이면 빈 보드만
    */
   const draw = (game, now = performance.now()) => {
-    fit();
+    const resized = fit();
     const visual = getVisual();
+    const state = game?.state;
+    const board = state?.board ?? emptyBoard;
+    const active = state?.active;
+    const hold = state?.hold;
+    const holdUsed = state?.holdUsed;
+    const queue = state?.queue ?? emptyQueue;
+    const pending = Math.min(VISIBLE_ROWS, state?.garbage?.pending ?? 0);
+    const hintCells = state?.downstack?.hintCells ?? state?.buildLesson?.hintCells ?? state?.finesseTarget;
+    const lockTimer = active ? state.lock.timer : 0;
+    const shown = state?.puzzle ? Math.max(0, state.puzzle.need - state.puzzle.placed - 1) : game?.rules.previewCount;
+
+    // 같은 엔진 프레임이라도 힌트나 화면 설정이 바뀔 수 있고, 반대로 프레임이 흘러도 보드는 그대로일 수 있다.
+    const view = [
+      game,
+      visual,
+      active?.type,
+      active?.x,
+      active?.y,
+      active?.rot,
+      state?.pieceId,
+      lockTimer,
+      hold,
+      holdUsed,
+      pending,
+      hintCells,
+      shown,
+    ];
+    if (!compact) for (const type of queue) view.push(type);
+    if (
+      !resized &&
+      !invalidated &&
+      !animating &&
+      !effects.active &&
+      view.length === previous.length &&
+      view.every((value, index) => value === previous[index]) &&
+      board.cells.every((value, index) => value === previousCells[index])
+    )
+      return;
+
+    const redrawLabels = resized || invalidated || game !== previous[0];
+    previous = view;
+    previousCells.set(board.cells);
+    invalidated = false;
+
     const theme = findTheme(visual.theme);
     const palette = paletteFor(visual, theme);
-    const motion = visual.effects === "full";
-    const { board, active, hold, holdUsed, queue } = game
-      ? game.state
-      : { board: emptyBoard, active: null, hold: null, holdUsed: false, queue: [] };
+    const effectLevel = compact ? "off" : visual.effects;
+    const motion = effectLevel === "full";
     const bx = side * cell;
     const by = MARGIN_TOP * cell;
     const toY = y => by + (y - VISIBLE_TOP) * cell;
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    effects.prune(now, visual.effects);
+    effects.prune(now, effectLevel);
+    animating = effects.active;
     pattern = visual.pattern === "on";
     drawGrid(theme.board, bx, by, visual.grid !== "off");
     effects.drawDrops(ctx, { bx, by, cell, toY }, now, theme.board.ink);
@@ -139,7 +193,7 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     }
 
     // 다음 피스와 고스트는 줄 삭제 효과보다 위에 그린다.
-    effects.draw(ctx, { bx, cell, toY, cols: COLS }, now, theme.board.ink, visual.effects);
+    effects.draw(ctx, { bx, cell, toY, cols: COLS }, now, theme.board.ink, effectLevel);
 
     if (active) {
       const color = palette[CELL_ID[active.type]];
@@ -159,10 +213,10 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
         active.rot
       );
       const ox = (shown.x - active.x) * cell;
+      animating ||= ox !== 0;
       // 고정까지 남은 시간만큼 살짝 어두워진다.
-      const lock = game.state.lock;
       const delay = game.rules.lock.delay;
-      ctx.globalAlpha = lock.timer > 0 && delay > 0 ? 1 - 0.18 * Math.min(1, lock.timer / delay) : 1;
+      ctx.globalAlpha = lockTimer > 0 && delay > 0 ? 1 - 0.18 * Math.min(1, lockTimer / delay) : 1;
       for (const [x, y] of cells) {
         if (y >= VISIBLE_TOP - MARGIN_TOP) {
           const px = bx + x * cell + ox;
@@ -181,8 +235,6 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       ctx.globalAlpha = 1;
     }
 
-    const hintCells =
-      game?.state.downstack?.hintCells ?? game?.state.buildLesson?.hintCells ?? game?.state.finesseTarget;
     if (hintCells?.length && active) {
       ctx.save();
       ctx.strokeStyle = theme.board.ink;
@@ -195,7 +247,6 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     }
 
     // 대기 중인 쓰레기는 한 줄씩 구분한다. CPU의 좁은 캔버스에서는 안쪽에 그린다.
-    const pending = Math.min(VISIBLE_ROWS, game?.state.garbage?.pending ?? 0);
     if (pending > 0) {
       const w = Math.max(2, Math.round(cell * 0.18));
       ctx.fillStyle = "#e5484d";
@@ -207,22 +258,25 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
 
     if (!game || compact) return;
 
-    labelColor = getComputedStyle(canvas).color || labelColor;
     // 홀드
     const small = Math.round(cell * (narrow.matches ? 0.57 : 0.8));
     const sidePad = Math.round((side * cell - 4 * small) / 2);
+    const nx = bx + COLS * cell + sidePad;
+    if (redrawLabels) {
+      // 글자 모양과 색이 바뀔 때만 새로 그려 두고, 피스가 움직일 때는 그대로 사용한다.
+      labelCtx.clearRect(0, 0, labels.width, labels.height);
+      labelCtx.fillStyle = getComputedStyle(canvas).color || "#b1b9b0";
+      if (game.rules.hold.enabled) labelCtx.fillText(t("홀드"), sidePad, 0);
+      if (game.rules.previewCount > 0) labelCtx.fillText(t("다음 피스"), nx, 0);
+    }
+    ctx.drawImage(labels, 0, by);
     if (game.rules.hold.enabled) {
-      label(t("홀드"), sidePad, by);
       if (hold) preview(theme, palette, game, hold, sidePad, by + cell, small, holdUsed);
     }
 
     // 넥스트
-    const nx = bx + COLS * cell + sidePad;
     if (game.rules.previewCount > 0) {
-      label(t("다음 피스"), nx, by);
       // 퍼즐은 주어진 피스만(돌아오는 피스는 보이지 않게): 지금 피스를 뺀 남은 수까지
-      const puzzle = game.state.puzzle;
-      const shown = puzzle ? Math.max(0, puzzle.need - puzzle.placed - 1) : game.rules.previewCount;
       queue.slice(0, Math.min(game.rules.previewCount, shown)).forEach((type, i) => {
         preview(theme, palette, game, type, nx, by + cell + i * small * 3, small);
       });
@@ -231,15 +285,19 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
 
   return {
     draw,
+    invalidate() {
+      invalidated = true;
+    },
     /** 엔진 이벤트로 효과를 만든다 */
     addEvents: (events, now = performance.now()) => {
-      if (!events.length) return;
+      if (compact || !events.length) return;
       const visual = getVisual();
       effects.add(events, visual.effects, now, findTheme(visual.theme).motion);
     },
     clearEffects() {
       effects.clear();
       slide.reset();
+      invalidated = true;
     },
   };
 };
