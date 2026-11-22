@@ -1,4 +1,5 @@
 // 연습 고르기 대화상자: 종류를 누르면 바로 시작한다.
+import { BUILD_LESSONS } from "../modes/build-lessons.js";
 import { BATTLE_LESSONS } from "../modes/battle-lessons.js";
 import { FINESSE_LESSONS } from "../modes/finesse-lessons.js";
 import { INTRO_LESSONS } from "../modes/intro-lessons.js";
@@ -29,7 +30,12 @@ export const createPracticeUI = ({ dialog, onPick, progress, onStage }) => {
           { class: "menu-text" },
           el("strong", { text: mode.downstack?.title ?? mode.name }),
           el("small", {
-            text: result === "no-hints" && mode.downstack ? t("힌트 없이 완료") : result ? t("완료") : mode.description,
+            text:
+              result === "no-hints" && (mode.downstack || mode.buildLesson)
+                ? t("힌트 없이 완료")
+                : result
+                  ? t("완료")
+                  : mode.description,
           })
         ),
         icon("chevron-right")
@@ -78,7 +84,18 @@ export const createPracticeUI = ({ dialog, onPick, progress, onStage }) => {
         description: t("공격·상쇄·반격을 한 수씩 연습"),
         lessons: BATTLE_LESSONS,
       };
-      const drills = [intro, battle, ...DRILLS.flatMap(d => (d.id === "finesse" ? [downstack, lesson, d] : [d]))];
+      const build = {
+        id: "build-training",
+        name: t("빌드 연습"),
+        description: t("4줄 우물과 T스핀 자리를 직접 만들기"),
+        lessons: BUILD_LESSONS,
+      };
+      const drills = [
+        intro,
+        battle,
+        build,
+        ...DRILLS.flatMap(d => (d.id === "finesse" ? [downstack, lesson, d] : [d])),
+      ];
       const list = el(
         "div",
         { class: "menu-list practice-list" },

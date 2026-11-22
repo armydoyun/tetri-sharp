@@ -1,6 +1,6 @@
-import { HEIGHT, VISIBLE_ROWS, WIDTH, collides, get, set } from "../core/board.js";
+import { HEIGHT, VISIBLE_ROWS, WIDTH, get, set } from "../core/board.js";
 import { cellsOf, GARBAGE } from "../core/pieces.js";
-import { ROTATIONS } from "../rules/rotation/index.js";
+import { reachableLandings, sameCells } from "./placement-hints.js";
 import { MODERN } from "../rules/presets.js";
 import { t } from "../i18n/index.js";
 
@@ -42,8 +42,6 @@ const exercises = /** @type {const} */ ([
   ],
 ]);
 
-const sameCells = (left, right) => left.every(([x, y]) => right.some(([cx, cy]) => cx === x && cy === y));
-
 const garbageRows = board => {
   const rows = [];
   for (let y = HEIGHT - VISIBLE_ROWS; y < HEIGHT; y++) {
@@ -52,45 +50,14 @@ const garbageRows = board => {
   return rows;
 };
 
-// 현재 피스에서 이동·회전·소프트 드롭으로 닿는 고정 위치만 제안한다.
 const findOpening = (board, active, preferred, row) => {
-  if (!active || row === undefined) return [];
-  const rotation = ROTATIONS.srs;
-  const { type } = active;
-  const fits = (x, y, rot) => !collides(board, cellsOf(type, rot), x, y);
+  if (row === undefined) return [];
   const holes = Array.from({ length: WIDTH }, (_, x) => get(board, x, row)).filter(value => !value).length;
-  const queue = [];
-  const seen = new Set();
-  const add = (x, y, rot) => {
-    const key = `${x},${y},${rot}`;
-    if (seen.has(key) || !fits(x, y, rot)) return;
-    seen.add(key);
-    queue.push({ x, y, rot });
-  };
-  add(active.x, active.y, active.rot);
   let opening = [];
-  for (let i = 0; i < queue.length; i++) {
-    const { x, y, rot } = queue[i];
-    if (fits(x, y + 1, rot)) add(x, y + 1, rot);
-    else {
-      const cells = cellsOf(type, rot).map(([cx, cy]) => [x + cx, y + cy]);
-      const covered = cells.filter(([, cy]) => cy === row).length;
-      if (covered === holes) {
-        if (sameCells(preferred, cells)) return cells;
-        if (!opening.length) opening = cells;
-      }
-    }
-    add(x - 1, y, rot);
-    add(x + 1, y, rot);
-    for (const turns of [1, 2, 3]) {
-      const to = (rot + turns) % 4;
-      const kicks = rotation.kicks(type, rot, to, (cx, cy) => collides(board, [[cx, cy]], x, y));
-      for (const [dx, dy] of kicks) {
-        if (!fits(x + dx, y + dy, to)) continue;
-        add(x + dx, y + dy, to);
-        break;
-      }
-    }
+  for (const cells of reachableLandings(board, active)) {
+    if (cells.filter(([, y]) => y === row).length !== holes) continue;
+    if (sameCells(preferred, cells)) return cells;
+    if (!opening.length) opening = cells;
   }
   return opening;
 };

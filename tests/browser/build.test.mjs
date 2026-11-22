@@ -925,7 +925,7 @@ test("규칙 공유: 편집기에서 코드를 붙여 넣으면 불러오고, #r
 test("연습: 메뉴에서 고르면 시작하고, 놓을 때마다 성공/시도를 센다", async () => {
   const { context, page, errors } = await openPage();
   await page.click("#open-practice");
-  assert.equal(await page.locator("#practice .menu-row").count(), 11);
+  assert.equal(await page.locator("#practice .menu-row").count(), 12);
   assert.equal(await page.locator('[data-drill="double"]').isVisible(), true);
   await page.click('[data-drill="tsd"]');
   await page.waitForFunction(() => document.body.dataset.screen === "play", null, {
@@ -1094,6 +1094,51 @@ test("CPU 대전 입문: 즉시 재시도하고 공격·상쇄·전송 수를 �
     await play(["ArrowUp", ...Array(3).fill("ArrowRight"), "Space"]);
     assert.equal(await text(page, "race-result"), "공격 4줄 · 상쇄 2줄 · 상대에게 2줄");
     assert.equal(await page.locator('#results [data-action="next-puzzle"]').isVisible(), false);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("빌드 연습: 빈칸·배치 힌트, 초기화와 힌트 없는 4줄 완주", async () => {
+  const { context, page, errors } = await openPage(null, undefined, { frameClock: true });
+  const play = codes =>
+    page.evaluate(keys => {
+      for (const code of keys) {
+        window.dispatchEvent(new KeyboardEvent("keydown", { code, cancelable: true }));
+        window.dispatchEvent(new KeyboardEvent("keyup", { code, cancelable: true }));
+        window.advanceFrame();
+      }
+    }, codes);
+  try {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.click("#open-practice");
+    await page.click('[data-drill="build-training"]');
+    assert.equal(await page.locator("[data-practice-stage]").count(), 2);
+    await page.click('[data-practice-stage="build-lesson-1"]');
+    await page.evaluate(() => window.advanceFrame());
+    assert.equal(await text(page, "hud-lines"), "10");
+    await page.click("#downstack-hint");
+    assert.match(await text(page, "downstack-status"), /점선 열/);
+    await page.click("#downstack-hint");
+    assert.match(await text(page, "downstack-status"), /놓을 수 있는 자리/);
+    await play([...Array(4).fill("ArrowLeft"), "Space"]);
+    assert.equal(await text(page, "hud-lines"), "9");
+    await page.click("#downstack-retry");
+    await page.evaluate(() => window.advanceFrame());
+    assert.equal(await text(page, "hud-lines"), "10");
+    assert.equal(await text(page, "downstack-status"), "");
+
+    await play([4, 2, 4, 2].flatMap(count => [...Array(count).fill("ArrowLeft"), "Space"]));
+    await play(Array.from({ length: 4 }, () => ["ArrowRight", "Space"]).flat());
+    await play([3, 4].flatMap(count => ["ArrowUp", ...Array(count).fill("ArrowRight"), "Space"]));
+    assert.equal(await text(page, "results-title"), "성공!");
+    const progress = await page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:practice:progress")));
+    assert.equal(progress["build-lesson-1"], "no-hints");
+    await page.click('#results [data-action="next-puzzle"]');
+    await page.evaluate(() => window.advanceFrame());
+    assert.equal(await text(page, "hud-lines"), "3");
+    assert.match(await text(page, "session-title"), /T스핀 더블/);
     assert.deepEqual(errors, []);
   } finally {
     await context.close();

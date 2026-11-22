@@ -44,6 +44,7 @@ import { makeCustomRules, sanitizeRuleBody } from "./rules/sanitize.js";
 import { decodeRules } from "./rules/share.js";
 import { createSfx } from "./audio/sfx.js";
 import { DOWNSTACK_LESSONS } from "./modes/downstack.js";
+import { BUILD_LESSONS } from "./modes/build-lessons.js";
 import { BATTLE_LESSONS } from "./modes/battle-lessons.js";
 import { INTRO_LESSONS } from "./modes/intro-lessons.js";
 import { createPracticeProgress } from "./storage/practice-progress.js";
@@ -493,7 +494,7 @@ const setScreen = next => {
   touch.setEnabled(next === "play" || next === "countdown");
   gestures.setEnabled((next === "play" || next === "countdown") && gesturesOn());
   document.body.classList.toggle("is-practice", Boolean(mode.practice && !isGuidedPractice()) && next !== "menu");
-  document.body.classList.toggle("is-downstack", Boolean(mode.downstack) && next !== "menu");
+  document.body.classList.toggle("has-lesson-hints", hasLessonHints(mode) && next !== "menu");
   document.body.classList.toggle("is-finesse-lesson", Boolean(mode.lesson) && next !== "menu");
   const modeTitle = mode.versus ? t("CPU · {level}", { level: mode.versus.name }) : mode.name;
   $("session-title").textContent = next === "menu" ? "" : scenePractice ? scenePracticeTitle() : modeTitle;
@@ -583,8 +584,8 @@ const start = (
   }
   pbSplits = target?.splits ?? resultPbSplits;
   acc = 0;
-  countdown = m.downstack || m.battleLesson ? 0 : (COUNTDOWN_FRAMES[settings.access.countdown] ?? READY_FRAMES);
-  if (m.downstack) resetDownstackHint();
+  countdown = hasLessonHints(m) || m.battleLesson ? 0 : (COUNTDOWN_FRAMES[settings.access.countdown] ?? READY_FRAMES);
+  if (hasLessonHints(m)) resetLessonHint();
   goTimer = 0;
   undo.reset();
   showPanel(null);
@@ -839,7 +840,7 @@ const finish = () => {
   if (mode.id === "sprint40" && state.stats.pieces > 0)
     sprintHistory.add(rules.id, state.frame, state.over === "clear");
   if (state.over === "clear" && isGuidedPractice()) {
-    practiceProgress.mark(mode.id, state.downstack?.usedHint);
+    practiceProgress.mark(mode.id, lessonHintState(state)?.usedHint);
   }
 
   let outcome = null;
@@ -1047,19 +1048,23 @@ $("active-rules").addEventListener("click", e => {
 });
 $("edit-rules").addEventListener("click", () => rulesUI.open());
 
-const isGuidedPractice = () => mode.lesson || mode.downstack || mode.intro || mode.battleLesson;
+const hasLessonHints = m => Boolean(m.downstack || m.buildLesson);
+const lessonHintState = state => state.downstack ?? state.buildLesson;
+const isGuidedPractice = () => mode.lesson || hasLessonHints(mode) || mode.intro || mode.battleLesson;
 const nextPracticeLesson = () =>
-  mode.battleLesson
-    ? BATTLE_LESSONS[mode.battleLesson]
-    : mode.intro
-      ? INTRO_LESSONS[mode.intro]
-      : mode.downstack
-        ? DOWNSTACK_LESSONS[mode.downstack.index + 1]
-        : mode.lesson
-          ? FINESSE_LESSONS[mode.lesson.index + 1]
-          : null;
+  mode.buildLesson
+    ? BUILD_LESSONS[mode.buildLesson]
+    : mode.battleLesson
+      ? BATTLE_LESSONS[mode.battleLesson]
+      : mode.intro
+        ? INTRO_LESSONS[mode.intro]
+        : mode.downstack
+          ? DOWNSTACK_LESSONS[mode.downstack.index + 1]
+          : mode.lesson
+            ? FINESSE_LESSONS[mode.lesson.index + 1]
+            : null;
 const downstackHint = $("downstack-hint");
-const resetDownstackHint = () => {
+const resetLessonHint = () => {
   downstackHint.textContent = t("힌트");
   $("downstack-status").textContent = "";
 };
@@ -1071,13 +1076,13 @@ for (const control of [downstackHint, downstackRetry]) {
   });
 }
 downstackHint.addEventListener("click", event => {
-  if (!mode.downstack || screen !== "play" || !game) return;
+  if (!hasLessonHints(mode) || screen !== "play" || !game?.state.active) return;
   $("downstack-status").textContent = mode.hint(game.state);
-  downstackHint.textContent = t(["힌트", "자리 힌트", "힌트 숨기기"][game.state.downstack.hintLevel]);
+  downstackHint.textContent = t(["힌트", "자리 힌트", "힌트 숨기기"][lessonHintState(game.state).hintLevel]);
   if (event.detail > 0) downstackHint.blur();
 });
 downstackRetry.addEventListener("click", () => {
-  if (mode.downstack && screen === "play") start(mode, rules);
+  if (hasLessonHints(mode) && screen === "play") start(mode, rules);
 });
 
 const practiceUI = createPracticeUI({
@@ -2105,7 +2110,7 @@ const tick = () => {
     versus.cpu.step(cpuInput);
     settleBattleFrame(game, versus.cpu, events);
   }
-  if (mode.downstack && events.some(event => event.type === "lock")) resetDownstackHint();
+  if (hasLessonHints(mode) && events.some(event => event.type === "lock")) resetLessonHint();
   const extra = finesse?.frame(held, pressed, hadActive, events) ?? 0;
   if (extra > 0 && mode.finesse) announceText([t("피네스 +{n}", { n: extra })]);
   if (mode.splits) splits = advanceSplits(mode.splits, splits, game.state.stats.lines, game.state.frame);
