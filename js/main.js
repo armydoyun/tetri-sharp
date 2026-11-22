@@ -1472,6 +1472,23 @@ $("welcome-open").addEventListener("click", () => {
   helpUI.open({ fromWelcome: true });
 });
 $("welcome-close").addEventListener("click", dismissWelcome);
+// 처음 온 사람이 설정을 찾지 않아도 소리를 켤 수 있게(설정의 효과음 크기와 같은 값을 바꾼다)
+const WELCOME_VOLUME = 60;
+const welcomeSound = $("welcome-sound");
+const renderWelcomeSound = () => {
+  const on = settings.volume > 0;
+  welcomeSound.setAttribute("aria-pressed", String(on));
+  /** @type {HTMLElement} */ (welcomeSound.querySelector(".btn-label")).textContent = on
+    ? t("소리 끄기")
+    : t("소리 켜기");
+};
+welcomeSound.addEventListener("click", () => {
+  settings = sanitizeSettings({ ...settings, volume: settings.volume > 0 ? 0 : WELCOME_VOLUME });
+  saveSettings(store, settings);
+  renderWelcomeSound();
+  if (settings.volume > 0) sfx.play("clear2");
+});
+renderWelcomeSound();
 $("open-help").addEventListener("click", () => {
   pause();
   helpUI.open();

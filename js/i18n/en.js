@@ -419,6 +419,8 @@ export const EN = {
     "In practice modes, Undo takes back the piece you just placed.",
   "게임 중 R을 누르면 다시 시작할지 먼저 물어요. 로고를 누르면 첫 화면으로 가요.":
     "Pressing R during a game asks before restarting. The logo takes you home.",
+  "소리 켜기": "Turn sound on",
+  "소리 끄기": "Turn sound off",
   "이 안내는 머리글의 도움말에서 언제든 다시 볼 수 있어요.": "You can open this again anytime from Help at the top.",
   도움말: "Help",
   "처음 오셨나요?": "New here?",

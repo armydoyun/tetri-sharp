@@ -3153,3 +3153,20 @@ test("리플레이: 끝까지 보면 재생 단추가 '다시 재생'이 되고,
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("처음 안내 줄에서 소리를 켜고 끌 수 있고, 설정의 효과음 크기와 같은 값이다", async () => {
+  const { context, page, errors } = await openPage();
+  const sound = page.locator("#welcome-sound");
+  const volume = () => page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:settings") ?? "{}").volume ?? 0);
+  assert.equal(await sound.getAttribute("aria-pressed"), "false");
+  assert.equal(await volume(), 0, "공용 PC를 생각해 기본은 꺼져 있다");
+  await sound.click();
+  assert.equal(await sound.getAttribute("aria-pressed"), "true");
+  assert.equal(await sound.textContent(), "소리 끄기");
+  assert.ok((await volume()) > 0);
+  await sound.click();
+  assert.equal(await volume(), 0);
+  assert.equal(await sound.textContent(), "소리 켜기");
+  assert.deepEqual(errors, []);
+  await context.close();
+});

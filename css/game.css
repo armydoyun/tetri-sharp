@@ -1582,6 +1582,22 @@ body.gestures-mode {
   flex: none;
 }
 
+/* 좁은 화면: 버튼 셋이 글 옆에 붙으면 글이 한 단어씩 꺾인다 → 버튼 줄을 글 아래로, 닫기는 오른쪽 끝 */
+@media (max-width: 560px) {
+  .welcome {
+    flex-wrap: wrap;
+  }
+
+  .welcome-text,
+  .welcome-actions {
+    flex: 1 1 100%;
+  }
+
+  #welcome-close {
+    margin-left: auto;
+  }
+}
+
 /* 머리글: 좁으면 "도움말" 글자는 숨기고 아이콘만(이름은 aria-label) */
 /* 머리글: 좁으면 "도움말"·"설정" 글자는 숨기고 아이콘만(이름은 aria-label) */
 @media (max-width: 480px) {
