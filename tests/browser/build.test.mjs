@@ -1213,10 +1213,13 @@ test("규칙 공유: 받은 코드·링크는 지금 규칙을 덮어쓰지 않�
 
 test("내 규칙: 첫 화면에서 고르고 공유 탭을 열며, 편집기에서 새 규칙·이름·지우기를 한다", async () => {
   const { context, page, errors } = await openPage();
-  // Custom이 아닐 때는 내 규칙 줄이 보이지 않지만 자리는 그대로
-  assert.equal(await page.locator("#rule-slot-row").evaluate(el => getComputedStyle(el).visibility), "hidden");
+  // Custom이 아닐 때는 내 규칙 줄 자리에 같은 높이로 Custom 안내 한 줄(빈칸 없이, 탭을 바꿔도 아래가 움직이지 않게)
+  const rowHeight = () => page.locator("#rule-slot-row").evaluate(el => el.getBoundingClientRect().height);
+  assert.match(await page.locator("#rule-slot-row").textContent(), /Custom을 고르면/);
+  const offHeight = await rowHeight();
   await page.click('[data-rules="custom"]');
-  assert.equal(await page.locator("#rule-slot-row").evaluate(el => getComputedStyle(el).visibility), "visible");
+  assert.equal(await page.locator("#rule-slot").isVisible(), true);
+  assert.equal(await rowHeight(), offHeight, "줄 높이가 같다");
   await page.click("#rule-slot-share");
   assert.equal(await page.locator("#rule-share-code").isVisible(), true, "공유 탭으로 열린다");
   await page.click("#rule-slot-add");
@@ -2187,7 +2190,11 @@ test("CPU 대전: 첫 싱글의 공격 0줄과 콤보 공격 이유를 플레이
   );
   try {
     await page.click('[data-mode="versus"]');
-    assert.equal(await page.locator("#versus .notice-slot").isVisible(), false);
+    // 알림 칸은 다른 대화상자처럼 비어 있는 자리(숨기면 닫기 버튼이 발 폭 전체로 늘어난다 — 2차 평가 U35)
+    assert.equal(await page.locator("#versus .notice-slot").textContent(), "");
+    const closeBox = await page.locator("#versus-close").boundingBox();
+    const footBox = await page.locator("#versus .dialog-foot").boundingBox();
+    assert.ok(closeBox.width < footBox.width / 2, `닫기 버튼 폭 ${closeBox.width} / 발 ${footBox.width}`);
     await page.click('#versus [data-level="easy"]');
     await page.setViewportSize({ width: 560, height: 360 });
     const rect = () => page.locator("#board").boundingBox();
