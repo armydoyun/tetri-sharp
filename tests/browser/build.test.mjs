@@ -3441,3 +3441,18 @@ test("규칙 편집: 프리셋으로 채우면 지금 내 규칙을 덮어쓰지
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("하드 드롭 연타로 1~2초 만에 막힌 Sprint: 피스가 10개를 넘어도 짧은 판으로 보고 추천 연습도 띄우지 않는다", async () => {
+  const { context, page, errors } = await openPage(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  await startMode(page, "sprint40");
+  for (let i = 0; i < 40 && !(await visible(page, "results")); i++) await page.keyboard.press("Space");
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  assert.ok(Number(await text(page, "hud-pieces")) >= 10, "피스는 10개 넘게 놓였다");
+  assert.match(await text(page, "results-stats"), /PPS—/);
+  assert.equal(await page.locator('#results [data-action="export"]').isDisabled(), true);
+  assert.equal(await page.locator("#results-practice-scene").isVisible(), false, "추천 연습 없음");
+  assert.deepEqual(errors, []);
+  await context.close();
+});

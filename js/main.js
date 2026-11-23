@@ -833,9 +833,19 @@ $("go-home").addEventListener("click", () => {
   toMenu();
 });
 
-/** 이보다 적은 피스로, 이 시간 안에 막힌 판은 결과의 비율 값을 —로, 공유를 끈다 */
+/**
+ * 너무 일찍 끝난 판: 결과의 비율 값을 —로, 공유·추천 연습을 끄고 "마지막 판"으로 남기지 않는다(F11·F21).
+ * 20초 안에 막혔고, 줄을 하나도 못 지웠거나 피스를 10개도 못 놓은 판. 하드 드롭 연타(1초에 12피스, 0줄)도 여기에 든다.
+ * 깬 판(퍼즐 등)과 20초 넘게 버틴 판(Survival 등)은 아니다.
+ */
+const SHORT_GAME_SECONDS = 20;
 const SHORT_GAME_PIECES = 10;
-const SHORT_GAME_SECONDS = 10;
+const isShortGame = state => {
+  if (state.over === "clear" || state.frame >= SHORT_GAME_SECONDS * 60) return false;
+  // 버틴 시간이 기록인 모드(Survival)는 줄을 안 지워도 제대로 된 판일 수 있다 → 피스 수만 본다
+  const survives = mode.record?.metric === "frames" && mode.record.order === "desc";
+  return state.stats.pieces < SHORT_GAME_PIECES || (!survives && state.stats.lines === 0);
+};
 
 const renderResultSplits = () => {
   const details = /** @type {HTMLDetailsElement} */ ($("results-splits"));
@@ -892,7 +902,8 @@ const renderResultSplits = () => {
   $("results-split-note").textContent = note;
   // 첫 구간(10줄)에 닿기 전에 끝났으면 머리줄뿐인 빈 표 대신 안내만 보인다
   /** @type {HTMLTableElement} */ ($("results-splits").querySelector("table")).hidden = rows.length === 0;
-  if (replay && mode.id === "sprint40") {
+  // 너무 일찍 끝난 판(연타 등)에서 고른 "추천 연습"은 뜻이 없다
+  if (replay && mode.id === "sprint40" && !isShortGame(game.state)) {
     let target = null;
     if (!slowest && rows.every(row => row.delta === null)) {
       if (analysis?.for !== replay) analysis = { ...analyzeReplay(replay, findMode), for: replay };
@@ -1035,9 +1046,7 @@ const finish = () => {
   if (lastReplay && versus) lastReplay.cpu = versus.recorder.finish(versus.cpu.state);
   /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="watch"]')).disabled = !lastReplay;
   // 피스 몇 개 만에 막힌 판: 비율 값(PPS)은 뜻이 없고, 공유·"마지막 판"으로 남길 만한 판도 아니다(F11)
-  // (Survival처럼 버틴 시간이 기록인 판은 피스가 적어도 오래 버텼으면 그대로)
-  const tooShort =
-    state.over !== "clear" && state.stats.pieces < SHORT_GAME_PIECES && state.frame < SHORT_GAME_SECONDS * 60;
+  const tooShort = isShortGame(state);
   const exportButton = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="export"]'));
   exportButton.disabled = !mode.trialCode && (!lastReplay || Boolean(versus) || tooShort);
   exportButton.querySelector(".btn-label").textContent = mode.trialCode ? t("퍼즐 편집") : t("공유");
