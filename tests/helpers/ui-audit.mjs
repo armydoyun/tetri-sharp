@@ -176,5 +176,48 @@ export const auditInPage = () => {
     if (Math.abs(dx) > 1 || Math.abs(dy) > 1)
       problems.push(`버튼 정렬 · ${describe(b)} 면 중심에서 (${dx.toFixed(1)}, ${dy.toFixed(1)})px`);
   }
+  // 6) 나머지 컨트롤(docs/DESIGN_SYSTEM.md "컴포넌트"): 정해진 구조, 내용은 (턱을 뺀) 면의 세로 가운데 1px 안
+  const ANATOMY = {
+    ".select": "svg.icon, .select-value",
+    ".tool-row": "svg.icon, .tool-label, small.tool-meta, small.tool-note",
+    ".menu-row": "svg.icon, .menu-index, .menu-text, .mode-best",
+  };
+  for (const [sel, allowed] of Object.entries(ANATOMY))
+    for (const c of all.filter(el => el.matches(sel))) {
+      const stray = [...c.childNodes].filter(
+        n =>
+          (n.nodeType === 3 && n.nodeValue.trim()) ||
+          (n.nodeType === 1 && !(/** @type {Element} */ (n).matches(allowed)))
+      );
+      if (stray.length) problems.push(`컨트롤 구조 · ${describe(c)} (${allowed} 밖의 내용)`);
+    }
+  for (const c of all.filter(el => el.matches(".select, .tool-row, .menu-row, .key-slot"))) {
+    const s = getComputedStyle(c);
+    const r = c.getBoundingClientRect();
+    const ledge = /inset/.test(s.boxShadow)
+      ? Math.abs(parseFloat(s.boxShadow.split(" ").filter(v => v.endsWith("px"))[1]) || 0)
+      : 0;
+    const faceY = (r.top + parseFloat(s.borderTopWidth) + r.bottom - parseFloat(s.borderBottomWidth) - ledge) / 2;
+    // 줄(목록·도구)은 오른쪽 화살표가, 나머지는 내용 전체가 가운데
+    const parts = (
+      c.matches(".menu-row, .tool-row") ? [...c.children].filter(k => k.matches("svg.icon")) : [...c.children]
+    )
+      .filter(visible)
+      .map(k => k.getBoundingClientRect());
+    if (!parts.length) continue;
+    const dy = (Math.min(...parts.map(q => q.top)) + Math.max(...parts.map(q => q.bottom))) / 2 - faceY;
+    if (Math.abs(dy) > 1) problems.push(`컨트롤 정렬 · ${describe(c)} 면 중심에서 세로 ${dy.toFixed(1)}px`);
+  }
+  // 글자 입력은 위아래 여백이 같고, 스위치는 어디서나 같은 크기
+  for (const c of all.filter(el => el.matches(".text-input"))) {
+    const s = getComputedStyle(c);
+    if (Math.abs(parseFloat(s.paddingTop) - parseFloat(s.paddingBottom)) > 0.5)
+      problems.push(`컨트롤 정렬 · ${describe(c)} 위아래 여백 ${s.paddingTop}/${s.paddingBottom}`);
+  }
+  for (const c of all.filter(el => el.matches(".switch"))) {
+    const r = c.getBoundingClientRect();
+    if (Math.round(r.width) !== 48 || Math.round(r.height) !== 26)
+      problems.push(`컨트롤 크기 · ${describe(c)} ${Math.round(r.width)}×${Math.round(r.height)} (48×26)`);
+  }
   return [...new Set(problems)];
 };
