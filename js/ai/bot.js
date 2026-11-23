@@ -1,6 +1,8 @@
 // CPU 플레이어. 엔진을 직접 건드리지 않고 사람처럼 매 프레임 버튼 입력만 만든다.
 //  1) 새 피스가 나오면 놓을 수 있는 자리(회전 × 가로 위치, 그대로 떨어뜨리기)를 모두 판 위에 놓아 보고 점수를 매긴다.
 //     홀드를 쓸 수 있으면 홀드한 피스(또는 다음 피스)로도 똑같이 해 본다.
+//     어려움 이상(level.lookahead)은 위쪽 후보마다 다음 피스까지 놓아 보고 두 수를 합친 점수로 고른다
+//     (같은 난이도 한 수 봇과 40판: 어려움 36승, 최강 36승. 보낼 공격 줄을 점수에 더하는 것은 이득이 없었다).
 //  2) 고른 자리로 가려고 매 프레임 실제 피스 상태를 보며 회전 → 좌우 이동 → 하드 드롭을 한 번에 하나씩 누른다.
 //  3) 난이도의 PPS에 맞춰 피스마다 생각하는 시간을 둔다. 쉬운 난이도는 가끔 차선을 고른다.
 // 결정론: 난수는 시드 PRNG만 쓴다.
@@ -97,6 +99,9 @@ const distinctRotations = (rotation, type) => {
   return out;
 };
 
+/** 두 수 앞보기에서 다음 피스까지 놓아 볼 이번 피스 후보 수 */
+const LOOK_WIDTH = 8;
+
 /** T-spin 가산점: [지운 줄 수]. 대전에서 공격이 4줄보다 세니 그만큼 쳐준다. */
 const SPIN_BONUS = Object.freeze([0, 9, 16, 22]);
 
@@ -104,7 +109,8 @@ const SPIN_BONUS = Object.freeze([0, 9, 16, 22]);
  * 이 피스로 갈 수 있는 자리마다 점수. 생성 높이에서 좌우로 막힘없이 간 뒤 떨어뜨리는 자리가 기본이다.
  * options.tucks: 바닥까지 내린 뒤 옆으로 밀어 넣는 자리(처마 아래)도 본다 → slide(칸 수, 부호가 방향)
  * options.spins: T를 바닥에서 한 번 더 돌려 줄을 지우는 T-spin 자리도 본다 → spin(+1 시계, -1 반시계), 가산점
- * @returns {{ rot: number, x: number, score: number, slide?: number, spin?: number, tspin?: string }[]}
+ * 후보마다 놓은 뒤의 판(board)과 지운 줄 수(lines)도 돌려준다 → 두 수 앞보기가 이어서 쓴다.
+ * @returns {{ rot: number, x: number, score: number, lines: number, board: any, slide?: number, spin?: number, tspin?: string }[]}
  */
 export const placements = (board, rotation, type, startX, startY, options = {}) => {
   const { tucks = false, spins = false, style = "balanced" } = options;
@@ -114,7 +120,7 @@ export const placements = (board, rotation, type, startX, startY, options = {}) 
     const b = { ...board, cells: board.cells.slice() };
     place(b, cells, x, y, 9);
     const lines = clearLines(b).length;
-    return { score: evaluate(b, lines, style), lines };
+    return { score: evaluate(b, lines, style), lines, board: b };
   };
   /** 바닥에서 한 번 돌린다(엔진과 같은 킥 순서). 들어가면 돌린 뒤의 자리 */
   const turn = (x, y, rot, dir) => {
@@ -141,7 +147,14 @@ export const placements = (board, rotation, type, startX, startY, options = {}) 
       if (tspin !== "full") continue;
       const placed = score(cells, r.x, r.y);
       if (placed.lines === 0) continue;
-      out.push({ ...base, spin: dir, tspin, score: placed.score + (SPIN_BONUS[Math.min(placed.lines, 3)] ?? 0) });
+      out.push({
+        ...base,
+        spin: dir,
+        tspin,
+        lines: placed.lines,
+        board: placed.board,
+        score: placed.score + (SPIN_BONUS[Math.min(placed.lines, 3)] ?? 0),
+      });
     }
   };
   for (const rot of distinctRotations(rotation, type)) {
@@ -158,7 +171,8 @@ export const placements = (board, rotation, type, startX, startY, options = {}) 
       }
     }
     for (const [x, y] of restOf) {
-      out.push({ rot, x, score: score(cells, x, y).score });
+      const placed = score(cells, x, y);
+      out.push({ rot, x, score: placed.score, lines: placed.lines, board: placed.board });
       if (spins && type === "T") addSpins({ rot, x }, x, y, rot);
       if (!tucks) continue;
       // 바닥에서 옆으로 밀기: 곧장 떨어뜨려서는 닿지 않는 자리(위가 막힌 처마 아래)만 새 후보다
@@ -170,7 +184,8 @@ export const placements = (board, rotation, type, startX, startY, options = {}) 
           while (fits(tx, ty + 1)) ty += 1;
           if (restOf.get(tx) === ty) continue;
           const base = { rot, x, slide: tx - x };
-          out.push({ ...base, score: score(cells, tx, ty).score });
+          const placed = score(cells, tx, ty);
+          out.push({ ...base, score: placed.score, lines: placed.lines, board: placed.board });
           if (spins && type === "T") addSpins(base, tx, ty, rot);
         }
       }
@@ -181,7 +196,7 @@ export const placements = (board, rotation, type, startX, startY, options = {}) 
 
 /**
  * @param {{ game: ReturnType<typeof import("../core/engine.js").createGame>, rotation: any,
- *   level: { pps: number, mistake: number, hold: boolean, holdMinGain?: number, tucks?: boolean, spins?: boolean, style?: string },
+ *   level: { pps: number, mistake: number, hold: boolean, holdMinGain?: number, tucks?: boolean, spins?: boolean, lookahead?: boolean, style?: string },
  *   seed?: number }} options
  */
 export const createBot = ({ game, rotation, level, seed = 1 }) => {
@@ -209,20 +224,52 @@ export const createBot = ({ game, rotation, level, seed = 1 }) => {
     return list[0];
   };
 
+  /** 홀드했거나 새로 나온 피스는 생성 위치에서 시작한다 */
+  const spawnX = type => Math.floor((WIDTH - (type === "I" ? 4 : type === "O" ? 2 : 3)) / 2);
+
+  /**
+   * 두 수 앞보기: 이번 피스 후보 중 위쪽 LOOK_WIDTH개를 놓아 본 판에서 다음 피스를 가장 좋게 놓았을 때의 점수로 다시 줄 세운다.
+   * 점수 = (이번 수의 줄 삭제·T-spin 몫) + (다음 수까지 놓은 판의 점수). 다음 피스를 둘 곳이 없으면 크게 깎는다.
+   */
+  const deepen = (list, nextType, y, options) => {
+    if (!nextType) return list;
+    const rescored = list.slice(0, LOOK_WIDTH).map(c => {
+      const gain = c.score - evaluate(c.board, 0, options.style);
+      const second = placements(c.board, rotation, nextType, spawnX(nextType), y, options)[0];
+      return { ...c, score: gain + (second ? second.score : c.score - 1000) };
+    });
+    return rescored.sort((p, q) => q.score - p.score);
+  };
+
   const think = () => {
     const s = game.state;
     const a = s.active;
     const options = { tucks: Boolean(level.tucks), spins: Boolean(level.spins), style: level.style ?? "balanced" };
-    const here = placements(s.board, rotation, a.type, a.x, a.y, options);
-    let best = { hold: false, ...(pick(here) ?? { rot: a.rot, x: a.x, score: -Infinity }) };
     const canHold = level.hold && rules.hold.enabled && !s.holdUsed;
     const other = s.hold ?? s.queue[0];
-    if (canHold && other && other !== a.type) {
-      // 홀드한 피스는 같은 자리(생성 위치)에서 나온다.
-      const size = other === "I" ? 4 : other === "O" ? 2 : 3;
-      const ox = Math.floor((WIDTH - size) / 2);
-      const alt = placements(s.board, rotation, other, ox, a.y, options)[0];
-      if (alt && alt.score > best.score + holdMinGain) best = { hold: true, ...alt };
+    let best;
+    if (level.lookahead) {
+      // 이번 피스로 둘 때 다음은 queue[0], 홀드로 바꿔 둘 때 다음은 (홀드가 비어 있었으면) queue[1]
+      const here = deepen(placements(s.board, rotation, a.type, a.x, a.y, options), s.queue[0], a.y, options);
+      const alt =
+        canHold && other && other !== a.type
+          ? deepen(
+              placements(s.board, rotation, other, spawnX(other), a.y, options),
+              s.hold ? s.queue[0] : s.queue[1],
+              a.y,
+              options
+            ).map(c => ({ ...c, hold: true }))
+          : [];
+      const all = [...here.map(c => ({ ...c, hold: false })), ...alt].sort((p, q) => q.score - p.score);
+      best = pick(all) ?? { hold: false, rot: a.rot, x: a.x, score: -Infinity };
+    } else {
+      const here = placements(s.board, rotation, a.type, a.x, a.y, options);
+      best = { hold: false, ...(pick(here) ?? { rot: a.rot, x: a.x, score: -Infinity }) };
+      if (canHold && other && other !== a.type) {
+        // 홀드한 피스는 같은 자리(생성 위치)에서 나온다.
+        const alt = placements(s.board, rotation, other, spawnX(other), a.y, options)[0];
+        if (alt && alt.score > best.score + holdMinGain) best = { hold: true, ...alt };
+      }
     }
     plan = { hold: best.hold, rot: best.rot, x: best.x, slide: best.slide ?? 0, spin: best.spin ?? 0, phase: "align" };
     // 생각하는 시간: 한 피스에 쓸 프레임에서 움직이는 데 드는 프레임을 뺀 만큼(내리기는 몇 프레임으로 친다)

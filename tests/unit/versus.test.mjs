@@ -278,6 +278,27 @@ test("최강 봇은 쉬움 봇을 이긴다", () => {
   assert.equal(b.state.over, null);
 });
 
+test("어려움 이상은 두 수 앞을 본다: 한 수만 보는 같은 난이도 봇을 이긴다", () => {
+  const hard = levelById("hard");
+  assert.equal(hard.lookahead, true);
+  assert.ok(!levelById("normal-plus").lookahead, "보통+까지는 그대로 한 수만 본다");
+  const oneStep = { ...hard, lookahead: false };
+  let wins = 0;
+  for (const seed of [7, 8, 9, 10]) {
+    const a = createGame({ rules: MODERN, seed, mode: versusMode(hard) });
+    const b = createGame({ rules: MODERN, seed, mode: versusMode(hard) });
+    const ba = createBot({ game: a, rotation: ROTATIONS.srs, level: hard, seed: 1 });
+    const bb = createBot({ game: b, rotation: ROTATIONS.srs, level: oneStep, seed: 2 });
+    for (let f = 0; f < 60 * 400 && !a.state.over && !b.state.over; f++) {
+      a.step(ba.input());
+      b.step(bb.input());
+      exchangeGarbage(a, b);
+    }
+    if (b.state.over && !a.state.over) wins += 1;
+  }
+  assert.ok(wins >= 3, `네 판 중 ${wins}판 승리`);
+});
+
 test("백업: 대전 전적도 옮기고 이상한 값은 버린다", () => {
   const parsed = parseBackup(
     {

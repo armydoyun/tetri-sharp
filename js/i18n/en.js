@@ -355,6 +355,7 @@ export const EN = {
   "CPU 대전 · {level} · {style}": "CPU battle · {level} · {style}",
   성향: "Style",
   "밀어 넣기": "tucks",
+  "다음 피스까지 계산": "plans with the next piece",
   "T-spin": "T-spins",
   "{n}줄 상쇄": "{n} blocked",
   "{n}줄 보냄": "{n} sent",

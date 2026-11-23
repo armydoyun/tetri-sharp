@@ -48,6 +48,7 @@ export const createVersusUI = ({ dialog, getStats, onPick, getStyle, setStyle })
                 hold: !level.hold ? t("홀드 안 씀") : "holdMinGain" in level ? t("홀드 제한적 사용") : t("홀드 사용"),
               }),
               ...("spins" in level ? [t("T-spin")] : "tucks" in level ? [t("밀어 넣기")] : []),
+              ...("lookahead" in level ? [t("다음 피스까지 계산")] : []),
             ].join(" · "),
             meta: s && s.win + s.loss ? t("{win}승 {loss}패", { win: s.win, loss: s.loss }) : "",
             onClick: () => {
