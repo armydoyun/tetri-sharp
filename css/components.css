@@ -1593,3 +1593,82 @@ body.touch-on :is(.btn, .btn-small, .key-slot, .select, .text-input, .choice > b
   border: 1px solid var(--border-strong);
   background: transparent;
 }
+
+/* ---- 업적 대화상자: 묶음 제목(이룬 수) + 목록. 이룬 것은 체크와 날짜, 아직은 흐리게 ---- */
+.achievement-group-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-m);
+  font-weight: 800;
+}
+
+.achievement-group-title small {
+  color: var(--text-dim);
+  font-size: var(--text-s);
+}
+
+.achievement-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.achievement {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: var(--space-1) 0;
+  border-bottom: var(--border-w) solid var(--border);
+}
+
+.achievement-mark {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border-strong);
+  border-radius: var(--radius-s);
+}
+
+/* 아직 못 이룬 것: 흐린 점선 — 눌러서 고르는 체크 상자처럼 보이지 않게 */
+.achievement:not(.is-done) .achievement-mark {
+  border-style: dashed;
+  border-color: var(--border);
+}
+
+.achievement.is-done .achievement-mark {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.achievement-mark .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.achievement-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.achievement-text strong {
+  font-size: var(--text-m);
+}
+
+.achievement-text small,
+.achievement-date {
+  color: var(--text-dim);
+  font-size: var(--text-s);
+}
+
+.achievement:not(.is-done) .achievement-text strong {
+  color: var(--text-dim);
+}

@@ -7,6 +7,8 @@ import { createTouch, touchVisible } from "./input/touch.js";
 import { compilePadmap, createGamepad } from "./input/gamepad.js";
 import { ACTIONS, compileKeymap, keyLabel } from "./input/keymap.js";
 import { RANK_STEPS, rankLabel, rankOf } from "./modes/ranks.js";
+import { ACHIEVEMENTS, createAchievements } from "./storage/achievements.js";
+import { createAchievementsUI } from "./ui/achievements.js";
 import { MODES, RECORD_MODES, SURVIVAL_MILESTONES, findMode as findBaseMode } from "./modes/index.js";
 import { dailyMode, dateKey, findDaily, recentDailyKeys } from "./modes/daily.js";
 import { decodeReplayCode, encodeReplayCode, replayLink } from "./replay/share.js";
@@ -419,6 +421,7 @@ const startRace = (m, selected = currentRules()) => {
 const renderMenu = () => {
   renderRuleTabs();
   renderPuzzleProgress();
+  renderAchievementProgress();
   const ruleSet = currentRules();
   $("active-rules").textContent = t("규칙 · {name}", { name: ruleSet.name });
   const list = $("mode-list");
@@ -803,6 +806,7 @@ $("go-home").addEventListener("click", () => {
     practiceUI.isOpen ||
     versusUI.isOpen ||
     dailyUI.isOpen ||
+    achievementsUI.isOpen ||
     helpUI.isOpen ||
     puzzleUI.isOpen ||
     shareUI.isOpen
@@ -988,6 +992,18 @@ const finish = () => {
   // 퍼즐: 깬 단계를 남기고, 깼으면 "다음 단계"를 보인다(마지막 단계면 다시 하기만)
   if (mode.puzzle?.number && state.over === "clear") puzzleProgress.markCleared(mode.puzzle.id);
   if (mode.trialCode && state.over === "clear") puzzleEditor.markCleared(mode.trialCode);
+  // 업적: 이번 판에 처음 이룬 것(플레이 업적은 실제 모드·오늘의 도전·CPU 대전에서만)
+  const freshAchievements = achievements.evaluate({
+    mode,
+    state,
+    real: !scenePractice && (MODES.includes(mode) || Boolean(mode.daily) || Boolean(mode.versus)),
+    won: Boolean(mode.versus) && state.over === WIN,
+    puzzlesCleared: puzzleProgress.cleared(),
+    puzzles: PUZZLES,
+  });
+  $("results-achievements").textContent = freshAchievements.length
+    ? t("업적 달성 · {names}", { names: freshAchievements.map(a => a.name).join(", ") })
+    : "";
   const nextPuzzle = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="next-puzzle"]'));
   const nextLesson = nextPracticeLesson();
   const hasNext = nextLesson || (mode.puzzle?.number && mode.puzzle.number < PUZZLES.length);
@@ -1261,6 +1277,11 @@ $("puzzles").addEventListener("close", () => {
     /** @type {HTMLElement | null} */ (panels.results.querySelector('[data-action="export"]'))?.focus();
 });
 /** 첫 화면 "퍼즐" 줄의 진행도 */
+const renderAchievementProgress = () => {
+  const done = achievements.unlocked();
+  $("achievement-progress").textContent = `${ACHIEVEMENTS.filter(a => done[a.id]).length} / ${ACHIEVEMENTS.length}`;
+};
+
 const renderPuzzleProgress = () => {
   $("puzzle-progress").textContent = `${puzzleProgress.cleared().size} / ${PUZZLES.length}`;
 };
@@ -1288,6 +1309,16 @@ $("stats").addEventListener("close", () => {
   } else {
     /** @type {HTMLElement | null} */ (document.querySelector('[data-action="stats"]'))?.focus();
   }
+});
+
+const achievements = createAchievements(store);
+const achievementsUI = createAchievementsUI({
+  dialog: /** @type {HTMLDialogElement} */ ($("achievements")),
+  achievements,
+});
+$("open-achievements").addEventListener("click", () => achievementsUI.open());
+$("achievements").addEventListener("close", () => {
+  if (screen === "menu") /** @type {HTMLElement | null} */ ($("open-achievements"))?.focus();
 });
 
 const recordsUI = createRecordsUI({
@@ -1322,6 +1353,7 @@ const handleSystem = (action, code = "") => {
     practiceUI.isOpen ||
     versusUI.isOpen ||
     dailyUI.isOpen ||
+    achievementsUI.isOpen ||
     helpUI.isOpen ||
     puzzleUI.isOpen ||
     shareUI.isOpen
@@ -1428,6 +1460,7 @@ const handlePadMenu = action => {
     practiceUI.isOpen ||
     versusUI.isOpen ||
     dailyUI.isOpen ||
+    achievementsUI.isOpen ||
     helpUI.isOpen ||
     puzzleUI.isOpen ||
     shareUI.isOpen
@@ -2139,6 +2172,7 @@ window.addEventListener("keydown", e => {
     practiceUI.isOpen ||
     versusUI.isOpen ||
     dailyUI.isOpen ||
+    achievementsUI.isOpen ||
     helpUI.isOpen ||
     puzzleUI.isOpen ||
     shareUI.isOpen

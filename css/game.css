@@ -649,6 +649,18 @@ body[data-screen="paused"] .countdown {
   letter-spacing: 0.06em;
 }
 
+/* 결과: 이번 판에 처음 이룬 업적 한 줄(없으면 감춘다) */
+.results-achievements {
+  margin: 0;
+  color: var(--accent);
+  font-size: var(--text-s);
+  font-weight: 800;
+}
+
+.results-achievements:empty {
+  display: none;
+}
+
 .results-main {
   margin: 0;
   font-family: var(--font-num);

@@ -3245,3 +3245,29 @@ test("첫 화면 정리: 백업·리플레이 파일은 설정의 데이터 탭,
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("업적: 이룬 판의 결과 화면에 알리고, 첫 화면 개수와 업적 대화상자에 남는다", async () => {
+  // 판 비우기 장에서 1단계만 남겨 두고 1단계를 푼다
+  const others = PUZZLES.filter(p => p.kind === "pc" && p.number !== 1).map(p => p.id);
+  const { context, page, errors } = await openPage(rest => {
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
+    localStorage.setItem("tetrisharp:puzzle:cleared", JSON.stringify(rest));
+  }, others);
+  assert.match(await text(page, "achievement-progress"), /^0 \/ \d+$/);
+  await page.click("#open-puzzles");
+  await page.click('[data-puzzle="1"]');
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  for (const key of keysFor(solvePuzzle(PUZZLES[0]))) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(20);
+  }
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
+  assert.equal(await text(page, "results-achievements"), "업적 달성 · 판 비우기 장");
+  await page.keyboard.press("Escape");
+  assert.match(await text(page, "achievement-progress"), /^1 \/ \d+$/);
+  await page.click("#open-achievements");
+  assert.equal(await page.locator('#achievements [data-achievement="puzzle-pc"].is-done').count(), 1);
+  assert.equal(await page.locator('#achievements [data-achievement="puzzle-all"].is-done').count(), 0);
+  assert.deepEqual(errors, []);
+  await context.close();
+});

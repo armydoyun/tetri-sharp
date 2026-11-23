@@ -78,6 +78,7 @@
               <button id="open-practice" class="tool-row" type="button"><span>연습</span><span data-icon="chevron-right"></span></button>
               <button id="open-puzzles" class="tool-row" type="button"><span>퍼즐</span><small id="puzzle-progress" class="tool-meta num"></small><span data-icon="chevron-right"></span></button>
               <button id="open-records" class="tool-row" type="button"><span>기록</span><span data-icon="chevron-right"></span></button>
+              <button id="open-achievements" class="tool-row" type="button"><span>업적</span><small id="achievement-progress" class="tool-meta num"></small><span data-icon="chevron-right"></span></button>
             </div>
           </section>
 
@@ -250,6 +251,8 @@
                 <!-- 새 기록일 때만 보이지만 자리는 늘 차지한다(원칙 2) -->
                 <p id="results-badge" class="badge is-invisible"><span data-icon="star"></span>새 기록</p>
                 <p id="race-result" class="race-result"></p>
+                <!-- 이번 판에 처음 이룬 업적(없으면 자리를 차지하지 않는다) -->
+                <p id="results-achievements" class="results-achievements" role="status"></p>
                 <dl id="results-stats" class="results-stats"></dl>
                 <details id="results-splits" class="results-splits">
                   <summary>구간 기록</summary>
@@ -368,6 +371,7 @@
     <dialog id="share" class="dialog" aria-label="리플레이 공유"></dialog>
     <dialog id="versus" class="dialog" aria-label="CPU 대전"></dialog>
     <dialog id="daily" class="dialog" aria-label="오늘의 도전"></dialog>
+    <dialog id="achievements" class="dialog" aria-label="업적"></dialog>
     <!-- 화면 읽기 프로그램용 알림(보이지 않음): 줄 삭제·레벨업·결과 -->
     <p id="sr-status" class="sr-only" role="status" aria-live="polite"></p>
     <!-- ES Modules: 개발용 실행은 http://localhost를 사용한다. -->
