@@ -356,7 +356,8 @@ export const EN = {
   성향: "Style",
   "밀어 넣기": "tucks",
   "다음 피스까지 계산": "plans with the next piece",
-  "너무 일찍 끝난 판이라 공유하지 않고 마지막 판으로 남기지 않아요": "This game ended too early to share or keep as your last game",
+  "너무 일찍 끝난 판이라 공유하지 않고 마지막 판으로 남기지 않아요":
+    "This game ended too early to share or keep as your last game",
   "T-spin": "T-spins",
   "{n}줄 상쇄": "{n} blocked",
   "{n}줄 보냄": "{n} sent",
