@@ -279,9 +279,10 @@ test("최강 봇은 쉬움 봇을 이긴다", () => {
 });
 
 test("어려움 이상은 두 수 앞을 본다: 한 수만 보는 같은 난이도 봇을 이긴다", () => {
-  const hard = levelById("hard");
-  assert.equal(hard.lookahead, true);
+  assert.equal(levelById("hard").lookahead, true);
   assert.ok(!levelById("normal-plus").lookahead, "보통+까지는 그대로 한 수만 본다");
+  // 앞보기의 이득만 보려고 실수 확률이 0인 최강끼리 비교한다(어려움은 차선을 14% 골라 판마다 들쭉날쭉하다)
+  const hard = levelById("master");
   const oneStep = { ...hard, lookahead: false };
   let wins = 0;
   for (const seed of [7, 8, 9, 10]) {

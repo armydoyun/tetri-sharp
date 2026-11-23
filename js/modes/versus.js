@@ -54,6 +54,8 @@ export const applyBattleLock = (state, ev, events) => {
  * hold = 홀드를 쓰는지, holdMinGain = 홀드로 바꿀 때 필요한 최소 배치 점수 차이,
  * tucks = 바닥에서 옆으로 밀어 넣는지, spins = T를 바닥에서 돌려 넣는지(T-spin),
  * lookahead = 다음 피스(홀드 포함)까지 두 수 앞을 보는지.
+ * 단계마다 위 단계가 아래 단계를 대략 3/4쯤 이기게 맞췄다(봇끼리 40판, 같은 판을 자리 바꿔 두 번씩):
+ * 보통+ > 보통 29승, 어려움 > 보통+ 30승, 어려움+ > 어려움 33승, 최강 > 어려움+ 38승(최강은 상한이라 그대로).
  */
 export const LEVELS = Object.freeze([
   Object.freeze({ id: "easy", name: t("쉬움"), pps: 0.7, mistake: 20, hold: false }),
@@ -63,8 +65,8 @@ export const LEVELS = Object.freeze([
   Object.freeze({
     id: "hard",
     name: t("어려움"),
-    pps: 2,
-    mistake: 3,
+    pps: 1.8,
+    mistake: 14,
     hold: true,
     tucks: true,
     spins: true,
@@ -73,8 +75,8 @@ export const LEVELS = Object.freeze([
   Object.freeze({
     id: "hard-plus",
     name: t("어려움+"),
-    pps: 2.6,
-    mistake: 1,
+    pps: 2.2,
+    mistake: 8,
     hold: true,
     tucks: true,
     spins: true,
@@ -97,7 +99,7 @@ export const WIN = "win";
 
 /**
  * CPU 성향(난이도와 따로 고른다). 판을 보는 기준만 다르다(js/ai/bot.js STYLE_WEIGHTS).
- * 같은 어려움 봇끼리 60판에서 균형 대비 4줄 노림 45%, 안정 38%(18판은 10분 안에 끝나지 않음).
+ * 같은 어려움 봇끼리 60판에서 균형 대비 4줄 노림 43%, 안정 53%.
  */
 export const STYLES = Object.freeze([
   Object.freeze({ id: "balanced", name: t("균형"), hint: t("4줄을 노리다가 판이 높아지면 무엇이든 지워요") }),
