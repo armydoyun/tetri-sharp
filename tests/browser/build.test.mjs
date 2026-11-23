@@ -3501,3 +3501,34 @@ test("기록 지우기: 데이터 탭에서 두 번 눌러 기록·리플레이�
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("키보드: 대화상자는 열면 안으로 포커스가 가고, Esc로 닫으면 연 버튼으로 돌아온다", async () => {
+  const { context, page, errors } = await openPage();
+  const active = () => page.evaluate(() => document.activeElement?.id || document.activeElement?.dataset.mode || "");
+  for (const [opener, id] of [
+    ["open-settings", "settings"],
+    ["open-help", "help"],
+    ["open-practice", "practice"],
+    ["open-puzzles", "puzzles"],
+    ["open-records", "records"],
+    ["open-achievements", "achievements"],
+  ]) {
+    await page.focus(`#${opener}`);
+    await page.keyboard.press("Enter");
+    assert.equal(await page.evaluate(d => document.getElementById(d).contains(document.activeElement), id), true, id);
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(o => document.activeElement?.id === o, opener);
+    assert.equal(await active(), opener);
+  }
+  // 설정에서 값을 바꿔 다시 그려도 포커스는 같은 조작에 남는다
+  await page.focus("#open-settings");
+  await page.keyboard.press("Enter");
+  await page.focus('#set-handling-preset [data-value="relaxed"]');
+  await page.keyboard.press("Enter");
+  assert.equal(
+    await page.evaluate(() => document.activeElement?.matches('#set-handling-preset [data-value="relaxed"]')),
+    true
+  );
+  assert.deepEqual(errors, []);
+  await context.close();
+});

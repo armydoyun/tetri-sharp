@@ -1241,8 +1241,11 @@ const settingsUI = createSettingsUI({
     },
   },
   onClose: () => {
-    if (screen === "menu") toMenu();
-    else if (screen === "paused") showPanel("pause");
+    // 첫 화면은 다시 그리되(언어·화면 색 등), 포커스는 연 버튼(머리글 설정)으로 돌려준다
+    if (screen === "menu") {
+      toMenu();
+      /** @type {HTMLElement | null} */ ($("open-settings"))?.focus();
+    } else if (screen === "paused") showPanel("pause");
     else if (screen === "results") showPanel("results");
   },
 });
