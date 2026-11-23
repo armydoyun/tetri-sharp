@@ -115,9 +115,7 @@ export const createPracticeUI = ({ dialog, onPick, progress, onStage }) => {
         })
       );
       // 중력이 없는 것은 자리 연습(자유 쌓기·우물·T-spin·퍼펙트 클리어 등)뿐이다(F30). 입문·훈련 과정은 단계마다 안내한다
-      notice.textContent = t(
-        "쉬운 것부터 놓았어요. 자리 연습은 중력이 없으니 소프트 드롭으로 내려 돌려 넣으세요. 끝낸 연습은 완료로 표시돼요."
-      );
+      notice.textContent = t("쉬운 것부터 놓았어요. 자리 연습은 중력이 없어요 — 소프트 드롭으로 내려 넣으세요.");
       fillDialog(dialog, {
         title: t("연습"),
         body: el("div", {}, el("section", { class: "field-section" }, list)),

@@ -685,7 +685,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
     // 기록 지우기(F25): 기록표·리플레이·Sprint 기록 흐름·CPU 전적. 설정·내 규칙·연습·퍼즐 진행도·업적은 남긴다
     const clearRecords = confirmButton({
       label: t("지우기"),
-      confirmLabel: t("한 번 더 누르면 지워요"),
+      confirmLabel: t("정말 지우기"),
       icon: "close",
       size: "s",
       id: "clear-records",
@@ -744,7 +744,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
     // "설정"만 되돌린다(기록·리플레이·업적은 그대로 — 지우기는 데이터 탭). 두 번 눌러 확정(U40)
     const reset = confirmButton({
       label: t("설정 초기화"),
-      confirmLabel: t("한 번 더 누르면 초기화"),
+      confirmLabel: t("정말 초기화"),
       icon: "reset",
       id: "settings-reset",
       title: t("조작감·키·화면 설정을 기본값으로 되돌려요. 기록은 지우지 않아요."),
