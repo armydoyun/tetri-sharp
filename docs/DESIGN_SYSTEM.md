@@ -208,6 +208,14 @@ fieldRow({ id, label: t("고스트"), control: segmented({ id, label: t("고스�
 | `#mode-list .menu-row { grid-template-columns: … }`처럼 화면에서 줄 배치를 새로 짜기 | `controls.css`에 변형 class를 더하고 `menuRow()`에 선택지로 |
 | 컨트롤 안쪽 요소(`.btn-label` `.menu-text` 등)에 `line-height`·`padding`·`margin`·`grid-row` | 컨트롤 변수, 또는 `controls.css`의 변형 |
 
+### 키보드 · 화면 읽기
+
+- 대화상자는 열면 안쪽(닫기나 첫 조작)으로 포커스가 가고, 닫으면 **연 버튼으로 돌아온다**.
+- 값을 바꿔 내용을 다시 그릴 때는 `focusKey()`로 포커스 자리를 기억했다가 `restoreFocus()`로 같은 조작에 돌려준다(`js/ui/dom.js`).
+- 누를 수 있는 것과 입력은 모두 이름이 있다(글자, `aria-label`, 연결된 `label`). 아이콘은 `aria-hidden`.
+- 알림 칸(`.notice-slot`)은 `role="status"`. 상태가 바뀌는 버튼(두 번 눌러 확정)은 숨은 `aria-live`로 알린다.
+- `tabindex`는 0이나 -1만 쓴다.
+
 ### 검사
 
 - `tests/unit/design-rules.test.mjs`
@@ -220,6 +228,8 @@ fieldRow({ id, label: t("고스트"), control: segmented({ id, label: t("고스�
   - 버튼·세그먼트 칸: 구조, **내용 덩어리가 턱을 뺀 면의 가운데에서 가로·세로 1px 안**
   - 드롭다운·키 칸: 내용이 (턱을 뺀) 면의 세로 가운데 1px 안. 목록 줄·도구 줄: 오른쪽 화살표가 세로 가운데 1px 안, 정해진 구조
   - 글자 입력: 위아래 여백이 같다. 스위치: 48×26
+  - 빈 자리(보이지 않는데 자리만 차지하는 블록), 목록 줄 글자의 세로 가운데
+  - 접근성: 이름 없는 조작, 양수 tabindex, 이름 없는 대화상자, 포커스가 열린 대화상자 밖
 
 ## 화면
 
