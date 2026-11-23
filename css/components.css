@@ -940,6 +940,18 @@
   height: var(--control-h);
 }
 
+/* 최고 기록의 랭크 · 다음 랭크 기준 */
+.records-rank {
+  margin: var(--space-3) 0 0;
+  color: var(--text-dim);
+  font-size: var(--text-m);
+}
+
+.records-rank strong {
+  color: var(--accent);
+  font-weight: 800;
+}
+
 .records-table {
   width: 100%;
   border-collapse: collapse;

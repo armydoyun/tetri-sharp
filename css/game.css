@@ -2002,7 +2002,9 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
   padding-inline-start: var(--space-3);
 }
 #mode-list .menu-text { grid-column: 1; }
-#mode-list .mode-best { min-width: 0; }
+/* 최고 기록(과 랭크)은 설명 아래 줄: 오른쪽 칸에 두면 2열 카드에서 설명이 낱말마다 꺾인다 */
+#mode-list .mode-best { min-width: 0; grid-column: 1; grid-row: 2; text-align: left; }
+#mode-list .menu-row > .icon { grid-row: 1 / span 2; }
 #mode-list .mode-best:empty { display: none; }
 #mode-list .menu-row > .icon { grid-column: 3; }
 

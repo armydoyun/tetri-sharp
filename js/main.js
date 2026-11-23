@@ -6,6 +6,7 @@ import { createKeyboard } from "./input/keyboard.js";
 import { createTouch, touchVisible } from "./input/touch.js";
 import { compilePadmap, createGamepad } from "./input/gamepad.js";
 import { ACTIONS, compileKeymap, keyLabel } from "./input/keymap.js";
+import { RANK_STEPS, rankLabel, rankOf } from "./modes/ranks.js";
 import { MODES, RECORD_MODES, SURVIVAL_MILESTONES, findMode as findBaseMode } from "./modes/index.js";
 import { dailyMode, dateKey, findDaily, recentDailyKeys } from "./modes/daily.js";
 import { decodeReplayCode, encodeReplayCode, replayLink } from "./replay/share.js";
@@ -437,7 +438,10 @@ const renderMenu = () => {
       text.append(name, desc);
       const pb = document.createElement("span");
       pb.className = "mode-best num";
-      pb.textContent = best ? t("최고 기록 {record}", { record: m.formatRecord(best) }) : "";
+      const rank = rankOf(m, best);
+      pb.textContent = best
+        ? t("최고 기록 {record}", { record: m.formatRecord(best) }) + (rank ? ` · ${rankLabel(rank)}` : "")
+        : "";
       btn.append(text, pb, icon("chevron-right"));
       btn.addEventListener("click", () => start(m));
       return btn;
@@ -1070,6 +1074,11 @@ const finish = () => {
   ];
   // 순위 줄은 늘 둔다(없으면 —) → 결과 화면 높이가 판마다 같다.
   rows.push([t("순위"), outcome && outcome.rank < 10 ? t("{n}위", { n: outcome.rank + 1 }) : "—"]);
+  // 랭크가 있는 모드: 기록으로 남는 판이면 이 판의 랭크(다음 랭크 기준은 기록 화면에서)
+  if (RANK_STEPS[mode.id]) {
+    const run = { frames: state.frame, score: state.score, lines: state.stats.lines, level: state.level };
+    rows.push([t("랭크"), (mode.isRecordable(state) && rankOf(mode, run)) || "—"]);
+  }
   if (mode.splits) {
     const delta = splitDelta(splits, resultPbSplits);
     if (delta !== null) rows.push([t("PB 대비"), formatDelta(delta)]);

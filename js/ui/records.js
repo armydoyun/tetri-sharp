@@ -7,6 +7,7 @@ import { recordKey } from "../storage/records.js";
 import { MAX_RANKED } from "../replay/replay.js";
 import { button, el, fillDialog, fieldRow } from "./dom.js";
 import { dropdown } from "./select.js";
+import { RANK_STEPS, nextRankStep, rankLabel, rankOf } from "../modes/ranks.js";
 import { t } from "../i18n/index.js";
 
 const ROWS = 10;
@@ -178,6 +179,25 @@ export const createRecordsUI = ({ dialog, modes, records, sprintHistory, replayF
       );
     });
 
+    // 최고 기록의 랭크와 다음 랭크 기준(랭크가 있는 모드만)
+    const rank = rankOf(mode, list[0]);
+    const next = nextRankStep(mode, list[0]);
+    const rankLine = rank
+      ? el(
+          "p",
+          { class: "records-rank", id: "records-rank" },
+          el("strong", { text: rankLabel(rank) }),
+          " ",
+          el("span", {
+            text: next
+              ? t("다음 {rank}: {record}", {
+                  rank: next.rank,
+                  record: mode.formatRecord({ [RANK_STEPS[mode.id].metric]: next.value }),
+                })
+              : t("가장 높은 랭크예요"),
+          })
+        )
+      : null;
     const empty = el("p", {
       class: "records-empty",
       text: t("아직 기록이 없어요. 이 모드와 규칙으로 한 판을 끝내면 여기에 표시돼요."),
@@ -197,6 +217,7 @@ export const createRecordsUI = ({ dialog, modes, records, sprintHistory, replayF
         fieldRow({ id: "records-mode", label: t("모드"), control: modeSelect }),
         fieldRow({ id: "records-rules", label: t("규칙"), control: rulesSelect })
       ),
+      ...(rankLine ? [rankLine] : []),
       ...(list.length
         ? [el("table", { class: "records-table" }, el("thead", {}, head), el("tbody", {}, ...rows))]
         : [empty]),
