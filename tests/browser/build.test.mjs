@@ -332,9 +332,11 @@ test("이어서 하기: 새 판을 취소한 뒤 Sprint를 완주하면 기록�
     await startMode(page, "sprint40");
     await playReplayFrames(page, replay.inputs, 0, 241);
     await page.reload();
-    const confirmation = page.waitForEvent("dialog").then(dialog => dialog.dismiss());
+    // 저장된 판이 있으면 앱 안의 확인 대화상자로 묻는다(브라우저 확인창 아님). 닫기 = 취소
     await page.click('[data-mode="endless"]');
-    await confirmation;
+    await page.locator("#ask").waitFor({ state: "visible" });
+    assert.match(await page.locator("#ask").textContent(), /저장된 판을 지울까요/);
+    await page.click("#ask-cancel");
     assert.equal(await visible(page, "continue-run"), true);
     await page.click("#continue-run");
     await playReplayFrames(page, replay.inputs, 241, replay.result.frames);
@@ -1712,8 +1714,8 @@ test("전체 흐름: Survival 한 판 → 결과·새 기록 → 기록표 리�
   await page.reload();
   await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
   assert.equal(await page.locator('[data-mode="survival"] .mode-best').textContent(), "");
-  page.once("dialog", dialog => dialog.accept());
   await page.setInputFiles("#backup-file", file);
+  await page.click("#ask-ok");
   await page.waitForFunction(() => /백업을 불러왔어요/.test(document.getElementById("menu-notice")?.textContent ?? ""));
   assert.match(await page.locator('[data-mode="survival"] .mode-best').textContent(), /최고 기록/);
   assert.equal(await page.locator("#watch-last").isDisabled(), false, "마지막 판 리플레이도 돌아온다");
@@ -1786,12 +1788,10 @@ test("네트워크 없이 단일 HTML에서 이전 백업을 확인하고 안전
       };
     });
 
-    const messages = [];
-    page.on("dialog", async dialog => {
-      messages.push(dialog.message());
-      await dialog.accept();
-    });
     await page.setInputFiles("#backup-file", file);
+    await page.locator("#ask").waitFor({ state: "visible" });
+    const messages = [await page.locator("#ask .ask-body").textContent()];
+    await page.click("#ask-ok");
     await page.waitForFunction(() => document.getElementById("menu-notice")?.textContent.includes("저장하지 못했어요"));
     assert.match(messages[0], /기록 1개, 리플레이 2개/);
     assert.match(messages[0], /퍼즐 완료 0개 · 훈련 완료 0개 · Sprint 시도 0개/);
@@ -1801,6 +1801,7 @@ test("네트워크 없이 단일 HTML에서 이전 백업을 확인하고 안전
     await page.reload();
     await ready(page);
     await page.setInputFiles("#backup-file", file);
+    await page.click("#ask-ok");
     await page.waitForFunction(() => document.getElementById("menu-notice")?.textContent.includes("백업을 불러왔어요"));
     await page.reload();
     await ready(page);

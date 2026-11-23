@@ -27,6 +27,7 @@ import { loadSettings, sanitizeSettings, saveSettings, toEngineHandling } from "
 import { createRecords } from "./storage/records.js";
 import { createSettingsUI } from "./ui/settings.js";
 import { createRulesUI } from "./ui/rules.js";
+import { createAsk } from "./ui/ask.js";
 import { button, menuRow, segmentButtons } from "./ui/components.js";
 import { el } from "./ui/dom.js";
 import { dropdown } from "./ui/select.js";
@@ -311,12 +312,21 @@ const clearRun = () => {
   if (runJournal && savedRun()?.id === runJournal.entry.id) store.set(SUSPENDED_RUN_KEY, null);
   runJournal = null;
 };
-const canReplaceRun = () => {
+/** 이어서 할 판이 저장돼 있는데 다른 판을 시작하려 하는가(그러면 먼저 묻는다) */
+const replacesSavedRun = () => {
   const current = savedRun();
-  return (
-    !current || (runJournal && current.id === savedRunId) || window.confirm(t("저장된 판을 지우고 새 판을 시작할까요?"))
-  );
+  return Boolean(current) && !(runJournal && current.id === savedRunId);
 };
+/** 저장된 판을 버릴지 앱 안의 확인 대화상자로 묻고, 그러자고 하면 then을 부른다 */
+const confirmReplaceRun = then =>
+  ask({
+    title: t("저장된 판을 지울까요?"),
+    message: t("이어서 할 수 있게 저장해 둔 판이 있어요. 새 판을 시작하면 그 판은 지워져요."),
+    okLabel: t("지우고 새 판 시작"),
+    okIcon: "play",
+  }).then(ok => {
+    if (ok) then();
+  });
 
 // ---- 표시 도우미 ----
 
@@ -658,9 +668,15 @@ const start = (
   selectedRules = currentRules(),
   target = null,
   retrySeed = /** @type {number | undefined} */ (undefined),
-  restored = null
+  restored = null,
+  confirmed = false
 ) => {
-  if (restoringRun ? !restored : !canReplaceRun()) return;
+  if (restoringRun) {
+    if (!restored) return;
+  } else if (!confirmed && replacesSavedRun()) {
+    confirmReplaceRun(() => start(m, selectedRules, target, retrySeed, restored, true));
+    return;
+  }
   confirming = null;
   if (screen === "replay") stopReplay();
   mode = m;
@@ -1230,6 +1246,9 @@ const settingsUI = createSettingsUI({
     else if (screen === "results") showPanel("results");
   },
 });
+
+/** 앱 안 확인 대화상자(브라우저 확인창 대신) */
+const ask = createAsk(/** @type {HTMLDialogElement} */ ($("ask")));
 
 const rulesUI = createRulesUI({
   dialog: /** @type {HTMLDialogElement} */ ($("rules-editor")),
@@ -2153,9 +2172,12 @@ const resetSceneAttempt = (restored = null) => {
 };
 
 /** @param {SceneSplit | null} split @param {FinesseScene | null} target */
-const enterScenePractice = (split = null, target = null, rescue = null, restored = null) => {
+const enterScenePractice = (split = null, target = null, rescue = null, restored = null, confirmed = false) => {
   if (!replayPaused || !(canPracticeScene() || (rescue && player && !player.done))) return;
-  if (!restoringRun && !canReplaceRun()) return;
+  if (!restoringRun && !confirmed && replacesSavedRun()) {
+    confirmReplaceRun(() => enterScenePractice(split, target, rescue, restored, true));
+    return;
+  }
   scenePractice = {
     spawnFrame: restored?.scene.spawnFrame ?? rescue?.spawnFrame ?? target?.spawnFrame ?? player.spawnFrame,
     split,
@@ -2387,7 +2409,8 @@ const backupActions = setupBackup({
   findMode,
   fileInput: /** @type {HTMLInputElement} */ ($("backup-file")),
   canImport: () => screen === "menu",
-  confirmImport: message => window.confirm(message),
+  confirmImport: message =>
+    ask({ title: t("백업을 불러올까요?"), message: message.split("\n"), okLabel: t("불러오기"), okIcon: "folder" }),
   notify: notifyData,
   onRestored: reloadFromStore,
 });

@@ -5,7 +5,6 @@ export const EN = {
   "이어서 하기": "Continue saved game",
   "창을 닫아도 이 판은 이 기기에 남아요.": "This game stays on this device even if you close the window.",
   "{mode} · {time} · {lines}줄": "{mode} · {time} · {lines} lines",
-  "저장된 판을 지우고 새 판을 시작할까요?": "Replace the saved game and start a new one?",
   "저장된 판을 불러오는 중…": "Restoring your saved game…",
   "저장된 판을 이어서 할 수 없어요.": "Could not continue the saved game.",
   "저장 공간을 확인해 주세요. 이번 진행을 저장하지 못했어요.":
@@ -934,6 +933,12 @@ export const EN = {
   "CPU 대전에서 모두 50번 이기기": "Win 50 CPU battles in total",
   "장면 목록": "Scenes",
   "표시할 장면이 없어요": "No marked scenes",
+  확인: "Confirm",
+  "저장된 판을 지울까요?": "Delete the saved game?",
+  "이어서 할 수 있게 저장해 둔 판이 있어요. 새 판을 시작하면 그 판은 지워져요.":
+    "You have a game saved to continue. Starting a new one deletes it.",
+  "지우고 새 판 시작": "Delete and start",
+  "백업을 불러올까요?": "Load this backup?",
   "설정 초기화": "Reset settings",
   "정말 초기화": "Confirm reset",
   "조작감·키·화면 설정을 기본값으로 되돌려요. 기록은 지우지 않아요.":

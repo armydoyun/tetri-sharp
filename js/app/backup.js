@@ -9,7 +9,7 @@ import { t } from "../i18n/index.js";
  *   findMode: (id: string) => any,
  *   fileInput: HTMLInputElement,
  *   canImport: () => boolean,
- *   confirmImport: (message: string) => boolean,
+ *   confirmImport: (message: string) => boolean | Promise<boolean>,
  *   notify: (text: string) => void,
  *   onRestored: () => void,
  * }} options  onRestored: 메모리에 들고 있던 값들을 저장소에서 다시 읽는다
@@ -53,7 +53,8 @@ export const setupBackup = ({ store, findMode, fileInput, canImport, confirmImpo
       t("백업에 포함되지 않은 연습·퍼즐·Sprint 진행도는 유지돼요.") +
       "\n" +
       t("이 브라우저에 저장된 데이터를 백업 내용으로 바꿀까요?");
-    if (!confirmImport(message)) return;
+    if (!(await confirmImport(message))) return;
+    if (current !== request || !canImport()) return;
     if (!restoreBackup(store, parsed)) {
       notify(t("백업을 저장하지 못했어요. 기존 데이터는 그대로예요."));
       return;

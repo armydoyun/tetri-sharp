@@ -195,7 +195,7 @@ fieldRow({ id, label: t("고스트"), control: segmented({ id, label: t("고스�
 
 | 하지 말 것 | 대신 |
 | --- | --- |
-| `window.confirm(…)`(브라우저 기본 확인창) | `confirmButton()` — 앱 안에서 두 번 눌러 확정 |
+| `window.confirm(…)`·`alert`·`prompt`(브라우저 기본 창) | 대화상자 안 한 버튼이면 `confirmButton()`(두 번 눌러 확정), 대화상자 밖 흐름이면 `ask({ title, message, okLabel })`(`js/ui/ask.js`, 앱 안 확인 대화상자 · Promise) |
 | `document.createElement("button")`, `el("button", …)`, `el("input", …)`(여러 줄로 써도 같다) | `button()` `iconButton()` `segmented()` `toggle()` `slider()` `textInput()` `menuRow()` |
 | `<button class="btn">편집</button>` (맨 글자) | `<button class="btn"><span class="btn-label">편집</span></button>` |
 | 아이콘만 있는 버튼에 글자 없이 `class="btn"` | `iconButton({ icon, label })` 또는 `.btn-icon-only` + `aria-label` |

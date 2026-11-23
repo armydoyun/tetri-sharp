@@ -19,7 +19,8 @@
   덮어쓰지 않는다. 크기를 바꿀 때는 변수만: `--btn-size` `--btn-min` `--btn-px` `--btn-py` `--btn-gap` `--btn-font` `--btn-icon`,
   세그먼트 `--seg-*`, 드롭다운 `--select-size`, 글자 입력 `--input-size`. 새 배치가 필요하면 `controls.css`에 변형 class를 더한다.
 - 상태가 바뀌어도 크기·위치가 그대로여야 한다. 흐름 안의 요소를 `hidden`으로 빼지 말고 `disabled`나 `.is-invisible`로 자리를 남긴다.
-- 지우기·초기화처럼 되돌릴 수 없는 일은 `window.confirm` 대신 `confirmButton()`(두 번 눌러 확정)으로.
+- 지우기·초기화처럼 되돌릴 수 없는 일은 `window.confirm` 대신 `confirmButton()`(두 번 눌러 확정)으로,
+  대화상자 밖 흐름(새 판 시작 등)은 `js/ui/ask.js`의 앱 안 확인 대화상자로. `window.confirm·alert·prompt`는 테스트가 막는다.
 - 색·간격·크기는 `css/tokens.css` 변수만 쓴다. 이모지·기호 글자 아이콘(× ← ✓ 등)은 쓰지 않는다 — `js/ui/icons.js`의 SVG.
 - 화면에 보이는 문구는 한국어로 쓰고 `t("…")`로 감싼 뒤 `js/i18n/en.js`에 영어를 더한다.
 
