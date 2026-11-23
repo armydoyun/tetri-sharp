@@ -650,7 +650,8 @@ test("Custom 규칙: 편집 내용이 저장되고 기록표 id가 바뀌며, �
 
 test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파일 저장 → 메뉴에서 열기", async () => {
   const { context, page, errors } = await openPage();
-  await startMode(page, "endless");
+  // 버틴 시간이 기록인 Survival: 연타로 금방 막혀도 피스가 10개를 넘으면 공유할 수 있는 판이다(짧은 판 판정 F21)
+  await startMode(page, "survival");
   for (let i = 0; i < 40; i++) await page.keyboard.press(i % 3 ? "Space" : "ArrowLeft");
   await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 5000 });
   const pieces = await text(page, "hud-pieces");
@@ -690,7 +691,7 @@ test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파�
   assert.equal(await page.locator('#share input[type="url"]').evaluate(el => el === document.activeElement), true);
   const [download] = await Promise.all([page.waitForEvent("download"), page.click("#share-file")]);
   await page.click("#share-close");
-  assert.match(download.suggestedFilename(), /^tetri-sharp-endless-.*\.json$/);
+  assert.match(download.suggestedFilename(), /^tetri-sharp-survival-.*\.json$/);
   const file = await download.path();
   const saved = JSON.parse(fs.readFileSync(file, "utf8"));
   assert.equal(saved.app, "tetri-sharp");
@@ -2639,7 +2640,12 @@ test("Sprint 첫 결과에서 피네스 장면을 추천하고 같은 배치의 
     }, inputs);
   try {
     await startMode(page, "sprint40");
-    await input(["ArrowLeft", "ArrowRight", ...Array(50).fill("Space")]);
+    // 첫 피스는 왼쪽·오른쪽을 헛되이 누르고 놓는다. 20초 넘게 둔 뒤 막혀야 짧은 판(F21)이 아니라 추천 연습이 뜬다.
+    await input(["ArrowLeft", "ArrowRight", "Space"]);
+    await page.evaluate(() => {
+      for (let i = 0; i < 21 * 60; i++) window.advanceFrame();
+    });
+    await input(Array(50).fill("Space"));
     const entry = page.locator("#results-practice-scene");
     assert.match(await entry.textContent(), /추천 연습.*피네스/);
     await entry.click();
