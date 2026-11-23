@@ -3330,3 +3330,25 @@ test("CPU 성향: 대전 목록 위에서 고르고 기억하며, 전적은 성�
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("피스 몇 개 만에 막힌 판: PPS는 —, 공유는 끄고 이유를 보이며, 마지막 판도 덮어쓰지 않는다", async () => {
+  const { context, page, errors } = await openPage(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  await startMode(page, "endless");
+  // 세워서 한가운데에만 떨어뜨리면 금방 막힌다
+  for (let i = 0; i < 20 && !(await visible(page, "results")); i++) {
+    await page.keyboard.press("ArrowUp");
+    await page.keyboard.press("Space");
+  }
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  const pieces = Number(await text(page, "hud-pieces"));
+  assert.ok(pieces < 10, `세워서 떨어뜨리기만 하면 ${pieces}개 만에 막힌다`);
+  assert.match(await text(page, "results-stats"), /PPS—/);
+  assert.equal(await page.locator('#results [data-action="export"]').isDisabled(), true);
+  assert.match(await text(page, "race-result"), /너무 일찍 끝난 판/);
+  assert.equal(await page.locator('#results [data-action="retry"]').isDisabled(), false, "다시 하기는 그대로");
+  assert.equal(await page.evaluate(() => localStorage.getItem("tetrisharp:replay:last")), null);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
