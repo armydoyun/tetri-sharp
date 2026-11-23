@@ -939,6 +939,7 @@ export const EN = {
     "You have a game saved to continue. Starting a new one deletes it.",
   "지우고 새 판 시작": "Delete and start",
   "백업을 불러올까요?": "Load this backup?",
+  "{label} — 한 번 더 누르면 실행해요": "{label} — press again to do it",
   "설정 초기화": "Reset settings",
   "정말 초기화": "Confirm reset",
   "조작감·키·화면 설정을 기본값으로 되돌려요. 기록은 지우지 않아요.":
