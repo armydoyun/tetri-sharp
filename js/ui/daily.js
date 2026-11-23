@@ -1,5 +1,6 @@
 // 오늘의 도전 대화상자: 도전하기 · 내 결과 공유(코드·링크) · 받은 코드로 겨루기
-import { button, el, fieldRow, fillDialog } from "./dom.js";
+import { el, fieldRow, fillDialog } from "./dom.js";
+import { button, textInput } from "./components.js";
 import { t } from "../i18n/index.js";
 import { dropdown } from "./select.js";
 
@@ -29,14 +30,13 @@ export const createDailyUI = ({ dialog, dates, getEntry, makeCode, makeLink, onS
 
   const shareRows = async replay => {
     const code = await makeCode(replay);
-    const codeInput = el("input", {
+    const codeInput = textInput({
       id: "daily-code",
-      class: "text-input num",
-      type: "text",
+      num: true,
       value: code,
       readOnly: true,
     });
-    const copyCode = button({ text: t("복사"), iconName: "copy", className: "btn btn-small", id: "daily-copy" });
+    const copyCode = button({ label: t("복사"), icon: "copy", size: "s", id: "daily-copy" });
     copyCode.disabled = !code;
     copyCode.addEventListener("click", async () => {
       const ok = await copy(code);
@@ -45,7 +45,7 @@ export const createDailyUI = ({ dialog, dates, getEntry, makeCode, makeLink, onS
         : t("복사하지 못했어요. 코드를 선택해 직접 복사해 주세요");
       if (!ok) /** @type {HTMLInputElement} */ (codeInput).select();
     });
-    const copyLink = button({ text: t("링크 복사"), iconName: "link", className: "btn btn-small", id: "daily-link" });
+    const copyLink = button({ label: t("링크 복사"), icon: "link", size: "s", id: "daily-link" });
     copyLink.disabled = !code;
     copyLink.addEventListener("click", async () => {
       notice.textContent = (await copy(makeLink(code)))
@@ -93,11 +93,11 @@ export const createDailyUI = ({ dialog, dates, getEntry, makeCode, makeLink, onS
     const best = el("span", { class: "daily-best num", id: "daily-best", "aria-live": "polite" });
     // 고른 날짜의 모드(날마다 바뀐다)
     const modeLine = el("small", { id: "daily-mode" });
-    const play = button({ text: t("도전하기"), iconName: "play", className: "btn btn-primary", id: "daily-start" });
+    const play = button({ label: t("도전하기"), icon: "play", variant: "primary", id: "daily-start" });
     const watch = button({
-      text: t("최고 기록 다시 보기"),
-      iconName: "play",
-      className: "btn btn-small",
+      label: t("최고 기록 다시 보기"),
+      icon: "play",
+      size: "s",
       id: "daily-watch",
     });
     const share = el("div");
@@ -135,17 +135,16 @@ export const createDailyUI = ({ dialog, dates, getEntry, makeCode, makeLink, onS
     });
 
     const pasteInput = /** @type {HTMLInputElement} */ (
-      el("input", {
+      textInput({
         id: "daily-paste",
-        class: "text-input num",
-        type: "text",
+        num: true,
         value: pasted,
         placeholder: t("TD1- 코드나 링크"),
         autocomplete: "off",
         spellcheck: false,
       })
     );
-    const race = button({ text: t("겨루기"), iconName: "play", className: "btn btn-small", id: "daily-race" });
+    const race = button({ label: t("겨루기"), icon: "play", size: "s", id: "daily-race" });
     let checking = false;
     race.disabled = !pasteInput.value.trim();
     pasteInput.addEventListener("input", () => {

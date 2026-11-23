@@ -5,7 +5,8 @@ import { FINESSE_LESSONS } from "../modes/finesse-lessons.js";
 import { INTRO_LESSONS } from "../modes/intro-lessons.js";
 import { DOWNSTACK_LESSONS } from "../modes/downstack.js";
 import { DRILLS } from "../modes/practice.js";
-import { button, el, fillDialog } from "./dom.js";
+import { el, fillDialog } from "./dom.js";
+import { button } from "./components.js";
 import { icon } from "./icons.js";
 import { t } from "../i18n/index.js";
 
@@ -46,7 +47,7 @@ export const createPracticeUI = ({ dialog, onPick, progress, onStage }) => {
       });
       return stage;
     });
-    const back = button({ text: t("연습 목록") });
+    const back = button({ label: t("연습 목록") });
     back.addEventListener("click", () => ui.open());
     notice.textContent = t("원하는 단계를 골라 다시 연습할 수 있어요.");
     fillDialog(dialog, {

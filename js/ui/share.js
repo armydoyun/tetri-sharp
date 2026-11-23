@@ -1,5 +1,6 @@
 // 리플레이 공유 창: 링크 복사 · 파일 저장. 받은 사람은 링크를 열면 바로 재생하고 그 기록과 달릴 수 있다.
-import { button, el, fieldRow, fillDialog } from "./dom.js";
+import { el, fieldRow, fillDialog } from "./dom.js";
+import { button, textInput } from "./components.js";
 import { t } from "../i18n/index.js";
 
 /**
@@ -27,13 +28,13 @@ export const createShareUI = ({ dialog, makeCode, makeLink, onSaveFile }) => {
       const code = await makeCode(replay);
       const link = makeLink(code);
       const copyLink = button({
-        text: t("링크 복사"),
-        iconName: "link",
-        className: "btn btn-primary btn-small",
+        label: t("링크 복사"),
+        icon: "link",
+        variant: "primary",
+        size: "s",
         id: "share-link",
       });
-      const linkInput = el("input", {
-        class: "text-input",
+      const linkInput = textInput({
         type: "url",
         value: link,
         readOnly: true,
@@ -52,9 +53,9 @@ export const createShareUI = ({ dialog, makeCode, makeLink, onSaveFile }) => {
         }
       });
       const save = button({
-        text: t("파일로 저장"),
-        iconName: "download",
-        className: "btn btn-small",
+        label: t("파일로 저장"),
+        icon: "download",
+        size: "s",
         id: "share-file",
       });
       save.addEventListener("click", () => {

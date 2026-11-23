@@ -21,7 +21,8 @@ import {
   defaultVisual,
   handlingPresetOf,
 } from "../storage/settings.js";
-import { button, choice, choiceCards, el, fieldRow, fillDialog, rangeRow, slider, tabBar } from "./dom.js";
+import { el, fieldRow, fillDialog } from "./dom.js";
+import { button, choiceCards, rangeRow, segmented, slider, tabBar } from "./components.js";
 import { COLOR_SWATCHES, PIECE_ORDER, THEMES, THEME_IDS, findTheme, paletteFor } from "../render/themes.js";
 import { keycap } from "./keycap.js";
 import { createThemePreview } from "../render/preview.js";
@@ -143,7 +144,8 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
           const p = handlingPresetOf(getSettings().handling);
           return p ? t(PRESET_HINTS[p]) : t("아래에서 직접 조절한 값이에요");
         })(),
-        control: choice({
+        control: segmented({
+          wrap: true,
           id: "set-handling-preset",
           label: t("조작감"),
           options: PRESET_OPTIONS,
@@ -178,7 +180,8 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
         id: "set-touch",
         label: t("터치 버튼"),
         hint: TOUCH_HINTS[getSettings().touch],
-        control: choice({
+        control: segmented({
+          wrap: true,
           id: "set-touch",
           label: t("터치 버튼"),
           options: TOUCH_OPTIONS,
@@ -193,7 +196,8 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
         id: "set-touch-mode",
         label: t("터치 조작 방식"),
         hint: t(TOUCH_MODE_HINTS[getSettings().touchMode]),
-        control: choice({
+        control: segmented({
+          wrap: true,
           id: "set-touch-mode",
           label: t("터치 조작 방식"),
           options: [
@@ -232,7 +236,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
     const a = getSettings().access;
     const visual = getSettings().visual;
     const row = (id, label, hint, options, value, onChange) =>
-      fieldRow({ id, label, hint, control: choice({ id, label, options, value, onChange }) });
+      fieldRow({ id, label, hint, control: segmented({ wrap: true, id, label, options, value, onChange }) });
     return el(
       "section",
       { class: "field-section" },
@@ -332,7 +336,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
         return b;
       })
     );
-    const reset = button({ text: t("테마 색으로"), iconName: "reset", className: "btn btn-small", id: "color-reset" });
+    const reset = button({ label: t("테마 색으로"), icon: "reset", size: "s", id: "color-reset" });
     reset.addEventListener("click", () => {
       update({ visual: { ...getSettings().visual, colors: {} } });
       render();
@@ -356,7 +360,8 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
       id: "set-effects",
       label: t("화면 효과"),
       hint: EFFECT_HINTS[visual.effects],
-      control: choice({
+      control: segmented({
+        wrap: true,
         id: "set-effects",
         label: t("화면 효과"),
         options: EFFECT_OPTIONS,
@@ -373,7 +378,8 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
           : visual.palette === "custom"
             ? t("아래에서 피스를 고르고 색을 눌러요. 고르지 않은 피스는 테마 색이에요")
             : t("고른 테마의 색을 써요"),
-      control: choice({
+      control: segmented({
+        wrap: true,
         id: "set-palette",
         label: t("블록 색"),
         options: [
@@ -438,7 +444,8 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
         id: "set-scheme",
         label: t("화면 색"),
         hint: t(SCHEME_HINTS[scheme]),
-        control: choice({
+        control: segmented({
+          wrap: true,
           id: "set-scheme",
           label: t("화면 색"),
           options: [
@@ -457,7 +464,8 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
         id: "set-game-surface",
         label: t("게임 중 화면"),
         hint: t(GAME_SURFACE_HINTS[getSettings().gameSurface]),
-        control: choice({
+        control: segmented({
+          wrap: true,
           id: "set-game-surface",
           label: t("게임 중 화면"),
           options: [
@@ -483,7 +491,8 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
         id: "set-ghost",
         label: t("고스트"),
         hint: t("피스가 떨어질 자리 표시의 진하기"),
-        control: choice({
+        control: segmented({
+          wrap: true,
           id: "set-ghost",
           label: t("고스트"),
           options: [
@@ -499,7 +508,8 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
         id: "set-grid",
         label: t("격자 선"),
         hint: visual.grid === "off" ? t("격자 선 없이 블록만 보여요") : t("보드에 칸을 나누는 선을 그려요"),
-        control: choice({
+        control: segmented({
+          wrap: true,
           id: "set-grid",
           label: t("격자 선"),
           options: [
@@ -514,7 +524,8 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
         id: "set-inputs",
         label: t("키 입력 표시"),
         hint: t("게임과 리플레이에서 누르는 키를 정보 칸 아래에 보여 줘요"),
-        control: choice({
+        control: segmented({
+          wrap: true,
           id: "set-inputs",
           label: t("키 입력 표시"),
           options: [
@@ -532,7 +543,8 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
           getSettings().lang === "auto"
             ? t("브라우저 언어를 따라요 · 바꾸면 페이지를 다시 불러와요")
             : t("바꾸면 페이지를 다시 불러와요"),
-        control: choice({
+        control: segmented({
+          wrap: true,
           id: "set-lang",
           label: t("언어"),
           options: [
@@ -648,24 +660,24 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
   const dataSection = () => {
     const menuOnly = !data.canImport();
     const exportBackup = button({
-      text: t("저장"),
-      iconName: "download",
-      className: "btn btn-small",
+      label: t("저장"),
+      icon: "download",
+      size: "s",
       id: "export-backup",
     });
     exportBackup.addEventListener("click", () => data.exportBackup());
     const importBackup = button({
-      text: t("불러오기"),
-      iconName: "folder",
-      className: "btn btn-small",
+      label: t("불러오기"),
+      icon: "folder",
+      size: "s",
       id: "import-backup",
       disabled: menuOnly,
     });
     importBackup.addEventListener("click", () => data.importBackup());
     const openReplay = button({
-      text: t("파일 열기"),
-      iconName: "folder",
-      className: "btn btn-small",
+      label: t("파일 열기"),
+      icon: "folder",
+      size: "s",
       id: "open-replay",
       disabled: menuOnly,
     });
@@ -708,7 +720,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
   const render = () => {
     stopThemePreview();
     const scroll = dialog.querySelector(".dialog-body")?.scrollTop ?? 0;
-    const reset = button({ text: t("전체 설정 초기화"), iconName: "reset", id: "settings-reset" });
+    const reset = button({ label: t("전체 설정 초기화"), icon: "reset", id: "settings-reset" });
     reset.addEventListener("click", () => {
       if (!window.confirm(t("조작감, 키 설정, 화면 설정을 모두 기본값으로 되돌릴까요?"))) return;
       capture = null;

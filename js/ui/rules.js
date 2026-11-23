@@ -1,7 +1,8 @@
 // Custom 규칙 편집 대화상자. 바꿀 때마다 onChange(규칙 내용)를 부르고, 저장·적용은 호출한 쪽이 한다.
 import { PRESET_LIST } from "../rules/presets.js";
 import { GRAVITY_OPTIONS, LIMITS, makeCustomRules, sanitizeRuleBody } from "../rules/sanitize.js";
-import { button, el, fieldRow, fillDialog, rangeRow, slider, switchInput, tabBar } from "./dom.js";
+import { el, fieldRow, fillDialog } from "./dom.js";
+import { button, rangeRow, slider, tabBar, textInput, toggle } from "./components.js";
 import { dropdown } from "./select.js";
 import { decodeRules, encodeRules, rulesLink } from "../rules/share.js";
 import { MAX_RULE_NAME, MAX_RULE_SLOTS } from "../storage/rule-slots.js";
@@ -226,7 +227,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
       });
     }
     if (field.type === "toggle") {
-      const input = switchInput({ id, checked: Boolean(value), disabled });
+      const input = toggle({ id, checked: Boolean(value), disabled });
       input.addEventListener("change", () => commit(input.checked));
       return input;
     }
@@ -266,14 +267,13 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
 
   const shareSection = rules => {
     const code = encodeRules(rules);
-    const codeInput = el("input", {
+    const codeInput = textInput({
       id: "rule-share-code",
-      class: "text-input num",
-      type: "text",
+      num: true,
       value: code,
       readOnly: true,
     });
-    const copyCode = button({ text: t("복사"), iconName: "copy", className: "btn btn-small", id: "rule-share-copy" });
+    const copyCode = button({ label: t("복사"), icon: "copy", size: "s", id: "rule-share-copy" });
     copyCode.addEventListener("click", async () => {
       message = (await copy(code, codeInput))
         ? t("규칙 코드를 복사했어요")
@@ -282,9 +282,9 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
     });
     const link = rulesLink(rules, location.href);
     const copyLink = button({
-      text: t("링크 복사"),
-      iconName: "link",
-      className: "btn btn-small",
+      label: t("링크 복사"),
+      icon: "link",
+      size: "s",
       id: "rule-share-link",
     });
     copyLink.addEventListener("click", async () => {
@@ -293,15 +293,14 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
         : t("복사하지 못했어요");
       notice.textContent = message;
     });
-    const pasteInput = el("input", {
+    const pasteInput = textInput({
       id: "rule-share-paste",
-      class: "text-input num",
-      type: "text",
+      num: true,
       placeholder: t("TS1-로 시작하는 코드나 링크"),
       autocomplete: "off",
       spellcheck: false,
     });
-    const load = button({ text: t("불러오기"), iconName: "folder", className: "btn btn-small", id: "rule-share-load" });
+    const load = button({ label: t("불러오기"), icon: "folder", size: "s", id: "rule-share-load" });
     const doLoad = () => {
       const body = decodeRules(pasteInput.value);
       if (!body) {
@@ -356,10 +355,8 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
     const state = slots.read();
     const current = state.slots[state.active];
     const nameInput = /** @type {HTMLInputElement} */ (
-      el("input", {
+      textInput({
         id: "rule-slot-name",
-        class: "text-input",
-        type: "text",
         value: current.name,
         maxLength: MAX_RULE_NAME,
         "aria-label": t("규칙 이름"),
@@ -377,7 +374,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
       render("rule-slot-name");
     };
     nameInput.addEventListener("change", saveName);
-    const addSlot = button({ text: t("새 규칙"), iconName: "edit", className: "btn btn-small", id: "rule-slot-add" });
+    const addSlot = button({ label: t("새 규칙"), icon: "edit", size: "s", id: "rule-slot-add" });
     addSlot.disabled = state.slots.length >= MAX_RULE_SLOTS;
     addSlot.addEventListener("click", () => {
       if (!slots.add(t("내 규칙 {n}", { n: state.slots.length + 1 }), PRESET_LIST[0])) return;
@@ -385,9 +382,9 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
       render("rule-slot-name");
     });
     const removeSlot = button({
-      text: t("지우기"),
-      iconName: "close",
-      className: "btn btn-small",
+      label: t("지우기"),
+      icon: "close",
+      size: "s",
       id: "rule-slot-remove",
     });
     removeSlot.disabled = state.slots.length <= 1;
@@ -412,7 +409,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
       { class: "rule-presets" },
       el("span", { class: "field-help", text: t("프리셋에서 시작") }),
       ...PRESET_LIST.map(p => {
-        const b = button({ text: p.name, className: "btn btn-small", "data-preset": p.id });
+        const b = button({ label: p.name, size: "s", "data-preset": p.id });
         b.addEventListener("click", () => {
           onChange(sanitizeRuleBody(p));
           message = t("{name} 값으로 채웠어요 · 기록표 {id}", { name: p.name, id: makeCustomRules(p).id });

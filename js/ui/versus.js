@@ -1,6 +1,7 @@
 // CPU 대전 난이도 고르기 대화상자. 줄마다 [번호 | 난이도·속도 | 전적 | >]
 import { LEVELS, STYLES, versusStatKey } from "../modes/versus.js";
-import { choice, el, fieldRow, fillDialog } from "./dom.js";
+import { el, fieldRow, fillDialog } from "./dom.js";
+import { segmented } from "./components.js";
 import { icon } from "./icons.js";
 import { t } from "../i18n/index.js";
 
@@ -19,7 +20,8 @@ export const createVersusUI = ({ dialog, getStats, onPick, getStyle, setStyle })
         id: "versus-style",
         label: t("성향"),
         hint: (STYLES.find(x => x.id === style) ?? STYLES[0]).hint,
-        control: choice({
+        control: segmented({
+          wrap: true,
           id: "versus-style",
           label: t("성향"),
           options: STYLES.map(x => [x.id, x.name]),
