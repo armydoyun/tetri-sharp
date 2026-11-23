@@ -14,6 +14,8 @@ export const createAchievementsUI = ({ dialog, achievements }) => {
   return {
     open() {
       const done = achievements.unlocked();
+      const totals = achievements.totals();
+      const number = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
       const count = ACHIEVEMENTS.filter(a => done[a.id]).length;
       const body = el(
         "div",
@@ -49,8 +51,13 @@ export const createAchievementsUI = ({ dialog, achievements }) => {
                   ),
                   el("span", {
                     class: "achievement-date num",
-                    text: done[a.id] ? formatDate(done[a.id]) : "",
-                    "aria-label": done[a.id] ? t("{date}에 이룸", { date: formatDate(done[a.id]) }) : t("아직"),
+                    // 누적 업적은 아직이면 진행도(312 / 1,000)
+                    text: done[a.id]
+                      ? formatDate(done[a.id])
+                      : a.total
+                        ? `${number(Math.min(totals[a.total] ?? 0, a.goal ?? 0))} / ${number(a.goal ?? 0)}`
+                        : "",
+                    "aria-label": done[a.id] ? t("{date}에 달성", { date: formatDate(done[a.id]) }) : t("아직"),
                   })
                 )
               )
@@ -58,7 +65,7 @@ export const createAchievementsUI = ({ dialog, achievements }) => {
           );
         })
       );
-      notice.textContent = t("{done} / {total}개 이룸 · 이 기기에 저장되고 백업에 들어가요", {
+      notice.textContent = t("{done} / {total} 달성 · 이 기기에 저장되고 백업에 들어가요", {
         done: count,
         total: ACHIEVEMENTS.length,
       });

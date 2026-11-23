@@ -171,15 +171,32 @@ body[data-screen="menu"] .stage {
   --seg-font: var(--text-l);
 }
 
-/* 내 규칙 줄(Custom일 때): [고르기 | 공유]. 다른 규칙일 때도 자리는 그대로(보이지만 않는다) */
+/* 내 규칙 줄(Custom일 때): [고르기 | 공유]. 다른 규칙일 때는 같은 높이로 Custom 안내 한 줄 */
 .rule-slot-home {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: var(--space-2);
+  min-height: var(--control-h);
 }
 
-.rule-slot-home.is-off {
-  visibility: hidden;
+/* 터치 화면에서는 안의 드롭다운이 44px → 안내만 있을 때도 같은 높이 */
+@media (pointer: coarse) {
+  .rule-slot-home {
+    min-height: 44px;
+  }
+}
+
+body.touch-on .rule-slot-home {
+  min-height: 44px;
+}
+
+.rule-slot-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--text-s);
+  line-height: 1.4;
 }
 
 .rule-desc {
@@ -734,6 +751,50 @@ body.is-finesse-lesson .results-stats :is(dt, dd) {
   width: 100%;
   display: grid;
   gap: var(--space-2);
+}
+
+/* 장면 목록: 조작 아래가 크게 비는 넓고 높은 화면(데스크톱)에서만. 길면 이 칸만 스크롤(U42) */
+.replay-scenes {
+  display: none;
+}
+
+@media (min-width: 1000px) and (min-height: 640px) {
+  .replay-scenes {
+    display: grid;
+    gap: var(--space-1);
+    min-height: 0;
+    padding-top: var(--space-2);
+    border-top: var(--border-w) solid var(--border);
+  }
+}
+
+.replay-scenes-title {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--text-s);
+  font-weight: 700;
+}
+
+.replay-scene-list {
+  display: grid;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.replay-scene-list .replay-scene {
+  width: 100%;
+  min-width: 0;
+}
+
+.replay-scene[aria-current="true"] {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.replay-scene-empty {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--text-s);
 }
 
 .replay-info,
@@ -1358,9 +1419,31 @@ body.is-versus {
 }
 
 @media (max-width: 720px) {
+  /* 공격 알림은 자리를 따로 잡지 않고 CPU 상황 줄 위에 한 줄로 잠깐 겹쳐 떴다가 사라진다(2.8초, 누르기를 막지 않음).
+     자리를 비워 두면 그만큼(76px) 보드가 줄어들고(2차 평가 U32), 보드 위에 띄우면 새 피스가 가려진다. */
   body.is-versus {
+    --versus-feedback-h: 0px;
     --board-inline-reserve: 2px;
     --chrome-h: calc(220px + var(--versus-feedback-h));
+  }
+
+  body.is-versus .versus-panel {
+    position: relative;
+  }
+
+  body.is-versus .versus-feedback-slot {
+    display: contents;
+  }
+
+  body.is-versus .versus-feedback {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: center;
+    align-items: baseline;
+    gap: 0 var(--space-2);
   }
 
   body.is-versus .versus-panel {
@@ -1555,6 +1638,13 @@ body.gestures-mode {
 /* 머리글: 좁으면 "도움말"·"설정" 글자는 숨기고 아이콘만(이름은 aria-label) */
 @media (max-width: 480px) {
   .header-actions .header-label {
+    display: none;
+  }
+}
+
+/* 휴대폰 가로로 플레이할 때도 아이콘만: 머리글 글자가 높이와 폭을 먹는다(U41) */
+@media (orientation: landscape) and (max-height: 520px) and (pointer: coarse) {
+  body:not([data-screen="menu"]) .header-actions .header-label {
     display: none;
   }
 }
@@ -1969,6 +2059,11 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
 /* 첫 판과 자주 쓰는 도구를 먼저 읽게 한다. */
 .home .welcome { padding-block: var(--space-2); }
 .active-rules { color: var(--text-dim); font-size: var(--text-s); }
+/* 넓은 화면에서는 규칙 블록이 같은 화면에 보이므로 "규칙 · Modern"은 지금 규칙을 알려 주는 글자만(링크 모양 없음, U45).
+   한 칸으로 쌓이는 좁은 화면에서만 규칙 블록으로 가는 링크 */
+@media (min-width: 681px) {
+  .active-rules { text-decoration: none; pointer-events: none; }
+}
 
 .mode-objective:empty,
 .inline-notice:empty { display: none; }

@@ -8,7 +8,7 @@
 - 버튼·세그먼트·스위치·슬라이더·글자 입력·드롭다운·목록 줄은 **`js/ui/components.js`로만 만든다.** 크기·여백·정렬은 **`css/controls.css`에서만** 정한다.
   `document.createElement("button")`, `el("button", …)`, `el("input", …)`을 화면 코드에 쓰지 않는다.
   ```js
-  import { button, iconButton, segmented, toggle, slider, rangeRow, textInput, dropdown, menuRow } from "./components.js";
+  import { button, iconButton, confirmButton, segmented, toggle, slider, rangeRow, textInput, dropdown, menuRow } from "./components.js";
   button({ label: t("저장"), icon: "download", size: "s", onClick: save });
   ```
 - `index.html`에 버튼을 적을 때는 구조를 그대로 지킨다: `[<span data-icon>] [<span class="btn-label">] [<small class="btn-meta">] [<kbd>]`.
@@ -19,6 +19,7 @@
   덮어쓰지 않는다. 크기를 바꿀 때는 변수만: `--btn-size` `--btn-min` `--btn-px` `--btn-py` `--btn-gap` `--btn-font` `--btn-icon`,
   세그먼트 `--seg-*`, 드롭다운 `--select-size`, 글자 입력 `--input-size`. 새 배치가 필요하면 `controls.css`에 변형 class를 더한다.
 - 상태가 바뀌어도 크기·위치가 그대로여야 한다. 흐름 안의 요소를 `hidden`으로 빼지 말고 `disabled`나 `.is-invisible`로 자리를 남긴다.
+- 지우기·초기화처럼 되돌릴 수 없는 일은 `window.confirm` 대신 `confirmButton()`(두 번 눌러 확정)으로.
 - 색·간격·크기는 `css/tokens.css` 변수만 쓴다. 이모지·기호 글자 아이콘(× ← ✓ 등)은 쓰지 않는다 — `js/ui/icons.js`의 SVG.
 - 화면에 보이는 문구는 한국어로 쓰고 `t("…")`로 감싼 뒤 `js/i18n/en.js`에 영어를 더한다.
 

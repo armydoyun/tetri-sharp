@@ -10,9 +10,9 @@ const describeAttack = ({ cleared, tspin, lines, blocked, base, backToBack, comb
   if (!outcome.length) outcome.push(t("공격 0줄"));
   const clear =
     tspin === "mini"
-      ? t("미니 T스핀 {n}줄", { n: cleared })
+      ? t("T-spin Mini {n}줄", { n: cleared })
       : tspin === "full"
-        ? t("T스핀 {n}줄", { n: cleared })
+        ? t("T-spin {n}줄", { n: cleared })
         : t("일반 {n}줄", { n: cleared });
   const parts = [`${clear} +${base}`];
   if (backToBack) parts.push(t("백투백 +{n}", { n: backToBack }));
@@ -90,7 +90,7 @@ export const createFeedback = ({ actionEl, versusEl, srStatus, getSettings, desc
   };
 
   const announceAttack = e => {
-    // 매번 싱글이 나올 때 알릴 필요는 없다. 미니 T스핀과 상쇄처럼 다른 결과는 매번 설명한다.
+    // 매번 싱글이 나올 때 알릴 필요는 없다. T-spin Mini와 상쇄처럼 다른 결과는 매번 설명한다.
     if (e.tspin === "none" && !e.lines && !e.blocked) {
       if (explainedSingle) return "";
       explainedSingle = true;

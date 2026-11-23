@@ -108,6 +108,9 @@ const scenarios = async (page, quick) => {
       await esc();
     }
   }
+  // 설정 초기화는 두 번 눌러 확정한다
+  await page.click("#settings-reset");
+  await check("설정 초기화 확인 이름");
   await page.click("#settings-reset");
   await esc();
 

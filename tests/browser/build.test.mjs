@@ -504,20 +504,31 @@ test("막히면 결과 화면이 뜨고, Space 연타로 건너뛰지 않으며,
   await context.close();
 });
 
-test("전체 설정 초기화는 취소할 수 있고, 확인 후 버튼으로 포커스가 돌아온다", async () => {
+test("설정 초기화는 두 번 눌러 확정하고(브라우저 확인창 없음), 폭이 바뀌지 않으며 포커스가 돌아온다", async () => {
   const { context, page, errors } = await openPage();
+  let nativeDialog = false;
+  page.on("dialog", dialog => {
+    nativeDialog = true;
+    dialog.dismiss();
+  });
   await page.click("#open-settings");
   const das = page.locator("#set-das");
   await das.fill("100");
   const reset = page.locator("#settings-reset");
-  page.once("dialog", dialog => dialog.dismiss());
+  const width = async () => (await reset.boundingBox()).width;
+  const before = await width();
   await reset.click();
-  assert.equal(await das.inputValue(), "100");
-
-  page.once("dialog", dialog => dialog.accept());
+  assert.equal(await das.inputValue(), "100", "한 번 누르면 아직 그대로");
+  assert.equal(await reset.getAttribute("data-armed"), "1");
+  assert.equal(await width(), before, "확인 이름으로 바뀌어도 폭이 같다");
+  // 다른 곳을 누르면(포커스를 잃으면) 처음으로
+  await das.focus();
+  assert.equal(await reset.getAttribute("data-armed"), null);
+  await reset.click();
   await reset.click();
   assert.notEqual(await das.inputValue(), "100");
   assert.equal(await reset.evaluate(el => el === document.activeElement), true);
+  assert.equal(nativeDialog, false);
   assert.deepEqual(errors, []);
   await context.close();
 });
@@ -650,7 +661,8 @@ test("Custom 규칙: 편집 내용이 저장되고 기록표 id가 바뀌며, �
 
 test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파일 저장 → 메뉴에서 열기", async () => {
   const { context, page, errors } = await openPage();
-  await startMode(page, "endless");
+  // 버틴 시간이 기록인 Survival: 연타로 금방 막혀도 피스가 10개를 넘으면 공유할 수 있는 판이다(짧은 판 판정 F21)
+  await startMode(page, "survival");
   for (let i = 0; i < 40; i++) await page.keyboard.press(i % 3 ? "Space" : "ArrowLeft");
   await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 5000 });
   const pieces = await text(page, "hud-pieces");
@@ -690,7 +702,7 @@ test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파�
   assert.equal(await page.locator('#share input[type="url"]').evaluate(el => el === document.activeElement), true);
   const [download] = await Promise.all([page.waitForEvent("download"), page.click("#share-file")]);
   await page.click("#share-close");
-  assert.match(download.suggestedFilename(), /^tetri-sharp-endless-.*\.json$/);
+  assert.match(download.suggestedFilename(), /^tetri-sharp-survival-.*\.json$/);
   const file = await download.path();
   const saved = JSON.parse(fs.readFileSync(file, "utf8"));
   assert.equal(saved.app, "tetri-sharp");
@@ -1213,10 +1225,13 @@ test("규칙 공유: 받은 코드·링크는 지금 규칙을 덮어쓰지 않�
 
 test("내 규칙: 첫 화면에서 고르고 공유 탭을 열며, 편집기에서 새 규칙·이름·지우기를 한다", async () => {
   const { context, page, errors } = await openPage();
-  // Custom이 아닐 때는 내 규칙 줄이 보이지 않지만 자리는 그대로
-  assert.equal(await page.locator("#rule-slot-row").evaluate(el => getComputedStyle(el).visibility), "hidden");
+  // Custom이 아닐 때는 내 규칙 줄 자리에 같은 높이로 Custom 안내 한 줄(빈칸 없이, 탭을 바꿔도 아래가 움직이지 않게)
+  const rowHeight = () => page.locator("#rule-slot-row").evaluate(el => el.getBoundingClientRect().height);
+  assert.match(await page.locator("#rule-slot-row").textContent(), /Custom을 고르면/);
+  const offHeight = await rowHeight();
   await page.click('[data-rules="custom"]');
-  assert.equal(await page.locator("#rule-slot-row").evaluate(el => getComputedStyle(el).visibility), "visible");
+  assert.equal(await page.locator("#rule-slot").isVisible(), true);
+  assert.equal(await rowHeight(), offHeight, "줄 높이가 같다");
   await page.click("#rule-slot-share");
   assert.equal(await page.locator("#rule-share-code").isVisible(), true, "공유 탭으로 열린다");
   await page.click("#rule-slot-add");
@@ -1227,7 +1242,8 @@ test("내 규칙: 첫 화면에서 고르고 공유 탭을 열며, 편집기에�
   // 대화상자의 close 이벤트(첫 화면 다시 그리기)는 닫은 다음 차례에 온다
   await page.waitForFunction(() => document.querySelector("#rule-slot .select-value")?.textContent === "대회용");
   await page.click("#edit-rules");
-  page.once("dialog", dialog => dialog.accept());
+  await page.click("#rule-slot-remove");
+  assert.equal(await page.locator("#rule-slot-name").inputValue(), "대회용", "한 번 누르면 아직 그대로");
   await page.click("#rule-slot-remove");
   assert.equal(await page.locator("#rule-slot-name").inputValue(), "내 규칙 1");
   assert.equal(await page.locator("#rule-slot-remove").isDisabled(), true, "마지막 하나는 지울 수 없다");
@@ -1451,7 +1467,7 @@ test("빌드 연습: 빈칸·배치 힌트, 초기화와 힌트 없는 4줄 완�
     await page.click('#results [data-action="next-puzzle"]');
     await page.evaluate(() => window.advanceFrame());
     assert.equal(await text(page, "hud-lines"), "3");
-    assert.match(await text(page, "session-title"), /T스핀 더블/);
+    assert.match(await text(page, "session-title"), /T-spin Double 자리/);
     assert.deepEqual(errors, []);
   } finally {
     await context.close();
@@ -2166,9 +2182,10 @@ test("최근 도전: 날짜별 최고 기록을 다시 보고 같은 시드로 �
       await page.waitForTimeout(20);
     }
     assert.ok(await visible(page, "results"));
-    const attempt = await page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:replay:last")));
-    assert.equal(attempt.mode, replay.mode);
-    assert.equal(attempt.seed, replay.seed);
+    // 연타로 금방 막힌 판은 "마지막 판"으로 남기지 않는다(F21) → 결과의 다시 보기로 같은 날짜(시드) 판인지 본다
+    assert.equal(await page.evaluate(() => localStorage.getItem("tetrisharp:replay:last")), null);
+    await page.click('#results [data-action="watch"]');
+    assert.match(await text(page, "replay-title"), new RegExp(date));
     assert.deepEqual(errors, []);
   } finally {
     await context.close();
@@ -2187,7 +2204,11 @@ test("CPU 대전: 첫 싱글의 공격 0줄과 콤보 공격 이유를 플레이
   );
   try {
     await page.click('[data-mode="versus"]');
-    assert.equal(await page.locator("#versus .notice-slot").isVisible(), false);
+    // 알림 칸은 다른 대화상자처럼 비어 있는 자리(숨기면 닫기 버튼이 발 폭 전체로 늘어난다 — 2차 평가 U35)
+    assert.equal(await page.locator("#versus .notice-slot").textContent(), "");
+    const closeBox = await page.locator("#versus-close").boundingBox();
+    const footBox = await page.locator("#versus .dialog-foot").boundingBox();
+    assert.ok(closeBox.width < footBox.width / 2, `닫기 버튼 폭 ${closeBox.width} / 발 ${footBox.width}`);
     await page.click('#versus [data-level="easy"]');
     await page.setViewportSize({ width: 560, height: 360 });
     const rect = () => page.locator("#board").boundingBox();
@@ -2631,7 +2652,12 @@ test("Sprint 첫 결과에서 피네스 장면을 추천하고 같은 배치의 
     }, inputs);
   try {
     await startMode(page, "sprint40");
-    await input(["ArrowLeft", "ArrowRight", ...Array(50).fill("Space")]);
+    // 첫 피스는 왼쪽·오른쪽을 헛되이 누르고 놓는다. 20초 넘게 둔 뒤 막혀야 짧은 판(F21)이 아니라 추천 연습이 뜬다.
+    await input(["ArrowLeft", "ArrowRight", "Space"]);
+    await page.evaluate(() => {
+      for (let i = 0; i < 21 * 60; i++) window.advanceFrame();
+    });
+    await input(Array(50).fill("Space"));
     const entry = page.locator("#results-practice-scene");
     assert.match(await entry.textContent(), /추천 연습.*피네스/);
     await entry.click();
@@ -3380,4 +3406,97 @@ test("휴대폰 가로: 설정 대화상자는 탭을 왼쪽 세로로 두고 �
   } finally {
     await context.close();
   }
+});
+
+test("휴대폰 CPU 대전: 공격 알림 자리를 따로 비워 두지 않아 보드가 Sprint와 비슷한 크기다", async () => {
+  const context = await browser.newContext({ locale: "ko-KR", viewport: { width: 390, height: 664 }, hasTouch: true });
+  await context.addInitScript(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  const page = await context.newPage();
+  try {
+    await page.goto(url);
+    await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+    const boardHeight = () => page.evaluate(() => document.getElementById("board").getBoundingClientRect().height);
+    await startMode(page, "sprint40");
+    const sprint = await boardHeight();
+    await page.keyboard.press("Escape");
+    await page.click('#pause [data-action="menu"]');
+    await page.click('[data-confirm="ok"]').catch(() => {});
+    await page.click('[data-mode="versus"]');
+    await page.click('[data-level="easy"]');
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    const versus = await boardHeight();
+    assert.ok(versus >= sprint * 0.85, `CPU 대전 보드 ${versus}px · Sprint ${sprint}px`);
+    // 알림은 CPU 상황 줄 위에 겹쳐 뜬다(보드를 가리지 않는다)
+    const overlap = await page.evaluate(() => {
+      const f = document.getElementById("versus-feedback").getBoundingClientRect();
+      const b = document.getElementById("board").getBoundingClientRect();
+      return f.bottom - b.top;
+    });
+    assert.ok(overlap <= 0, `알림이 보드를 ${overlap}px 가린다`);
+  } finally {
+    await context.close();
+  }
+});
+
+test("규칙 편집: 프리셋으로 채우면 지금 내 규칙을 덮어쓰지만, 되돌리기로 바로 전으로 돌아간다", async () => {
+  const { context, page, errors } = await openPage();
+  await page.click('[data-rules="custom"]');
+  await page.click("#edit-rules");
+  assert.equal(await page.locator("#rule-undo").isDisabled(), true, "처음에는 되돌릴 것이 없다");
+  await page.locator("#rule-hardDrop").uncheck();
+  await page.click('[data-preset="arcade"]');
+  assert.equal(await page.locator("#rule-rotation .select-value").textContent(), "ARS");
+  assert.match(await page.locator("#rules-record").textContent(), /되돌리기/);
+  await page.click("#rule-undo");
+  assert.equal(await page.locator("#rule-rotation .select-value").textContent(), "SRS");
+  assert.equal(await page.locator("#rule-hardDrop").isChecked(), false, "프리셋 전에 고친 값까지 돌아온다");
+  assert.equal(await page.locator("#rule-undo").isDisabled(), true, "한 번만");
+  // 프리셋 뒤에 다른 값을 고치면 되돌리기는 꺼진다(고친 것이 사라지지 않게)
+  await page.click('[data-preset="retro"]');
+  await page.locator("#rule-ghost").check();
+  assert.equal(await page.locator("#rule-undo").isDisabled(), true);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("하드 드롭 연타로 1~2초 만에 막힌 Sprint: 피스가 10개를 넘어도 짧은 판으로 보고 추천 연습도 띄우지 않는다", async () => {
+  const { context, page, errors } = await openPage(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  await startMode(page, "sprint40");
+  for (let i = 0; i < 40 && !(await visible(page, "results")); i++) await page.keyboard.press("Space");
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  assert.ok(Number(await text(page, "hud-pieces")) >= 10, "피스는 10개 넘게 놓였다");
+  assert.match(await text(page, "results-stats"), /PPS—/);
+  assert.equal(await page.locator('#results [data-action="export"]').isDisabled(), true);
+  assert.equal(await page.locator("#results-practice-scene").isVisible(), false, "추천 연습 없음");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("기록 지우기: 데이터 탭에서 두 번 눌러 기록·리플레이·CPU 전적을 지우고, 설정·업적은 남긴다", async () => {
+  const { context, page, errors } = await openPage(() => {
+    localStorage.setItem(
+      "tetrisharp:records",
+      JSON.stringify({ "sprint40|modern": [{ frames: 3000, lines: 40, pieces: 100 }] })
+    );
+    localStorage.setItem("tetrisharp:versus:stats", JSON.stringify({ easy: { win: 3, loss: 1 } }));
+    localStorage.setItem("tetrisharp:achievements", JSON.stringify({ "first-line": "2026-11-20" }));
+  });
+  assert.match(await page.locator('[data-mode="sprint40"] .mode-best').textContent(), /최고 기록/);
+  await page.click("#open-settings");
+  await page.click('.dialog-tabs [data-value="data"]');
+  const clear = page.locator("#clear-records");
+  await clear.click();
+  assert.match(await page.locator('[data-mode="sprint40"] .mode-best').textContent(), /최고 기록/, "한 번은 그대로");
+  await clear.click();
+  assert.match(await text(page, "settings-notice"), /지웠어요/);
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => document.querySelector('[data-mode="sprint40"] .mode-best')?.textContent === "");
+  assert.equal(await page.locator('[data-mode="versus"] .mode-best').textContent(), "");
+  assert.match(await text(page, "achievement-progress"), /^1 \//, "업적은 남는다");
+  assert.deepEqual(errors, []);
+  await context.close();
 });

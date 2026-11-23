@@ -36,7 +36,7 @@ const exercises = [
     goal: event => event.lines === 4,
   },
   {
-    name: t("T스핀 더블 자리 만들기"),
+    name: t("T-spin Double 자리 만들기"),
     description: t("왼쪽 빈 열을 채우고 지붕을 만든 뒤 T를 돌려 2줄을 지우세요."),
     moves: spin,
     setup: board => {

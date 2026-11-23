@@ -45,7 +45,8 @@
 | --- | --- | --- | --- |
 | 버튼 | `button({ label, icon?, variant?, size?, wrap?, kbd?, onClick? })` | `.btn` (+ `.btn-primary` `.btn-ghost` `.btn-small` `.btn-wrap`) | 표면 + 진한 테두리 + 아래 턱. 주 버튼은 강조색 면과 진한 강조 턱 |
 | 아이콘 버튼 | `iconButton({ icon, label, variant = "ghost", size = "s" })` | `.btn.btn-icon-only` | 정사각형. 이름은 `aria-label`·`title`로만 |
-| 줄 전체 버튼 | (정적 HTML) | `.btn.btn-split` | 이름은 왼쪽, `.btn-meta`는 오른쪽 (첫 화면 "이어서 하기") |
+| 줄 전체 버튼 | `button({ label, meta })` 또는 정적 HTML | `.btn.btn-split` | 이름은 왼쪽, `.btn-meta`는 오른쪽 (첫 화면 "이어서 하기", 리플레이 장면 목록) |
+| 두 번 눌러 확정 | `confirmButton({ label, confirmLabel, onConfirm })` | `.btn.btn-confirm` | 되돌릴 수 없는 일(지우기·초기화). 처음 누르면 짧은 확인 이름("정말 지우기")과 강조 테두리, 4초 안에 한 번 더 누르면 실행. 두 이름을 겹쳐 폭이 바뀌지 않는다. 브라우저 `window.confirm` 대신 |
 | 세그먼트 | `segmented({ label, options, value, onChange, wrap?, arrows? })` | `.segmented` / `.choice` | 움푹 들어간 홈 안의 칸. 고른 칸만 강조색 블록으로 솟는다 |
 | 탭 줄 | `tabBar({ tabs, active, onSelect })` | `.segmented` | 세그먼트 + ←→ Home End로 이동 |
 | 세그먼트 칸만 | `segmentButtons(options, value, onChange)` | — | HTML에 이미 있는 `.segmented` 틀을 채울 때(`#rule-tabs`) |
@@ -194,6 +195,7 @@ fieldRow({ id, label: t("고스트"), control: segmented({ id, label: t("고스�
 
 | 하지 말 것 | 대신 |
 | --- | --- |
+| `window.confirm(…)`(브라우저 기본 확인창) | `confirmButton()` — 앱 안에서 두 번 눌러 확정 |
 | `document.createElement("button")`, `el("button", …)`, `el("input", …)`(여러 줄로 써도 같다) | `button()` `iconButton()` `segmented()` `toggle()` `slider()` `textInput()` `menuRow()` |
 | `<button class="btn">편집</button>` (맨 글자) | `<button class="btn"><span class="btn-label">편집</span></button>` |
 | 아이콘만 있는 버튼에 글자 없이 `class="btn"` | `iconButton({ icon, label })` 또는 `.btn-icon-only` + `aria-label` |

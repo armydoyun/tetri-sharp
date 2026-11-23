@@ -28,9 +28,19 @@ export const RANK_STEPS = Object.freeze({
  * @param {any} entry  기록표 항목(frames·score·lines·level)
  * @returns {string | null}
  */
-export const rankOf = (mode, entry) => {
+/** 랭크·업적을 주는 규칙: 기본 규칙(Modern·Retro·Arcade)만. Custom은 지연을 0으로 두는 등 쉽게 만들 수 있다(2차 평가 F22) */
+export const RANKED_RULES = Object.freeze(new Set(["modern", "retro", "arcade"]));
+export const isRankedRules = rules => RANKED_RULES.has(rules?.id);
+
+/**
+ * @param {any} mode
+ * @param {any} entry
+ * @param {any} [rules] 주면 기본 규칙일 때만 랭크를 준다
+ */
+export const rankOf = (mode, entry, rules) => {
   const table = RANK_STEPS[mode?.id];
   if (!table || !entry) return null;
+  if (rules !== undefined && !isRankedRules(rules)) return null;
   const value = Number(entry[table.metric]);
   if (!Number.isFinite(value)) return null;
   const reached = table.steps.filter(step => (table.better === "lower" ? value <= step : value >= step)).length;

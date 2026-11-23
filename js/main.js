@@ -6,7 +6,7 @@ import { createKeyboard } from "./input/keyboard.js";
 import { createTouch, touchVisible } from "./input/touch.js";
 import { compilePadmap, createGamepad } from "./input/gamepad.js";
 import { ACTIONS, compileKeymap, keyLabel } from "./input/keymap.js";
-import { RANK_STEPS, rankLabel, rankOf } from "./modes/ranks.js";
+import { RANK_STEPS, isRankedRules, rankLabel, rankOf } from "./modes/ranks.js";
 import { MAX_RULE_SLOTS, createRuleSlots } from "./storage/rule-slots.js";
 import { ACHIEVEMENTS, createAchievements } from "./storage/achievements.js";
 import { createAchievementsUI } from "./ui/achievements.js";
@@ -28,6 +28,7 @@ import { createRecords } from "./storage/records.js";
 import { createSettingsUI } from "./ui/settings.js";
 import { createRulesUI } from "./ui/rules.js";
 import { button, menuRow, segmentButtons } from "./ui/components.js";
+import { el } from "./ui/dom.js";
 import { dropdown } from "./ui/select.js";
 import { createRecordsUI } from "./ui/records.js";
 import { createStatsUI } from "./ui/stats.js";
@@ -61,7 +62,7 @@ import { BUILD_LESSONS } from "./modes/build-lessons.js";
 import { BATTLE_LESSONS } from "./modes/battle-lessons.js";
 import { INTRO_LESSONS } from "./modes/intro-lessons.js";
 import { createPracticeProgress } from "./storage/practice-progress.js";
-import { createSprintHistory } from "./storage/sprint-history.js";
+import { SPRINT_HISTORY_KEY, createSprintHistory } from "./storage/sprint-history.js";
 import { FINESSE_LESSONS } from "./modes/finesse-lessons.js";
 import { createFinesseTracker } from "./modes/finesse.js";
 import { analyzeReplay } from "./replay/analyze.js";
@@ -374,8 +375,15 @@ const renderRuleSlotRow = () => {
   });
   const share = button({ label: t("공유"), icon: "link", size: "s", id: "rule-slot-share" });
   share.addEventListener("click", () => rulesUI.open("share"));
-  row.replaceChildren(picker, share);
-  row.classList.toggle("is-off", ruleChoice !== "custom");
+  // Custom이 아니면 같은 자리에 안내 한 줄(비워 두면 휴대폰에서 탭과 아래 블록 사이가 크게 빈다)
+  if (ruleChoice === "custom") row.replaceChildren(picker, share);
+  else
+    row.replaceChildren(
+      el("p", {
+        class: "rule-slot-hint",
+        text: t("Custom을 고르면 규칙을 직접 바꾸고, 내 규칙을 10개까지 저장해 공유할 수 있어요."),
+      })
+    );
 };
 
 const renderRuleTabs = () => {
@@ -401,10 +409,8 @@ const renderRuleTabs = () => {
   /** @type {HTMLButtonElement} */ ($("edit-rules")).disabled = ruleChoice !== "custom";
   $("rule-desc").textContent =
     ruleChoice === "custom"
-      ? t('직접 조합한 규칙이에요. "편집"으로 바꿀 수 있고, 조합마다 기록이 따로 쌓여요 (기록표 {id}).', {
-          id: makeCustomRules(customBody).id,
-        })
-      : `${RULE_DESCRIPTIONS[ruleChoice]} ${t("바꾸고 싶으면 Custom을 골라 편집하세요.")}`;
+      ? t('직접 조합한 규칙이에요. "편집"으로 바꿀 수 있고, 조합마다 기록이 따로 쌓여요.')
+      : RULE_DESCRIPTIONS[ruleChoice];
 };
 
 /** 이 모드·규칙의 최고 기록과 그 리플레이(둘이 같은 판이고, 끝까지 간 판일 때만) */
@@ -466,7 +472,7 @@ const renderMenu = () => {
   list.replaceChildren(
     ...MODES.map(m => {
       const best = records.best(m, ruleSet);
-      const rank = rankOf(m, best);
+      const rank = rankOf(m, best, ruleSet);
       return menuRow({
         "data-mode": m.id,
         title: m.name,
@@ -827,9 +833,19 @@ $("go-home").addEventListener("click", () => {
   toMenu();
 });
 
-/** 이보다 적은 피스로, 이 시간 안에 막힌 판은 결과의 비율 값을 —로, 공유를 끈다 */
+/**
+ * 너무 일찍 끝난 판: 결과의 비율 값을 —로, 공유·추천 연습을 끄고 "마지막 판"으로 남기지 않는다(F11·F21).
+ * 20초 안에 막혔고, 줄을 하나도 못 지웠거나 피스를 10개도 못 놓은 판. 하드 드롭 연타(1초에 12피스, 0줄)도 여기에 든다.
+ * 깬 판(퍼즐 등)과 20초 넘게 버틴 판(Survival 등)은 아니다.
+ */
+const SHORT_GAME_SECONDS = 20;
 const SHORT_GAME_PIECES = 10;
-const SHORT_GAME_SECONDS = 10;
+const isShortGame = state => {
+  if (state.over === "clear" || state.frame >= SHORT_GAME_SECONDS * 60) return false;
+  // 버틴 시간이 기록인 모드(Survival)는 줄을 안 지워도 제대로 된 판일 수 있다 → 피스 수만 본다
+  const survives = mode.record?.metric === "frames" && mode.record.order === "desc";
+  return state.stats.pieces < SHORT_GAME_PIECES || (!survives && state.stats.lines === 0);
+};
 
 const renderResultSplits = () => {
   const details = /** @type {HTMLDetailsElement} */ ($("results-splits"));
@@ -886,7 +902,8 @@ const renderResultSplits = () => {
   $("results-split-note").textContent = note;
   // 첫 구간(10줄)에 닿기 전에 끝났으면 머리줄뿐인 빈 표 대신 안내만 보인다
   /** @type {HTMLTableElement} */ ($("results-splits").querySelector("table")).hidden = rows.length === 0;
-  if (replay && mode.id === "sprint40") {
+  // 너무 일찍 끝난 판(연타 등)에서 고른 "추천 연습"은 뜻이 없다
+  if (replay && mode.id === "sprint40" && !isShortGame(game.state)) {
     let target = null;
     if (!slowest && rows.every(row => row.delta === null)) {
       if (analysis?.for !== replay) analysis = { ...analyzeReplay(replay, findMode), for: replay };
@@ -922,7 +939,10 @@ const renderResultSplits = () => {
         to: slowest.to,
         delta: formatDelta(slowest.lost / 60),
       })
-    : t("구간 기록");
+    : rows.length === 0
+      ? // 첫 구간(10줄) 전에 끝났으면 펼쳐도 표가 없다 → 안에 있는 "같은 순서로 재시작"을 이름으로(U44)
+        t("같은 블록 순서로 다시 · 구간 기록은 10줄부터")
+      : t("구간 기록");
 };
 
 /** 달리기 결과 한 줄: 시간 기록 모드는 시간 차, 점수 모드는 점수 차 */
@@ -1009,7 +1029,9 @@ const finish = () => {
   const freshAchievements = achievements.evaluate({
     mode,
     state,
-    real: !scenePractice && (MODES.includes(mode) || Boolean(mode.daily) || Boolean(mode.versus)),
+    // Custom 규칙 판은 업적을 주지 않는다(퍼즐 업적은 규칙과 무관) — 2차 평가 F22
+    real:
+      !scenePractice && isRankedRules(rules) && (MODES.includes(mode) || Boolean(mode.daily) || Boolean(mode.versus)),
     won: Boolean(mode.versus) && state.over === WIN,
     puzzlesCleared: puzzleProgress.cleared(),
     puzzles: PUZZLES,
@@ -1029,9 +1051,7 @@ const finish = () => {
   if (lastReplay && versus) lastReplay.cpu = versus.recorder.finish(versus.cpu.state);
   /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="watch"]')).disabled = !lastReplay;
   // 피스 몇 개 만에 막힌 판: 비율 값(PPS)은 뜻이 없고, 공유·"마지막 판"으로 남길 만한 판도 아니다(F11)
-  // (Survival처럼 버틴 시간이 기록인 판은 피스가 적어도 오래 버텼으면 그대로)
-  const tooShort =
-    state.over !== "clear" && state.stats.pieces < SHORT_GAME_PIECES && state.frame < SHORT_GAME_SECONDS * 60;
+  const tooShort = isShortGame(state);
   const exportButton = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="export"]'));
   exportButton.disabled = !mode.trialCode && (!lastReplay || Boolean(versus) || tooShort);
   exportButton.querySelector(".btn-label").textContent = mode.trialCode ? t("퍼즐 편집") : t("공유");
@@ -1112,7 +1132,7 @@ const finish = () => {
   // 랭크가 있는 모드: 기록으로 남는 판이면 이 판의 랭크(다음 랭크 기준은 기록 화면에서)
   if (RANK_STEPS[mode.id]) {
     const run = { frames: state.frame, score: state.score, lines: state.stats.lines, level: state.level };
-    rows.push([t("랭크"), (mode.isRecordable(state) && rankOf(mode, run)) || "—"]);
+    rows.push([t("랭크"), (mode.isRecordable(state) && rankOf(mode, run, rules)) || "—"]);
   }
   if (mode.splits) {
     const delta = splitDelta(splits, resultPbSplits);
@@ -1194,6 +1214,15 @@ const settingsUI = createSettingsUI({
     exportBackup: () => backupActions.exportBackup(),
     importBackup: () => backupActions.importBackup(),
     openReplay: () => /** @type {HTMLInputElement} */ ($("replay-file")).click(),
+    // 기록 지우기(F25): 기록표·리플레이·Sprint 기록 흐름·CPU 전적. 설정·내 규칙·연습·퍼즐 진행도·업적은 남긴다
+    clearRecords: () => {
+      store.set("records", {});
+      store.set("replay:best", {});
+      store.set("replay:last", null);
+      store.set(SPRINT_HISTORY_KEY, null);
+      store.set("versus:stats", {});
+      lastReplay = null;
+    },
   },
   onClose: () => {
     if (screen === "menu") toMenu();
@@ -1737,8 +1766,30 @@ new ResizeObserver(() => {
   if (h) document.body.style.setProperty("--replay-bar-h", `${h}px`);
 }).observe(replayBar);
 
+/** 장면 목록(넓은 화면): 표시마다 [이름 | 시간] 한 줄, 누르면 그 장면으로 */
+const renderSceneList = () => {
+  const marks = analysis?.markers ?? [];
+  $("replay-scene-list").replaceChildren(
+    ...(marks.length
+      ? marks.map((mark, index) =>
+          button({
+            label: MARK_LABELS[mark.kind](mark),
+            meta: formatTime(mark.frame),
+            variant: "ghost",
+            size: "s",
+            class: `replay-scene is-${mark.kind}`,
+            "data-mark": String(index),
+            "aria-current": index === selectedMark ? "true" : undefined,
+            onClick: () => seekMark(index),
+          })
+        )
+      : [el("p", { class: "replay-scene-empty", text: t("표시할 장면이 없어요") })])
+  );
+};
+
 const renderMarkers = () => {
   renderTimelineMarks();
+  renderSceneList();
   const markers = analysis?.markers ?? [];
   const highlights = markers.filter(m => m.kind === "highlight").length;
   // 요약: 표시 색과 같은 작은 칸 + 개수(범례 역할)
@@ -1798,6 +1849,9 @@ const seekMark = index => {
   if (!mark) return false;
   seekReplay(player?.cpu ? mark.frame : mark.frame - 30, true);
   selectedMark = index;
+  for (const row of $("replay-scene-list").querySelectorAll("[data-mark]"))
+    if (row.getAttribute("data-mark") === String(index)) row.setAttribute("aria-current", "true");
+    else row.removeAttribute("aria-current");
   if (player?.cpu) {
     replayBattleEvent.textContent = mark.label;
     replayBattleEvent.hidden = false;
@@ -1825,7 +1879,8 @@ const replayPractice = /** @type {HTMLButtonElement} */ (replayBar.querySelector
 const canPracticeScene = () => ownReplay && playing?.mode === "sprint40" && player && !player.done;
 
 const updateReplayBar = () => {
-  replayPractice.disabled = !replayPaused || !canPracticeScene();
+  // 재생 중에도 누를 수 있다: 누르면 멈추고 지금 장면을 연습한다(이유 없이 꺼져 있던 것, U43)
+  replayPractice.disabled = !canPracticeScene();
   // 끝까지 본 뒤에는 재생 단추가 "다시 재생"(처음부터)이 된다. 흐려진 "일시정지"로 남지 않게.
   const ended = Boolean(player?.done);
   /** @type {HTMLElement} */ (replayBar.querySelector(".replay-toggle-icon")).replaceChildren(
@@ -2188,7 +2243,10 @@ for (const btn of replayBar.querySelectorAll("[data-replay]")) {
       }
       return;
     }
-    if (action === "practice") return enterScenePractice();
+    if (action === "practice") {
+      replayPaused = true;
+      return enterScenePractice();
+    }
     if (action === "share" && playing && !player?.cpu) return shareUI.open(playing, `${mode.name} · ${rules.name}`);
     if (action === "race" && playing) return raceReplay(playing);
     if (action === "restart") return restartReplay();
@@ -2605,7 +2663,7 @@ const importRulesFromLink = () => {
   customBody = ruleSlots.active().body;
   ruleChoice = "custom";
   store.set("lastRules", "custom");
-  showMenuNotice(t("링크로 받은 규칙을 내 규칙에 새로 넣었어요 · 기록표 {id}", { id: makeCustomRules(body).id }));
+  showMenuNotice(t("링크로 받은 규칙을 내 규칙에 새로 넣었어요"));
   return true;
 };
 

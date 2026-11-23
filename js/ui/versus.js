@@ -9,7 +9,7 @@ import { t } from "../i18n/index.js";
  *   onPick: (level: any, style: string) => void, getStyle: () => string, setStyle: (style: string) => void }} options
  */
 export const createVersusUI = ({ dialog, getStats, onPick, getStyle, setStyle }) => {
-  const notice = el("p", { class: "notice-slot", hidden: true });
+  const notice = el("p", { class: "notice-slot", role: "status" });
   const api = {
     open() {
       const stats = getStats();

@@ -208,6 +208,34 @@ export const auditInPage = () => {
     const dy = (Math.min(...parts.map(q => q.top)) + Math.max(...parts.map(q => q.bottom))) / 2 - faceY;
     if (Math.abs(dy) > 1) problems.push(`컨트롤 정렬 · ${describe(c)} 면 중심에서 세로 ${dy.toFixed(1)}px`);
   }
+  // 목록 줄의 글자 덩어리(이름·설명·정보)도 세로 가운데: 빈 둘째 줄이 남으면 위로 쏠린다(2차 평가 U34)
+  for (const c of all.filter(el => el.matches(".menu-row:not(:has(> .menu-index))"))) {
+    const parts = [...c.children].filter(k => k.matches(".menu-text, .mode-best") && visible(k));
+    if (!parts.length) continue;
+    const s = getComputedStyle(c);
+    const r = c.getBoundingClientRect();
+    const mid = (r.top + parseFloat(s.borderTopWidth) + r.bottom - parseFloat(s.borderBottomWidth)) / 2;
+    const rects = parts.map(k => k.getBoundingClientRect());
+    const dy = (Math.min(...rects.map(q => q.top)) + Math.max(...rects.map(q => q.bottom))) / 2 - mid;
+    if (Math.abs(dy) > 2) problems.push(`컨트롤 정렬 · ${describe(c)} 글자가 세로 가운데에서 ${dy.toFixed(1)}px`);
+  }
+  // 빈 자리: visibility로 숨겨 두고 높이만 차지하는 블록(24px 넘게)은 화면에 구멍으로 보인다(2차 평가 U33).
+  // 자리를 지켜야 하면 그 자리에 안내 등 보이는 내용을 둔다. 겹쳐 뜨는 것(position 있는 것)과 보드 위 표시는 뺀다.
+  for (const el of root.querySelectorAll("body *")) {
+    if (!(el instanceof HTMLElement)) continue;
+    const s = getComputedStyle(el);
+    if (s.visibility !== "hidden" || s.display === "none" || s.position === "absolute" || s.position === "fixed")
+      continue;
+    if (el.parentElement && getComputedStyle(el.parentElement).visibility === "hidden") continue;
+    // aria-hidden 크기 잡이(보이는 글자와 같은 칸에 겹쳐 폭만 잡는 것, 예: #replay-time-width)도 뺀다
+    if (el.closest('dialog:not([open]), [hidden], [aria-hidden="true"], .board-wrap, .stage-side, .hud, .touchpad'))
+      continue;
+    const r = el.getBoundingClientRect();
+    if (r.height > 24 && r.width > 48 && r.bottom > 0 && r.top < innerHeight)
+      problems.push(
+        `빈 자리 · ${describe(el)} ${Math.round(r.width)}×${Math.round(r.height)} (보이지 않는데 자리만 차지)`
+      );
+  }
   // 글자 입력은 위아래 여백이 같고, 스위치는 어디서나 같은 크기
   for (const c of all.filter(el => el.matches(".text-input"))) {
     const s = getComputedStyle(c);

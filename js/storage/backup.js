@@ -2,9 +2,10 @@
 // 들일 때는 항목마다 원래 저장할 때와 같은 검사를 거친다. 알 수 없는 항목은 버린다.
 import { sanitizeSettings } from "./settings.js";
 import { PUZZLES } from "../modes/puzzles.js";
+import { STYLES } from "../modes/versus.js";
 import { PRACTICE_PROGRESS_KEY, sanitizePracticeProgress } from "./practice-progress.js";
 import { SPRINT_HISTORY_KEY, sanitizeSprintHistory } from "./sprint-history.js";
-import { ACHIEVEMENTS_KEY, sanitizeAchievements } from "./achievements.js";
+import { ACHIEVEMENTS_KEY, ACHIEVEMENT_TOTALS_KEY, sanitizeAchievements, sanitizeTotals } from "./achievements.js";
 import { RULE_SLOTS_KEY, sanitizeRuleSlots } from "./rule-slots.js";
 import { isEntry } from "./records.js";
 import { sanitizeRuleBody } from "../rules/sanitize.js";
@@ -25,10 +26,12 @@ export const BACKUP_KEYS = Object.freeze([
   "replay:last",
   "replay:best",
   "versus:stats",
+  "versus:style",
   "puzzle:cleared",
   PRACTICE_PROGRESS_KEY,
   SPRINT_HISTORY_KEY,
   ACHIEVEMENTS_KEY,
+  ACHIEVEMENT_TOTALS_KEY,
   RULE_SLOTS_KEY,
 ]);
 
@@ -72,6 +75,8 @@ export const parseBackup = (raw, findMode) => {
   }
   if (src[SPRINT_HISTORY_KEY] !== undefined) data[SPRINT_HISTORY_KEY] = sanitizeSprintHistory(src[SPRINT_HISTORY_KEY]);
   if (src[ACHIEVEMENTS_KEY] !== undefined) data[ACHIEVEMENTS_KEY] = sanitizeAchievements(src[ACHIEVEMENTS_KEY]);
+  if (src[ACHIEVEMENT_TOTALS_KEY] !== undefined)
+    data[ACHIEVEMENT_TOTALS_KEY] = sanitizeTotals(src[ACHIEVEMENT_TOTALS_KEY]);
   const slots = src[RULE_SLOTS_KEY] !== undefined ? sanitizeRuleSlots(src[RULE_SLOTS_KEY]) : null;
   if (slots) data[RULE_SLOTS_KEY] = slots;
   if (src.settings !== undefined) data.settings = sanitizeSettings(src.settings);
@@ -119,6 +124,8 @@ export const parseBackup = (raw, findMode) => {
     }
     data["versus:stats"] = stats;
   }
+  // 고른 CPU 성향(아는 이름만)
+  if (STYLES.some(style => style.id === src["versus:style"])) data["versus:style"] = src["versus:style"];
   return {
     date: typeof raw.date === "string" ? raw.date.slice(0, 40) : "",
     data,

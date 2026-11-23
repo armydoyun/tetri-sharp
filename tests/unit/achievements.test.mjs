@@ -82,3 +82,43 @@ test("업적 저장값: 모르는 id·날짜가 아닌 값은 버리고, 백업�
   assert.deepEqual(parsed.data[ACHIEVEMENTS_KEY], { quad: "2026-11-23T00:00:00Z" });
   assert.equal(new Set(ACHIEVEMENTS.map(a => a.id)).size, ACHIEVEMENTS.length, "id가 겹치지 않는다");
 });
+
+test("Custom 규칙 판(real=false)은 모드 업적도 주지 않는다", async () => {
+  const { ACHIEVEMENTS } = await import("../../js/storage/achievements.js");
+  const { findMode } = await import("../../js/modes/index.js");
+  const sprint = findMode("sprint40");
+  const state = { over: "clear", frame: 50 * 60, score: 0, level: 1, stats: { lines: 40 }, tally: {} };
+  const ctx = real => ({ mode: sprint, state, real, won: false, puzzlesCleared: new Set(), puzzles: [] });
+  const got = real => ACHIEVEMENTS.filter(a => a.test(ctx(real))).map(a => a.id);
+  assert.ok(got(true).includes("sprint-1m"));
+  assert.equal(got(false).includes("sprint-1m"), false);
+  assert.equal(got(false).includes("sprint-clear"), false);
+});
+
+test("누적 업적: 실제 판에서만 줄·4줄·T-spin·판·승을 더하고, 목표에 닿으면 달성한다", async () => {
+  const { createAchievements, ACHIEVEMENT_TOTALS_KEY } = await import("../../js/storage/achievements.js");
+  const { createStore, memoryBackend } = await import("../../js/storage/store.js");
+  const { findMode } = await import("../../js/modes/index.js");
+  const store = createStore(memoryBackend());
+  const a = createAchievements(store);
+  const marathon = findMode("marathon");
+  const state = {
+    over: "topOut",
+    frame: 9000,
+    score: 0,
+    level: 5,
+    stats: { lines: 400 },
+    tally: { clears: { "none-4": 60, "full-2": 3 } },
+  };
+  const ctx = real => ({ mode: marathon, state, real, won: false, puzzlesCleared: new Set(), puzzles: [] });
+  a.evaluate(ctx(false));
+  assert.equal(a.totals().lines, 0, "연습·Custom 판은 더하지 않는다");
+  a.evaluate(ctx(true));
+  a.evaluate(ctx(true));
+  assert.deepEqual(a.totals(), { games: 2, lines: 800, quads: 120, tspins: 6, wins: 0 });
+  assert.ok(a.unlocked()["quads-100"]);
+  assert.equal(a.unlocked()["lines-1000"], undefined);
+  const fresh = a.evaluate(ctx(true)).map(x => x.id);
+  assert.ok(fresh.includes("lines-1000"));
+  assert.ok(store.get(ACHIEVEMENT_TOTALS_KEY, null));
+});

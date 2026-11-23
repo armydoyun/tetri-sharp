@@ -8,7 +8,7 @@ import { MAX_RANKED } from "../replay/replay.js";
 import { el, fillDialog, fieldRow } from "./dom.js";
 import { button, textInput } from "./components.js";
 import { dropdown } from "./select.js";
-import { RANK_STEPS, nextRankStep, rankLabel, rankOf } from "../modes/ranks.js";
+import { RANK_STEPS, isRankedRules, nextRankStep, rankLabel, rankOf } from "../modes/ranks.js";
 import { t } from "../i18n/index.js";
 
 const ROWS = 10;
@@ -179,7 +179,7 @@ export const createRecordsUI = ({ dialog, modes, records, sprintHistory, replayF
     });
 
     // 최고 기록의 랭크와 다음 랭크 기준(랭크가 있는 모드만)
-    const rank = rankOf(mode, list[0]);
+    const rank = rankOf(mode, list[0], rules);
     const next = nextRankStep(mode, list[0]);
     const rankLine = rank
       ? el(
@@ -196,7 +196,13 @@ export const createRecordsUI = ({ dialog, modes, records, sprintHistory, replayF
               : t("가장 높은 랭크예요"),
           })
         )
-      : null;
+      : RANK_STEPS[mode.id] && list[0] && !isRankedRules(rules)
+        ? el("p", {
+            class: "records-rank",
+            id: "records-rank",
+            text: t("랭크와 업적은 기본 규칙(Modern·Retro·Arcade)에서만 받아요"),
+          })
+        : null;
     const empty = el("p", {
       class: "records-empty",
       text: t("아직 기록이 없어요. 이 모드와 규칙으로 한 판을 끝내면 여기에 표시돼요."),

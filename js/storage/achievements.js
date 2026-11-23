@@ -5,13 +5,17 @@ import { t } from "../i18n/index.js";
 import { rankOf, RANK_ORDER } from "../modes/ranks.js";
 
 export const ACHIEVEMENTS_KEY = "achievements";
+/** 누적 업적의 합계(실제 판에서만 센다). 기록 지우기로는 지우지 않는다 */
+export const ACHIEVEMENT_TOTALS_KEY = "achievements:totals";
+export const TOTAL_KEYS = Object.freeze(["games", "lines", "quads", "tspins", "wins"]);
 
 const MIN = 3600; // 1분 = 3600프레임
 
 /**
- * @typedef {{ mode: any, state: any, real: boolean, won: boolean, puzzlesCleared: Set<number>, puzzles: readonly any[] }} Context
- *   real: 실제 플레이(메뉴의 모드·오늘의 도전·CPU 대전). won: CPU 대전에서 이겼는가
- * @typedef {{ id: string, group: string, name: string, description: string, test: (c: Context) => boolean }} Achievement
+ * @typedef {{ mode: any, state: any, real: boolean, won: boolean, puzzlesCleared: Set<number>, puzzles: readonly any[], totals?: Record<string, number> }} Context
+ *   real: 실제 플레이(메뉴의 모드·오늘의 도전·CPU 대전, 기본 규칙). won: CPU 대전에서 이겼는가
+ *   totals: 이번 판까지 더한 누적 합계(evaluate가 채운다)
+ * @typedef {{ id: string, group: string, name: string, description: string, test: (c: Context) => boolean, total?: string, goal?: number }} Achievement
  */
 
 const play = (id, name, description, test) => ({
@@ -26,11 +30,22 @@ const inMode = (id, modeId, name, description, test) => ({
   group: "modes",
   name,
   description,
-  test: c => c.mode.id === modeId && test(c.state, c.mode),
+  test: c => c.real && c.mode.id === modeId && test(c.state, c.mode),
 });
 const clears = (state, key) => (state.tally?.clears?.[key] ?? 0) > 0;
 const runRank = (state, mode) =>
   rankOf(mode, { frames: state.frame, score: state.score, lines: state.stats.lines, level: state.level });
+
+/** 누적 업적: 여러 판에 걸쳐 쌓는다(다시 들어올 이유, 2차 평가 F27). 목록에 진행도(312 / 1,000)를 보인다 */
+const total = (id, key, goal, name, description) => ({
+  id,
+  group: "total",
+  name,
+  description,
+  total: key,
+  goal,
+  test: c => (c.totals?.[key] ?? 0) >= goal,
+});
 
 /** @type {ReadonlyArray<Achievement>} */
 export const ACHIEVEMENTS = Object.freeze([
@@ -39,7 +54,7 @@ export const ACHIEVEMENTS = Object.freeze([
   play("tsd", "T-spin Double", t("T를 돌려 넣어 2줄 지우기"), s => clears(s, "full-2")),
   play("tst", "T-spin Triple", t("T를 돌려 넣어 3줄 지우기"), s => clears(s, "full-3")),
   play("perfect", t("퍼펙트 클리어"), t("판을 완전히 비우기"), s => (s.tally?.perfect ?? 0) > 0),
-  play("combo5", t("5콤보"), t("줄을 지우는 고정 6번 연속"), s => (s.tally?.maxCombo ?? 0) >= 5),
+  play("combo5", t("5콤보"), t("줄 삭제 6번 연속(5콤보)"), s => (s.tally?.maxCombo ?? 0) >= 5),
   play("b2b4", t("백투백 4연속"), t("4줄·T-spin 같은 어려운 삭제 4번 연속"), s => (s.tally?.maxB2b ?? 0) >= 4),
 
   inMode("sprint-clear", "sprint40", t("Sprint 완주"), t("Sprint 40L 끝까지"), s => s.over === "clear"),
@@ -109,6 +124,12 @@ export const ACHIEVEMENTS = Object.freeze([
     description: t("퍼즐 30단계 모두"),
     test: c => c.puzzles.every(p => c.puzzlesCleared.has(p.id)),
   },
+  total("games-100", "games", 100, t("100판"), t("실제 판 100번 끝까지")),
+  total("lines-1000", "lines", 1000, t("줄 1,000개"), t("여러 판에 걸쳐 줄 1,000개 지우기")),
+  total("lines-10000", "lines", 10000, t("줄 10,000개"), t("여러 판에 걸쳐 줄 10,000개 지우기")),
+  total("quads-100", "quads", 100, t("4줄 100번"), t("여러 판에 걸쳐 4줄 삭제 100번")),
+  total("tspins-100", "tspins", 100, t("T-spin 100번"), t("여러 판에 걸쳐 줄을 지우는 T-spin 100번")),
+  total("wins-50", "wins", 50, t("CPU 50승"), t("CPU 대전에서 모두 50번 이기기")),
 ]);
 
 export const ACHIEVEMENT_GROUPS = Object.freeze([
@@ -116,6 +137,7 @@ export const ACHIEVEMENT_GROUPS = Object.freeze([
   ["modes", t("모드")],
   ["cpu", t("CPU 대전")],
   ["puzzle", t("퍼즐")],
+  ["total", t("누적")],
 ]);
 
 const IDS = new Set(ACHIEVEMENTS.map(a => a.id));
@@ -131,12 +153,40 @@ export const sanitizeAchievements = raw => {
   return out;
 };
 
+/** 누적 합계를 믿을 수 있는 값으로: 아는 이름의 0 이상 정수만 */
+export const sanitizeTotals = raw => {
+  /** @type {Record<string, number>} */
+  const out = {};
+  for (const key of TOTAL_KEYS) {
+    const v = raw && typeof raw === "object" ? raw[key] : 0;
+    out[key] = Number.isInteger(v) && v >= 0 ? Math.min(v, 1e9) : 0;
+  }
+  return out;
+};
+
+/** 이번 판이 더하는 양 */
+const gameTotals = (state, won) => {
+  const clears = state.tally?.clears ?? {};
+  const sum = prefix =>
+    Object.entries(clears).reduce((n, [k, v]) => n + (k.startsWith(prefix) ? Number(v) || 0 : 0), 0);
+  return {
+    games: 1,
+    lines: state.stats?.lines ?? 0,
+    quads: Number(clears["none-4"]) || 0,
+    tspins: sum("full-"),
+    wins: won ? 1 : 0,
+  };
+};
+
 /** @param {ReturnType<typeof import("./store.js").createStore>} store */
 export const createAchievements = store => {
   const read = () => sanitizeAchievements(store.get(ACHIEVEMENTS_KEY, {}));
+  const readTotals = () => sanitizeTotals(store.get(ACHIEVEMENT_TOTALS_KEY, {}));
   return {
     /** @returns {Record<string, string>} id → 처음 이룬 날짜 */
     unlocked: read,
+    /** @returns {Record<string, number>} 누적 합계 */
+    totals: readTotals,
     /**
      * 판이 끝났을 때: 이번에 처음 이룬 업적을 남기고 돌려준다.
      * @param {Context} context
@@ -144,6 +194,14 @@ export const createAchievements = store => {
      */
     evaluate(context, date = new Date().toISOString()) {
       const done = read();
+      // 누적 합계는 실제 판에서만 더한다
+      const totals = readTotals();
+      if (context.real) {
+        const add = gameTotals(context.state, context.won);
+        for (const key of TOTAL_KEYS) totals[key] += add[key];
+        store.set(ACHIEVEMENT_TOTALS_KEY, totals);
+      }
+      context = { ...context, totals };
       const fresh = ACHIEVEMENTS.filter(a => !done[a.id] && a.test(context));
       if (!fresh.length) return [];
       for (const a of fresh) done[a.id] = date;

@@ -97,3 +97,33 @@ select {
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
 }
+
+/* 펼치기(<details>): 브라우저 기본 삼각형(▶) 대신 js/ui/icons.js의 chevron-right와 같은 선을 쓴다(디자인 원칙 1).
+   열리면 아래로 돌린다. 자기 표식이 따로 있는 곳(첫 화면 조작법 .help-card)은 그쪽 규칙을 따른다. */
+summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  list-style: none;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+details:not(.help-card) > summary::before {
+  content: "";
+  flex: none;
+  width: 1em;
+  height: 1em;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='square'%3E%3Cpath d='M9.5 6.5 15 12l-5.5 5.5'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='square'%3E%3Cpath d='M9.5 6.5 15 12l-5.5 5.5'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  transition: transform var(--dur) var(--ease);
+}
+
+details[open]:not(.help-card) > summary::before {
+  transform: rotate(90deg);
+}

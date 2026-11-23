@@ -13,12 +13,12 @@ export const EN = {
   "다른 창에서 저장된 판이 바뀌었어요.": "The saved game changed in another window.",
 
   "빌드 연습": "Build practice",
-  "4줄 우물과 T스핀 자리를 직접 만들기": "Build a four-line well and a T-spin setup",
+  "4줄 우물과 T-spin 자리를 직접 만들기": "Build a four-line well and a T-spin setup",
   "4줄 우물 만들기": "Build a four-line well",
   "오른쪽 한 열을 남기고 쌓은 뒤 I 피스로 4줄을 지우세요.":
     "Leave the right column open, then clear four lines with the I piece.",
   "마지막 I 피스를 위해 점선 열을 비워 두세요.": "Keep the outlined column open for the final I piece.",
-  "T스핀 더블 자리 만들기": "Build a T-spin Double setup",
+  "T-spin Double 자리 만들기": "Build a T-spin Double setup",
   "왼쪽 빈 열을 채우고 지붕을 만든 뒤 T를 돌려 2줄을 지우세요.":
     "Fill the left column, build the roof, then rotate T into place to clear two lines.",
   "마지막 T가 들어갈 점선 칸을 비워 두세요.": "Keep the outlined cells open for the final T piece.",
@@ -195,9 +195,6 @@ export const EN = {
   "받은 사람이 링크를 열면 바로 재생할 수 있어요.": "Anyone who opens the link can watch this replay.",
   "자동 복사가 막혔어요. 선택된 링크를 직접 복사해 주세요.":
     "Automatic copying is unavailable. Copy the selected link manually.",
-  "조작감, 키 설정, 화면 설정을 모두 기본값으로 되돌릴까요?":
-    "Restore the defaults for controls, bindings, and display settings?",
-  "전체 설정 초기화": "Reset all settings",
   "시작!": "Go!",
   준비: "Ready",
   "다음 피스": "Next",
@@ -236,9 +233,10 @@ export const EN = {
     "Old home-console feel: no wall kicks, hold, hard drop or ghost; pieces lock on contact; fixed handling.",
   "아케이드 느낌: ARS 회전, 최근 4개를 피하는 생성기, 생성·줄 삭제 지연, 미리 회전(IRS).":
     "Arcade feel: ARS rotation, a generator that avoids the last 4 pieces, spawn and line-clear delays, IRS.",
-  "바꾸고 싶으면 Custom을 골라 편집하세요.": "To change it, pick Custom and edit.",
-  '직접 조합한 규칙이에요. "편집"으로 바꿀 수 있고, 조합마다 기록이 따로 쌓여요 (기록표 {id}).':
-    'Your own mix of rules. Change it with "Edit"; each mix keeps its own records (table {id}).',
+  "Custom을 고르면 규칙을 직접 바꾸고, 내 규칙을 10개까지 저장해 공유할 수 있어요.":
+    "Pick Custom to change the rules yourself and save up to 10 rule sets to share.",
+  '직접 조합한 규칙이에요. "편집"으로 바꿀 수 있고, 조합마다 기록이 따로 쌓여요.':
+    'Your own mix of rules. Change it with "Edit"; each mix keeps its own records.',
   "최고 기록 {record}": "Best {record}",
   "이 최고 기록은 현재 버전에서 재현할 수 없어요. 새 최고 기록이 필요해요.":
     "This best run can't be reproduced in this version. Set a new best first.",
@@ -363,8 +361,8 @@ export const EN = {
   "{n}줄 보냄": "{n} sent",
   "공격 0줄": "No attack",
   "일반 {n}줄": "{n}-line clear",
-  "미니 T스핀 {n}줄": "{n}-line mini T-spin",
-  "T스핀 {n}줄": "{n}-line T-spin",
+  "T-spin Mini {n}줄": "{n}-line mini T-spin",
+  "T-spin {n}줄": "{n}-line T-spin",
   "백투백 +{n}": "B2B +{n}",
   "콤보 +{n}": "Combo +{n}",
   "퍼펙트 클리어 +{n}": "Perfect clear +{n}",
@@ -453,7 +451,6 @@ export const EN = {
   "다음 {rank}: {record}": "Next {rank}: {record}",
   "가장 높은 랭크예요": "Top rank",
   // ---- 내 규칙 ----
-  "‘{name}’ 규칙을 지울까요? 이 규칙의 기록은 남아요.": "Delete the rules ‘{name}’? Records made with them stay.",
   "규칙 이름": "Rules name",
   "규칙을 지웠어요": "Rules deleted",
   "내 규칙": "My rules",
@@ -461,21 +458,21 @@ export const EN = {
   "내 규칙이 가득 찼어요({n}개). 하나를 지우고 다시 불러와 주세요": "My rules is full ({n}). Delete one and load again",
   "내 규칙이 가득 찼어요({n}개). 하나를 지우고 링크를 다시 열어 주세요":
     "My rules is full ({n}). Delete one and open the link again",
-  "링크로 받은 규칙을 내 규칙에 새로 넣었어요 · 기록표 {id}": "Added the linked rules to My rules · records {id}",
+  "링크로 받은 규칙을 내 규칙에 새로 넣었어요": "Added the linked rules to My rules",
   "링크를 복사했어요. 받은 사람이 열면 이 규칙이 내 규칙에 새로 들어가요":
     "Link copied. Opening it adds these rules to the recipient's My rules",
   "받은 규칙": "Received rules",
   "새 규칙": "New rules",
   "새 규칙을 만들었어요(Modern 값에서 시작)": "New rules created (starting from Modern)",
-  "새 칸으로 불러왔어요 · 기록표 {id}": "Loaded as new rules · records {id}",
+  "새 칸으로 불러왔어요": "Loaded as new rules",
   "이름을 바꿨어요": "Renamed",
   지우기: "Delete",
   // ---- 업적 ----
   업적: "Achievements",
   "업적 달성 · {names}": "Achievement unlocked · {names}",
-  "{date}에 이룸": "Unlocked {date}",
+  "{date}에 달성": "Unlocked {date}",
   아직: "Not yet",
-  "{done} / {total}개 이룸 · 이 기기에 저장되고 백업에 들어가요":
+  "{done} / {total} 달성 · 이 기기에 저장되고 백업에 들어가요":
     "{done} / {total} unlocked · saved on this device and in backups",
   "첫 줄": "First line",
   "줄을 처음으로 지우기": "Clear your first line",
@@ -485,7 +482,7 @@ export const EN = {
   "T를 돌려 넣어 3줄 지우기": "Spin a T in to clear 3 lines",
   "판을 완전히 비우기": "Empty the whole board",
   "5콤보": "5 combo",
-  "줄을 지우는 고정 6번 연속": "6 line-clearing pieces in a row",
+  "줄 삭제 6번 연속(5콤보)": "6 line-clearing pieces in a row",
   "백투백 4연속": "4 back-to-backs",
   "4줄·T-spin 같은 어려운 삭제 4번 연속": "4 difficult clears (quads, T-spins) in a row",
   "Sprint 완주": "Sprint finished",
@@ -635,6 +632,7 @@ export const EN = {
   "같은 블록 재시작": "Retry same sequence",
   "PB와 달리기": "Race my best",
   "가장 많이 밀린 구간 {from}–{to}줄 ({delta}초)": "Slowest segment: lines {from}–{to} ({delta}s)",
+  "같은 블록 순서로 다시 · 구간 기록은 10줄부터": "Retry the same pieces · splits start at 10 lines",
   "10줄부터 구간 기록이 남아요.": "Splits start at 10 lines.",
   "같은 규칙의 최고 기록이 쌓이면 비교할 수 있어요.": "You can compare once you have a best with these rules.",
   "완료한 비교 구간에서 잃은 시간이 없어요.": "No time lost in the finished segments.",
@@ -712,8 +710,8 @@ export const EN = {
   "아직 기록이 없어요": "No records yet",
 
   // ---- 연습 ----
-  "중력이 없어요. 소프트 드롭으로 내려 돌려 넣으세요. 끝낸 연습은 완료로 표시돼요.":
-    "No gravity. Soft drop the piece and rotate it into place. Finished drills are marked done.",
+  "쉬운 것부터 놓았어요. 자리 연습은 중력이 없어요 — 소프트 드롭으로 내려 넣으세요.":
+    "Easiest first. Setup drills have no gravity — soft drop pieces into place.",
   "좌우가 바뀌는 T-spin Double 자리에 T를 돌려 넣기": "Spin a T into a T-spin Double slot that switches sides",
   "지붕 아래로 T를 돌려 넣어 세 줄 지우기 · 좌우가 바뀌어요":
     "Spin a T under the overhang to clear three lines · switches sides",
@@ -818,7 +816,6 @@ export const EN = {
   없음: "None",
   누르세요: "Press",
   기본값으로: "Reset to defaults",
-  "모든 설정을 기본값으로 되돌렸어요.": "All settings are back to their defaults.",
   "‘{key}’ 버튼을 ‘{action}’에서 옮겼어요.": "Moved the ‘{key}’ button from ‘{action}’.",
   "‘{key}’ 키를 ‘{action}’에서 옮겼어요.": "Moved the ‘{key}’ key from ‘{action}’.",
   "게임패드가 연결돼 있지 않아요. 연결하고 버튼을 눌러 주세요.":
@@ -922,7 +919,38 @@ export const EN = {
   "배포 주소에서 열었을 때 쓸모 있어요": "Useful when opened from the published address",
   "코드 불러오기": "Load a code",
   "받은 코드나 링크를 붙여 넣기": "Paste a code or link you received",
+  누적: "Lifetime",
+  "100판": "100 games",
+  "실제 판 100번 끝까지": "Finish 100 real games",
+  "줄 1,000개": "1,000 lines",
+  "여러 판에 걸쳐 줄 1,000개 지우기": "Clear 1,000 lines across games",
+  "줄 10,000개": "10,000 lines",
+  "여러 판에 걸쳐 줄 10,000개 지우기": "Clear 10,000 lines across games",
+  "4줄 100번": "100 quads",
+  "여러 판에 걸쳐 4줄 삭제 100번": "Clear 4 lines at once 100 times across games",
+  "T-spin 100번": "100 T-spins",
+  "여러 판에 걸쳐 줄을 지우는 T-spin 100번": "Make 100 line-clearing T-spins across games",
+  "CPU 50승": "50 CPU wins",
+  "CPU 대전에서 모두 50번 이기기": "Win 50 CPU battles in total",
+  "장면 목록": "Scenes",
+  "표시할 장면이 없어요": "No marked scenes",
+  "설정 초기화": "Reset settings",
+  "정말 초기화": "Confirm reset",
+  "조작감·키·화면 설정을 기본값으로 되돌려요. 기록은 지우지 않아요.":
+    "Restores handling, keys and display to defaults. Records are kept.",
+  "설정을 기본값으로 되돌렸어요. 기록은 그대로예요.": "Settings restored to defaults. Records are kept.",
+  "정말 지우기": "Confirm",
+  "기록과 리플레이를 지웠어요.": "Records and replays deleted.",
+  "기록 지우기": "Delete records",
+  "첫 화면에서 열었을 때만 지울 수 있어요": "Only available when opened from the home screen",
+  "기록표·리플레이·CPU 전적을 지워요. 설정·내 규칙·진행도·업적은 남아요. 먼저 백업하세요":
+    "Deletes record tables, replays and CPU results. Settings, My rules, progress and achievements stay. Back up first",
+  "‘{name}’ 규칙을 지워요. 이 규칙의 기록은 남아요.": "Deletes ‘{name}’. Its records are kept.",
   "프리셋에서 시작": "Start from a preset",
-  "{name} 값으로 채웠어요 · 기록표 {id}": "Filled with {name} values · table {id}",
+  "‘{rule}’을 {name} 값으로 채웠어요. 되돌리기로 전으로 돌아갈 수 있어요.":
+    "Filled ‘{rule}’ with {name} values. Use Undo to go back.",
+  "프리셋으로 채우기 전으로 되돌렸어요": "Restored the rules from before the preset",
+  "랭크와 업적은 기본 규칙(Modern·Retro·Arcade)에서만 받아요":
+    "Ranks and achievements are only earned with the standard rules (Modern, Retro, Arcade)",
   "기록표 {id} · 조합마다 기록이 따로 쌓여요": "Table {id} · each mix keeps its own records",
 };

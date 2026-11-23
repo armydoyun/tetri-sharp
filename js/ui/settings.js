@@ -22,7 +22,7 @@ import {
   handlingPresetOf,
 } from "../storage/settings.js";
 import { el, fieldRow, fillDialog } from "./dom.js";
-import { button, choiceCards, rangeRow, segmented, slider, tabBar } from "./components.js";
+import { button, choiceCards, confirmButton, rangeRow, segmented, slider, tabBar } from "./components.js";
 import { COLOR_SWATCHES, PIECE_ORDER, THEMES, THEME_IDS, findTheme, paletteFor } from "../render/themes.js";
 import { keycap } from "./keycap.js";
 import { createThemePreview } from "../render/preview.js";
@@ -682,6 +682,19 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
       disabled: menuOnly,
     });
     openReplay.addEventListener("click", () => data.openReplay());
+    // 기록 지우기(F25): 기록표·리플레이·Sprint 기록 흐름·CPU 전적. 설정·내 규칙·연습·퍼즐 진행도·업적은 남긴다
+    const clearRecords = confirmButton({
+      label: t("지우기"),
+      confirmLabel: t("정말 지우기"),
+      icon: "close",
+      size: "s",
+      id: "clear-records",
+      disabled: menuOnly,
+      onConfirm: () => {
+        data.clearRecords();
+        notice.textContent = t("기록과 리플레이를 지웠어요.");
+      },
+    });
     return el(
       "section",
       { class: "field-section" },
@@ -702,6 +715,14 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
         label: t("리플레이 파일 열기"),
         hint: menuOnly ? t("첫 화면에서 열었을 때만 열 수 있어요") : t("받은 리플레이 파일(.json)을 재생해요"),
         control: openReplay,
+      }),
+      fieldRow({
+        id: "clear-records",
+        label: t("기록 지우기"),
+        hint: menuOnly
+          ? t("첫 화면에서 열었을 때만 지울 수 있어요")
+          : t("기록표·리플레이·CPU 전적을 지워요. 설정·내 규칙·진행도·업적은 남아요. 먼저 백업하세요"),
+        control: clearRecords,
       })
     );
   };
@@ -720,9 +741,16 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
   const render = () => {
     stopThemePreview();
     const scroll = dialog.querySelector(".dialog-body")?.scrollTop ?? 0;
-    const reset = button({ label: t("전체 설정 초기화"), icon: "reset", id: "settings-reset" });
-    reset.addEventListener("click", () => {
-      if (!window.confirm(t("조작감, 키 설정, 화면 설정을 모두 기본값으로 되돌릴까요?"))) return;
+    // "설정"만 되돌린다(기록·리플레이·업적은 그대로 — 지우기는 데이터 탭). 두 번 눌러 확정(U40)
+    const reset = confirmButton({
+      label: t("설정 초기화"),
+      confirmLabel: t("정말 초기화"),
+      icon: "reset",
+      id: "settings-reset",
+      title: t("조작감·키·화면 설정을 기본값으로 되돌려요. 기록은 지우지 않아요."),
+      onConfirm: () => resetAll(),
+    });
+    const resetAll = () => {
       capture = null;
       onChange({
         ...getSettings(),
@@ -737,10 +765,10 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
         access: defaultAccess(),
         touchMode: DEFAULT_SETTINGS.touchMode,
       });
-      notice.textContent = t("모든 설정을 기본값으로 되돌렸어요.");
+      notice.textContent = t("설정을 기본값으로 되돌렸어요. 기록은 그대로예요.");
       render();
       /** @type {HTMLElement | null} */ (dialog.querySelector("#settings-reset"))?.focus();
-    });
+    };
     const tabs = tabBar({
       tabs: TABS,
       active: tab,
