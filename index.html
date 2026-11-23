@@ -22,9 +22,9 @@
         </h1>
         <p id="session-title" class="session-title"></p>
         <div class="header-actions">
-          <button id="pause-game" class="btn btn-ghost" type="button" aria-label="일시정지"><span data-icon="pause"></span><span class="header-label">일시정지</span></button>
-          <button id="open-help" class="btn btn-ghost" type="button" aria-label="도움말"><span data-icon="help"></span><span class="header-label">도움말</span></button>
-          <button id="open-settings" class="btn btn-ghost" type="button" aria-label="설정"><span data-icon="sliders"></span><span class="header-label">설정</span></button>
+          <button id="pause-game" class="btn btn-ghost" type="button" aria-label="일시정지"><span data-icon="pause"></span><span class="btn-label header-label">일시정지</span></button>
+          <button id="open-help" class="btn btn-ghost" type="button" aria-label="도움말"><span data-icon="help"></span><span class="btn-label header-label">도움말</span></button>
+          <button id="open-settings" class="btn btn-ghost" type="button" aria-label="설정"><span data-icon="sliders"></span><span class="btn-label header-label">설정</span></button>
         </div>
       </header>
       <!-- 첫 화면: 보드 위 덮개가 아닌 독립된 화면. 넓은 화면에서는 넓게 쓴다 -->
@@ -36,8 +36,8 @@
               <h2 id="mode-title" class="section-title">플레이 모드</h2>
               <a id="active-rules" class="active-rules" href="#rules-title"></a>
             </div>
-            <button id="continue-run" class="btn btn-primary" type="button" hidden>
-              <span>이어서 하기</span><small id="continue-run-info"></small>
+            <button id="continue-run" class="btn btn-primary btn-split" type="button" hidden>
+              <span class="btn-label">이어서 하기</span><small id="continue-run-info" class="btn-meta"></small>
             </button>
             <div id="mode-list" class="menu-list"></div>
           </section>
@@ -60,7 +60,7 @@
             <div class="block-head">
               <h2 id="rules-title" class="section-title">규칙</h2>
               <button id="edit-rules" type="button" class="btn btn-small" title="Custom 규칙 편집">
-                <span data-icon="edit"></span>편집
+                <span data-icon="edit"></span><span class="btn-label">편집</span>
               </button>
             </div>
             <div id="rule-tabs" class="segmented rule-tabs" role="group" aria-label="규칙"></div>
@@ -114,8 +114,8 @@
           <p id="mode-objective" class="mode-objective"></p>
           <div class="downstack-controls">
             <div class="actions-row">
-              <button id="downstack-hint" class="btn btn-small" type="button">힌트</button>
-              <button id="downstack-retry" class="btn btn-small" type="button">다시 시작</button>
+              <button id="downstack-hint" class="btn btn-small" type="button"><span class="btn-label">힌트</span></button>
+              <button id="downstack-retry" class="btn btn-small" type="button"><span class="btn-label">다시 시작</span></button>
             </div>
             <p id="downstack-status" role="status"></p>
           </div>
@@ -195,8 +195,8 @@
           <canvas id="replay-cpu-board" class="board" aria-label="CPU 보드"></canvas>
           <div class="replay-board-captions" aria-hidden="true"><span>내 보드</span><span>CPU 보드</span></div>
           <div id="replay-battle-view" class="replay-battle-view" role="group" aria-label="리플레이 보드 선택" hidden>
-            <button type="button" class="btn btn-small" data-board-view="own" aria-pressed="true">내 보드</button>
-            <button type="button" class="btn btn-small" data-board-view="cpu" aria-pressed="false">CPU 보드</button>
+            <button type="button" class="btn btn-small" data-board-view="own" aria-pressed="true"><span class="btn-label">내 보드</span></button>
+            <button type="button" class="btn btn-small" data-board-view="cpu" aria-pressed="false"><span class="btn-label">CPU 보드</span></button>
           </div>
           <div id="countdown" class="countdown" aria-live="assertive" hidden><span id="countdown-label"></span></div>
           <div id="action" class="action" aria-hidden="true"></div>
@@ -219,8 +219,8 @@
               <h2 id="confirm-title" class="panel-title"></h2>
               <p id="confirm-desc" class="confirm-desc">진행 중인 판은 저장되지 않고 사라져요.</p>
               <div class="actions-row">
-                <button type="button" class="btn" data-confirm="cancel"><span class="confirm-cancel-icon"></span><span class="confirm-cancel-text">계속하기</span> <kbd><kbd class="keycap">Esc</kbd></kbd></button>
-                <button type="button" class="btn btn-primary" data-confirm="ok"><span class="confirm-ok-icon"></span><span class="confirm-ok-text">다시 시작</span> <kbd class="confirm-ok-key"></kbd></button>
+                <button type="button" class="btn" data-confirm="cancel"><span class="btn-icon confirm-cancel-icon"></span><span class="btn-label confirm-cancel-text">계속하기</span> <kbd><kbd class="keycap">Esc</kbd></kbd></button>
+                <button type="button" class="btn btn-primary" data-confirm="ok"><span class="btn-icon confirm-ok-icon"></span><span class="btn-label confirm-ok-text">다시 시작</span> <kbd class="confirm-ok-key"></kbd></button>
               </div>
             </div>
           </div>
@@ -264,8 +264,8 @@
                   </table>
                   <p id="results-split-note" role="status"></p>
                   <div class="actions-row">
-                    <button type="button" class="btn btn-small" data-action="retry-seed">같은 블록 순서로 재시작</button>
-                    <button type="button" class="btn btn-small" id="results-race-best" data-action="race-best" disabled>최고 기록과 달리기</button>
+                    <button type="button" class="btn btn-small" data-action="retry-seed"><span class="btn-label">같은 블록 순서로 재시작</span></button>
+                    <button type="button" class="btn btn-small" id="results-race-best" data-action="race-best" disabled><span class="btn-label">최고 기록과 달리기</span></button>
                   </div>
                 </details>
               </div>
@@ -296,7 +296,7 @@
               <span id="replay-title" class="replay-title"></span>
               <span id="replay-status" class="replay-status"></span>
             </div>
-            <button type="button" class="btn btn-ghost" data-replay="exit"><span data-icon="close"></span><span>닫기</span></button>
+            <button type="button" class="btn btn-ghost" data-replay="exit"><span data-icon="close"></span><span class="btn-label">닫기</span></button>
           </div>
           <p id="replay-note" class="replay-note" role="status"></p>
           <dl id="replay-battle-tally" class="replay-battle-tally" hidden>
@@ -326,21 +326,21 @@
             </div>
           </div>
           <div class="replay-transport">
-            <button type="button" class="btn num" data-replay="back" aria-label="5초 뒤로"><span>-5초</span></button>
-            <button type="button" class="btn btn-primary" data-replay="toggle"><span class="replay-toggle-icon"><span data-icon="pause"></span></span><span class="replay-toggle-text">일시정지</span></button>
-            <button type="button" class="btn num" data-replay="ahead" aria-label="5초 앞으로"><span>+5초</span></button>
-            <button type="button" class="btn num" data-replay="speed" aria-label="재생 속도 바꾸기"><span class="replay-speed">1x</span></button>
+            <button type="button" class="btn num" data-replay="back" aria-label="5초 뒤로"><span class="btn-label">-5초</span></button>
+            <button type="button" class="btn btn-primary" data-replay="toggle"><span class="btn-icon replay-toggle-icon"><span data-icon="pause"></span></span><span class="btn-label replay-toggle-text">일시정지</span></button>
+            <button type="button" class="btn num" data-replay="ahead" aria-label="5초 앞으로"><span class="btn-label">+5초</span></button>
+            <button type="button" class="btn num" data-replay="speed" aria-label="재생 속도 바꾸기"><span class="btn-label replay-speed">1x</span></button>
           </div>
           <div class="replay-utilities">
             <div class="replay-refine">
-              <button type="button" class="btn btn-ghost num" data-replay="step-back" aria-label="한 프레임 뒤로"><span>-1F</span></button>
-              <button type="button" class="btn btn-ghost num" data-replay="step" aria-label="한 프레임 앞으로"><span>+1F</span></button>
-              <button type="button" class="btn btn-ghost" data-replay="restart"><span data-icon="restart"></span><span>처음부터</span></button>
+              <button type="button" class="btn btn-ghost num" data-replay="step-back" aria-label="한 프레임 뒤로"><span class="btn-label">-1F</span></button>
+              <button type="button" class="btn btn-ghost num" data-replay="step" aria-label="한 프레임 앞으로"><span class="btn-label">+1F</span></button>
+              <button type="button" class="btn btn-ghost" data-replay="restart"><span data-icon="restart"></span><span class="btn-label">처음부터</span></button>
             </div>
             <div class="replay-actions">
               <button type="button" class="btn btn-ghost" data-replay="practice" hidden><span class="btn-label">장면 연습</span></button>
-              <button type="button" class="btn btn-ghost" data-replay="share"><span data-icon="link"></span><span>공유</span></button>
-              <button type="button" class="btn btn-ghost" data-replay="race" hidden><span data-icon="play"></span><span>이 기록과 달리기</span></button>
+              <button type="button" class="btn btn-ghost" data-replay="share"><span data-icon="link"></span><span class="btn-label">공유</span></button>
+              <button type="button" class="btn btn-ghost" data-replay="race" hidden><span data-icon="play"></span><span class="btn-label">이 기록과 달리기</span></button>
             </div>
           </div>
         </div>
