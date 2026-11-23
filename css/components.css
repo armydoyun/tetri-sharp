@@ -1331,7 +1331,24 @@ body.touch-on :is(.btn, .btn-small, .key-slot, .select, .text-input, .choice > b
 }
 
 /* ---- 퍼즐 단계 격자 ---- */
-/* 퍼즐 30단계가 마지막 줄에 덩그러니 남지 않게 30을 나누는 열 수: 넓으면 6열(5줄), 좁으면 3열 */
+/* 장: 제목 줄(이름 · 깬 수) + 격자 */
+.puzzle-chapter-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-m);
+  font-weight: 800;
+}
+
+.puzzle-chapter-title small {
+  color: var(--text-dim);
+  font-size: var(--text-s);
+  font-weight: 700;
+}
+
+/* 넓으면 6열, 좁으면 3열 */
 .puzzle-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));

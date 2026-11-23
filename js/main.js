@@ -1004,7 +1004,7 @@ const finish = () => {
 
   if (mode.versus) addVersusResult(mode.versus.id, state.over === WIN);
   // 퍼즐: 깬 단계를 남기고, 깼으면 "다음 단계"를 보인다(마지막 단계면 다시 하기만)
-  if (mode.puzzle?.number && state.over === "clear") puzzleProgress.markCleared(mode.puzzle.number);
+  if (mode.puzzle?.number && state.over === "clear") puzzleProgress.markCleared(mode.puzzle.id);
   if (mode.trialCode && state.over === "clear") puzzleEditor.markCleared(mode.trialCode);
   const nextPuzzle = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="next-puzzle"]'));
   const nextLesson = nextPracticeLesson();
