@@ -753,6 +753,50 @@ body.is-finesse-lesson .results-stats :is(dt, dd) {
   gap: var(--space-2);
 }
 
+/* 장면 목록: 조작 아래가 크게 비는 넓고 높은 화면(데스크톱)에서만. 길면 이 칸만 스크롤(U42) */
+.replay-scenes {
+  display: none;
+}
+
+@media (min-width: 1000px) and (min-height: 640px) {
+  .replay-scenes {
+    display: grid;
+    gap: var(--space-1);
+    min-height: 0;
+    padding-top: var(--space-2);
+    border-top: var(--border-w) solid var(--border);
+  }
+}
+
+.replay-scenes-title {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--text-s);
+  font-weight: 700;
+}
+
+.replay-scene-list {
+  display: grid;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.replay-scene-list .replay-scene {
+  width: 100%;
+  min-width: 0;
+}
+
+.replay-scene[aria-current="true"] {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.replay-scene-empty {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--text-s);
+}
+
 .replay-info,
 .replay-heading {
   display: flex;

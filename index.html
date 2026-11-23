@@ -344,6 +344,11 @@
               <button type="button" class="btn btn-ghost" data-replay="race" hidden><span data-icon="play"></span><span class="btn-label">이 기록과 달리기</span></button>
             </div>
           </div>
+          <!-- 장면 목록: 넓은 화면에서 조작 아래 빈 자리에 표시(피네스 실수·오래 고민·주요 장면). 누르면 그 장면으로 -->
+          <section class="replay-scenes" aria-labelledby="replay-scenes-title">
+            <h3 id="replay-scenes-title" class="replay-scenes-title">장면 목록</h3>
+            <div id="replay-scene-list" class="replay-scene-list"></div>
+          </section>
         </div>
         <!-- 터치 버튼: 세로 화면은 보드 아래 5×2, 가로 화면은 왼쪽(이동)·오른쪽(회전·드롭)으로 나눈다 -->
         <div id="touchpad" class="touchpad" aria-label="터치 조작">

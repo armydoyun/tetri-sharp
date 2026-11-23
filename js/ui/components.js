@@ -38,18 +38,30 @@ export const buttonClass = ({ variant = "default", size = "m", wrap = false, ico
  *   size?: ButtonSize,
  *   wrap?: boolean,
  *   kbd?: string,
+ *   meta?: string,
  *   onClick?: (e: MouseEvent) => void,
  *   class?: string,
  *   [attr: string]: any,
  * }} o
  * @returns {HTMLButtonElement}
  */
-export const button = ({ label, icon, variant, size, wrap, kbd, onClick, class: extra, ...attrs }) => {
+export const button = ({ label, icon, variant, size, wrap, kbd, meta, onClick, class: extra, ...attrs }) => {
   const b = el(
     "button",
-    { type: "button", ...attrs, class: buttonClass({ variant, size, wrap, extra }) },
+    {
+      type: "button",
+      ...attrs,
+      // 부가 정보(meta)가 있으면 줄 전체 폭 버튼: 이름은 왼쪽, 정보는 오른쪽(.btn-split)
+      class: buttonClass({
+        variant,
+        size,
+        wrap,
+        extra: [meta !== undefined ? "btn-split" : "", extra].filter(Boolean).join(" "),
+      }),
+    },
     ...(icon ? [iconSvg(icon)] : []),
     el("span", { class: "btn-label", text: label }),
+    ...(meta !== undefined ? [el("small", { class: "btn-meta num", text: meta })] : []),
     ...(kbd ? [el("kbd", { text: kbd })] : [])
   );
   if (onClick) b.addEventListener("click", onClick);
@@ -58,7 +70,8 @@ export const button = ({ label, icon, variant, size, wrap, kbd, onClick, class: 
 
 /**
  * 두 번 눌러 확정하는 버튼(지우기·초기화처럼 되돌릴 수 없는 일). 브라우저 기본 확인창(window.confirm) 대신 쓴다.
- * 처음 누르면 이름이 confirmLabel로 바뀌고(4초 또는 포커스를 잃으면 돌아온다), 그때 한 번 더 누르면 onConfirm.
+ * 처음 누르면 이름이 confirmLabel("정말 지우기"처럼 짧게)로 바뀌고(4초 또는 포커스를 잃으면 돌아온다), 그때 한 번 더 누르면 onConfirm.
+ * 버튼 폭은 두 이름 중 긴 쪽이므로 confirmLabel은 label과 비슷한 길이로 쓴다.
  * 두 이름을 한 칸에 겹쳐 두고 하나만 보이므로 버튼 폭이 바뀌지 않는다(원칙 2).
  * @param {{ label: string, confirmLabel: string, onConfirm: () => void, icon?: IconName, variant?: ButtonVariant, size?: ButtonSize, class?: string, [attr: string]: any }} o
  * @returns {HTMLButtonElement}

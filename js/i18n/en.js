@@ -710,8 +710,8 @@ export const EN = {
   "아직 기록이 없어요": "No records yet",
 
   // ---- 연습 ----
-  "쉬운 것부터 놓았어요. 자리 연습은 중력이 없으니 소프트 드롭으로 내려 돌려 넣으세요. 끝낸 연습은 완료로 표시돼요.":
-    "Ordered from easiest. Setup drills have no gravity, so soft drop to lower and spin pieces in. Finished practices are marked done.",
+  "쉬운 것부터 놓았어요. 자리 연습은 중력이 없어요 — 소프트 드롭으로 내려 넣으세요.":
+    "Easiest first. Setup drills have no gravity — soft drop pieces into place.",
   "좌우가 바뀌는 T-spin Double 자리에 T를 돌려 넣기": "Spin a T into a T-spin Double slot that switches sides",
   "지붕 아래로 T를 돌려 넣어 세 줄 지우기 · 좌우가 바뀌어요":
     "Spin a T under the overhang to clear three lines · switches sides",
@@ -932,12 +932,14 @@ export const EN = {
   "여러 판에 걸쳐 줄을 지우는 T-spin 100번": "Make 100 line-clearing T-spins across games",
   "CPU 50승": "50 CPU wins",
   "CPU 대전에서 모두 50번 이기기": "Win 50 CPU battles in total",
+  "장면 목록": "Scenes",
+  "표시할 장면이 없어요": "No marked scenes",
   "설정 초기화": "Reset settings",
-  "한 번 더 누르면 초기화": "Tap again to reset",
+  "정말 초기화": "Confirm reset",
   "조작감·키·화면 설정을 기본값으로 되돌려요. 기록은 지우지 않아요.":
     "Restores handling, keys and display to defaults. Records are kept.",
   "설정을 기본값으로 되돌렸어요. 기록은 그대로예요.": "Settings restored to defaults. Records are kept.",
-  "한 번 더 누르면 지워요": "Tap again to delete",
+  "정말 지우기": "Confirm",
   "기록과 리플레이를 지웠어요.": "Records and replays deleted.",
   "기록 지우기": "Delete records",
   "첫 화면에서 열었을 때만 지울 수 있어요": "Only available when opened from the home screen",

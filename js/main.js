@@ -1766,8 +1766,30 @@ new ResizeObserver(() => {
   if (h) document.body.style.setProperty("--replay-bar-h", `${h}px`);
 }).observe(replayBar);
 
+/** 장면 목록(넓은 화면): 표시마다 [이름 | 시간] 한 줄, 누르면 그 장면으로 */
+const renderSceneList = () => {
+  const marks = analysis?.markers ?? [];
+  $("replay-scene-list").replaceChildren(
+    ...(marks.length
+      ? marks.map((mark, index) =>
+          button({
+            label: MARK_LABELS[mark.kind](mark),
+            meta: formatTime(mark.frame),
+            variant: "ghost",
+            size: "s",
+            class: `replay-scene is-${mark.kind}`,
+            "data-mark": String(index),
+            "aria-current": index === selectedMark ? "true" : undefined,
+            onClick: () => seekMark(index),
+          })
+        )
+      : [el("p", { class: "replay-scene-empty", text: t("표시할 장면이 없어요") })])
+  );
+};
+
 const renderMarkers = () => {
   renderTimelineMarks();
+  renderSceneList();
   const markers = analysis?.markers ?? [];
   const highlights = markers.filter(m => m.kind === "highlight").length;
   // 요약: 표시 색과 같은 작은 칸 + 개수(범례 역할)
@@ -1827,6 +1849,9 @@ const seekMark = index => {
   if (!mark) return false;
   seekReplay(player?.cpu ? mark.frame : mark.frame - 30, true);
   selectedMark = index;
+  for (const row of $("replay-scene-list").querySelectorAll("[data-mark]"))
+    if (row.getAttribute("data-mark") === String(index)) row.setAttribute("aria-current", "true");
+    else row.removeAttribute("aria-current");
   if (player?.cpu) {
     replayBattleEvent.textContent = mark.label;
     replayBattleEvent.hidden = false;
