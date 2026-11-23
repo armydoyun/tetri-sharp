@@ -192,16 +192,6 @@ body[data-screen="menu"] .stage {
   color: var(--text-dim);
 }
 
-/* 모드 줄: 최고 기록은 오른쪽 고정 칸 */
-.mode-best {
-  min-width: 9em;
-  color: var(--accent);
-  font-family: var(--font-num);
-  font-size: var(--text-s);
-  font-weight: 700;
-  text-align: right;
-}
-
 #continue-run {
   width: 100%;
   margin-bottom: var(--space-2);
@@ -215,33 +205,6 @@ body[data-screen="menu"] .stage {
   border-left-color: var(--accent);
 }
 
-@media (max-width: 600px) {
-  .menu-row {
-    grid-template-columns: 2em minmax(0, 1fr) 16px;
-    gap: var(--space-2);
-    min-height: 60px;
-  }
-
-  .menu-row .mode-best {
-    grid-column: 2;
-    grid-row: 2;
-    min-width: 0;
-    text-align: left;
-  }
-
-  .menu-row .mode-best:empty {
-    display: none;
-  }
-
-  .menu-row > .icon {
-    grid-column: 3;
-    grid-row: 1 / span 2;
-  }
-
-  .menu-text strong {
-    font-size: var(--text-l);
-  }
-}
 
 .menu-notice {
   margin-top: calc(-1 * var(--space-2));
@@ -2006,17 +1969,6 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
 /* 첫 판과 자주 쓰는 도구를 먼저 읽게 한다. */
 .home .welcome { padding-block: var(--space-2); }
 .active-rules { color: var(--text-dim); font-size: var(--text-s); }
-#mode-list .menu-row {
-  grid-template-columns: minmax(0, 1fr) auto 16px;
-  min-height: 54px;
-  padding-inline-start: var(--space-3);
-}
-#mode-list .menu-text { grid-column: 1; }
-/* 최고 기록(과 랭크)은 설명 아래 줄: 오른쪽 칸에 두면 2열 카드에서 설명이 낱말마다 꺾인다 */
-#mode-list .mode-best { min-width: 0; grid-column: 1; grid-row: 2; text-align: left; }
-#mode-list .menu-row > .icon { grid-row: 1 / span 2; }
-#mode-list .mode-best:empty { display: none; }
-#mode-list .menu-row > .icon { grid-column: 3; }
 
 .mode-objective:empty,
 .inline-notice:empty { display: none; }
@@ -2040,9 +1992,6 @@ body[data-screen="results"] #action { display: none; }
   .home-modes, .home .home-block, .home .welcome, .home .help-card { width: 100%; }
 }
 
-@media (max-width: 600px) {
-  #mode-list .mode-best { grid-column: 1; }
-}
 
 @media (orientation: landscape) and (max-height: 520px) and (pointer: coarse) {
   .race-panel .race-board { display: none; }

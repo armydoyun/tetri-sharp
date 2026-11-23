@@ -137,16 +137,18 @@ export const segmentButtons = (options, value, onChange) =>
   });
 
 /**
- * 첫 화면 목록 줄: [이름 + 설명 | 오른쪽 정보 | >]. 정보 칸은 비어 있어도 자리를 차지한다.
- * @param {{ title: string, desc: string, meta?: string, onClick: () => void, [attr: string]: any }} o
+ * 목록 줄. 번호가 있으면 [번호 | 이름·설명 | 정보 | >](연습·CPU 난이도),
+ * 없으면 [이름·설명 / 정보 | >](첫 화면 모드 목록, .menu-row-stacked). 정보 칸은 비어 있어도 자리를 차지한다.
+ * @param {{ index?: number, title: string, desc: string, meta?: string, onClick: () => void, [attr: string]: any }} o
  * @returns {HTMLButtonElement}
  */
-export const menuRow = ({ title, desc, meta = "", onClick, ...attrs }) => {
+export const menuRow = ({ index, title, desc, meta, onClick, ...attrs }) => {
   const b = el(
     "button",
-    { type: "button", ...attrs, class: "menu-row" },
+    { type: "button", ...attrs, class: index === undefined ? "menu-row menu-row-stacked" : "menu-row" },
+    ...(index === undefined ? [] : [el("span", { class: "menu-index num", text: String(index).padStart(2, "0") })]),
     el("span", { class: "menu-text" }, el("strong", { text: title }), el("small", { text: desc })),
-    el("span", { class: "mode-best num", text: meta }),
+    ...(meta === undefined ? [] : [el("span", { class: "mode-best num", text: meta })]),
     iconSvg("chevron-right")
   );
   b.addEventListener("click", onClick);

@@ -92,13 +92,7 @@ test("CSS 파일마다 중괄호 짝이 맞는다(하나라도 빠지면 그 뒤
 
 /** CSS 규칙 목록: { file, selector, props } (@media 안 규칙 포함) */
 const cssRules = file => {
-  let text = fs.readFileSync(path.join(ROOT, file), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
-  // 버튼·세그먼트의 바탕 정의는 검사하지 않는다(여기서만 여백·높이를 정한다)
-  if (file === "css/components.css") {
-    const start = text.indexOf(".btn {");
-    const end = text.indexOf(".select {");
-    text = text.slice(0, start) + text.slice(end);
-  }
+  const text = fs.readFileSync(path.join(ROOT, file), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
   const rules = [];
   for (const m of text.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     const selector = m[1].replace(/@media[^{]*$/, "").trim();
@@ -163,15 +157,53 @@ const LAYOUT_PROPS = new Set([
   "transform",
 ]);
 
-test("컴포넌트: 화면 CSS는 버튼·세그먼트 칸의 여백·높이·정렬을 직접 덮어쓰지 않는다(--btn-*·--seg-* 변수로)", () => {
-  const isSegmentItem = sel => /(segmented|choice|rule-tabs)\b[^,]*>\s*button/.test(sel) && subject(sel) === "button";
+// 컨트롤(누르고 고르고 적는 것). 크기·여백·정렬은 css/controls.css에서만 정한다
+const CONTROL = /\.(btn|select|select-option|text-input|switch|range|menu-row|tool-row|key-slot)(?![\w-])/;
+const isSegmentItem = sel => /(segmented|choice|rule-tabs)\b[^,]*>\s*button/.test(sel) && subject(sel) === "button";
+// 컨트롤 자체에서 막는 것: 가운데 맞춤·크기·안쪽 배치
+const CONTROL_PROPS = new Set([
+  ...LAYOUT_PROPS,
+  "grid-template-columns",
+  "grid-template-rows",
+  "grid-template-areas",
+  "align-content",
+  "border-width",
+  "border-bottom-width",
+]);
+// 컨트롤 안쪽 요소(.btn-label, .menu-text 등)에서 막는 것: 줄 높이·자리 옮기기
+const INNER_PROPS = new Set([
+  "line-height",
+  "padding",
+  "padding-block",
+  "padding-top",
+  "padding-bottom",
+  "height",
+  "min-height",
+  "margin",
+  "margin-top",
+  "margin-bottom",
+  "margin-block",
+  "align-self",
+  "vertical-align",
+  "position",
+  "top",
+  "bottom",
+  "transform",
+  "grid-row",
+  "grid-column",
+]);
+
+test("컴포넌트: controls.css 밖의 CSS는 컨트롤의 여백·높이·정렬을 직접 덮어쓰지 않는다(--btn-* 같은 변수로)", () => {
   const bad = walk("css")
-    .filter(f => f.endsWith(".css"))
+    .filter(f => f.endsWith(".css") && f !== "css/controls.css")
     .flatMap(cssRules)
     .flatMap(({ file, selector, props }) =>
-      splitSelectors(selector)
-        .filter(sel => /\.btn(?![\w-])/.test(subject(sel)) || isSegmentItem(sel))
-        .flatMap(sel => props.filter(p => LAYOUT_PROPS.has(p)).map(p => `${file}: ${sel} { ${p} }`))
+      splitSelectors(selector).flatMap(sel => {
+        const self = CONTROL.test(subject(sel)) || isSegmentItem(sel);
+        const inner = !self && (CONTROL.test(sel) || /(segmented|choice)\b[^,]*>\s*button/.test(sel));
+        const banned = self ? CONTROL_PROPS : inner ? INNER_PROPS : null;
+        return banned ? props.filter(p => banned.has(p)).map(p => `${file}: ${sel} { ${p} }`) : [];
+      })
     );
   assert.deepEqual(bad, []);
 });
@@ -194,18 +226,23 @@ test("컴포넌트: index.html의 버튼은 [아이콘][.btn-label][.btn-meta][k
 });
 
 test("컴포넌트: 화면 코드는 버튼·입력을 직접 만들지 않는다 — js/ui/components.js를 쓴다", () => {
-  // 모양이 따로 정해진 특수 버튼만 예외(색 견본·키 칸·퍼즐 칸·리플레이 표시)
+  // 모양이 따로 정해진 특수 버튼만 예외(색 견본·피스 칩·키 칸·퍼즐 칸·퍼즐 편집 칸·리플레이 표시) — docs/DESIGN_SYSTEM.md "특수 버튼"
   const ALLOWED = new Set([
     "js/ui/settings.js:color-swatch",
+    "js/ui/settings.js:color-piece",
+    "js/ui/puzzles.js:puzzle-tile",
     "js/ui/settings.js:key-slot",
     "js/ui/puzzle-editor.js:puzzle-editor-cell",
     "js/main.js:replay-mark",
   ]);
   const bad = [];
-  for (const f of walk("js").filter(f => f.endsWith(".js") && f !== "js/ui/components.js")) {
+  // 컴포넌트를 만드는 파일: components.js와 드롭다운(select.js)
+  const SOURCES_OF_CONTROLS = new Set(["js/ui/components.js", "js/ui/select.js"]);
+  for (const f of walk("js").filter(f => f.endsWith(".js") && !SOURCES_OF_CONTROLS.has(f))) {
     const text = stripComments(f, fs.readFileSync(path.join(ROOT, f), "utf8"));
     for (const m of text.matchAll(
-      /el\("(button|input|select|textarea)"|createElement\("(button|input|select|textarea)"\)/g
+      // 여러 줄에 걸친 el(\n "button", …)도 잡는다
+      /\bel\(\s*"(button|input|select|textarea)"|createElement\(\s*"(button|input|select|textarea)"\s*\)/g
     )) {
       const near = text.slice(m.index, m.index + 400);
       const cls = /class(?:Name)?:?\s*=?\s*[`"]([\w-]+)/.exec(near)?.[1] ?? "?";
