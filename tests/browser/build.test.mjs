@@ -3369,8 +3369,8 @@ test("피스 몇 개 만에 막힌 판: PPS는 —, 공유는 끄고 이유를 �
     await page.keyboard.press("Space");
   }
   await page.waitForFunction(() => !document.getElementById("results")?.hidden);
-  const pieces = Number(await text(page, "hud-pieces"));
-  assert.ok(pieces < 10, `세워서 떨어뜨리기만 하면 ${pieces}개 만에 막힌다`);
+  // 블록 순서는 무작위라 막히기까지 피스 수는 판마다 조금 다르다. 짧은 판 기준(20초 안, 줄 0개)에 드는지만 본다
+  assert.equal(await text(page, "hud-lines"), "0", "세워서 떨어뜨리기만 하면 줄을 못 지우고 금방 막힌다");
   assert.match(await text(page, "results-stats"), /PPS—/);
   assert.equal(await page.locator('#results [data-action="export"]').isDisabled(), true);
   assert.match(await text(page, "race-result"), /너무 일찍 끝난 판/);
@@ -3515,9 +3515,14 @@ test("키보드: 대화상자는 열면 안으로 포커스가 가고, Esc로 �
   ]) {
     await page.focus(`#${opener}`);
     await page.keyboard.press("Enter");
-    assert.equal(await page.evaluate(d => document.getElementById(d).contains(document.activeElement), id), true, id);
+    // 몇몇 대화상자는 그린 다음 차례에 포커스를 옮긴다(느린 CI 기계에서는 바로 재면 아직 밖에 있다)
+    await page
+      .waitForFunction(d => document.getElementById(d).contains(document.activeElement), id, { timeout: 3000 })
+      .catch(async () => assert.fail(`${id} 열기: 포커스 ${await active()}`));
     await page.keyboard.press("Escape");
-    await page.waitForFunction(o => document.activeElement?.id === o, opener);
+    await page
+      .waitForFunction(o => document.activeElement?.id === o, opener, { timeout: 3000 })
+      .catch(async () => assert.fail(`${id} 닫기: 포커스 ${await active()}`));
     assert.equal(await active(), opener);
   }
   // 설정에서 값을 바꿔 다시 그려도 포커스는 같은 조작에 남는다

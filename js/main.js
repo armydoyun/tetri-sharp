@@ -562,8 +562,19 @@ const dailyUI = createDailyUI({
   onWatch: replay => startReplay(replay, "menu", "", true),
   onRace: raceFromCode,
 });
+/**
+ * 대화상자를 닫은 뒤 연 버튼으로 포커스를 돌려준다. close 이벤트는 조금 늦게 오므로,
+ * 그 사이 사용자가 다른 조작으로 옮겨 갔으면(포커스가 body가 아니면) 빼앗지 않는다.
+ * @param {Element | null} target
+ */
+const returnFocus = target => {
+  const active = document.activeElement;
+  if (!active || active === document.body || active === document.documentElement)
+    /** @type {HTMLElement | null} */ (target)?.focus();
+};
+
 $("daily").addEventListener("close", () => {
-  if (screen === "menu") /** @type {HTMLElement | null} */ (document.querySelector('[data-mode="daily"]'))?.focus();
+  if (screen === "menu") returnFocus(document.querySelector('[data-mode="daily"]'));
 });
 const formatSurvivalGoal = frames => formatTime(frames).split(".")[0];
 
@@ -632,7 +643,8 @@ const setScreen = next => {
           : "";
 };
 
-const toMenu = (initial = false) => {
+/** @param {boolean} [initial] 처음 열 때 @param {boolean} [keepFocus] 포커스는 옮기지 않는다(대화상자를 닫고 다시 그릴 때) */
+const toMenu = (initial = false, keepFocus = false) => {
   confirming = null;
   game = null;
   race = null;
@@ -650,9 +662,10 @@ const toMenu = (initial = false) => {
   const defaultMode = /** @type {HTMLElement | null} */ (panels.menu.querySelector(`[data-mode="${mode.id}"]`));
   // 처음 열 때는 포커스만 두고(Enter로 바로 시작) 테두리는 그리지 않는다 — "골라 둔 모드"처럼 보이지 않게.
   // 게임에서 돌아올 때는 키보드로 오가는 중일 수 있으니 브라우저가 정한 대로 보인다.
-  (continueRun.hidden ? defaultMode : continueRun)?.focus(
-    /** @type {FocusOptions} */ ({ preventScroll: initial, ...(initial ? { focusVisible: false } : {}) })
-  );
+  if (!keepFocus)
+    (continueRun.hidden ? defaultMode : continueRun)?.focus(
+      /** @type {FocusOptions} */ ({ preventScroll: initial, ...(initial ? { focusVisible: false } : {}) })
+    );
 };
 
 const showModeHud = (m, replay = false) => {
@@ -1243,8 +1256,8 @@ const settingsUI = createSettingsUI({
   onClose: () => {
     // 첫 화면은 다시 그리되(언어·화면 색 등), 포커스는 연 버튼(머리글 설정)으로 돌려준다
     if (screen === "menu") {
-      toMenu();
-      /** @type {HTMLElement | null} */ ($("open-settings"))?.focus();
+      toMenu(false, true);
+      returnFocus($("open-settings"));
     } else if (screen === "paused") showPanel("pause");
     else if (screen === "results") showPanel("results");
   },
@@ -1357,7 +1370,7 @@ const puzzleUI = createPuzzleUI({
 });
 $("open-puzzles").addEventListener("click", () => puzzleUI.open());
 $("puzzles").addEventListener("close", () => {
-  if (!puzzleDialog.open && screen === "menu") $("open-puzzles").focus();
+  if (!puzzleDialog.open && screen === "menu") returnFocus($("open-puzzles"));
   if (!puzzleDialog.open && screen === "results" && mode.trialCode)
     /** @type {HTMLElement | null} */ (panels.results.querySelector('[data-action="export"]'))?.focus();
 });
@@ -1371,7 +1384,7 @@ const renderPuzzleProgress = () => {
   $("puzzle-progress").textContent = `${puzzleProgress.cleared().size} / ${PUZZLES.length}`;
 };
 $("practice").addEventListener("close", () => {
-  if (screen === "menu") /** @type {HTMLElement | null} */ ($("open-practice"))?.focus();
+  if (screen === "menu") returnFocus($("open-practice"));
 });
 
 const versusUI = createVersusUI({
@@ -1382,7 +1395,7 @@ const versusUI = createVersusUI({
   setStyle: style => store.set("versus:style", style),
 });
 $("versus").addEventListener("close", () => {
-  if (screen === "menu") /** @type {HTMLElement | null} */ (document.querySelector('[data-mode="versus"]'))?.focus();
+  if (screen === "menu") returnFocus(document.querySelector('[data-mode="versus"]'));
 });
 
 const statsUI = createStatsUI({ dialog: /** @type {HTMLDialogElement} */ ($("stats")) });
@@ -1405,7 +1418,7 @@ const achievementsUI = createAchievementsUI({
 });
 $("open-achievements").addEventListener("click", () => achievementsUI.open());
 $("achievements").addEventListener("close", () => {
-  if (screen === "menu") /** @type {HTMLElement | null} */ ($("open-achievements"))?.focus();
+  if (screen === "menu") returnFocus($("open-achievements"));
 });
 
 const recordsUI = createRecordsUI({
@@ -1427,7 +1440,7 @@ const recordsUI = createRecordsUI({
 });
 $("open-records").addEventListener("click", () => recordsUI.open({ modeId: mode.id, rulesId: currentRules().id }));
 $("records").addEventListener("close", () => {
-  if (screen === "menu") /** @type {HTMLElement | null} */ ($("open-records"))?.focus();
+  if (screen === "menu") returnFocus($("open-records"));
 });
 
 const handleSystem = (action, code = "") => {
