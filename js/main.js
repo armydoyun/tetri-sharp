@@ -827,6 +827,10 @@ $("go-home").addEventListener("click", () => {
   toMenu();
 });
 
+/** 이보다 적은 피스로, 이 시간 안에 막힌 판은 결과의 비율 값을 —로, 공유를 끈다 */
+const SHORT_GAME_PIECES = 10;
+const SHORT_GAME_SECONDS = 10;
+
 const renderResultSplits = () => {
   const details = /** @type {HTMLDetailsElement} */ ($("results-splits"));
   details.hidden = !mode.splits;
@@ -1024,12 +1028,16 @@ const finish = () => {
   rescueButton.hidden = !survival || !lastReplay || !state.stats.pieces;
   if (lastReplay && versus) lastReplay.cpu = versus.recorder.finish(versus.cpu.state);
   /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="watch"]')).disabled = !lastReplay;
+  // 피스 몇 개 만에 막힌 판: 비율 값(PPS)은 뜻이 없고, 공유·"마지막 판"으로 남길 만한 판도 아니다(F11)
+  // (Survival처럼 버틴 시간이 기록인 판은 피스가 적어도 오래 버텼으면 그대로)
+  const tooShort =
+    state.over !== "clear" && state.stats.pieces < SHORT_GAME_PIECES && state.frame < SHORT_GAME_SECONDS * 60;
   const exportButton = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="export"]'));
-  exportButton.disabled = !mode.trialCode && (!lastReplay || Boolean(versus));
+  exportButton.disabled = !mode.trialCode && (!lastReplay || Boolean(versus) || tooShort);
   exportButton.querySelector(".btn-label").textContent = mode.trialCode ? t("퍼즐 편집") : t("공유");
   exportButton.setAttribute("aria-label", mode.trialCode ? t("퍼즐 편집·공유") : t("리플레이 공유"));
   exportButton.title = mode.trialCode ? t("퍼즐 편집·공유") : t("리플레이 공유(링크·파일)");
-  if (lastReplay && !versus) {
+  if (lastReplay && !versus && !tooShort) {
     replays.saveLast(lastReplay);
     if (outcome && outcome.rank < MAX_RANKED)
       replays.saveRanked(recordKey(mode, rules), lastReplay, records.list(mode, rules));
@@ -1056,7 +1064,9 @@ const finish = () => {
       : race
         ? raceResultText(state, race.target.best, race.target.friend)
         : "";
-  $("race-result").textContent = resultNote;
+  const shortNote =
+    tooShort && !mode.trialCode ? t("너무 일찍 끝난 판이라 공유하지 않고 마지막 판으로 남기지 않아요") : "";
+  $("race-result").textContent = [resultNote, shortNote].filter(Boolean).join(" · ");
   if (survival || mode.battleLesson) say(`${summary.title} ${summary.main}. ${resultNote}`);
 
   const seconds = state.frame / 60;
@@ -1067,7 +1077,7 @@ const finish = () => {
       [t("시간"), formatTime(state.frame)],
       [t("줄"), String(state.stats.lines)],
       [t("피스"), String(state.stats.pieces)],
-      ["PPS", seconds ? (state.stats.pieces / seconds).toFixed(2) : "0.00"],
+      ["PPS", tooShort ? "—" : seconds ? (state.stats.pieces / seconds).toFixed(2) : "0.00"],
       [t("보낸 줄"), String(g.sent)],
       [t("막은 쓰레기"), String(g.blocked)],
       [t("받은 쓰레기"), String(g.received)],
@@ -1094,7 +1104,7 @@ const finish = () => {
     [t("레벨"), String(state.level)],
     [t("줄"), String(state.stats.lines)],
     [t("피스"), String(state.stats.pieces)],
-    ["PPS", seconds ? (state.stats.pieces / seconds).toFixed(2) : "0.00"],
+    ["PPS", tooShort ? "—" : seconds ? (state.stats.pieces / seconds).toFixed(2) : "0.00"],
     [t("최고 기록"), best ? mode.formatRecord(best) : "—"],
   ];
   // 순위 줄은 늘 둔다(없으면 —) → 결과 화면 높이가 판마다 같다.

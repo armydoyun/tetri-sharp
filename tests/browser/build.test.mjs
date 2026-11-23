@@ -3330,3 +3330,54 @@ test("CPU 성향: 대전 목록 위에서 고르고 기억하며, 전적은 성�
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("피스 몇 개 만에 막힌 판: PPS는 —, 공유는 끄고 이유를 보이며, 마지막 판도 덮어쓰지 않는다", async () => {
+  const { context, page, errors } = await openPage(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  await startMode(page, "endless");
+  // 세워서 한가운데에만 떨어뜨리면 금방 막힌다
+  for (let i = 0; i < 20 && !(await visible(page, "results")); i++) {
+    await page.keyboard.press("ArrowUp");
+    await page.keyboard.press("Space");
+  }
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  const pieces = Number(await text(page, "hud-pieces"));
+  assert.ok(pieces < 10, `세워서 떨어뜨리기만 하면 ${pieces}개 만에 막힌다`);
+  assert.match(await text(page, "results-stats"), /PPS—/);
+  assert.equal(await page.locator('#results [data-action="export"]').isDisabled(), true);
+  assert.match(await text(page, "race-result"), /너무 일찍 끝난 판/);
+  assert.equal(await page.locator('#results [data-action="retry"]').isDisabled(), false, "다시 하기는 그대로");
+  assert.equal(await page.evaluate(() => localStorage.getItem("tetrisharp:replay:last")), null);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("휴대폰 가로: 설정 대화상자는 탭을 왼쪽 세로로 두고 내용 칸이 높이 대부분을 쓴다", async () => {
+  const context = await browser.newContext({ locale: "ko-KR", viewport: { width: 750, height: 342 }, hasTouch: true });
+  const page = await context.newPage();
+  try {
+    await page.goto(url);
+    await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+    await page.click("#open-settings");
+    const box = await page.evaluate(() => {
+      const d = document.querySelector("#settings");
+      const r = s => d.querySelector(s).getBoundingClientRect();
+      const tabs = [...d.querySelectorAll(".dialog-tabs .segmented > button")].map(b => b.getBoundingClientRect());
+      return {
+        tabs: r(".dialog-tabs"),
+        body: r(".dialog-body"),
+        dialog: d.getBoundingClientRect(),
+        lastTab: tabs.at(-1),
+      };
+    });
+    assert.ok(box.tabs.right <= box.body.left + 1, "탭은 내용 왼쪽");
+    assert.ok(box.lastTab.bottom <= box.dialog.bottom, "마지막 탭까지 보인다");
+    assert.ok(box.body.height >= 200, `내용 칸 높이 ${box.body.height}px`);
+    await page.locator(".dialog-tabs .segmented > button").first().focus();
+    await page.keyboard.press("ArrowDown");
+    assert.equal(await page.locator(".dialog-tabs .segmented > button").nth(1).getAttribute("aria-pressed"), "true");
+  } finally {
+    await context.close();
+  }
+});

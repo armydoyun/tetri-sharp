@@ -52,16 +52,44 @@ export const applyBattleLock = (state, ev, events) => {
 /**
  * 난이도: pps = CPU가 1초에 놓는 피스 수, mistake = 가장 좋은 자리 대신 차선을 고를 확률(%),
  * hold = 홀드를 쓰는지, holdMinGain = 홀드로 바꿀 때 필요한 최소 배치 점수 차이,
- * tucks = 바닥에서 옆으로 밀어 넣는지, spins = T를 바닥에서 돌려 넣는지(T-spin).
+ * tucks = 바닥에서 옆으로 밀어 넣는지, spins = T를 바닥에서 돌려 넣는지(T-spin),
+ * lookahead = 다음 피스(홀드 포함)까지 두 수 앞을 보는지.
  */
 export const LEVELS = Object.freeze([
   Object.freeze({ id: "easy", name: t("쉬움"), pps: 0.7, mistake: 20, hold: false }),
   Object.freeze({ id: "easy-plus", name: t("쉬움+"), pps: 0.95, mistake: 16, hold: true, holdMinGain: 3 }),
   Object.freeze({ id: "normal", name: t("보통"), pps: 1.2, mistake: 12, hold: true, tucks: true }),
   Object.freeze({ id: "normal-plus", name: t("보통+"), pps: 1.6, mistake: 8, hold: true, tucks: true }),
-  Object.freeze({ id: "hard", name: t("어려움"), pps: 2, mistake: 3, hold: true, tucks: true, spins: true }),
-  Object.freeze({ id: "hard-plus", name: t("어려움+"), pps: 2.6, mistake: 1, hold: true, tucks: true, spins: true }),
-  Object.freeze({ id: "master", name: t("최강"), pps: 3.2, mistake: 0, hold: true, tucks: true, spins: true }),
+  Object.freeze({
+    id: "hard",
+    name: t("어려움"),
+    pps: 2,
+    mistake: 3,
+    hold: true,
+    tucks: true,
+    spins: true,
+    lookahead: true,
+  }),
+  Object.freeze({
+    id: "hard-plus",
+    name: t("어려움+"),
+    pps: 2.6,
+    mistake: 1,
+    hold: true,
+    tucks: true,
+    spins: true,
+    lookahead: true,
+  }),
+  Object.freeze({
+    id: "master",
+    name: t("최강"),
+    pps: 3.2,
+    mistake: 0,
+    hold: true,
+    tucks: true,
+    spins: true,
+    lookahead: true,
+  }),
 ]);
 
 /** 대전에서 상대를 이겼을 때 엔진에 넣는 결과 */
@@ -69,7 +97,7 @@ export const WIN = "win";
 
 /**
  * CPU 성향(난이도와 따로 고른다). 판을 보는 기준만 다르다(js/ai/bot.js STYLE_WEIGHTS).
- * 같은 어려움 봇끼리 60판에서 균형 대비 4줄 노림 35%, 안정 53%.
+ * 같은 어려움 봇끼리 60판에서 균형 대비 4줄 노림 45%, 안정 38%(18판은 10분 안에 끝나지 않음).
  */
 export const STYLES = Object.freeze([
   Object.freeze({ id: "balanced", name: t("균형"), hint: t("4줄을 노리다가 판이 높아지면 무엇이든 지워요") }),
