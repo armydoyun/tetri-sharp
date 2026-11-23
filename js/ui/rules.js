@@ -209,6 +209,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
     const id = `rule-${field.path.replace(/\./g, "-")}`;
     const value = getPath(rules, field.path) ?? field.fallback;
     const commit = v => {
+      undo = null;
       onChange(sanitizeRuleBody(setPath(rules, field.path, v)));
       render(id);
     };
@@ -249,6 +250,12 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
   const notice = el("p", { class: "notice-slot", role: "status", id: "rules-record" });
   /** 잠깐 보여 줄 알림(다음 렌더 한 번만). 없으면 기록표 이름을 보여 준다. */
   let message = "";
+  /**
+   * 프리셋으로 채우기 직전의 규칙(되돌리기용). 프리셋은 지금 고른 내 규칙을 덮어쓰므로 한 번은 되돌릴 수 있게 한다.
+   * 다른 값을 고치거나 다른 규칙으로 옮기면 비운다(되돌리면 그 고친 것까지 사라지므로).
+   * @type {null | { body: any, slot: number }}
+   */
+  let undo = null;
 
   /** 클립보드에 복사. 막혀 있으면 입력칸을 선택해 둔다. */
   const copy = async (text, input) => {
@@ -391,6 +398,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
     removeSlot.addEventListener("click", () => {
       if (!window.confirm(t("‘{name}’ 규칙을 지울까요? 이 규칙의 기록은 남아요.", { name: current.name }))) return;
       slots.remove();
+      undo = null;
       message = t("규칙을 지웠어요");
       render("rule-slot-name");
     });
@@ -411,8 +419,12 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
       ...PRESET_LIST.map(p => {
         const b = button({ label: p.name, size: "s", "data-preset": p.id });
         b.addEventListener("click", () => {
+          undo = { body: sanitizeRuleBody(rules), slot: state.active };
           onChange(sanitizeRuleBody(p));
-          message = t("{name} 값으로 채웠어요 · 기록표 {id}", { name: p.name, id: makeCustomRules(p).id });
+          message = t("‘{rule}’을 {name} 값으로 채웠어요. 되돌리기로 전으로 돌아갈 수 있어요.", {
+            rule: current.name,
+            name: p.name,
+          });
           render();
           /** @type {HTMLElement | null} */ (dialog.querySelector(`[data-preset="${p.id}"]`))?.focus();
         });
@@ -448,6 +460,17 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
       body.append(section);
     }
 
+    // 되돌리기: 늘 같은 자리(발)에 있고, 프리셋으로 채운 직후에만 누를 수 있다(원칙 2)
+    if (undo && undo.slot !== state.active) undo = null;
+    const undoButton = button({ label: t("되돌리기"), icon: "undo", id: "rule-undo", disabled: !undo });
+    undoButton.addEventListener("click", () => {
+      if (!undo) return;
+      const { body: before } = undo;
+      undo = null;
+      onChange(before);
+      message = t("프리셋으로 채우기 전으로 되돌렸어요");
+      render("rule-undo");
+    });
     notice.dataset.recordKey = makeCustomRules(rules).id;
     notice.textContent = message || t("변경은 즉시 저장되며, 규칙 조합마다 기록을 따로 보관해요.");
     message = "";
@@ -455,7 +478,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
       title: t("Custom 규칙"),
       body,
       notice,
-      actions: [],
+      actions: [undoButton],
       closeId: "rules-close",
       tabs: el("div", { class: "rule-tabs-head" }, slotRow, presets, tabs),
     });

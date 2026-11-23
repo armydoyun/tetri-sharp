@@ -3420,3 +3420,24 @@ test("휴대폰 CPU 대전: 공격 알림 자리를 따로 비워 두지 않아 
     await context.close();
   }
 });
+
+test("규칙 편집: 프리셋으로 채우면 지금 내 규칙을 덮어쓰지만, 되돌리기로 바로 전으로 돌아간다", async () => {
+  const { context, page, errors } = await openPage();
+  await page.click('[data-rules="custom"]');
+  await page.click("#edit-rules");
+  assert.equal(await page.locator("#rule-undo").isDisabled(), true, "처음에는 되돌릴 것이 없다");
+  await page.locator("#rule-hardDrop").uncheck();
+  await page.click('[data-preset="arcade"]');
+  assert.equal(await page.locator("#rule-rotation .select-value").textContent(), "ARS");
+  assert.match(await page.locator("#rules-record").textContent(), /되돌리기/);
+  await page.click("#rule-undo");
+  assert.equal(await page.locator("#rule-rotation .select-value").textContent(), "SRS");
+  assert.equal(await page.locator("#rule-hardDrop").isChecked(), false, "프리셋 전에 고친 값까지 돌아온다");
+  assert.equal(await page.locator("#rule-undo").isDisabled(), true, "한 번만");
+  // 프리셋 뒤에 다른 값을 고치면 되돌리기는 꺼진다(고친 것이 사라지지 않게)
+  await page.click('[data-preset="retro"]');
+  await page.locator("#rule-ghost").check();
+  assert.equal(await page.locator("#rule-undo").isDisabled(), true);
+  assert.deepEqual(errors, []);
+  await context.close();
+});

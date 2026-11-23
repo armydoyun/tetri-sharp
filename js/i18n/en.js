@@ -924,6 +924,8 @@ export const EN = {
   "코드 불러오기": "Load a code",
   "받은 코드나 링크를 붙여 넣기": "Paste a code or link you received",
   "프리셋에서 시작": "Start from a preset",
-  "{name} 값으로 채웠어요 · 기록표 {id}": "Filled with {name} values · table {id}",
+  "‘{rule}’을 {name} 값으로 채웠어요. 되돌리기로 전으로 돌아갈 수 있어요.":
+    "Filled ‘{rule}’ with {name} values. Use Undo to go back.",
+  "프리셋으로 채우기 전으로 되돌렸어요": "Restored the rules from before the preset",
   "기록표 {id} · 조합마다 기록이 따로 쌓여요": "Table {id} · each mix keeps its own records",
 };
