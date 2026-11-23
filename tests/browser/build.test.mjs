@@ -3381,3 +3381,35 @@ test("휴대폰 가로: 설정 대화상자는 탭을 왼쪽 세로로 두고 �
     await context.close();
   }
 });
+
+test("휴대폰 CPU 대전: 공격 알림 자리를 따로 비워 두지 않아 보드가 Sprint와 비슷한 크기다", async () => {
+  const context = await browser.newContext({ locale: "ko-KR", viewport: { width: 390, height: 664 }, hasTouch: true });
+  await context.addInitScript(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  const page = await context.newPage();
+  try {
+    await page.goto(url);
+    await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+    const boardHeight = () => page.evaluate(() => document.getElementById("board").getBoundingClientRect().height);
+    await startMode(page, "sprint40");
+    const sprint = await boardHeight();
+    await page.keyboard.press("Escape");
+    await page.click('#pause [data-action="menu"]');
+    await page.click('[data-confirm="ok"]').catch(() => {});
+    await page.click('[data-mode="versus"]');
+    await page.click('[data-level="easy"]');
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    const versus = await boardHeight();
+    assert.ok(versus >= sprint * 0.85, `CPU 대전 보드 ${versus}px · Sprint ${sprint}px`);
+    // 알림은 CPU 상황 줄 위에 겹쳐 뜬다(보드를 가리지 않는다)
+    const overlap = await page.evaluate(() => {
+      const f = document.getElementById("versus-feedback").getBoundingClientRect();
+      const b = document.getElementById("board").getBoundingClientRect();
+      return f.bottom - b.top;
+    });
+    assert.ok(overlap <= 0, `알림이 보드를 ${overlap}px 가린다`);
+  } finally {
+    await context.close();
+  }
+});

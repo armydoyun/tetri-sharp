@@ -1358,9 +1358,31 @@ body.is-versus {
 }
 
 @media (max-width: 720px) {
+  /* 공격 알림은 자리를 따로 잡지 않고 CPU 상황 줄 위에 한 줄로 잠깐 겹쳐 떴다가 사라진다(2.8초, 누르기를 막지 않음).
+     자리를 비워 두면 그만큼(76px) 보드가 줄어들고(2차 평가 U32), 보드 위에 띄우면 새 피스가 가려진다. */
   body.is-versus {
+    --versus-feedback-h: 0px;
     --board-inline-reserve: 2px;
     --chrome-h: calc(220px + var(--versus-feedback-h));
+  }
+
+  body.is-versus .versus-panel {
+    position: relative;
+  }
+
+  body.is-versus .versus-feedback-slot {
+    display: contents;
+  }
+
+  body.is-versus .versus-feedback {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: center;
+    align-items: baseline;
+    gap: 0 var(--space-2);
   }
 
   body.is-versus .versus-panel {
