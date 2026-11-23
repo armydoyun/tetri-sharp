@@ -1,8 +1,7 @@
 // CPU 대전 난이도 고르기 대화상자. 줄마다 [번호 | 난이도·속도 | 전적 | >]
 import { LEVELS, STYLES, versusStatKey } from "../modes/versus.js";
 import { el, fieldRow, fillDialog } from "./dom.js";
-import { segmented } from "./components.js";
-import { icon } from "./icons.js";
+import { menuRow, segmented } from "./components.js";
 import { t } from "../i18n/index.js";
 
 /**
@@ -38,40 +37,24 @@ export const createVersusUI = ({ dialog, getStats, onPick, getStyle, setStyle })
         { class: "menu-list" },
         ...LEVELS.map((level, i) => {
           const s = stats[versusStatKey(level.id, style)];
-          const row = el(
-            "button",
-            { type: "button", class: "menu-row", "data-level": level.id },
-            el("span", { class: "menu-index num", text: String(i + 1).padStart(2, "0") }),
-            el(
-              "span",
-              { class: "menu-text" },
-              el("strong", { text: level.name }),
-              el("small", {
-                // 난이도 차이: 속도·홀드에 더해 바닥에서 밀어 넣기, T-spin을 쓰는지
-                text: [
-                  t("초당 {pps}피스 · {hold}", {
-                    pps: level.pps,
-                    hold: !level.hold
-                      ? t("홀드 안 씀")
-                      : "holdMinGain" in level
-                        ? t("홀드 제한적 사용")
-                        : t("홀드 사용"),
-                  }),
-                  ...("spins" in level ? [t("T-spin")] : "tucks" in level ? [t("밀어 넣기")] : []),
-                ].join(" · "),
-              })
-            ),
-            el("span", {
-              class: "mode-best num",
-              text: s && s.win + s.loss ? t("{win}승 {loss}패", { win: s.win, loss: s.loss }) : "",
-            }),
-            icon("chevron-right")
-          );
-          row.addEventListener("click", () => {
-            dialog.close();
-            onPick(level, style);
+          return menuRow({
+            index: i + 1,
+            "data-level": level.id,
+            title: level.name,
+            // 난이도 차이: 속도·홀드에 더해 바닥에서 밀어 넣기, T-spin을 쓰는지
+            desc: [
+              t("초당 {pps}피스 · {hold}", {
+                pps: level.pps,
+                hold: !level.hold ? t("홀드 안 씀") : "holdMinGain" in level ? t("홀드 제한적 사용") : t("홀드 사용"),
+              }),
+              ...("spins" in level ? [t("T-spin")] : "tucks" in level ? [t("밀어 넣기")] : []),
+            ].join(" · "),
+            meta: s && s.win + s.loss ? t("{win}승 {loss}패", { win: s.win, loss: s.loss }) : "",
+            onClick: () => {
+              dialog.close();
+              onPick(level, style);
+            },
           });
-          return row;
         })
       );
       fillDialog(dialog, {

@@ -6,8 +6,7 @@ import { INTRO_LESSONS } from "../modes/intro-lessons.js";
 import { DOWNSTACK_LESSONS } from "../modes/downstack.js";
 import { DRILLS } from "../modes/practice.js";
 import { el, fillDialog } from "./dom.js";
-import { button } from "./components.js";
-import { icon } from "./icons.js";
+import { button, menuRow } from "./components.js";
 import { t } from "../i18n/index.js";
 
 /** @param {{ dialog: HTMLDialogElement, onPick: (drill: any) => void, progress: ReturnType<typeof import("../storage/practice-progress.js").createPracticeProgress>, onStage: (mode: any) => void }} options */
@@ -17,35 +16,22 @@ export const createPracticeUI = ({ dialog, onPick, progress, onStage }) => {
     const completed = progress.read();
     const stages = lessons.map((mode, index) => {
       const result = completed[mode.id];
-      const stage = el(
-        "button",
-        {
-          type: "button",
-          class: "menu-row",
-          "data-practice-stage": mode.id,
-          "data-downstack": mode.downstack && mode.id,
+      return menuRow({
+        index: index + 1,
+        "data-practice-stage": mode.id,
+        "data-downstack": mode.downstack && mode.id,
+        title: mode.downstack?.title ?? mode.name,
+        desc:
+          result === "no-hints" && (mode.downstack || mode.buildLesson)
+            ? t("힌트 없이 완료")
+            : result
+              ? t("완료")
+              : mode.description,
+        onClick: () => {
+          dialog.close();
+          onStage(mode);
         },
-        el("span", { class: "menu-index num", text: String(index + 1).padStart(2, "0") }),
-        el(
-          "span",
-          { class: "menu-text" },
-          el("strong", { text: mode.downstack?.title ?? mode.name }),
-          el("small", {
-            text:
-              result === "no-hints" && (mode.downstack || mode.buildLesson)
-                ? t("힌트 없이 완료")
-                : result
-                  ? t("완료")
-                  : mode.description,
-          })
-        ),
-        icon("chevron-right")
-      );
-      stage.addEventListener("click", () => {
-        dialog.close();
-        onStage(mode);
       });
-      return stage;
     });
     const back = button({ label: t("연습 목록") });
     back.addEventListener("click", () => ui.open());
@@ -102,19 +88,17 @@ export const createPracticeUI = ({ dialog, onPick, progress, onStage }) => {
         { class: "menu-list practice-list" },
         ...[...drills.filter(drill => drill.id === "free"), ...drills.filter(drill => drill.id !== "free")].map(
           (d, i) => {
-            const card = el(
-              "button",
-              { type: "button", class: "menu-row", "data-drill": d.id },
-              el("span", { class: "menu-index num", text: String(i + 1).padStart(2, "0") }),
-              el("span", { class: "menu-text" }, el("strong", { text: d.name }), el("small", { text: d.description })),
-              icon("chevron-right")
-            );
-            card.addEventListener("click", () => {
-              if ("lessons" in d) return openStages(d);
-              dialog.close();
-              onPick(d);
+            return menuRow({
+              index: i + 1,
+              "data-drill": d.id,
+              title: d.name,
+              desc: d.description,
+              onClick: () => {
+                if ("lessons" in d) return openStages(d);
+                dialog.close();
+                onPick(d);
+              },
             });
-            return card;
           }
         )
       );
