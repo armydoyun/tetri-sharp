@@ -26,7 +26,7 @@ const inMode = (id, modeId, name, description, test) => ({
   group: "modes",
   name,
   description,
-  test: c => c.mode.id === modeId && test(c.state, c.mode),
+  test: c => c.real && c.mode.id === modeId && test(c.state, c.mode),
 });
 const clears = (state, key) => (state.tally?.clears?.[key] ?? 0) > 0;
 const runRank = (state, mode) =>

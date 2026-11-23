@@ -40,3 +40,14 @@ test("다음 랭크 기준: 지금 랭크의 바로 위, S+면 없다", () => {
   assert.deepEqual(nextRankStep(master, { level: 450 }), { rank: "A", value: 600 });
   assert.equal(nextRankStep(master, { level: 999 }), null);
 });
+
+test("랭크는 기본 규칙(Modern·Retro·Arcade)에서만: Custom 기록에는 주지 않는다", async () => {
+  const { rankOf, isRankedRules } = await import("../../js/modes/ranks.js");
+  const { findMode } = await import("../../js/modes/index.js");
+  const sprint = findMode("sprint40");
+  const fast = { frames: 30 * 60 };
+  assert.ok(rankOf(sprint, fast));
+  assert.ok(rankOf(sprint, fast, { id: "modern" }));
+  assert.equal(rankOf(sprint, fast, { id: "custom-abc" }), null);
+  assert.equal(isRankedRules({ id: "retro" }), true);
+});

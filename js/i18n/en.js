@@ -927,5 +927,7 @@ export const EN = {
   "‘{rule}’을 {name} 값으로 채웠어요. 되돌리기로 전으로 돌아갈 수 있어요.":
     "Filled ‘{rule}’ with {name} values. Use Undo to go back.",
   "프리셋으로 채우기 전으로 되돌렸어요": "Restored the rules from before the preset",
+  "랭크와 업적은 기본 규칙(Modern·Retro·Arcade)에서만 받아요":
+    "Ranks and achievements are only earned with the standard rules (Modern, Retro, Arcade)",
   "기록표 {id} · 조합마다 기록이 따로 쌓여요": "Table {id} · each mix keeps its own records",
 };

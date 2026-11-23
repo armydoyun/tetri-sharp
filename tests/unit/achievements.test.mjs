@@ -82,3 +82,15 @@ test("업적 저장값: 모르는 id·날짜가 아닌 값은 버리고, 백업�
   assert.deepEqual(parsed.data[ACHIEVEMENTS_KEY], { quad: "2026-11-23T00:00:00Z" });
   assert.equal(new Set(ACHIEVEMENTS.map(a => a.id)).size, ACHIEVEMENTS.length, "id가 겹치지 않는다");
 });
+
+test("Custom 규칙 판(real=false)은 모드 업적도 주지 않는다", async () => {
+  const { ACHIEVEMENTS } = await import("../../js/storage/achievements.js");
+  const { findMode } = await import("../../js/modes/index.js");
+  const sprint = findMode("sprint40");
+  const state = { over: "clear", frame: 50 * 60, score: 0, level: 1, stats: { lines: 40 }, tally: {} };
+  const ctx = real => ({ mode: sprint, state, real, won: false, puzzlesCleared: new Set(), puzzles: [] });
+  const got = real => ACHIEVEMENTS.filter(a => a.test(ctx(real))).map(a => a.id);
+  assert.ok(got(true).includes("sprint-1m"));
+  assert.equal(got(false).includes("sprint-1m"), false);
+  assert.equal(got(false).includes("sprint-clear"), false);
+});

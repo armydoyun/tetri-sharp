@@ -6,7 +6,7 @@ import { createKeyboard } from "./input/keyboard.js";
 import { createTouch, touchVisible } from "./input/touch.js";
 import { compilePadmap, createGamepad } from "./input/gamepad.js";
 import { ACTIONS, compileKeymap, keyLabel } from "./input/keymap.js";
-import { RANK_STEPS, rankLabel, rankOf } from "./modes/ranks.js";
+import { RANK_STEPS, isRankedRules, rankLabel, rankOf } from "./modes/ranks.js";
 import { MAX_RULE_SLOTS, createRuleSlots } from "./storage/rule-slots.js";
 import { ACHIEVEMENTS, createAchievements } from "./storage/achievements.js";
 import { createAchievementsUI } from "./ui/achievements.js";
@@ -472,7 +472,7 @@ const renderMenu = () => {
   list.replaceChildren(
     ...MODES.map(m => {
       const best = records.best(m, ruleSet);
-      const rank = rankOf(m, best);
+      const rank = rankOf(m, best, ruleSet);
       return menuRow({
         "data-mode": m.id,
         title: m.name,
@@ -1026,7 +1026,9 @@ const finish = () => {
   const freshAchievements = achievements.evaluate({
     mode,
     state,
-    real: !scenePractice && (MODES.includes(mode) || Boolean(mode.daily) || Boolean(mode.versus)),
+    // Custom 규칙 판은 업적을 주지 않는다(퍼즐 업적은 규칙과 무관) — 2차 평가 F22
+    real:
+      !scenePractice && isRankedRules(rules) && (MODES.includes(mode) || Boolean(mode.daily) || Boolean(mode.versus)),
     won: Boolean(mode.versus) && state.over === WIN,
     puzzlesCleared: puzzleProgress.cleared(),
     puzzles: PUZZLES,
@@ -1127,7 +1129,7 @@ const finish = () => {
   // 랭크가 있는 모드: 기록으로 남는 판이면 이 판의 랭크(다음 랭크 기준은 기록 화면에서)
   if (RANK_STEPS[mode.id]) {
     const run = { frames: state.frame, score: state.score, lines: state.stats.lines, level: state.level };
-    rows.push([t("랭크"), (mode.isRecordable(state) && rankOf(mode, run)) || "—"]);
+    rows.push([t("랭크"), (mode.isRecordable(state) && rankOf(mode, run, rules)) || "—"]);
   }
   if (mode.splits) {
     const delta = splitDelta(splits, resultPbSplits);
