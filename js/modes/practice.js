@@ -111,9 +111,32 @@ export const buildPcExact = (board, pieces, rng) => {
   return true;
 };
 
-/** @returns {number[][][] | null} 피스마다 비울 칸(놓는 순서의 거꾸로) */
-const findPcHoles = (pieces, rng) => {
-  const top = HEIGHT - PC_ROWS;
+/**
+ * 4줄 만들기: 아래 4줄을 채우되 한 열(well)은 비워 우물로 두고, 앞 피스들(pieces, I 빼고 놓는 순서)이 정확히 들어갈 칸만 비운다.
+ * 앞 피스를 모두 놓으면 우물 말고는 4줄이 다 차고, 마지막 I를 세워 넣으면 4줄이 지워진다. 앞 피스는 우물을 덮을 수 없다.
+ * @returns {boolean} 만들었는가
+ */
+export const buildQuadExact = (board, pieces, rng, well) => {
+  const rows = 4;
+  const reserved = new Set();
+  for (let y = HEIGHT - rows; y < HEIGHT; y++) reserved.add(y * WIDTH + well);
+  const holes = findPcHoles(pieces, rng, rows, reserved);
+  clear(board);
+  if (!holes) return false;
+  const empty = new Set([...reserved, ...holes.flat().map(([x, y]) => y * WIDTH + x)]);
+  for (let y = HEIGHT - rows; y < HEIGHT; y++)
+    for (let x = 0; x < WIDTH; x++) if (!empty.has(y * WIDTH + x)) set(board, x, y, GARBAGE);
+  return true;
+};
+
+/**
+ * @param {string[]} pieces 놓는 순서
+ * @param {number} [rows] 채울 줄 수(퍼펙트 클리어는 2줄)
+ * @param {Set<number>} [reserved] 처음부터 비워 둘 칸(피스가 들어가면 안 된다, 예: 4줄 우물)
+ * @returns {number[][][] | null} 피스마다 비울 칸(놓는 순서의 거꾸로)
+ */
+const findPcHoles = (pieces, rng, rows = PC_ROWS, reserved = new Set()) => {
+  const top = HEIGHT - rows;
   const key = (x, y) => y * WIDTH + x;
   /** 칸들이 위에서 곧장 들어갈 수 있는가: 같은 열에서 위쪽 칸은 모두 비어 있어야 한다 */
   const open = (cells, empty) =>
@@ -132,12 +155,12 @@ const findPcHoles = (pieces, rng) => {
       found = chosen;
       return;
     }
-    const slots = slotsIn(order[i], PC_ROWS);
+    const slots = slotsIn(order[i], rows);
     // 같은 결과가 나오게 시드 난수로 시작 위치만 돌린다.
     const offset = slots.length ? rng.int(slots.length) : 0;
     for (let k = 0; k < slots.length && !found; k++) {
       const cells = slots[(k + offset) % slots.length];
-      if (cells.some(([x, y]) => empty.has(key(x, y)))) continue;
+      if (cells.some(([x, y]) => empty.has(key(x, y)) || reserved.has(key(x, y)))) continue;
       const next = new Set(empty);
       for (const [x, y] of cells) next.add(key(x, y));
       // 이 피스를 놓을 때는 이미 놓인 피스(앞 순서)가 아직 비어 있다 → 남은 피스 칸은 빈칸으로 보지 않는다.
@@ -145,7 +168,7 @@ const findPcHoles = (pieces, rng) => {
       search(i + 1, next, [...chosen, cells]);
     }
   };
-  search(0, new Set(), []);
+  search(0, new Set(reserved), []);
   return found;
 };
 

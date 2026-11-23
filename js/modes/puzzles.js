@@ -1,18 +1,20 @@
 // 퍼즐 모드: 정해진 판과 정해진 피스로 목표를 이루는 단계형 문제. 중력 없음, 늘 Modern 규칙.
 //  - 판 비우기: 아래 두 줄의 구멍을 주어진 피스로 채워 퍼펙트 클리어(피스 1~4개)
+//  - 4줄 만들기: 한 열을 우물로 남긴 아래 네 줄의 구멍을 앞 피스로 채우고 마지막 I로 4줄(피스 2~4개)
 //  - T-spin Double / Triple: 주어진 T 하나로
 // 단계는 시드로 만들어 어디서나 같고, 모든 단계는 풀 수 있게 만든다(단위 테스트가 탐색기로 확인한다).
 import { MODERN } from "../rules/presets.js";
 import { createRng } from "../core/rng.js";
 import { WIDTH } from "../core/board.js";
-import { buildPcExact, buildTsd, buildTst } from "./practice.js";
+import { buildPcExact, buildQuadExact, buildTsd, buildTst } from "./practice.js";
 import { t } from "../i18n/index.js";
 
 const TYPES = ["I", "J", "L", "O", "S", "T", "Z"];
 
 /**
  * 단계 계획: [종류, 피스 수]. 앞쪽은 쉽게(피스 하나), 뒤로 갈수록 피스가 늘고 T-spin이 섞인다.
- * @type {ReadonlyArray<[ "pc" | "tsd" | "tst", number ]>}
+ * 뒤에 붙인 단계(31~)는 나중에 더한 장이다. 이미 있는 단계의 번호(id)·시드는 바꾸지 않는다(진행도·리플레이가 id로 맞는다).
+ * @type {ReadonlyArray<[ "pc" | "quad" | "tsd" | "tst", number ]>}
  */
 const PLAN = Object.freeze([
   ["pc", 1],
@@ -45,6 +47,15 @@ const PLAN = Object.freeze([
   ["pc", 4],
   ["pc", 4],
   ["pc", 4],
+  // 4줄 만들기(피스 수는 마지막 I 포함)
+  ["quad", 2],
+  ["quad", 2],
+  ["quad", 2],
+  ["quad", 3],
+  ["quad", 3],
+  ["quad", 3],
+  ["quad", 4],
+  ["quad", 4],
 ]);
 
 /**
@@ -65,6 +76,24 @@ const makeStage = index => {
       goal: ev => ev.tspin === "full" && ev.lines === (kind === "tsd" ? 2 : 3),
     };
   }
+  if (kind === "quad") {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const rng = createRng(12001 + index * 977 + attempt);
+      // I는 마지막에 우물로 → 앞 피스에는 I를 섞지 않는다(I가 우물 말고 다른 데 세워지면 헷갈린다)
+      const front = Array.from({ length: count - 1 }, () => TYPES[1 + rng.int(TYPES.length - 1)]);
+      const well = rng.int(2) === 0 ? rng.int(3) : WIDTH - 1 - rng.int(3);
+      const board = { width: WIDTH, height: 40, cells: new Uint8Array(WIDTH * 40) };
+      if (!buildQuadExact(board, front, createRng(53 + index * 131 + attempt), well)) continue;
+      const cells = board.cells.slice();
+      return {
+        kind,
+        pieces: [...front, "I"],
+        build: target => target.cells.set(cells),
+        goal: ev => ev.lines === 4,
+      };
+    }
+    throw new Error(`퍼즐 단계를 만들 수 없습니다: ${index + 1}`);
+  }
   for (let attempt = 0; attempt < 200; attempt++) {
     const rng = createRng(9001 + index * 977 + attempt);
     const pieces = Array.from({ length: count }, () => TYPES[rng.int(TYPES.length)]);
@@ -84,12 +113,13 @@ const makeStage = index => {
 
 export const KIND_NAMES = Object.freeze({
   pc: t("판 비우기"),
+  quad: t("4줄 만들기"),
   tsd: "T-spin Double",
   tst: "T-spin Triple",
 });
 
-/** 장 순서: 판 비우기 → T-spin Double → T-spin Triple */
-export const CHAPTERS = Object.freeze(["pc", "tsd", "tst"]);
+/** 장 순서(쉬운 것부터): 판 비우기 → 4줄 만들기 → T-spin Double → T-spin Triple */
+export const CHAPTERS = Object.freeze(["pc", "quad", "tsd", "tst"]);
 
 /**
  * 모든 단계(앞에서 한 번 만들어 둔다). 보여 주는 순서는 장별로, 장 안에서는 피스가 적은 것부터.

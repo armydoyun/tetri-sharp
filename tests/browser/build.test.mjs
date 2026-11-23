@@ -3537,3 +3537,22 @@ test("키보드: 대화상자는 열면 안으로 포커스가 가고, Esc로 �
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("퍼즐 4줄 만들기: 우물을 남기고 앞 피스를 채운 뒤 I로 4줄을 지우면 성공", async () => {
+  const { context, page, errors } = await openPage(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  const first = PUZZLES.find(p => p.kind === "quad");
+  await page.click("#open-puzzles");
+  assert.match(await page.locator("#puzzles").textContent(), /4줄 만들기/);
+  await page.click(`[data-puzzle="${first.number}"]`);
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  for (const key of keysFor(solvePuzzle(first))) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(20);
+  }
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
+  assert.equal(await text(page, "results-title"), "성공!");
+  assert.deepEqual(errors, []);
+  await context.close();
+});

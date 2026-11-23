@@ -21,13 +21,29 @@ const solvesPc = (board, pieces) => {
   });
 };
 
-test("퍼즐 30단계는 모두 주어진 피스로 풀 수 있다", () => {
-  assert.equal(PUZZLES.length, 30);
+/** 앞 피스를 아래 네 줄 안에 놓고(줄을 지우지 않고), 마지막 I로 4줄을 지울 수 있는가 */
+const solvesQuad = (board, pieces) => {
+  const [type, ...rest] = pieces;
+  return placements(board, type).some(p => {
+    if (!rest.length) return p.lines === 4;
+    if (p.lines) return false;
+    if (ROTATIONS.srs.cells(type, p.rot).some(([, cy]) => p.y + cy < HEIGHT - 4)) return false;
+    const next = { ...board, cells: board.cells.slice() };
+    place(next, ROTATIONS.srs.cells(type, p.rot), p.x, p.y, 1);
+    return solvesQuad(next, rest);
+  });
+};
+
+test("퍼즐 38단계는 모두 주어진 피스로 풀 수 있다", () => {
+  assert.equal(PUZZLES.length, 38);
   for (const p of PUZZLES) {
     const board = createBoard();
     p.build(board);
     if (p.kind === "pc") assert.ok(solvesPc(board, p.pieces), `단계 ${p.number}: ${p.pieces.join("")}`);
-    else {
+    else if (p.kind === "quad") {
+      assert.equal(p.pieces.at(-1), "I", "마지막은 I");
+      assert.ok(solvesQuad(board, p.pieces), `단계 ${p.number}: ${p.pieces.join("")}`);
+    } else {
       const lines = p.kind === "tsd" ? 2 : 3;
       assert.ok(
         placements(board, "T").some(q => q.tspin === "full" && q.lines === lines),
@@ -72,7 +88,7 @@ test("깬 단계 기록과 다음 단계", () => {
   assert.deepEqual([...progress.cleared()], [1, 3], "이상한 값은 버린다");
 });
 
-test("퍼즐 순서: 판 비우기 → T-spin Double → T-spin Triple 장, 장 안에서는 피스가 적은 것부터", async () => {
+test("퍼즐 순서: 판 비우기 → 4줄 만들기 → T-spin Double → T-spin Triple 장, 장 안에서는 피스가 적은 것부터", async () => {
   const { CHAPTERS } = await import("../../js/modes/puzzles.js");
   assert.deepEqual(
     PUZZLES.map(p => p.number),
@@ -92,7 +108,7 @@ test("퍼즐 순서: 판 비우기 → T-spin Double → T-spin Triple 장, 장 
   assert.deepEqual(
     PUZZLES.map(p => p.id).sort((a, b) => a - b),
     PUZZLES.map((_, i) => i + 1),
-    "id는 만들 때의 번호 1~30"
+    "id는 만들 때의 번호 1~38(4줄 만들기는 31~)"
   );
 });
 

@@ -76,7 +76,9 @@ export const createPuzzleUI = ({ dialog, progress, onPick, onCreate }) => {
           {},
           el("p", {
             class: "field-help",
-            text: t("판 비우기는 주어진 피스로 아래 두 줄을 모두 지우고, T-spin은 T 하나로 해내요."),
+            text: t(
+              "판 비우기는 아래 두 줄을 모두 지우고, 4줄 만들기는 우물을 남겨 채운 뒤 I로 4줄, T-spin은 T 하나로 해내요."
+            ),
           }),
           grid
         ),

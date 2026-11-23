@@ -118,6 +118,13 @@ export const ACHIEVEMENTS = Object.freeze([
     test: c => c.puzzles.filter(p => p.kind === "pc").every(p => c.puzzlesCleared.has(p.id)),
   },
   {
+    id: "puzzle-quad",
+    group: "puzzle",
+    name: t("4줄 만들기 장"),
+    description: t("4줄 만들기 퍼즐을 모두 풀기"),
+    test: c => c.puzzles.filter(p => p.kind === "quad").every(p => c.puzzlesCleared.has(p.id)),
+  },
+  {
     id: "puzzle-all",
     group: "puzzle",
     name: t("퍼즐 완주"),

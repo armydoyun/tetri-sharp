@@ -576,8 +576,8 @@ export const EN = {
   "{n}피스": "{n} pcs",
   "{done} / {total}단계 깸 · 중력 없음, 정해진 피스만 써요":
     "{done} / {total} solved · no gravity, only the given pieces",
-  "판 비우기는 주어진 피스로 아래 두 줄을 모두 지우고, T-spin은 T 하나로 해내요.":
-    "Clear the board: use the given pieces to clear the bottom two lines. T-spin stages: do it with a single T.",
+  "판 비우기는 아래 두 줄을 모두 지우고, 4줄 만들기는 우물을 남겨 채운 뒤 I로 4줄, T-spin은 T 하나로 해내요.":
+    "Board clears empty the bottom two rows, quads fill around a well and finish with an I for four lines, and T-spins use a single T.",
 
   // ---- 리플레이 공유 ----
   "이 리플레이": "this replay",
@@ -940,6 +940,11 @@ export const EN = {
   "지우고 새 판 시작": "Delete and start",
   "백업을 불러올까요?": "Load this backup?",
   "{label} — 한 번 더 누르면 실행해요": "{label} — press again to do it",
+  "4줄 만들기": "Quad builds",
+  "4줄 만들기 장": "Quad chapter",
+  "4줄 만들기 퍼즐을 모두 풀기": "Solve every quad build puzzle",
+  "목표 · 우물을 남기고 채운 뒤 마지막 I로 4줄 지우기":
+    "Goal · Fill around the well, then clear four lines with the last I",
   "설정 초기화": "Reset settings",
   "정말 초기화": "Confirm reset",
   "조작감·키·화면 설정을 기본값으로 되돌려요. 기록은 지우지 않아요.":
