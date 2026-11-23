@@ -57,6 +57,45 @@ export const button = ({ label, icon, variant, size, wrap, kbd, onClick, class: 
 };
 
 /**
+ * 두 번 눌러 확정하는 버튼(지우기·초기화처럼 되돌릴 수 없는 일). 브라우저 기본 확인창(window.confirm) 대신 쓴다.
+ * 처음 누르면 이름이 confirmLabel로 바뀌고(4초 또는 포커스를 잃으면 돌아온다), 그때 한 번 더 누르면 onConfirm.
+ * 두 이름을 한 칸에 겹쳐 두고 하나만 보이므로 버튼 폭이 바뀌지 않는다(원칙 2).
+ * @param {{ label: string, confirmLabel: string, onConfirm: () => void, icon?: IconName, variant?: ButtonVariant, size?: ButtonSize, class?: string, [attr: string]: any }} o
+ * @returns {HTMLButtonElement}
+ */
+export const confirmButton = ({ label, confirmLabel, onConfirm, icon, variant, size, class: extra, ...attrs }) => {
+  const b = el(
+    "button",
+    {
+      type: "button",
+      ...attrs,
+      class: buttonClass({ variant, size, extra: ["btn-confirm", extra].filter(Boolean).join(" ") }),
+    },
+    ...(icon ? [iconSvg(icon)] : []),
+    el("span", { class: "btn-label btn-swap" }, el("span", { text: label }), el("span", { text: confirmLabel }))
+  );
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  let timer;
+  const disarm = () => {
+    clearTimeout(timer);
+    delete b.dataset.armed;
+    b.removeAttribute("aria-label");
+  };
+  b.addEventListener("click", () => {
+    if (b.dataset.armed) {
+      disarm();
+      onConfirm();
+      return;
+    }
+    b.dataset.armed = "1";
+    b.setAttribute("aria-label", confirmLabel);
+    timer = setTimeout(disarm, 4000);
+  });
+  b.addEventListener("blur", disarm);
+  return /** @type {HTMLButtonElement} */ (b);
+};
+
+/**
  * 아이콘만 있는 정사각형 버튼(닫기 등). 이름은 화면 읽기 프로그램과 툴팁으로만 보인다.
  * @param {{ icon: IconName, label: string, variant?: ButtonVariant, size?: ButtonSize, onClick?: (e: MouseEvent) => void, class?: string, [attr: string]: any }} o
  * @returns {HTMLButtonElement}

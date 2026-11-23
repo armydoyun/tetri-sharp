@@ -504,20 +504,31 @@ test("막히면 결과 화면이 뜨고, Space 연타로 건너뛰지 않으며,
   await context.close();
 });
 
-test("전체 설정 초기화는 취소할 수 있고, 확인 후 버튼으로 포커스가 돌아온다", async () => {
+test("설정 초기화는 두 번 눌러 확정하고(브라우저 확인창 없음), 폭이 바뀌지 않으며 포커스가 돌아온다", async () => {
   const { context, page, errors } = await openPage();
+  let nativeDialog = false;
+  page.on("dialog", dialog => {
+    nativeDialog = true;
+    dialog.dismiss();
+  });
   await page.click("#open-settings");
   const das = page.locator("#set-das");
   await das.fill("100");
   const reset = page.locator("#settings-reset");
-  page.once("dialog", dialog => dialog.dismiss());
+  const width = async () => (await reset.boundingBox()).width;
+  const before = await width();
   await reset.click();
-  assert.equal(await das.inputValue(), "100");
-
-  page.once("dialog", dialog => dialog.accept());
+  assert.equal(await das.inputValue(), "100", "한 번 누르면 아직 그대로");
+  assert.equal(await reset.getAttribute("data-armed"), "1");
+  assert.equal(await width(), before, "확인 이름으로 바뀌어도 폭이 같다");
+  // 다른 곳을 누르면(포커스를 잃으면) 처음으로
+  await das.focus();
+  assert.equal(await reset.getAttribute("data-armed"), null);
+  await reset.click();
   await reset.click();
   assert.notEqual(await das.inputValue(), "100");
   assert.equal(await reset.evaluate(el => el === document.activeElement), true);
+  assert.equal(nativeDialog, false);
   assert.deepEqual(errors, []);
   await context.close();
 });
@@ -1231,7 +1242,8 @@ test("내 규칙: 첫 화면에서 고르고 공유 탭을 열며, 편집기에�
   // 대화상자의 close 이벤트(첫 화면 다시 그리기)는 닫은 다음 차례에 온다
   await page.waitForFunction(() => document.querySelector("#rule-slot .select-value")?.textContent === "대회용");
   await page.click("#edit-rules");
-  page.once("dialog", dialog => dialog.accept());
+  await page.click("#rule-slot-remove");
+  assert.equal(await page.locator("#rule-slot-name").inputValue(), "대회용", "한 번 누르면 아직 그대로");
   await page.click("#rule-slot-remove");
   assert.equal(await page.locator("#rule-slot-name").inputValue(), "내 규칙 1");
   assert.equal(await page.locator("#rule-slot-remove").isDisabled(), true, "마지막 하나는 지울 수 없다");
@@ -3460,6 +3472,31 @@ test("하드 드롭 연타로 1~2초 만에 막힌 Sprint: 피스가 10개를 �
   assert.match(await text(page, "results-stats"), /PPS—/);
   assert.equal(await page.locator('#results [data-action="export"]').isDisabled(), true);
   assert.equal(await page.locator("#results-practice-scene").isVisible(), false, "추천 연습 없음");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("기록 지우기: 데이터 탭에서 두 번 눌러 기록·리플레이·CPU 전적을 지우고, 설정·업적은 남긴다", async () => {
+  const { context, page, errors } = await openPage(() => {
+    localStorage.setItem(
+      "tetrisharp:records",
+      JSON.stringify({ "sprint40|modern": [{ frames: 3000, lines: 40, pieces: 100 }] })
+    );
+    localStorage.setItem("tetrisharp:versus:stats", JSON.stringify({ easy: { win: 3, loss: 1 } }));
+    localStorage.setItem("tetrisharp:achievements", JSON.stringify({ "first-line": "2026-11-20" }));
+  });
+  assert.match(await page.locator('[data-mode="sprint40"] .mode-best').textContent(), /최고 기록/);
+  await page.click("#open-settings");
+  await page.click('.dialog-tabs [data-value="data"]');
+  const clear = page.locator("#clear-records");
+  await clear.click();
+  assert.match(await page.locator('[data-mode="sprint40"] .mode-best').textContent(), /최고 기록/, "한 번은 그대로");
+  await clear.click();
+  assert.match(await text(page, "settings-notice"), /지웠어요/);
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => document.querySelector('[data-mode="sprint40"] .mode-best')?.textContent === "");
+  assert.equal(await page.locator('[data-mode="versus"] .mode-best').textContent(), "");
+  assert.match(await text(page, "achievement-progress"), /^1 \//, "업적은 남는다");
   assert.deepEqual(errors, []);
   await context.close();
 });

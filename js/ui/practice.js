@@ -77,32 +77,47 @@ export const createPracticeUI = ({ dialog, onPick, progress, onStage }) => {
         description: t("4줄 우물과 T-spin 자리를 직접 만들기"),
         lessons: BUILD_LESSONS,
       };
+      // 쉬운 것부터(2차 평가 F28): 조작 → 피네스 → 우물·파내기 → 빌드 → T-spin → 퍼펙트 클리어 → CPU 대전
+      const ORDER = [
+        "free",
+        "intro",
+        "finesse-lesson",
+        "finesse",
+        "quad",
+        "double",
+        "downstack",
+        "build-training",
+        "tsd",
+        "tst",
+        "pc",
+        "battle-training",
+      ];
+      const all = [intro, battle, build, downstack, lesson, ...DRILLS];
       const drills = [
-        intro,
-        battle,
-        build,
-        ...DRILLS.flatMap(d => (d.id === "finesse" ? [downstack, lesson, d] : [d])),
+        ...ORDER.map(id => all.find(d => d.id === id)).filter(Boolean),
+        ...all.filter(d => !ORDER.includes(d.id)),
       ];
       const list = el(
         "div",
         { class: "menu-list practice-list" },
-        ...[...drills.filter(drill => drill.id === "free"), ...drills.filter(drill => drill.id !== "free")].map(
-          (d, i) => {
-            return menuRow({
-              index: i + 1,
-              "data-drill": d.id,
-              title: d.name,
-              desc: d.description,
-              onClick: () => {
-                if ("lessons" in d) return openStages(d);
-                dialog.close();
-                onPick(d);
-              },
-            });
-          }
-        )
+        ...drills.map((d, i) => {
+          return menuRow({
+            index: i + 1,
+            "data-drill": d.id,
+            title: d.name,
+            desc: d.description,
+            onClick: () => {
+              if ("lessons" in d) return openStages(d);
+              dialog.close();
+              onPick(d);
+            },
+          });
+        })
       );
-      notice.textContent = t("중력이 없어요. 소프트 드롭으로 내려 돌려 넣으세요. 끝낸 연습은 완료로 표시돼요.");
+      // 중력이 없는 것은 자리 연습(자유 쌓기·우물·T-spin·퍼펙트 클리어 등)뿐이다(F30). 입문·훈련 과정은 단계마다 안내한다
+      notice.textContent = t(
+        "쉬운 것부터 놓았어요. 자리 연습은 중력이 없으니 소프트 드롭으로 내려 돌려 넣으세요. 끝낸 연습은 완료로 표시돼요."
+      );
       fillDialog(dialog, {
         title: t("연습"),
         body: el("div", {}, el("section", { class: "field-section" }, list)),

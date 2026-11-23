@@ -195,9 +195,6 @@ export const EN = {
   "받은 사람이 링크를 열면 바로 재생할 수 있어요.": "Anyone who opens the link can watch this replay.",
   "자동 복사가 막혔어요. 선택된 링크를 직접 복사해 주세요.":
     "Automatic copying is unavailable. Copy the selected link manually.",
-  "조작감, 키 설정, 화면 설정을 모두 기본값으로 되돌릴까요?":
-    "Restore the defaults for controls, bindings, and display settings?",
-  "전체 설정 초기화": "Reset all settings",
   "시작!": "Go!",
   준비: "Ready",
   "다음 피스": "Next",
@@ -454,7 +451,6 @@ export const EN = {
   "다음 {rank}: {record}": "Next {rank}: {record}",
   "가장 높은 랭크예요": "Top rank",
   // ---- 내 규칙 ----
-  "‘{name}’ 규칙을 지울까요? 이 규칙의 기록은 남아요.": "Delete the rules ‘{name}’? Records made with them stay.",
   "규칙 이름": "Rules name",
   "규칙을 지웠어요": "Rules deleted",
   "내 규칙": "My rules",
@@ -636,6 +632,7 @@ export const EN = {
   "같은 블록 재시작": "Retry same sequence",
   "PB와 달리기": "Race my best",
   "가장 많이 밀린 구간 {from}–{to}줄 ({delta}초)": "Slowest segment: lines {from}–{to} ({delta}s)",
+  "같은 블록 순서로 다시 · 구간 기록은 10줄부터": "Retry the same pieces · splits start at 10 lines",
   "10줄부터 구간 기록이 남아요.": "Splits start at 10 lines.",
   "같은 규칙의 최고 기록이 쌓이면 비교할 수 있어요.": "You can compare once you have a best with these rules.",
   "완료한 비교 구간에서 잃은 시간이 없어요.": "No time lost in the finished segments.",
@@ -713,8 +710,8 @@ export const EN = {
   "아직 기록이 없어요": "No records yet",
 
   // ---- 연습 ----
-  "중력이 없어요. 소프트 드롭으로 내려 돌려 넣으세요. 끝낸 연습은 완료로 표시돼요.":
-    "No gravity. Soft drop the piece and rotate it into place. Finished drills are marked done.",
+  "쉬운 것부터 놓았어요. 자리 연습은 중력이 없으니 소프트 드롭으로 내려 돌려 넣으세요. 끝낸 연습은 완료로 표시돼요.":
+    "Ordered from easiest. Setup drills have no gravity, so soft drop to lower and spin pieces in. Finished practices are marked done.",
   "좌우가 바뀌는 T-spin Double 자리에 T를 돌려 넣기": "Spin a T into a T-spin Double slot that switches sides",
   "지붕 아래로 T를 돌려 넣어 세 줄 지우기 · 좌우가 바뀌어요":
     "Spin a T under the overhang to clear three lines · switches sides",
@@ -819,7 +816,6 @@ export const EN = {
   없음: "None",
   누르세요: "Press",
   기본값으로: "Reset to defaults",
-  "모든 설정을 기본값으로 되돌렸어요.": "All settings are back to their defaults.",
   "‘{key}’ 버튼을 ‘{action}’에서 옮겼어요.": "Moved the ‘{key}’ button from ‘{action}’.",
   "‘{key}’ 키를 ‘{action}’에서 옮겼어요.": "Moved the ‘{key}’ key from ‘{action}’.",
   "게임패드가 연결돼 있지 않아요. 연결하고 버튼을 눌러 주세요.":
@@ -923,6 +919,18 @@ export const EN = {
   "배포 주소에서 열었을 때 쓸모 있어요": "Useful when opened from the published address",
   "코드 불러오기": "Load a code",
   "받은 코드나 링크를 붙여 넣기": "Paste a code or link you received",
+  "설정 초기화": "Reset settings",
+  "한 번 더 누르면 초기화": "Tap again to reset",
+  "조작감·키·화면 설정을 기본값으로 되돌려요. 기록은 지우지 않아요.":
+    "Restores handling, keys and display to defaults. Records are kept.",
+  "설정을 기본값으로 되돌렸어요. 기록은 그대로예요.": "Settings restored to defaults. Records are kept.",
+  "한 번 더 누르면 지워요": "Tap again to delete",
+  "기록과 리플레이를 지웠어요.": "Records and replays deleted.",
+  "기록 지우기": "Delete records",
+  "첫 화면에서 열었을 때만 지울 수 있어요": "Only available when opened from the home screen",
+  "기록표·리플레이·CPU 전적을 지워요. 설정·내 규칙·진행도·업적은 남아요. 먼저 백업하세요":
+    "Deletes record tables, replays and CPU results. Settings, My rules, progress and achievements stay. Back up first",
+  "‘{name}’ 규칙을 지워요. 이 규칙의 기록은 남아요.": "Deletes ‘{name}’. Its records are kept.",
   "프리셋에서 시작": "Start from a preset",
   "‘{rule}’을 {name} 값으로 채웠어요. 되돌리기로 전으로 돌아갈 수 있어요.":
     "Filled ‘{rule}’ with {name} values. Use Undo to go back.",

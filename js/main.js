@@ -62,7 +62,7 @@ import { BUILD_LESSONS } from "./modes/build-lessons.js";
 import { BATTLE_LESSONS } from "./modes/battle-lessons.js";
 import { INTRO_LESSONS } from "./modes/intro-lessons.js";
 import { createPracticeProgress } from "./storage/practice-progress.js";
-import { createSprintHistory } from "./storage/sprint-history.js";
+import { SPRINT_HISTORY_KEY, createSprintHistory } from "./storage/sprint-history.js";
 import { FINESSE_LESSONS } from "./modes/finesse-lessons.js";
 import { createFinesseTracker } from "./modes/finesse.js";
 import { analyzeReplay } from "./replay/analyze.js";
@@ -939,7 +939,10 @@ const renderResultSplits = () => {
         to: slowest.to,
         delta: formatDelta(slowest.lost / 60),
       })
-    : t("구간 기록");
+    : rows.length === 0
+      ? // 첫 구간(10줄) 전에 끝났으면 펼쳐도 표가 없다 → 안에 있는 "같은 순서로 재시작"을 이름으로(U44)
+        t("같은 블록 순서로 다시 · 구간 기록은 10줄부터")
+      : t("구간 기록");
 };
 
 /** 달리기 결과 한 줄: 시간 기록 모드는 시간 차, 점수 모드는 점수 차 */
@@ -1211,6 +1214,15 @@ const settingsUI = createSettingsUI({
     exportBackup: () => backupActions.exportBackup(),
     importBackup: () => backupActions.importBackup(),
     openReplay: () => /** @type {HTMLInputElement} */ ($("replay-file")).click(),
+    // 기록 지우기(F25): 기록표·리플레이·Sprint 기록 흐름·CPU 전적. 설정·내 규칙·연습·퍼즐 진행도·업적은 남긴다
+    clearRecords: () => {
+      store.set("records", {});
+      store.set("replay:best", {});
+      store.set("replay:last", null);
+      store.set(SPRINT_HISTORY_KEY, null);
+      store.set("versus:stats", {});
+      lastReplay = null;
+    },
   },
   onClose: () => {
     if (screen === "menu") toMenu();
@@ -1842,7 +1854,8 @@ const replayPractice = /** @type {HTMLButtonElement} */ (replayBar.querySelector
 const canPracticeScene = () => ownReplay && playing?.mode === "sprint40" && player && !player.done;
 
 const updateReplayBar = () => {
-  replayPractice.disabled = !replayPaused || !canPracticeScene();
+  // 재생 중에도 누를 수 있다: 누르면 멈추고 지금 장면을 연습한다(이유 없이 꺼져 있던 것, U43)
+  replayPractice.disabled = !canPracticeScene();
   // 끝까지 본 뒤에는 재생 단추가 "다시 재생"(처음부터)이 된다. 흐려진 "일시정지"로 남지 않게.
   const ended = Boolean(player?.done);
   /** @type {HTMLElement} */ (replayBar.querySelector(".replay-toggle-icon")).replaceChildren(
@@ -2205,7 +2218,10 @@ for (const btn of replayBar.querySelectorAll("[data-replay]")) {
       }
       return;
     }
-    if (action === "practice") return enterScenePractice();
+    if (action === "practice") {
+      replayPaused = true;
+      return enterScenePractice();
+    }
     if (action === "share" && playing && !player?.cpu) return shareUI.open(playing, `${mode.name} · ${rules.name}`);
     if (action === "race" && playing) return raceReplay(playing);
     if (action === "restart") return restartReplay();

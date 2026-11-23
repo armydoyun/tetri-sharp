@@ -2,7 +2,7 @@
 import { PRESET_LIST } from "../rules/presets.js";
 import { GRAVITY_OPTIONS, LIMITS, makeCustomRules, sanitizeRuleBody } from "../rules/sanitize.js";
 import { el, fieldRow, fillDialog } from "./dom.js";
-import { button, rangeRow, slider, tabBar, textInput, toggle } from "./components.js";
+import { button, confirmButton, rangeRow, slider, tabBar, textInput, toggle } from "./components.js";
 import { dropdown } from "./select.js";
 import { decodeRules, encodeRules, rulesLink } from "../rules/share.js";
 import { MAX_RULE_NAME, MAX_RULE_SLOTS } from "../storage/rule-slots.js";
@@ -388,19 +388,21 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
       message = t("새 규칙을 만들었어요(Modern 값에서 시작)");
       render("rule-slot-name");
     });
-    const removeSlot = button({
+    // 지우기는 두 번 눌러 확정(브라우저 확인창 대신). 이 규칙의 기록은 남는다
+    const removeSlot = confirmButton({
       label: t("지우기"),
+      confirmLabel: t("한 번 더 누르면 지워요"),
       icon: "close",
       size: "s",
       id: "rule-slot-remove",
-    });
-    removeSlot.disabled = state.slots.length <= 1;
-    removeSlot.addEventListener("click", () => {
-      if (!window.confirm(t("‘{name}’ 규칙을 지울까요? 이 규칙의 기록은 남아요.", { name: current.name }))) return;
-      slots.remove();
-      undo = null;
-      message = t("규칙을 지웠어요");
-      render("rule-slot-name");
+      title: t("‘{name}’ 규칙을 지워요. 이 규칙의 기록은 남아요.", { name: current.name }),
+      disabled: state.slots.length <= 1,
+      onConfirm: () => {
+        slots.remove();
+        undo = null;
+        message = t("규칙을 지웠어요");
+        render("rule-slot-name");
+      },
     });
     const slotRow = el(
       "div",
