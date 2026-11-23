@@ -108,7 +108,8 @@ export const parseBackup = (raw, findMode) => {
   if (isPlainObject(src["versus:stats"])) {
     const stats = {};
     const count = v => (Number.isInteger(v) && v >= 0 ? Math.min(v, 1e6) : 0);
-    for (const [key, value] of Object.entries(src["versus:stats"]).slice(0, 20)) {
+    // 난이도 7 × 성향 3 = 21칸
+    for (const [key, value] of Object.entries(src["versus:stats"]).slice(0, 40)) {
       if (!/^[\w-]{1,20}$/.test(key) || !isPlainObject(value)) continue;
       stats[key] = { win: count(value.win), loss: count(value.loss) };
     }

@@ -9,8 +9,24 @@ import { HEIGHT, WIDTH, clearLines, collides, get, inBounds, place } from "../co
 import { detectTSpin } from "../core/tspin.js";
 import { createRng } from "../core/rng.js";
 
-/** 판 점수(높을수록 좋다). 높이·구멍·울퉁불퉁함은 감점, 줄 삭제는 판이 낮을 때 4줄을 더 쳐준다. */
-export const evaluate = (board, lines) => {
+/**
+ * 성향(CPU 대전에서 난이도와 따로 고른다). 판 점수의 가중치만 다르다.
+ *  - balanced: 판이 낮으면 4줄을 노리고, 높아지면 무엇이든 지운다(기본)
+ *  - quad: 판이 낮을 때는 한 칸만 빈 줄을 쌓아 두고 지우기를 아낀다 → 4줄 삭제가 잦다
+ *  - safe: 높이를 더 무겁게 보고 늘 지운다(낮게 유지, 한 줄 삭제가 잦다)
+ * calm: 이 높이 아래면 "낮은 판"의 줄 점수, 아니면 "높은 판"의 줄 점수
+ * ready: 한 칸만 빈 줄 하나당 가산점
+ * (콤보 성향도 만들어 봤지만 한 수만 보는 봇은 줄을 한 줄씩 이어 지우지 못해 안정 성향과 같아져 뺐다.)
+ */
+export const STYLE_WEIGHTS = Object.freeze({
+  balanced: { height: 0.45, calm: 8, ready: 0, low: [0, -2.5, -1.5, 1, 14], high: [0, 2, 4, 6, 14] },
+  quad: { height: 0.3, calm: 7, ready: 2, low: [0, -3, -3, -2, 9], high: [0, 6, 7, 8, 9] },
+  safe: { height: 0.75, calm: 0, ready: 0, low: [0, 2, 4, 6, 10], high: [0, 2, 4, 6, 10] },
+});
+
+/** 판 점수(높을수록 좋다). 높이·구멍·울퉁불퉁함은 감점, 줄 삭제 점수는 성향과 판 높이에 따른다. */
+export const evaluate = (board, lines, style = "balanced") => {
+  const w = STYLE_WEIGHTS[style] ?? STYLE_WEIGHTS.balanced;
   const heights = new Array(WIDTH).fill(0);
   let holes = 0;
   let coveredDepth = 0;
@@ -40,10 +56,25 @@ export const evaluate = (board, lines) => {
   const total = heights.reduce((a, b) => a + b, 0);
   const max = Math.max(...heights);
   const danger = Math.max(0, max - 9);
-  // 판이 낮으면 1·2줄 삭제는 아끼고 4줄을 노린다. 높아지면 무엇이든 지운다.
   // (받을 쓰레기가 있을 때 작은 삭제를 서두르게 해 봤지만 같은 난이도끼리 40판에서 이득이 없거나 손해였다.)
-  const lineScore = max < 8 ? [0, -2.5, -1.5, 1, 14][lines] : [0, 2, 4, 6, 14][lines];
-  return -0.45 * total - 0.32 * bump - 4 * holes - 0.3 * coveredDepth - 1.5 * danger * danger + lineScore;
+  const lineScore = (max < w.calm ? w.low : w.high)[lines];
+  let ready = 0;
+  if (w.ready) {
+    for (let y = 0; y < HEIGHT; y++) {
+      let empty = 0;
+      for (let x = 0; x < WIDTH && empty < 2; x++) if (board.cells[y * WIDTH + x] === 0) empty += 1;
+      if (empty === 1) ready += 1;
+    }
+  }
+  return (
+    -w.height * total -
+    0.32 * bump -
+    4 * holes -
+    0.3 * coveredDepth -
+    1.5 * danger * danger +
+    lineScore +
+    w.ready * ready
+  );
 };
 
 /** 서로 다른 모양의 회전 상태들 */
@@ -76,14 +107,14 @@ const SPIN_BONUS = Object.freeze([0, 9, 16, 22]);
  * @returns {{ rot: number, x: number, score: number, slide?: number, spin?: number, tspin?: string }[]}
  */
 export const placements = (board, rotation, type, startX, startY, options = {}) => {
-  const { tucks = false, spins = false } = options;
+  const { tucks = false, spins = false, style = "balanced" } = options;
   const out = [];
   /** 보드에 놓아 보고 점수를 매긴다 */
   const score = (cells, x, y) => {
     const b = { ...board, cells: board.cells.slice() };
     place(b, cells, x, y, 9);
     const lines = clearLines(b).length;
-    return { score: evaluate(b, lines), lines };
+    return { score: evaluate(b, lines, style), lines };
   };
   /** 바닥에서 한 번 돌린다(엔진과 같은 킥 순서). 들어가면 돌린 뒤의 자리 */
   const turn = (x, y, rot, dir) => {
@@ -150,7 +181,7 @@ export const placements = (board, rotation, type, startX, startY, options = {}) 
 
 /**
  * @param {{ game: ReturnType<typeof import("../core/engine.js").createGame>, rotation: any,
- *   level: { pps: number, mistake: number, hold: boolean, holdMinGain?: number, tucks?: boolean, spins?: boolean },
+ *   level: { pps: number, mistake: number, hold: boolean, holdMinGain?: number, tucks?: boolean, spins?: boolean, style?: string },
  *   seed?: number }} options
  */
 export const createBot = ({ game, rotation, level, seed = 1 }) => {
@@ -181,7 +212,7 @@ export const createBot = ({ game, rotation, level, seed = 1 }) => {
   const think = () => {
     const s = game.state;
     const a = s.active;
-    const options = { tucks: Boolean(level.tucks), spins: Boolean(level.spins) };
+    const options = { tucks: Boolean(level.tucks), spins: Boolean(level.spins), style: level.style ?? "balanced" };
     const here = placements(s.board, rotation, a.type, a.x, a.y, options);
     let best = { hold: false, ...(pick(here) ?? { rot: a.rot, x: a.x, score: -Infinity }) };
     const canHold = level.hold && rules.hold.enabled && !s.holdUsed;

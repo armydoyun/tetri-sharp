@@ -63,7 +63,7 @@ import { FINESSE_LESSONS } from "./modes/finesse-lessons.js";
 import { createFinesseTracker } from "./modes/finesse.js";
 import { analyzeReplay } from "./replay/analyze.js";
 import { ROTATIONS } from "./rules/rotation/index.js";
-import { WIN, settleBattleFrame, versusMode } from "./modes/versus.js";
+import { STYLES, WIN, settleBattleFrame, versusMode, versusStatKey } from "./modes/versus.js";
 import { createBot } from "./ai/bot.js";
 import { createGestures } from "./input/gestures.js";
 import { createUndo } from "./modes/undo.js";
@@ -165,6 +165,13 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ref
 applyScheme();
 /** @type {null | { cpu: ReturnType<typeof createGame>, bot: ReturnType<typeof createBot>, recorder: ReturnType<typeof createRecorder> }} */
 let versus = null;
+/** "CPU · 쉬움", 균형이 아닌 성향이면 "CPU · 쉬움 · 4줄 노림" */
+const versusTitle = versus => {
+  const style = STYLES.find(x => x.id === versus.style);
+  return style && style.id !== "balanced"
+    ? t("CPU · {level} · {style}", { level: versus.name, style: style.name })
+    : t("CPU · {level}", { level: versus.name });
+};
 /** 난이도별 전적 */
 const versusStats = () => {
   const raw = store.get("versus:stats", {});
@@ -594,7 +601,7 @@ const setScreen = next => {
   document.body.classList.toggle("is-practice", Boolean(mode.practice && !isGuidedPractice()) && next !== "menu");
   document.body.classList.toggle("has-lesson-hints", hasLessonHints(mode) && next !== "menu");
   document.body.classList.toggle("is-finesse-lesson", Boolean(mode.lesson) && next !== "menu");
-  const modeTitle = mode.versus ? t("CPU · {level}", { level: mode.versus.name }) : mode.name;
+  const modeTitle = mode.versus ? versusTitle(mode.versus) : mode.name;
   $("session-title").textContent = next === "menu" ? "" : scenePractice ? scenePracticeTitle() : modeTitle;
   $("mode-objective").textContent =
     next === "menu" || next === "replay"
@@ -667,7 +674,7 @@ const start = (
       bot: createBot({ game: cpu, rotation: ROTATIONS[rules.rotation], level: m.versus, seed }),
       recorder: createRecorder({ seed, mode: m, rules, handling: cpu.handling }),
     };
-    $("versus-name").textContent = t("CPU · {level}", { level: m.versus.name });
+    $("versus-name").textContent = versusTitle(m.versus);
   } else versus = null;
   versusPanel.hidden = !versus;
   document.body.classList.toggle("is-versus", Boolean(versus));
@@ -988,7 +995,7 @@ const finish = () => {
   const best = records.best(mode, rules);
   const survival = mode.id === "survival";
 
-  if (mode.versus) addVersusResult(mode.versus.id, state.over === WIN);
+  if (mode.versus) addVersusResult(versusStatKey(mode.versus.id, mode.versus.style), state.over === WIN);
   // 퍼즐: 깬 단계를 남기고, 깼으면 "다음 단계"를 보인다(마지막 단계면 다시 하기만)
   if (mode.puzzle?.number && state.over === "clear") puzzleProgress.markCleared(mode.puzzle.id);
   if (mode.trialCode && state.over === "clear") puzzleEditor.markCleared(mode.trialCode);
@@ -1064,7 +1071,7 @@ const finish = () => {
       [t("받은 쓰레기"), String(g.received)],
       [t("CPU가 보낸 줄"), String(cg.sent)],
     ];
-    const s = versusStats()[mode.versus.id];
+    const s = versusStats()[versusStatKey(mode.versus.id, mode.versus.style)];
     vrows.push([t("전적"), s ? t("{win}승 {loss}패", { win: s.win, loss: s.loss }) : "—"]);
     $("results-stats").replaceChildren(
       ...vrows.flatMap(([k, v]) => {
@@ -1292,7 +1299,9 @@ $("practice").addEventListener("close", () => {
 const versusUI = createVersusUI({
   dialog: /** @type {HTMLDialogElement} */ ($("versus")),
   getStats: versusStats,
-  onPick: level => start(versusMode(level)),
+  onPick: (level, style) => start(versusMode(level, style)),
+  getStyle: () => String(store.get("versus:style", "balanced")),
+  setStyle: style => store.set("versus:style", style),
 });
 $("versus").addEventListener("close", () => {
   if (screen === "menu") /** @type {HTMLElement | null} */ (document.querySelector('[data-mode="versus"]'))?.focus();

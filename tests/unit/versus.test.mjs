@@ -353,3 +353,32 @@ test("봇 밀어 넣기를 엔진에서 실제로 해낸다: 내리고, 밀고, 
   assert.notEqual(get(b, 0, HEIGHT - 1), 0, "처마 아래 맨 아래 칸이 찼다");
   assert.notEqual(get(b, 0, HEIGHT - 2), 0);
 });
+
+test("CPU 성향: 균형은 이전과 같은 id·전적 열쇠, 다른 성향은 id로 다시 찾는다", async () => {
+  const { STYLES, versusStatKey, versusMode } = await import("../../js/modes/versus.js");
+  const hard = levelById("hard");
+  assert.equal(versusMode(hard).id, "versus-hard", "균형은 이전 id 그대로(저장된 이어서 하기와 맞는다)");
+  assert.equal(versusStatKey("hard"), "hard");
+  assert.equal(versusStatKey("normal-plus", "quad"), "normal-plus-quad");
+  for (const level of LEVELS)
+    for (const style of STYLES) {
+      const mode = versusMode(level, style.id);
+      assert.equal(findMode(mode.id), mode, mode.id);
+      assert.equal(mode.versus.style, style.id);
+      assert.equal(mode.versus.id, level.id, "업적·전적이 보는 난이도 id");
+    }
+});
+
+test("CPU 성향마다 같은 판을 다르게 본다: 4줄 노림은 낮은 판의 한 줄 삭제를 아끼고, 안정은 반긴다", () => {
+  const board = createBoard();
+  assert.ok(evaluate(board, 1, "safe") > evaluate(board, 0, "safe"), "안정: 지우는 쪽");
+  assert.ok(evaluate(board, 1, "quad") < evaluate(board, 0, "quad"), "4줄 노림: 아끼는 쪽");
+  // 4줄 노림은 한 칸만 빈 줄을 쌓아 두는 판을 더 좋게 본다
+  const ready = createBoard();
+  for (let x = 0; x < WIDTH - 1; x++) set(ready, x, HEIGHT - 1, 8);
+  const flat = createBoard();
+  for (let x = 0; x < 5; x++) set(flat, x, HEIGHT - 1, 8);
+  for (let x = 0; x < 4; x++) set(flat, x, HEIGHT - 2, 8);
+  const gap = style => evaluate(ready, 0, style) - evaluate(flat, 0, style);
+  assert.ok(gap("quad") > gap("balanced"));
+});

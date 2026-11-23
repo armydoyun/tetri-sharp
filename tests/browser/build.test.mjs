@@ -3271,3 +3271,29 @@ test("업적: 이룬 판의 결과 화면에 알리고, 첫 화면 개수와 업
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("CPU 성향: 대전 목록 위에서 고르고 기억하며, 전적은 성향마다 따로 보인다", async () => {
+  const { context, page, errors } = await openPage(() => {
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
+    localStorage.setItem("tetrisharp:versus:stats", JSON.stringify({ easy: { win: 2, loss: 1 } }));
+  });
+  await page.click('[data-mode="versus"]');
+  const easyRow = page.locator('#versus [data-level="easy"]');
+  assert.match(await easyRow.textContent(), /2승 1패/, "균형 전적은 예전 전적 그대로");
+  await page.click('#versus-style [data-value="quad"]');
+  assert.equal(await page.locator('#versus-style [data-value="quad"]').getAttribute("aria-pressed"), "true");
+  assert.doesNotMatch(await easyRow.textContent(), /승/, "4줄 노림 전적은 따로");
+  await easyRow.click();
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  assert.equal(await text(page, "session-title"), "CPU · 쉬움 · 4줄 노림");
+  await page.click("#go-home");
+  await page.click('[data-confirm="ok"]');
+  await page.click('[data-mode="versus"]');
+  assert.equal(
+    await page.locator('#versus-style [data-value="quad"]').getAttribute("aria-pressed"),
+    "true",
+    "마지막 성향을 기억한다"
+  );
+  assert.deepEqual(errors, []);
+  await context.close();
+});
