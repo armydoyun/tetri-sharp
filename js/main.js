@@ -28,6 +28,7 @@ import { createRecords } from "./storage/records.js";
 import { createSettingsUI } from "./ui/settings.js";
 import { createRulesUI } from "./ui/rules.js";
 import { button, menuRow, segmentButtons } from "./ui/components.js";
+import { el } from "./ui/dom.js";
 import { dropdown } from "./ui/select.js";
 import { createRecordsUI } from "./ui/records.js";
 import { createStatsUI } from "./ui/stats.js";
@@ -374,8 +375,15 @@ const renderRuleSlotRow = () => {
   });
   const share = button({ label: t("공유"), icon: "link", size: "s", id: "rule-slot-share" });
   share.addEventListener("click", () => rulesUI.open("share"));
-  row.replaceChildren(picker, share);
-  row.classList.toggle("is-off", ruleChoice !== "custom");
+  // Custom이 아니면 같은 자리에 안내 한 줄(비워 두면 휴대폰에서 탭과 아래 블록 사이가 크게 빈다)
+  if (ruleChoice === "custom") row.replaceChildren(picker, share);
+  else
+    row.replaceChildren(
+      el("p", {
+        class: "rule-slot-hint",
+        text: t("Custom을 고르면 규칙을 직접 바꾸고, 내 규칙을 10개까지 저장해 공유할 수 있어요."),
+      })
+    );
 };
 
 const renderRuleTabs = () => {
@@ -401,10 +409,8 @@ const renderRuleTabs = () => {
   /** @type {HTMLButtonElement} */ ($("edit-rules")).disabled = ruleChoice !== "custom";
   $("rule-desc").textContent =
     ruleChoice === "custom"
-      ? t('직접 조합한 규칙이에요. "편집"으로 바꿀 수 있고, 조합마다 기록이 따로 쌓여요 (기록표 {id}).', {
-          id: makeCustomRules(customBody).id,
-        })
-      : `${RULE_DESCRIPTIONS[ruleChoice]} ${t("바꾸고 싶으면 Custom을 골라 편집하세요.")}`;
+      ? t('직접 조합한 규칙이에요. "편집"으로 바꿀 수 있고, 조합마다 기록이 따로 쌓여요.')
+      : RULE_DESCRIPTIONS[ruleChoice];
 };
 
 /** 이 모드·규칙의 최고 기록과 그 리플레이(둘이 같은 판이고, 끝까지 간 판일 때만) */

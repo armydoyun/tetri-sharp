@@ -236,9 +236,10 @@ export const EN = {
     "Old home-console feel: no wall kicks, hold, hard drop or ghost; pieces lock on contact; fixed handling.",
   "아케이드 느낌: ARS 회전, 최근 4개를 피하는 생성기, 생성·줄 삭제 지연, 미리 회전(IRS).":
     "Arcade feel: ARS rotation, a generator that avoids the last 4 pieces, spawn and line-clear delays, IRS.",
-  "바꾸고 싶으면 Custom을 골라 편집하세요.": "To change it, pick Custom and edit.",
-  '직접 조합한 규칙이에요. "편집"으로 바꿀 수 있고, 조합마다 기록이 따로 쌓여요 (기록표 {id}).':
-    'Your own mix of rules. Change it with "Edit"; each mix keeps its own records (table {id}).',
+  "Custom을 고르면 규칙을 직접 바꾸고, 내 규칙을 10개까지 저장해 공유할 수 있어요.":
+    "Pick Custom to change the rules yourself and save up to 10 rule sets to share.",
+  '직접 조합한 규칙이에요. "편집"으로 바꿀 수 있고, 조합마다 기록이 따로 쌓여요.':
+    'Your own mix of rules. Change it with "Edit"; each mix keeps its own records.',
   "최고 기록 {record}": "Best {record}",
   "이 최고 기록은 현재 버전에서 재현할 수 없어요. 새 최고 기록이 필요해요.":
     "This best run can't be reproduced in this version. Set a new best first.",
