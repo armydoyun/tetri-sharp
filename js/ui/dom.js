@@ -1,5 +1,6 @@
 // 작은 DOM 도우미와 대화상자 틀. 설정·규칙 편집이 같은 모양(머리·몸통·발)을 쓴다.
-import { icon } from "./icons.js";
+// 버튼·선택·입력 같은 컴포넌트는 ./components.js에 있다.
+import { button, iconButton } from "./components.js";
 import { t } from "../i18n/index.js";
 
 /**
@@ -23,32 +24,14 @@ export const el = (tag, attrs = {}, ...children) => {
 };
 
 /**
- * 아이콘 + 글자 버튼
- * @param {{ text?: string, iconName?: import("./icons.js").IconName, className?: string, [attr: string]: any }} options
- */
-export const button = ({ text, iconName, className = "btn", ...attrs }) =>
-  el(
-    "button",
-    { type: "button", class: className, ...attrs },
-    ...(iconName ? [icon(iconName)] : []),
-    ...(text ? [el("span", { class: "btn-label", text })] : [])
-  );
-
-/**
  * 대화상자 내용을 [머리(제목·닫기) | 몸통 | 발(알림 칸·버튼)]으로 채운다.
  * 알림 칸(.notice-slot)은 늘 두 줄 자리를 차지해 글이 생겨도 버튼이 움직이지 않는다.
  * @param {HTMLDialogElement} dialog
  * @param {{ title: string, body: HTMLElement, notice: HTMLElement, actions: HTMLElement[], closeId: string, tabs?: HTMLElement | null }} parts
  */
 export const fillDialog = (dialog, { title, body, notice, actions, closeId, tabs = null }) => {
-  const close = el(
-    "button",
-    { type: "button", class: "btn btn-ghost btn-small", "aria-label": t("닫기") },
-    icon("close")
-  );
-  close.addEventListener("click", () => dialog.close());
-  const done = button({ text: t("닫기"), className: "btn btn-primary", id: closeId });
-  done.addEventListener("click", () => dialog.close());
+  const close = iconButton({ icon: "close", label: t("닫기"), onClick: () => dialog.close() });
+  const done = button({ label: t("닫기"), id: closeId, onClick: () => dialog.close() });
   body.classList.add("dialog-body");
   dialog.classList.toggle("dialog-tabbed", Boolean(tabs));
   // 같은 구역의 슬라이더는 값 칸 폭을 가장 긴 것에 맞춘다 → 막대 끝이 줄마다 나란하다
@@ -83,104 +66,3 @@ export const fieldRow = ({ id, label, hint, control, disabled = false, className
     ),
     control
   );
-
-/**
- * 세그먼트 선택(짧은 선택지 2~4개). 칸 폭이 같고 고른 칸은 색만 바뀐다.
- * @param {{ id: string, label: string, options: ReadonlyArray<[string, string]>, value: string, onChange: (v: string) => void, className?: string }} o
- */
-export const choice = ({ id, label, options, value, onChange, className = "choice" }) => {
-  const group = el("div", { class: className, role: "group", id, "aria-label": label });
-  for (const [v, text] of options) {
-    const b = el("button", { type: "button", text, "data-value": v, "aria-pressed": String(v === value) });
-    b.addEventListener("click", () => onChange(v));
-    group.append(b);
-  }
-  return group;
-};
-
-/**
- * 카드형 선택(이름 + 설명이 긴 선택지). 설명은 잘리지 않고 줄바꿈한다.
- * @param {{ id: string, label: string, options: ReadonlyArray<{ value: string, title: string, desc: string, preview?: HTMLElement }>, value: string, onChange: (v: string) => void }} o
- */
-export const choiceCards = ({ id, label, options, value, onChange }) => {
-  const group = el("div", { class: "choice-cards", role: "group", id, "aria-label": label });
-  for (const o of options) {
-    const b = el(
-      "button",
-      { type: "button", class: "choice-card", "data-value": o.value, "aria-pressed": String(o.value === value) },
-      ...(o.preview ? [o.preview] : []),
-      el("strong", { text: o.title }),
-      el("small", { text: o.desc })
-    );
-    b.addEventListener("click", () => onChange(o.value));
-    group.append(b);
-  }
-  return group;
-};
-
-/** 슬라이더: 채운 만큼을 --fill로 넘겨 칸 모양 막대를 그린다(css .range). */
-export const slider = attrs => {
-  const input = /** @type {HTMLInputElement} */ (el("input", { type: "range", ...attrs }));
-  const paint = () => {
-    const min = Number(input.min);
-    const max = Number(input.max);
-    const pct = max > min ? ((Number(input.value) - min) / (max - min)) * 100 : 0;
-    input.style.setProperty("--fill", `${pct}%`);
-  };
-  input.addEventListener("input", paint);
-  paint();
-  return input;
-};
-
-/**
- * 슬라이더 + 값 한 줄. 값 칸 폭은 이 슬라이더가 보일 수 있는 가장 긴 값(최솟값·최댓값·중간값)에 맞춘다
- * → 값이 바뀌어도 막대 길이가 흔들리지 않고, 긴 값("120F · 2000ms")도 잘리지 않는다.
- * @param {HTMLInputElement} input
- * @param {HTMLElement} output
- * @param {(v: number) => string} format
- */
-export const rangeRow = (input, output, format) => {
-  const min = Number(input.min);
-  const max = Number(input.max);
-  const step = Number(input.step) || 1;
-  let longest = 0;
-  // 값이 많지 않으니 전부 재 본다(가장 긴 값이 끝값이 아닐 수도 있다: "즉시" 등)
-  for (let v = min; v <= max + 1e-9; v += step) longest = Math.max(longest, [...format(v)].length);
-  output.dataset.ch = String(longest + 0.5);
-  output.style.minWidth = `${longest + 0.5}ch`;
-  return el("span", { class: "range" }, input, output);
-};
-
-/** 켜기/끄기 스위치(체크박스를 블록 모양으로) */
-export const switchInput = attrs =>
-  /** @type {HTMLInputElement} */ (el("input", { type: "checkbox", class: "switch", role: "switch", ...attrs }));
-
-/** 대화상자 탭 줄 */
-export const tabBar = ({ tabs, active, onSelect }) => {
-  const bar = choice({
-    id: "dialog-tab",
-    label: t("구역"),
-    options: tabs,
-    value: active,
-    onChange: onSelect,
-    className: "segmented",
-  });
-  bar.addEventListener("keydown", e => {
-    const buttons = [...bar.querySelectorAll("button")];
-    const current = buttons.findIndex(button => button === e.target);
-    if (current < 0) return;
-    const offset = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
-    const next =
-      e.key === "Home"
-        ? 0
-        : e.key === "End"
-          ? buttons.length - 1
-          : offset
-            ? (current + offset + buttons.length) % buttons.length
-            : -1;
-    if (next < 0) return;
-    e.preventDefault();
-    buttons[next].click();
-  });
-  return bar;
-};

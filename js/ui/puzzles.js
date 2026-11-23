@@ -1,7 +1,8 @@
 // 퍼즐 단계 고르기 대화상자: 장(판 비우기 · T-spin Double · T-spin Triple)마다 번호 칸 격자.
 // 깬 단계는 체크, 다음에 할 단계는 강조.
 import { CHAPTERS, KIND_NAMES, PUZZLES } from "../modes/puzzles.js";
-import { button, el, fillDialog } from "./dom.js";
+import { el, fillDialog } from "./dom.js";
+import { button } from "./components.js";
 import { icon } from "./icons.js";
 import { t } from "../i18n/index.js";
 
@@ -63,7 +64,7 @@ export const createPuzzleUI = ({ dialog, progress, onPick, onCreate }) => {
         done: cleared.size,
         total: PUZZLES.length,
       });
-      const create = button({ id: "puzzle-create", text: t("퍼즐 만들기") });
+      const create = button({ id: "puzzle-create", label: t("퍼즐 만들기") });
       create.addEventListener("click", () => {
         dialog.close();
         onCreate();

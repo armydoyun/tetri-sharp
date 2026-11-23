@@ -135,5 +135,46 @@ export const auditInPage = () => {
       if (hit) problems.push(`겹침 · ${describe(a.el)} × ${describe(b.el)}`);
     }
   }
+  // 5) 컴포넌트 약속(docs/DESIGN_SYSTEM.md "컴포넌트"): 버튼은 [아이콘][이름][단축키]만 담고,
+  //    내용 덩어리가 아래 턱을 뺀 버튼 면의 한가운데(가로·세로 1px 안)에 놓인다.
+  //    세그먼트 칸은 고르지 않았어도 턱 자리를 비워 두므로(골라도 글자가 안 움직이게) 늘 턱을 뺀 면으로 잰다.
+  for (const b of all.filter(el => el.matches(".btn:not(.btn-split), .segmented > button, .choice > button"))) {
+    if (b.matches(".btn")) {
+      // 버튼 구조: [아이콘 svg.icon | .btn-icon] [이름 .btn-label] [부가 정보 .btn-meta] [단축키 kbd]
+      const stray = [...b.childNodes].filter(
+        n =>
+          (n.nodeType === 3 && n.nodeValue.trim()) ||
+          (n.nodeType === 1 && !(/** @type {Element} */ (n).matches("svg.icon, .btn-icon, .btn-label, .btn-meta, kbd")))
+      );
+      if (stray.length) problems.push(`버튼 구조 · ${describe(b)} (아이콘·.btn-label·.btn-meta·kbd 밖의 내용)`);
+      if (b.querySelectorAll(":scope > .btn-label").length > 1) problems.push(`버튼 구조 · ${describe(b)} (이름 둘)`);
+    }
+    const parts = [...b.children].filter(visible).map(c => c.getBoundingClientRect());
+    if (!parts.length) {
+      if (!b.childNodes.length) continue;
+      const range = document.createRange();
+      range.selectNodeContents(b);
+      parts.push(range.getBoundingClientRect());
+    }
+    const s = getComputedStyle(b);
+    const r = b.getBoundingClientRect();
+    const ledge = b.matches(".btn")
+      ? /inset/.test(s.boxShadow)
+        ? Math.abs(parseFloat(s.boxShadow.split(" ").filter(v => v.endsWith("px"))[1]) || 0)
+        : 0
+      : parseFloat(s.getPropertyValue("--ledge")) || 0;
+    const face = {
+      x: (r.left + parseFloat(s.borderLeftWidth) + r.right - parseFloat(s.borderRightWidth)) / 2,
+      y: (r.top + parseFloat(s.borderTopWidth) + r.bottom - parseFloat(s.borderBottomWidth) - ledge) / 2,
+    };
+    const box = {
+      x: (Math.min(...parts.map(q => q.left)) + Math.max(...parts.map(q => q.right))) / 2,
+      y: (Math.min(...parts.map(q => q.top)) + Math.max(...parts.map(q => q.bottom))) / 2,
+    };
+    const dx = box.x - face.x;
+    const dy = box.y - face.y;
+    if (Math.abs(dx) > 1 || Math.abs(dy) > 1)
+      problems.push(`버튼 정렬 · ${describe(b)} 면 중심에서 (${dx.toFixed(1)}, ${dy.toFixed(1)})px`);
+  }
   return [...new Set(problems)];
 };

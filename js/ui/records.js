@@ -5,7 +5,8 @@ import { formatTime } from "../modes/format.js";
 import { PRESET_LIST } from "../rules/presets.js";
 import { recordKey } from "../storage/records.js";
 import { MAX_RANKED } from "../replay/replay.js";
-import { button, el, fillDialog, fieldRow } from "./dom.js";
+import { el, fillDialog, fieldRow } from "./dom.js";
+import { button, textInput } from "./components.js";
 import { dropdown } from "./select.js";
 import { RANK_STEPS, nextRankStep, rankLabel, rankOf } from "../modes/ranks.js";
 import { t } from "../i18n/index.js";
@@ -112,15 +113,13 @@ export const createRecordsUI = ({ dialog, modes, records, sprintHistory, replayF
         /** @type {HTMLElement | null} */ (dialog.querySelector("#records-rules"))?.focus();
       },
     });
-    const nameInput = el("input", {
+    const nameInput = textInput({
       id: "record-player-name",
-      class: "text-input",
-      type: "text",
       value: records.playerName,
       placeholder: t("이름 없음"),
       autocomplete: "off",
     });
-    const nameSave = button({ type: "submit", text: t("저장"), "aria-label": t("플레이어 이름 저장") });
+    const nameSave = button({ type: "submit", label: t("저장"), "aria-label": t("플레이어 이름 저장") });
     const nameForm = el("form", { class: "record-name-form" }, nameInput, nameSave);
     nameForm.addEventListener("submit", event => {
       event.preventDefault();
@@ -146,9 +145,9 @@ export const createRecordsUI = ({ dialog, modes, records, sprintHistory, replayF
       const watch =
         i < MAX_RANKED && e
           ? button({
-              text: t("보기"),
-              iconName: "play",
-              className: "btn btn-small",
+              label: t("보기"),
+              icon: "play",
+              size: "s",
               id: i === 0 ? "records-watch" : `records-watch-${i + 1}`,
               disabled: !replay,
               "aria-label": t("{n}위 리플레이 보기", { n: i + 1 }),
@@ -231,7 +230,7 @@ export const createRecordsUI = ({ dialog, modes, records, sprintHistory, replayF
       : "";
     const scroll = dialog.querySelector(".dialog-body")?.scrollTop ?? 0;
     // 이 모드·규칙의 최고 기록 리플레이와 같은 블록 순서로 달리기(달릴 수 있을 때만 보인다)
-    const race = button({ text: t("최고 기록과 달리기"), iconName: "play", id: "records-race" });
+    const race = button({ label: t("최고 기록과 달리기"), icon: "play", id: "records-race" });
     race.addEventListener("click", () => {
       dialog.close();
       onRace(mode.id, rulesId);

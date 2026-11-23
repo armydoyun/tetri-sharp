@@ -27,7 +27,7 @@ import { loadSettings, sanitizeSettings, saveSettings, toEngineHandling } from "
 import { createRecords } from "./storage/records.js";
 import { createSettingsUI } from "./ui/settings.js";
 import { createRulesUI } from "./ui/rules.js";
-import { button } from "./ui/dom.js";
+import { button, menuRow, segmentButtons } from "./ui/components.js";
 import { dropdown } from "./ui/select.js";
 import { createRecordsUI } from "./ui/records.js";
 import { createStatsUI } from "./ui/stats.js";
@@ -372,7 +372,7 @@ const renderRuleSlotRow = () => {
       /** @type {HTMLElement | null} */ ($("rule-slot"))?.focus();
     },
   });
-  const share = button({ text: t("공유"), iconName: "link", className: "btn btn-small", id: "rule-slot-share" });
+  const share = button({ label: t("공유"), icon: "link", size: "s", id: "rule-slot-share" });
   share.addEventListener("click", () => rulesUI.open("share"));
   row.replaceChildren(picker, share);
   row.classList.toggle("is-off", ruleChoice !== "custom");
@@ -381,20 +381,18 @@ const renderRuleSlotRow = () => {
 const renderRuleTabs = () => {
   const tabs = $("rule-tabs");
   tabs.replaceChildren(
-    ...RULE_CHOICES.map(id => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "rule-tab";
-      b.dataset.rules = id;
-      b.textContent = id === "custom" ? "Custom" : PRESETS[id].name;
-      b.setAttribute("aria-pressed", String(id === ruleChoice));
-      b.addEventListener("click", () => {
+    ...segmentButtons(
+      RULE_CHOICES.map(id => [id, id === "custom" ? "Custom" : PRESETS[id].name]),
+      ruleChoice,
+      id => {
         ruleChoice = id;
         store.set("lastRules", id);
         renderMenu();
         renderKeyHelp();
         /** @type {HTMLElement | null} */ (tabs.querySelector(`[data-rules="${id}"]`))?.focus();
-      });
+      }
+    ).map(b => {
+      b.dataset.rules = b.dataset.value;
       return b;
     })
   );
@@ -468,26 +466,16 @@ const renderMenu = () => {
   list.replaceChildren(
     ...MODES.map(m => {
       const best = records.best(m, ruleSet);
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "menu-row";
-      btn.dataset.mode = m.id;
-      const text = document.createElement("span");
-      text.className = "menu-text";
-      const name = document.createElement("strong");
-      name.textContent = m.name;
-      const desc = document.createElement("small");
-      desc.textContent = m.description;
-      text.append(name, desc);
-      const pb = document.createElement("span");
-      pb.className = "mode-best num";
       const rank = rankOf(m, best);
-      pb.textContent = best
-        ? t("최고 기록 {record}", { record: m.formatRecord(best) }) + (rank ? ` · ${rankLabel(rank)}` : "")
-        : "";
-      btn.append(text, pb, icon("chevron-right"));
-      btn.addEventListener("click", () => start(m));
-      return btn;
+      return menuRow({
+        "data-mode": m.id,
+        title: m.name,
+        desc: m.description,
+        meta: best
+          ? t("최고 기록 {record}", { record: m.formatRecord(best) }) + (rank ? ` · ${rankLabel(rank)}` : "")
+          : "",
+        onClick: () => start(m),
+      });
     }),
     versusRow(),
     dailyRow()
@@ -496,24 +484,14 @@ const renderMenu = () => {
 
 /** 첫 화면 모드 목록 끝의 CPU 대전 줄: 누르면 난이도를 고른다 */
 const versusRow = () => {
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "menu-row";
-  btn.dataset.mode = "versus";
-  const text = document.createElement("span");
-  text.className = "menu-text";
-  const name = document.createElement("strong");
-  name.textContent = t("CPU 대전");
-  const desc = document.createElement("small");
-  desc.textContent = t("CPU와 쓰레기 줄을 주고받기 · 먼저 막히면 패배");
-  text.append(name, desc);
   const wins = Object.values(versusStats()).reduce((sum, s) => sum + (s?.win | 0), 0);
-  const pb = document.createElement("span");
-  pb.className = "mode-best num";
-  pb.textContent = wins ? t("{n}승", { n: wins }) : "";
-  btn.append(text, pb, icon("chevron-right"));
-  btn.addEventListener("click", () => versusUI.open());
-  return btn;
+  return menuRow({
+    "data-mode": "versus",
+    title: t("CPU 대전"),
+    desc: t("CPU와 쓰레기 줄을 주고받기 · 먼저 막히면 패배"),
+    meta: wins ? t("{n}승", { n: wins }) : "",
+    onClick: () => versusUI.open(),
+  });
 };
 
 // ---- 오늘의 도전 ----
@@ -529,23 +507,13 @@ const dailyRow = () => {
   const key = dateKey();
   const m = dailyMode(key);
   const best = records.best(m, MODERN);
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "menu-row";
-  btn.dataset.mode = "daily";
-  const text = document.createElement("span");
-  text.className = "menu-text";
-  const name = document.createElement("strong");
-  name.textContent = t("오늘의 도전");
-  const desc = document.createElement("small");
-  desc.textContent = `${key} · ${t("{mode} · 모두 같은 블록 순서", { mode: m.baseName })}`;
-  text.append(name, desc);
-  const pb = document.createElement("span");
-  pb.className = "mode-best num";
-  pb.textContent = best ? t("최고 기록 {record}", { record: m.formatRecord(best) }) : "";
-  btn.append(text, pb, icon("chevron-right"));
-  btn.addEventListener("click", () => dailyUI.open());
-  return btn;
+  return menuRow({
+    "data-mode": "daily",
+    title: t("오늘의 도전"),
+    desc: `${key} · ${t("{mode} · 모두 같은 블록 순서", { mode: m.baseName })}`,
+    meta: best ? t("최고 기록 {record}", { record: m.formatRecord(best) }) : "",
+    onClick: () => dailyUI.open(),
+  });
 };
 
 /** 받은 코드로 겨루기. 문제가 있으면 알림 문구를 돌려준다 */
@@ -880,16 +848,17 @@ const renderResultSplits = () => {
       row.classList.toggle("is-slowest", slowest?.to === to);
       const segment = row.insertCell();
       if (replay) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "btn btn-small";
-        button.textContent = label;
-        button.setAttribute("aria-label", t("{segment} 구간 다시 보기", { segment: label }));
-        button.addEventListener("click", () => {
-          startReplay(replay, "results", "", true);
-          seekReplay(startFrame, true);
-        });
-        segment.append(button);
+        segment.append(
+          button({
+            label,
+            size: "s",
+            "aria-label": t("{segment} 구간 다시 보기", { segment: label }),
+            onClick: () => {
+              startReplay(replay, "results", "", true);
+              seekReplay(startFrame, true);
+            },
+          })
+        );
       } else segment.textContent = label;
       const priorDelta = index === 0 ? 0 : rows[index - 1].delta;
       row.insertCell().textContent = formatTime(frames - startFrame);

@@ -31,7 +31,7 @@
 }
 
 .header-actions .btn {
-  padding-inline: var(--space-2);
+  --btn-px: var(--space-2);
 }
 
 .session-title {
@@ -167,8 +167,8 @@ body[data-screen="menu"] .stage {
 }
 
 .rule-tabs > button {
-  height: 36px;
-  font-size: var(--text-l);
+  --seg-size: 36px;
+  --seg-font: var(--text-l);
 }
 
 /* 내 규칙 줄(Custom일 때): [고르기 | 공유]. 다른 규칙일 때도 자리는 그대로(보이지만 않는다) */
@@ -205,9 +205,6 @@ body[data-screen="menu"] .stage {
 #continue-run {
   width: 100%;
   margin-bottom: var(--space-2);
-  flex-wrap: wrap;
-  justify-content: space-between;
-  text-align: left;
 }
 
 #resume-save-status:empty {
@@ -754,8 +751,8 @@ body.is-finesse-lesson .results-stats :is(dt, dd) {
 }
 
 .results-splits .actions-row .btn {
-  min-height: var(--control-h-s);
-  height: auto;
+  --btn-size: auto;
+  --btn-min: var(--control-h-s);
   white-space: normal;
   overflow-wrap: anywhere;
 }
@@ -856,26 +853,16 @@ body.is-finesse-lesson .results-stats :is(dt, dd) {
 }
 
 .replay-bar .btn {
+  --btn-size: auto;
+  --btn-min: 32px;
+  --btn-py: 4px;
+  --btn-px: 6px;
+  --btn-gap: 6px;
+  --btn-font: var(--text-s);
+  --btn-icon: 14px;
   min-width: 0;
-  min-height: 32px;
-  height: auto;
-  padding: 4px 6px;
-  gap: 6px;
-  font-size: var(--text-s);
-  line-height: 1.2;
   white-space: normal;
   overflow-wrap: anywhere;
-}
-
-/* 아래 턱을 뺀 버튼 면의 중앙에 글자와 아이콘을 함께 놓는다. */
-:is(.replay-bar, .replay-battle-view) .btn:not(.btn-ghost) {
-  --replay-ledge: var(--ledge);
-  padding-block: calc(var(--space-1) - var(--replay-ledge) / 2)
-    calc(var(--space-1) + var(--replay-ledge) / 2);
-}
-
-:is(.replay-bar, .replay-battle-view) .btn:not(.btn-ghost):active:not(:disabled) {
-  --replay-ledge: 1px;
 }
 
 .replay-bar .btn:focus-visible {
@@ -886,13 +873,6 @@ body.is-finesse-lesson .results-stats :is(dt, dd) {
   white-space: nowrap;
 }
 
-.replay-bar .btn .icon,
-.replay-toggle-icon {
-  display: block;
-  flex: 0 0 14px;
-  width: 14px;
-  height: 14px;
-}
 
 .replay-bar .btn-ghost {
   color: var(--text-dim);
@@ -1325,8 +1305,8 @@ body[data-screen="replay"] .touchpad {
 }
 
 .actions-row-3 .btn {
-  padding-inline: var(--space-1);
-  gap: 4px;
+  --btn-px: var(--space-1);
+  --btn-gap: 4px;
 }
 
 @media (max-height: 760px), (max-width: 720px) {
@@ -1340,7 +1320,7 @@ body[data-screen="replay"] .touchpad {
   }
 
   .results-card .btn:not(.btn-small) {
-    height: 34px;
+    --btn-size: 34px;
   }
 }
 
@@ -1516,8 +1496,9 @@ body.has-lesson-hints[data-screen="play"] .downstack-controls {
 }
 
 .downstack-controls .btn {
+  --btn-size: auto;
+  --btn-min: var(--btn-base);
   min-width: 0;
-  height: auto;
   white-space: normal;
 }
 
@@ -1877,7 +1858,7 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
   }
 
   .actions-row-3 .btn {
-    font-size: var(--text-xs);
+    --btn-font: var(--text-xs);
   }
 }
 
@@ -1995,7 +1976,7 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
   }
 
   .replay-bar .btn {
-    min-height: 28px;
+    --btn-min: 28px;
   }
 }
 
@@ -2089,11 +2070,12 @@ body[data-screen="results"] #action { display: none; }
     grid-template-rows: minmax(0, 1fr) auto;
   }
   .results-card .actions .btn {
-    min-height: 34px;
-    height: auto;
-    padding: 4px;
-    gap: 4px;
-    font-size: var(--text-s);
+    --btn-size: auto;
+    --btn-min: 34px;
+    --btn-py: 4px;
+    --btn-px: 4px;
+    --btn-gap: 4px;
+    --btn-font: var(--text-s);
     white-space: normal;
   }
 
@@ -2146,10 +2128,11 @@ body[data-scene-practice] .race-panel {
 
 .scene-practice-actions .btn,
 #results-practice-scene {
+  --btn-size: auto;
+  --btn-min: var(--control-h-s);
+  --btn-py: var(--space-1);
+  --btn-px: var(--space-2);
   min-width: 0;
-  min-height: var(--control-h-s);
-  height: auto;
-  padding: var(--space-1) var(--space-2);
   white-space: normal;
   overflow-wrap: anywhere;
 }
@@ -2184,7 +2167,7 @@ body[data-scene-practice] .race-panel {
   }
 
   .replay-actions:has([data-replay="practice"]:not([hidden])) .btn {
-    padding-inline: var(--space-1);
+    --btn-px: var(--space-1);
   }
 }
 
@@ -2274,10 +2257,11 @@ body[data-scene-practice] .race-panel {
 }
 
 .scene-result-actions .btn {
+  --btn-size: auto;
+  --btn-min: 38px;
+  --btn-py: var(--space-1);
+  --btn-px: var(--space-2);
   min-width: 0;
-  min-height: 38px;
-  height: auto;
-  padding: var(--space-1) var(--space-2);
   white-space: normal;
   word-break: keep-all;
   overflow-wrap: anywhere;
@@ -2341,8 +2325,8 @@ body[data-scene-practice] .race-panel {
   }
 
   body:is([data-scene-practice="split"], [data-scene-practice="finesse"], [data-scene-practice="rescue"]) .scene-practice-actions .btn {
-    min-height: 44px;
-    padding-inline: var(--space-1);
+    --btn-min: 44px;
+    --btn-px: var(--space-1);
     word-break: keep-all;
   }
 }
@@ -2409,8 +2393,8 @@ body[data-battle-replay] .replay-info {
 }
 
 .replay-battle-view .btn {
+  --btn-px: var(--space-1);
   min-width: 0;
-  padding-inline: var(--space-1);
 }
 
 .replay-battle-view [aria-pressed="true"] {

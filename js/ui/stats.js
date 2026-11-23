@@ -1,6 +1,7 @@
 // 판 통계 대화상자: 결과 화면의 "통계"에서 연다. 엔진이 센 값(state.tally)을 보여 주기만 한다.
 import { formatScore, formatTime } from "../modes/format.js";
-import { button, el, fillDialog } from "./dom.js";
+import { el, fillDialog } from "./dom.js";
+import { button } from "./components.js";
 import { t } from "../i18n/index.js";
 
 const CLEAR_ROWS = [
@@ -91,7 +92,7 @@ export const createStatsUI = ({ dialog }) => {
             )
           )
         : table(t("줄 삭제"), clears);
-      const review = button({ text: t("구간 기록 보기"), iconName: "chart", id: "stats-splits" });
+      const review = button({ label: t("구간 기록 보기"), icon: "chart", id: "stats-splits" });
       review.addEventListener("click", () => dialog.close("splits"));
       dialog.returnValue = "";
       notice.textContent = subtitle;

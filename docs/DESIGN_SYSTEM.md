@@ -26,27 +26,185 @@
 
 ## 컴포넌트
 
+누르고 고르고 적는 것은 모두 **`js/ui/components.js`** 한 곳에서 만들고, 모양은 **`css/components.css`** 한 곳에서 정한다.
+화면 코드와 화면 CSS는 이것들을 *가져다 쓰기만* 한다. 이 약속은 테스트가 지킨다(아래 "검사").
+
+### 세 가지 약속
+
+1. **가운데는 "버튼 면"의 가운데다.** 누를 수 있는 것은 아래에 턱(`--ledge`, 3px)이 있다. 턱은 `box-shadow: inset`으로 그려 크기에 영향이 없으므로,
+   내용(아이콘·글자)은 상자 전체가 아니라 **턱을 뺀 면**의 한가운데에 와야 한다. 바탕 CSS가 아래 여백에 턱 몫(`--face-pad` = 3px, 눌렀을 때 1px)을
+   늘 더해서 이걸 맞춘다. 그래서 화면 CSS가 `padding`·`height`·`line-height`·`align-items`를 직접 덮어쓰면 가운데가 어긋난다 → **변수로만 바꾼다.**
+2. **구조는 하나다.** 버튼 안에는 `[아이콘] [이름 .btn-label] [부가 정보 .btn-meta] [단축키 kbd]`만 들어간다. 맨 글자(`<button>편집</button>`)나
+   `<span>` 아무거나를 넣지 않는다 — 줄 높이가 달라져 글자가 1–2px 뜨거나 가라앉는다.
+3. **상태가 바뀌어도 크기·글자 위치가 그대로다.** 바뀌는 것은 색·투명도와, 눌렀을 때 1px 내려앉는 것뿐이다. 세그먼트는 고르지 않은 칸도 턱 자리를 비워 둔다.
+   숨길 때는 `hidden` 대신 자리를 남기는 `.is-invisible`·`visibility`를 쓴다(원칙 2).
+
+### 한눈에
+
+| 컴포넌트 | 만들기(`js/ui/components.js`) | class | 모양 |
+| --- | --- | --- | --- |
+| 버튼 | `button({ label, icon?, variant?, size?, wrap?, kbd?, onClick? })` | `.btn` (+ `.btn-primary` `.btn-ghost` `.btn-small` `.btn-wrap`) | 표면 + 진한 테두리 + 아래 턱. 주 버튼은 강조색 면과 진한 강조 턱 |
+| 아이콘 버튼 | `iconButton({ icon, label, variant = "ghost", size = "s" })` | `.btn.btn-icon-only` | 정사각형. 이름은 `aria-label`·`title`로만 |
+| 줄 전체 버튼 | (정적 HTML) | `.btn.btn-split` | 이름은 왼쪽, `.btn-meta`는 오른쪽 (첫 화면 "이어서 하기") |
+| 세그먼트 | `segmented({ label, options, value, onChange, wrap?, arrows? })` | `.segmented` / `.choice` | 움푹 들어간 홈 안의 칸. 고른 칸만 강조색 블록으로 솟는다 |
+| 탭 줄 | `tabBar({ tabs, active, onSelect })` | `.segmented` | 세그먼트 + ←→ Home End로 이동 |
+| 세그먼트 칸만 | `segmentButtons(options, value, onChange)` | — | HTML에 이미 있는 `.segmented` 틀을 채울 때(`#rule-tabs`) |
+| 카드 선택 | `choiceCards({ options: [{ value, title, desc, preview? }] })` | `.choice-cards` `.choice-card` | 이름 + 긴 설명. 설명은 잘리지 않고 줄바꿈 |
+| 드롭다운 | `dropdown({ id, label, options, value, onChange })` | `.select` | 턱 있는 버튼 + 목록. ↑↓ Home End Enter Space Esc Tab, 바깥 클릭으로 닫힘 |
+| 스위치 | `toggle({ id, checked, disabled, onChange? })` | `.switch` | 홈 안에서 블록 하나가 좌우로 옮겨 간다(켜면 강조색) |
+| 슬라이더 | `rangeRow(slider({ id, min, max, step, value }), output, format)` | `.range` | 10칸 막대, 채운 칸은 강조색, 손잡이는 턱 있는 블록. 값 칸 폭은 가장 긴 값에 고정 |
+| 글자 입력 | `textInput({ id, value, placeholder, num? })` | `.text-input` | 움푹 들어간 칸(위쪽 안 그림자). 코드·숫자는 `num: true` |
+| 목록 줄 | `menuRow({ title, desc, meta, onClick })` | `.menu-row` | [번호 \| 이름·설명 \| 기록 \| >], 왼쪽 4px 막대가 호버·포커스에 강조색 |
+| 설정 한 줄 | `fieldRow({ id, label, hint, control })` (`js/ui/dom.js`) | `.field-row` | [이름 + 설명 줄 \| 조작]. 설명 줄은 비어도 자리를 차지 |
+| 대화상자 | `fillDialog(dialog, { title, body, notice, actions, closeId, tabs? })` (`js/ui/dom.js`) | `.dialog` | 위쪽 4px 강조 띠 · 제목과 닫기 · 탭 · 스크롤 몸통 · 알림 칸과 동작 |
+
+### 버튼
+
+```
+┌──────────────────────────────┐  ← 테두리 1px (--border-strong, 주 버튼은 --accent-ledge)
+│  [icon]  이름  [kbd]          │  ← 면: 내용은 이 면의 한가운데
+│▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁│  ← 턱 3px (inset 그림자, 크기에 영향 없음)
+└──────────────────────────────┘
+```
+
+| 크기 | 높이 | 좌우 여백 | 사이 | 글자 |
+| --- | --- | --- | --- | --- |
+| 보통(`size: "m"`) | `--control-h` 38px | 16px | 8px | `--text-l` |
+| 작게(`size: "s"`, `.btn-small`) | `--control-h-s` 32px | 12px | 4px | `--text-m` |
+| 터치 화면 | 최소 44px(`--btn-touch`) | | | |
+
+| 종류 | 쓰는 곳 |
+| --- | --- |
+| `default` | 대부분. 대화상자 아래 "닫기"도 이것 |
+| `primary` | 화면에 하나뿐인 주 동작(계속, 다시 하기, 도전하기) |
+| `ghost` | 머리글·리플레이 도구 줄처럼 버튼이 여럿 늘어선 곳. 테두리·턱이 없으니 내용은 상자 한가운데 |
+
+| 상태 | 모양 |
+| --- | --- |
+| 호버 | 면 색만 `--surface-2`(주 버튼 `--accent-hover`) |
+| 누름 | 1px 내려앉고 턱이 1px로 줄며 내용도 그 면의 가운데로 |
+| 포커스 | 2px 강조색 윤곽선 |
+| 사용 안 함 | 투명도 0.4, 색 그대로. 이유는 옆 설명 줄에 |
+| 고름(`aria-pressed="true"`) | 세그먼트처럼 쓰는 버튼 묶음에서만 |
+
+```js
+import { button, iconButton } from "./components.js";
+
+button({ label: t("도전하기"), icon: "play", variant: "primary", id: "daily-start", onClick: start });
+button({ label: t("링크 복사"), icon: "link", size: "s" });
+button({ label: t("같은 블록 순서로 재시작"), size: "s", wrap: true }); // 좁은 칸·영어에서 두 줄
+iconButton({ icon: "close", label: t("닫기"), onClick: () => dialog.close() });
+```
+
+정적 HTML(`index.html`)도 같은 구조를 그대로 적는다. 아이콘은 `<span data-icon="이름">`(시작할 때 SVG로 바뀐다),
+JS가 나중에 아이콘·글자를 바꾸는 자리는 `.btn-icon`·`.btn-label`에 훅 class를 덧붙인다.
+
+```html
+<button type="button" class="btn btn-small" data-action="stats"><span data-icon="chart"></span><span class="btn-label">통계</span></button>
+<button type="button" class="btn btn-primary" data-replay="toggle"><span class="btn-icon replay-toggle-icon"><span data-icon="pause"></span></span><span class="btn-label replay-toggle-text">일시정지</span></button>
+<button type="button" class="btn" data-action="retry"><span data-icon="restart"></span><span class="btn-label">다시 시작</span><kbd data-key="RESTART"></kbd></button>
+```
+
+#### 화면에 맞춰 크기 바꾸기 — 변수로만
+
+화면 CSS에서 버튼을 손볼 때는 아래 변수만 쓴다. 바탕 CSS가 이 값으로 여백·높이를 계산하면서 턱 몫을 더한다.
+
+| 변수 | 뜻 | 예 |
+| --- | --- | --- |
+| `--btn-size` | 높이. `auto`면 글자에 맞춰 늘어난다 | `--btn-size: 34px` |
+| `--btn-min` | 최소 높이(`--btn-size: auto`와 함께) | `--btn-min: var(--control-h-s)` |
+| `--btn-px` / `--btn-py` | 좌우 / 위아래 여백(아래에는 턱 몫이 자동으로 더해진다) | `--btn-px: var(--space-1)` |
+| `--btn-gap` | 아이콘·이름·단축키 사이 | `--btn-gap: 4px` |
+| `--btn-font` | 글자 크기 | `--btn-font: var(--text-s)` |
+| `--btn-icon` | 아이콘 크기 | `--btn-icon: 14px` |
+
+바깥에서 정하는 배치 속성(`width` `min-width` `flex` `grid-*` `justify-self` `margin` `white-space` `word-break` `overflow-wrap` `visibility` `color`)은 그대로 써도 된다.
+
+```css
+/* 좋음 */
+.replay-bar .btn { --btn-size: auto; --btn-min: 32px; --btn-py: 4px; --btn-px: 6px; --btn-font: var(--text-s); min-width: 0; }
+
+/* 안 됨: 턱 몫이 사라져 글자가 면의 아래쪽으로 1.5px 내려간다 */
+.replay-bar .btn { height: auto; padding: 4px 6px; line-height: 1.2; }
+```
+
+### 세그먼트
+
+```
+┌───────────────────────────────────┐  ← 홈: --surface-3, 안쪽 여백 3px
+│ ┌───────┐  Retro    Arcade  Custom │
+│ │Modern │                          │  ← 고른 칸만 강조색 블록 + 턱
+│ └▁▁▁▁▁▁▁┘                          │
+└───────────────────────────────────┘
+```
+
+- 짧은 선택지 2–5개. 칸 폭은 같다(`grid-auto-columns: 1fr`). 5개를 넘거나 설명이 필요하면 드롭다운이나 카드 선택.
+- `wrap: false` → `.segmented`: 한 줄 고정(규칙 탭, 대화상자 탭). `wrap: true` → `.choice`: 설정 선택지처럼 이름이 길면 두 줄로 꺾는다(한국어는 단어 중간에서 꺾지 않는다).
+- 고른 값은 `aria-pressed`. 다시 그리지 않고 표시만 바꿀 때는 `setSegmented(group, value)`.
+- 칸 크기도 변수로만 바꾼다: `--seg-size` `--seg-min` `--seg-px` `--seg-py` `--seg-font`.
+
+```js
+fieldRow({ id, label: t("고스트"), control: segmented({ id, label: t("고스트"), wrap: true, options, value, onChange }) });
+```
+
+### 스위치 · 슬라이더 · 글자 입력 · 드롭다운
+
+- **스위치**는 켜고 끄는 즉시 반영되는 설정에만. 이름은 `fieldRow`의 label이 붙는다(`for` = 스위치 id). 둘 중 하나를 고르는 데 이름이 필요하면 세그먼트.
+- **슬라이더**는 늘 `rangeRow`로 값 칸과 함께. 값 칸 폭은 가능한 가장 긴 값에 맞춰 두므로 값이 바뀌어도 막대 길이가 흔들리지 않는다.
+  한 구역의 슬라이더들은 `fillDialog`가 값 칸 폭을 가장 넓은 것에 맞춘다.
+- **글자 입력**은 높이 `--control-h-s`. 옆에 버튼을 둘 때는 `.inline-control`([입력 | 버튼]) 안에 넣는다.
+- **드롭다운**은 선택지가 많거나 설명이 필요할 때. 목록은 `position: fixed`로 떠서 대화상자 스크롤에 잘리지 않는다.
+
+### 특수 버튼
+
+모양이 따로 정해진 것들은 각자 class를 쓰고 `components.js`를 거치지 않는다. 새로 늘리지 않는다 — 꼭 필요하면 이 표와 테스트 허용 목록에 함께 올린다.
+
+| 요소 | class | 위치 |
+| --- | --- | --- |
+| 색 견본 | `.color-swatch` | `js/ui/settings.js` |
+| 키 칸 | `.key-slot` | `js/ui/settings.js` |
+| 퍼즐 편집 칸 | `.puzzle-editor-cell` | `js/ui/puzzle-editor.js` |
+| 리플레이 표시 | `.replay-mark` | `js/main.js` |
+| 도구 줄 | `.tool-row` | `index.html`(첫 화면 오른쪽) |
+| 로고 | `.logo-btn` | `index.html` 머리글 |
+
+### 그 밖의 표면
+
 | 컴포넌트 | 모양 | 코드 |
 | --- | --- | --- |
-| 버튼 | 표면 + 진한 테두리 + 아래 턱. 주 버튼은 강조색 면과 진한 강조 턱 | `.btn` `.btn-primary` |
-| 세그먼트 | 움푹 들어간 홈 안의 칸. 고른 칸만 강조색 블록으로 솟는다 | `.segmented` `.choice` |
-| 드롭다운 | 턱 있는 버튼 + 목록(이름·설명, 고른 항목 체크, 커서 줄은 왼쪽 강조 막대). ↑↓ Home End Enter Space Esc Tab, 바깥 클릭으로 닫힘. Esc는 목록만 닫는다 | `js/ui/select.js` `.select` |
-| 스위치 | 홈 안에서 블록 하나가 좌우로 옮겨 간다(켜면 강조색) | `switchInput()` `.switch` |
-| 슬라이더 | 10칸으로 나뉜 막대, 채운 칸은 강조색, 손잡이는 턱 있는 블록 | `slider()` `.range` |
-| 글자 입력 | 움푹 들어간 칸(위쪽 안 그림자) | `.text-input` |
-| 목록 줄 | [번호 \| 이름·설명 \| 기록 \| >], 왼쪽 4px 막대가 호버·포커스에 강조색 | `.menu-row` (모드·연습) |
-| 도구 줄 | 선으로만 나뉜 한 줄 동작, 왼쪽 3px 막대 | `.tool-row` |
-| 대화상자 | 위쪽 4px 강조 띠, 제목 · 탭 · 스크롤 몸통 · 하단 동작 | `.dialog` |
 | 계기판(HUD) | 카드 없이 이름(작게) 위 · 값(크게, 고정폭) 아래, 칸 사이 가는 선. 시간은 강조색 | `.hud` |
 | 퍼즐 칸 | 번호 블록 격자. 깬 단계는 강조색 면, 다음 단계는 강조색 테두리 | `.puzzle-grid` `.puzzle-tile` |
-| 색 고르기 | 피스 칩 한 줄(고른 피스는 솟음) + 16색 견본 격자. 견본은 정해진 색만 쓴다(자유 색상 입력 없음) | `.color-picker` `.color-swatch` |
+| 색 고르기 | 피스 칩 한 줄(고른 피스는 솟음) + 16색 견본 격자. 정해진 색만(자유 색상 입력 없음) | `.color-picker` `.color-swatch` |
 | 키 입력 표시 | 8칸 아이콘 줄, 누르는 동안 강조색. 한 프레임 탭도 110ms 남긴다 | `.input-display` |
 
 포커스는 2px 강조색 윤곽선. 선택 상태는 시각 표시와 `aria-pressed`·`aria-selected`·`aria-checked`를 함께 쓴다. 값이나 탭이 바뀌어도 주변이 움직이지 않도록 숫자 폭과 알림 영역을 확보한다.
 
+### 하지 말 것
+
+| 하지 말 것 | 대신 |
+| --- | --- |
+| `document.createElement("button")`, `el("button", …)`, `el("input", …)` | `button()` `iconButton()` `segmented()` `toggle()` `slider()` `textInput()` `menuRow()` |
+| `<button class="btn">편집</button>` (맨 글자) | `<button class="btn"><span class="btn-label">편집</span></button>` |
+| 아이콘만 있는 버튼에 글자 없이 `class="btn"` | `iconButton({ icon, label })` 또는 `.btn-icon-only` + `aria-label` |
+| `.foo .btn { padding: …; height: auto; line-height: … }` | `.foo .btn { --btn-py: …; --btn-size: auto; --btn-min: … }` |
+| `.foo .btn { display: flex; align-items: …; justify-content: … }` | 그대로 두거나 `.btn-split` |
+| 고른 칸만 굵게·크게 | 색만 바꾼다(크기·글자 위치 그대로) |
+| 버튼을 `hidden`으로 빼서 옆 버튼이 밀림 | 자리는 두고 `disabled` + 이유를 설명 줄에, 또는 `.is-invisible` |
+| 기호 글자(×, ←, ✓)나 이모지로 아이콘 | `js/ui/icons.js`의 SVG(`icon: "close"`) |
+| 새 색·새 크기 값 직접 쓰기(`#333`, `37px`) | `css/tokens.css` 변수(`--surface-2`, `--control-h`) |
+
+### 검사
+
+- `tests/unit/design-rules.test.mjs`
+  - 화면 CSS가 `.btn`·세그먼트 칸의 `padding` `height` `min-height` `line-height` `display` `align-items` `justify-content` `gap` `font-size` `box-shadow` `transform`을 덮어쓰면 실패
+  - `index.html`의 `.btn` 안에 정해진 구조 밖의 내용(맨 글자 등)이 있으면 실패
+  - `js/`에서 버튼·입력을 직접 만들면 실패(위 "특수 버튼"만 허용)
+- `tests/helpers/ui-audit.mjs`(브라우저 UI 검수, 네 화면 크기): 모든 화면·대화상자를 돌며 보이는 `.btn`·세그먼트 칸마다
+  구조와 **내용 덩어리가 턱을 뺀 면의 가운데에서 1px 안**인지 잰다.
+
 ## 화면
 
-- **첫 화면**: 넓으면 [규칙 · 모드 목록 | 내 기록과 달리기 · 연습과 기록 · 리플레이 · 데이터 · 조작법] 두 칸, 900px 이하는 한 칸. 모드는 번호가 붙은 목록 줄로, 최고 기록을 오른쪽 같은 자리에 둔다.
+- **첫 화면**: 넓으면 [플레이 모드 · 처음 안내 · 규칙 | 연습과 기록 · 다시 보기] 두 칸, 680px 이하는 한 칸. 모드는 번호가 붙은 목록 줄(`menuRow`)로, 최고 기록·랭크를 오른쪽 같은 자리에 둔다. 데이터(백업·리플레이 파일)는 설정에 있다.
 - **플레이**: 보드와 홀드·넥스트는 한 캔버스. 넓으면 보드 오른쪽에 계기판, 좁으면 보드 위 한 줄. 일시정지·결과는 보드 위 카드(위쪽 강조 띠).
 - Sprint 결과에서 구간 기록을 펼쳐 볼 수 있다. 달리기 중에는 데스크톱에서 상대 보드와 진행 막대, 모바일에서 진행 막대만 보인다.
 - **가로 휴대폰**(가로 방향이고 높이 520px 이하): 보드를 가운데 두고, 왼쪽에 계기판(두 칸 격자)과 이동 버튼(홀드·일시정지 / ← ↓ →),
@@ -99,4 +257,4 @@
 
 ## 변경 후 확인
 
-`npm test`로 판정과 브라우저 흐름을 확인한다. 홈과 게임은 라이트·다크, 좁은 화면에서 각각 확인한다. 화면 탭에서 아홉 테마와 효과 수준을 바꾸고, 착지·줄 삭제·일시정지·다시 시작을 확인한다. 배포 전 `npm run build`와 `npm run build:pages`를 실행한다.
+`npm test`로 판정과 브라우저 흐름을 확인한다(컴포넌트 약속 검사 포함). 홈과 게임은 라이트·다크, 좁은 화면에서 각각 확인한다. 화면 탭에서 아홉 테마와 효과 수준을 바꾸고, 착지·줄 삭제·일시정지·다시 시작을 확인한다. 배포 전 `npm run build`와 `npm run build:pages`를 실행한다.

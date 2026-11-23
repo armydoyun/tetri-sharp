@@ -30,6 +30,7 @@
   --radius-l: 4px; /* 대화상자·큰 표면 */
   --border-w: 1px;
   --ledge: 3px; /* 누를 수 있는 것의 아래 턱 */
+  --face-pad: var(--ledge); /* 턱이 있는 것은 내용을 턱만큼 위로 → 턱을 뺀 면의 한가운데(components.css .btn) */
   --icon-stroke: 2;
 
   /* ---- 움직임: 색·투명도와 눌림 1px만 ---- */

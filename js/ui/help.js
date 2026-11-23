@@ -1,7 +1,8 @@
 // 도움말(처음 오신 분 안내): 조작법 · 추천 순서 · 편하게 하는 설정. 머리글 "도움말"과 첫 화면 안내 줄에서 연다.
 // 키 이름은 지금 키 배치에서, 터치 기기면 터치 조작(버튼·제스처) 설명을 보여 준다.
 import { ACTIONS } from "../input/keymap.js";
-import { button, el, fillDialog } from "./dom.js";
+import { el, fillDialog } from "./dom.js";
+import { button } from "./components.js";
 import { keycap } from "./keycap.js";
 import { t } from "../i18n/index.js";
 
@@ -65,26 +66,26 @@ export const createHelpUI = ({ dialog, getSettings, isTouch, onOpenSettings, onS
       onOpenSettings(tab);
     };
     const control = button({
-      text: t("조작감 바꾸기"),
-      iconName: "sliders",
-      className: "btn btn-small",
+      label: t("조작감 바꾸기"),
+      icon: "sliders",
+      size: "s",
       id: "help-to-control",
     });
     control.addEventListener("click", () => toSettings("control"));
     const access = button({
-      text: t("접근성 설정"),
-      iconName: "sliders",
-      className: "btn btn-small",
+      label: t("접근성 설정"),
+      icon: "sliders",
+      size: "s",
       id: "help-to-access",
     });
     access.addEventListener("click", () => toSettings("access"));
 
-    const start = button({ text: t("Sprint 40L 시작"), iconName: "play", className: "btn btn-primary" });
+    const start = button({ label: t("Sprint 40L 시작"), icon: "play", variant: "primary" });
     start.addEventListener("click", () => {
       dialog.close();
       onStart();
     });
-    const intro = button({ text: t("기본 조작 연습"), iconName: "play" });
+    const intro = button({ label: t("기본 조작 연습"), icon: "play" });
     intro.addEventListener("click", () => {
       dialog.close();
       onIntro();

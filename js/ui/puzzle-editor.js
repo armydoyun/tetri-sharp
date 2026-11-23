@@ -2,7 +2,8 @@ import { WIDTH } from "../core/board.js";
 import { PIECE_TYPES } from "../core/pieces.js";
 import { t } from "../i18n/index.js";
 import { decodePuzzle, encodePuzzle, MAX_PUZZLE_PIECES, PUZZLE_CELLS } from "../modes/custom-puzzle.js";
-import { button, el, fillDialog } from "./dom.js";
+import { el, fillDialog } from "./dom.js";
+import { button, textInput } from "./components.js";
 
 /** @param {{ dialog: HTMLDialogElement, onTry: (code: string) => void }} options */
 export const createPuzzleEditor = ({ dialog, onTry }) => {
@@ -23,19 +24,18 @@ export const createPuzzleEditor = ({ dialog, onTry }) => {
     },
     open() {
       const notice = el("p", { class: "notice-slot", role: "status" });
-      const trial = button({ id: "puzzle-trial", text: t("시험 플레이") });
-      const copy = button({ id: "puzzle-copy", text: t("링크 복사"), iconName: "link" });
-      const link = el("input", {
+      const trial = button({ id: "puzzle-trial", label: t("시험 플레이") });
+      const copy = button({ id: "puzzle-copy", label: t("링크 복사"), icon: "link" });
+      const link = textInput({
         id: "custom-puzzle-link",
         type: "url",
-        class: "text-input",
         readOnly: true,
         hidden: true,
         "aria-label": t("공유 링크"),
       });
       const sequence = el("output", { class: "num", "aria-live": "polite" });
-      const remove = button({ text: t("마지막 피스 빼기"), className: "btn btn-small" });
-      const add = PIECE_TYPES.map(piece => button({ text: piece, className: "btn btn-small", "data-piece": piece }));
+      const remove = button({ label: t("마지막 피스 빼기"), size: "s" });
+      const add = PIECE_TYPES.map(piece => button({ label: piece, size: "s", "data-piece": piece }));
       const refresh = () => {
         const code = encodePuzzle({ cells, pieces });
         trial.disabled = !code;
