@@ -81,37 +81,19 @@
             </div>
           </section>
 
-          <section class="home-block race-entry" aria-labelledby="race-title">
-            <div class="block-head">
-              <h2 id="race-title" class="section-title">내 기록과 달리기</h2>
-            </div>
-            <p class="block-note">같은 규칙의 최고 기록 리플레이와 같은 블록 순서로 겨뤄요</p>
-            <p class="block-note race-empty">완주하면 같은 규칙의 내 기록과 달릴 수 있어요.</p>
-            <div id="race-modes" class="tool-list"></div>
-          </section>
-
+          <!-- 다시 보기: 마지막 판만. 리플레이 파일 열기와 백업은 설정의 데이터 탭,
+               내 기록과 달리기는 기록 대화상자와 결과 화면에서 한다 -->
           <section class="home-block" aria-labelledby="replay-tools-title">
             <div class="block-head">
-              <h2 id="replay-tools-title" class="section-title">리플레이</h2>
+              <h2 id="replay-tools-title" class="section-title">다시 보기</h2>
             </div>
             <div class="tool-list">
               <button id="watch-last" class="tool-row" type="button" disabled><span>마지막 판 다시 보기</span><small>저장된 판 없음</small><span data-icon="chevron-right"></span></button>
-              <button id="open-replay" class="tool-row" type="button"><span>파일 열기</span><span data-icon="folder"></span></button>
             </div>
-            <p id="replay-import-notice" class="inline-notice" role="status"></p>
-            <input id="replay-file" type="file" accept=".json,application/json" hidden />
           </section>
-
-          <section class="home-block" aria-labelledby="data-tools-title">
-            <div class="block-head">
-              <h2 id="data-tools-title" class="section-title">데이터</h2>
-            </div>
-            <div class="tool-list">
-              <button id="export-backup" class="tool-row" type="button"><span>백업 파일로 저장</span><span data-icon="download"></span></button>
-              <button id="import-backup" class="tool-row" type="button"><span>백업 불러오기</span><span data-icon="folder"></span></button>
-            </div>
-            <input id="backup-file" type="file" accept=".json,application/json" hidden />
-          </section>
+          <!-- 파일 고르기 창은 설정의 데이터 탭에서 연다(화면에는 보이지 않는다) -->
+          <input id="replay-file" type="file" accept=".json,application/json" hidden />
+          <input id="backup-file" type="file" accept=".json,application/json" hidden />
 
           <p id="menu-notice" class="notice-slot menu-notice" role="status"></p>
 

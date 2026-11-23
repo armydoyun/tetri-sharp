@@ -233,27 +233,6 @@ body[data-screen="menu"] .stage {
   }
 }
 
-/* 달리기: 모드마다 한 줄 */
-.race-mode-text {
-  display: grid;
-  gap: 1px;
-}
-
-.race-mode small {
-  color: var(--text-dim);
-  font-family: var(--font-num);
-  font-size: var(--text-s);
-  font-weight: 500;
-}
-
-.race-mode:disabled .race-mode-text strong {
-  color: var(--text-faint);
-}
-
-.race-mode:disabled small {
-  font-family: var(--font-ui);
-}
-
 .menu-notice {
   margin-top: calc(-1 * var(--space-2));
 }
@@ -2027,12 +2006,8 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
 #mode-list .mode-best:empty { display: none; }
 #mode-list .menu-row > .icon { grid-column: 3; }
 
-.race-entry:not(:has(.race-mode:enabled)) #race-modes,
-.race-entry:has(.race-mode:enabled) .race-empty,
-.race-entry:not(:has(.race-mode:enabled)) .block-note:not(.race-empty),
 .mode-objective:empty,
 .inline-notice:empty { display: none; }
-.race-mode:disabled { display: none; }
 .mode-objective, .inline-notice {
   margin: 0;
   color: var(--text-dim);

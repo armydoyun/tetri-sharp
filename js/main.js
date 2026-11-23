@@ -6,7 +6,7 @@ import { createKeyboard } from "./input/keyboard.js";
 import { createTouch, touchVisible } from "./input/touch.js";
 import { compilePadmap, createGamepad } from "./input/gamepad.js";
 import { ACTIONS, compileKeymap, keyLabel } from "./input/keymap.js";
-import { MODES, RACE_MODES, RECORD_MODES, SURVIVAL_MILESTONES, findMode as findBaseMode } from "./modes/index.js";
+import { MODES, RECORD_MODES, SURVIVAL_MILESTONES, findMode as findBaseMode } from "./modes/index.js";
 import { dailyMode, dateKey, findDaily, recentDailyKeys } from "./modes/daily.js";
 import { decodeReplayCode, encodeReplayCode, replayLink } from "./replay/share.js";
 import { createDailyUI } from "./ui/daily.js";
@@ -192,6 +192,8 @@ let ruleChoice = RULE_CHOICES.includes(store.get("lastRules", null)) ? store.get
 let customBody = sanitizeRuleBody(store.get("customRules", MODERN));
 /** 지금 고른 규칙 */
 const currentRules = () => (ruleChoice === "custom" ? makeCustomRules(customBody) : PRESETS[ruleChoice]);
+/** 규칙 id → 규칙: 프리셋이거나 지금 쓰는 Custom 규칙일 때만(다른 Custom 내용은 기록에 id만 있다) */
+const rulesById = id => PRESETS[id] ?? (makeCustomRules(customBody).id === id ? makeCustomRules(customBody) : null);
 /** 이번 판에 쓰는 규칙(게임 중에 Custom을 고쳐도 이번 판 기록은 시작할 때 규칙으로 남는다) */
 let rules = currentRules();
 let runPlayerName = "";
@@ -413,34 +415,10 @@ const startRace = (m, selected = currentRules()) => {
   start(m, selected, { ...target, splits: targetSplits });
 };
 
-const renderRaceModes = ruleSet => {
-  $("race-modes").replaceChildren(
-    ...RACE_MODES.map(m => {
-      const target = raceTargetFor(m, ruleSet);
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "tool-row race-mode";
-      btn.dataset.race = m.id;
-      btn.disabled = !target;
-      const name = document.createElement("strong");
-      name.textContent = m.name;
-      const info = document.createElement("small");
-      info.textContent = target ? m.formatRecord(target.best) : t("끝까지 간 리플레이 필요");
-      const body = document.createElement("span");
-      body.className = "race-mode-text";
-      body.append(name, info);
-      btn.append(body, icon("chevron-right"));
-      btn.addEventListener("click", () => startRace(m));
-      return btn;
-    })
-  );
-};
-
 const renderMenu = () => {
   renderRuleTabs();
   renderPuzzleProgress();
   const ruleSet = currentRules();
-  renderRaceModes(ruleSet);
   $("active-rules").textContent = t("규칙 · {name}", { name: ruleSet.name });
   const list = $("mode-list");
   list.replaceChildren(
@@ -1166,6 +1144,13 @@ const settingsUI = createSettingsUI({
   onPreviewSound: () => sfx.play("clear2"),
   // 모드 이름처럼 시작할 때 만든 글자까지 바꾸려면 다시 불러오는 게 가장 확실하다.
   onLanguage: () => location.reload(),
+  // 데이터 탭: 백업과 리플레이 파일(첫 화면에서 연 경우에만 불러오기). 버튼을 누를 때 부르므로 아래 정의를 쓴다.
+  data: {
+    canImport: () => screen === "menu",
+    exportBackup: () => backupActions.exportBackup(),
+    importBackup: () => backupActions.importBackup(),
+    openReplay: () => /** @type {HTMLInputElement} */ ($("replay-file")).click(),
+  },
   onClose: () => {
     if (screen === "menu") toMenu();
     else if (screen === "paused") showPanel("pause");
@@ -1303,6 +1288,15 @@ const recordsUI = createRecordsUI({
   sprintHistory,
   replayFor: (key, entry) => replays.forEntry(key, entry),
   onWatch: replay => startReplay(replay, "menu", "", true),
+  // 내 기록과 달리기(첫 화면에서 옮겨 왔다): 프리셋 규칙이나 지금 쓰는 Custom 규칙일 때
+  canRace: (modeId, rulesId) => {
+    const ruleSet = rulesById(rulesId);
+    return Boolean(ruleSet && raceTargetFor(findMode(modeId), ruleSet));
+  },
+  onRace: (modeId, rulesId) => {
+    const ruleSet = rulesById(rulesId);
+    if (ruleSet) startRace(findMode(modeId), ruleSet);
+  },
 });
 $("open-records").addEventListener("click", () => recordsUI.open({ modeId: mode.id, rulesId: currentRules().id }));
 $("records").addEventListener("close", () => {
@@ -2180,6 +2174,11 @@ const exportReplay = replay => {
 const showMenuNotice = text => {
   menuNotice.textContent = text;
 };
+/** 데이터 작업(백업·리플레이 파일) 결과: 설정이 열려 있으면 설정의 알림 칸, 아니면 첫 화면 알림 줄 */
+const notifyData = text => {
+  if (settingsUI.isOpen) settingsUI.notify(text);
+  else showMenuNotice(text);
+};
 
 /** 불러온 파일을 검사하고 재생한다. 결과가 기록과 다르면 알리고 그래도 재생한다. */
 const openReplayText = text => {
@@ -2191,12 +2190,12 @@ const openReplayText = text => {
   }
   const replay = sanitizeReplay(raw, findMode);
   if (!replay) {
-    $("replay-import-notice").textContent = t("읽을 수 없는 리플레이 파일이에요.");
+    notifyData(t("읽을 수 없는 리플레이 파일이에요."));
     return false;
   }
   const check = verifyReplay(replay, findMode);
-  $("replay-import-notice").textContent = "";
   showMenuNotice("");
+  settingsUI.close();
   const note = check.ok ? "" : t("저장된 결과와 재생 결과가 달라요. 다른 버전의 파일일 수 있어요.");
   startReplay(replay, "menu", note);
   return true;
@@ -2207,7 +2206,6 @@ $("watch-last").addEventListener("click", () => {
   if (replay) startReplay(replay, "menu", "", true);
 });
 const fileInput = /** @type {HTMLInputElement} */ ($("replay-file"));
-$("open-replay").addEventListener("click", () => fileInput.click());
 let replayFileRequest = 0;
 fileInput.addEventListener("change", async () => {
   const file = fileInput.files?.[0];
@@ -2219,8 +2217,7 @@ fileInput.addEventListener("change", async () => {
   try {
     text = await file.text();
   } catch {
-    if (request === replayFileRequest && screen === "menu")
-      $("replay-import-notice").textContent = t("파일을 읽지 못했어요. 다시 선택해 주세요.");
+    if (request === replayFileRequest && screen === "menu") notifyData(t("파일을 읽지 못했어요. 다시 선택해 주세요."));
     return;
   }
   if (request === replayFileRequest && screen === "menu") openReplayText(text);
@@ -2245,15 +2242,13 @@ const reloadFromStore = () => {
   toMenu();
 };
 
-setupBackup({
+const backupActions = setupBackup({
   store,
   findMode,
-  exportButton: $("export-backup"),
-  importButton: $("import-backup"),
   fileInput: /** @type {HTMLInputElement} */ ($("backup-file")),
   canImport: () => screen === "menu",
   confirmImport: message => window.confirm(message),
-  notify: text => showMenuNotice(text),
+  notify: notifyData,
   onRestored: reloadFromStore,
 });
 

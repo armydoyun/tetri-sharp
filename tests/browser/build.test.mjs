@@ -293,7 +293,9 @@ test("이어서 하기: 날짜 도전, 최고 기록과 달리기, 리플레이 
     assert.equal(await text(page, "session-title"), daily);
     await discard();
 
-    await page.click('[data-race="sprint40"]');
+    // 내 기록과 달리기는 기록 대화상자에서 시작한다
+    await page.click("#open-records");
+    await page.click("#records-race");
     await advance(90);
     const race = await page.locator("#race-progress").evaluate(el => el.value);
     assert.ok(race > 0);
@@ -720,10 +722,10 @@ test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파�
   await page
     .locator("#replay-file")
     .setInputFiles({ name: "bad.json", mimeType: "application/json", buffer: Buffer.from("{oops") });
-  await page.waitForFunction(() => document.getElementById("replay-import-notice")?.textContent !== "", null, {
+  await page.waitForFunction(() => document.getElementById("menu-notice")?.textContent !== "", null, {
     timeout: 3000,
   });
-  assert.match(await text(page, "replay-import-notice"), /읽을 수 없는/);
+  assert.match(await text(page, "menu-notice"), /읽을 수 없는/);
   assert.deepEqual(errors, []);
   await context.close();
 });
@@ -810,7 +812,7 @@ test("레이아웃 고정: 규칙 탭을 바꾸거나 메뉴 알림이 생겨도
   await page
     .locator("#replay-file")
     .setInputFiles({ name: "x.json", mimeType: "application/json", buffer: Buffer.from("{") });
-  await page.waitForFunction(() => document.getElementById("replay-import-notice")?.textContent !== "");
+  await page.waitForFunction(() => document.getElementById("menu-notice")?.textContent !== "");
   assert.deepEqual(await rects(page, sels), before, "알림이 생긴 뒤");
   assert.deepEqual(errors, []);
   await context.close();
@@ -1039,11 +1041,15 @@ test("Sprint 최고 기록과 달리기: 같은 규칙에서 시작하고 상대
     localStorage.setItem("tetrisharp:records", JSON.stringify({ [key]: [record] }));
     localStorage.setItem("tetrisharp:replay:best", JSON.stringify({ [key]: replay }));
   }, fixture);
-  await page.click('[data-rules="retro"]');
-  assert.equal(await page.locator('[data-race="sprint40"]').isDisabled(), true);
-  await page.click('[data-rules="modern"]');
-  assert.equal(await page.locator('[data-race="ultra"]').isDisabled(), true, "Ultra 최고 기록은 없다");
-  await page.click('[data-race="sprint40"]');
+  // 기록 대화상자: 최고 기록 리플레이가 있는 모드·규칙에서만 "최고 기록과 달리기"가 보인다
+  await page.click("#open-records");
+  await choose(page, "records-rules", "retro");
+  assert.equal(await page.locator("#records-race").count(), 0, "Retro 최고 기록은 없다");
+  await choose(page, "records-rules", "modern");
+  await choose(page, "records-mode", "ultra");
+  assert.equal(await page.locator("#records-race").count(), 0, "Ultra 최고 기록은 없다");
+  await choose(page, "records-mode", "sprint40");
+  await page.click("#records-race");
   assert.equal(await visible(page, "race-board"), true);
   await page.waitForFunction(() => document.getElementById("race-progress").value > 0);
   await page.click("#pause-game");
@@ -1640,7 +1646,12 @@ test("전체 흐름: Survival 한 판 → 결과·새 기록 → 기록표 리�
   assert.equal(await visible(page, "menu"), true);
 
   // 백업 저장
+  // 백업은 설정의 데이터 탭에 있다
+  await page.click("#open-settings");
+  await page.click('#settings .dialog-tabs [data-value="data"]');
   const [download] = await Promise.all([page.waitForEvent("download"), page.click("#export-backup")]);
+  assert.match(await text(page, "settings-notice"), /백업 파일로 저장했어요/, "결과는 설정의 알림 칸에");
+  await page.keyboard.press("Escape");
   const file = path.join(dir, "backup.json");
   await download.saveAs(file);
   const backup = JSON.parse(fs.readFileSync(file, "utf8"));
@@ -1886,22 +1897,27 @@ test("드롭다운: 키보드로 열고 고르며, Esc는 목록만 닫고 대�
 test("조작법을 펼쳐 페이지가 길어져도(스크롤바가 생겨도) 첫 화면이 좌우로 움직이지 않는다", async () => {
   // 헤드리스는 스크롤바를 겹쳐 그려 자리를 차지하지 않으므로, 폭을 차지하는 스크롤바를 켜서 연다.
   const real = await chromium.launch({ ...launchOptions(chromium), ignoreDefaultArgs: ["--hide-scrollbars"] });
-  const page = await real.newPage({ locale: "ko-KR", viewport: { width: 1280, height: 900 } });
-  await page.goto(url);
-  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
-  const xs = () =>
-    page.evaluate(() =>
-      [".logo", ".home-main", ".home-side", "#mode-list"].map(s =>
-        Math.round(document.querySelector(s).getBoundingClientRect().x)
-      )
-    );
-  const closed = await xs();
-  await page.click("#help-title");
-  assert.ok(await page.evaluate(() => document.documentElement.scrollHeight > innerHeight), "펼치면 스크롤이 생긴다");
-  assert.deepEqual(await xs(), closed, "펼친 뒤");
-  await page.click("#help-title");
-  assert.deepEqual(await xs(), closed, "접은 뒤");
-  await real.close();
+  try {
+    // 접었을 때는 화면에 들어가고(약 700px) 펼치면 넘치는(약 860px) 높이
+    const page = await real.newPage({ locale: "ko-KR", viewport: { width: 1280, height: 760 } });
+    await page.goto(url);
+    await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+    const xs = () =>
+      page.evaluate(() =>
+        [".logo", ".home-main", ".home-side", "#mode-list"].map(s =>
+          Math.round(document.querySelector(s).getBoundingClientRect().x)
+        )
+      );
+    const closed = await xs();
+    await page.click("#help-title");
+    assert.ok(await page.evaluate(() => document.documentElement.scrollHeight > innerHeight), "펼치면 스크롤이 생긴다");
+    assert.deepEqual(await xs(), closed, "펼친 뒤");
+    await page.click("#help-title");
+    assert.deepEqual(await xs(), closed, "접은 뒤");
+  } finally {
+    // 따로 띄운 브라우저는 실패해도 닫는다(남으면 테스트 프로세스가 끝나지 않는다)
+    await real.close();
+  }
 });
 
 test("화면 색: 시스템이 라이트여도 다크를 고르면 첫 화면이 어두워지고, 새로고침 후에도 유지된다", async () => {
@@ -3193,6 +3209,39 @@ test("오늘의 도전: 날마다 바뀌는 모드가 첫 화면·대화상자·
   const shown = cell => page.locator(`.hud [data-hud="${cell}"]`).evaluate(el => !el.classList.contains("is-off"));
   assert.equal(await shown("score"), true, "Ultra 정보 칸");
   assert.equal(await shown("split"), false);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("첫 화면 정리: 백업·리플레이 파일은 설정의 데이터 탭, 내 기록과 달리기는 기록 대화상자에서", async () => {
+  const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
+  const { context, page, errors } = await openPage(({ replay, record }) => {
+    localStorage.setItem("tetrisharp:records", JSON.stringify({ "sprint40|modern": [record] }));
+    localStorage.setItem("tetrisharp:replay:best", JSON.stringify({ "sprint40|modern": [replay] }));
+  }, fixture);
+  // 첫 화면 오른쪽은 두 블록: 연습과 기록 · 다시 보기
+  assert.equal(await page.locator(".home-side .home-block").count(), 2);
+  for (const gone of ["#export-backup", "#import-backup", "#open-replay", "#race-modes"])
+    assert.equal(await page.locator(`#menu ${gone}`).count(), 0, `${gone}는 첫 화면에 없다`);
+
+  // 데이터 탭: 첫 화면에서 열면 불러오기도 된다
+  await page.click("#open-settings");
+  await page.click('#settings .dialog-tabs [data-value="data"]');
+  assert.equal(await page.locator("#import-backup").isEnabled(), true);
+  assert.equal(await page.locator("#open-replay").isEnabled(), true);
+  await page.keyboard.press("Escape");
+
+  // 기록 대화상자에서 최고 기록과 달리기
+  await page.click("#open-records");
+  await page.click("#records-race");
+  await page.waitForFunction(() => ["countdown", "play"].includes(document.body.dataset.screen));
+  assert.equal(await visible(page, "race-panel"), true);
+
+  // 게임 중에 연 설정에서는 불러오기를 끈다(판을 덮어쓰지 않게)
+  await page.click("#open-settings");
+  await page.click('#settings .dialog-tabs [data-value="data"]');
+  assert.equal(await page.locator("#import-backup").isDisabled(), true);
+  assert.equal(await page.locator("#export-backup").isEnabled(), true);
   assert.deepEqual(errors, []);
   await context.close();
 });

@@ -61,9 +61,11 @@ const renderSprintHistory = (runs, personalBest) => {
  *   sprintHistory: ReturnType<typeof import("../storage/sprint-history.js").createSprintHistory>,
  *   replayFor: (key: string, entry: any) => any,
  *   onWatch: (replay: any) => void,
+ *   canRace: (modeId: string, rulesId: string) => boolean,
+ *   onRace: (modeId: string, rulesId: string) => void,
  * }} options
  */
-export const createRecordsUI = ({ dialog, modes, records, sprintHistory, replayFor, onWatch }) => {
+export const createRecordsUI = ({ dialog, modes, records, sprintHistory, replayFor, onWatch, canRace, onRace }) => {
   let modeId = modes[0].id;
   let rulesId = "modern";
   const notice = el("p", { class: "notice-slot", role: "status", id: "records-notice" });
@@ -207,7 +209,14 @@ export const createRecordsUI = ({ dialog, modes, records, sprintHistory, replayF
         : t("상위 {n}개 기록의 리플레이는 이 기능이 생긴 뒤 세운 기록부터 남아요", { n: MAX_RANKED })
       : "";
     const scroll = dialog.querySelector(".dialog-body")?.scrollTop ?? 0;
-    fillDialog(dialog, { title: t("기록"), body, notice, actions: [], closeId: "records-close" });
+    // 이 모드·규칙의 최고 기록 리플레이와 같은 블록 순서로 달리기(달릴 수 있을 때만 보인다)
+    const race = button({ text: t("최고 기록과 달리기"), iconName: "play", id: "records-race" });
+    race.addEventListener("click", () => {
+      dialog.close();
+      onRace(mode.id, rulesId);
+    });
+    const actions = mode.race && canRace(mode.id, rulesId) ? [race] : [];
+    fillDialog(dialog, { title: t("기록"), body, notice, actions, closeId: "records-close" });
     body.scrollTop = scroll;
   };
 
