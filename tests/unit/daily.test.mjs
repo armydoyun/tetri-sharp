@@ -58,3 +58,25 @@ test("결과 코드: 엉터리는 null", async () => {
   assert.equal(await decodeReplayCode("TD1-!!!"), null);
   assert.equal(await decodeReplayCode("TS1-abc"), null);
 });
+
+test("오늘의 도전 모드: 시작일 전은 늘 Sprint 40L, 그날부터 Sprint → Ultra → Dig를 날마다 돈다", async () => {
+  const { DIG, SPRINT_40, ULTRA } = await import("../../js/modes/index.js");
+  const { ROTATION_START, dailyBase, dailyMode, findDaily } = await import("../../js/modes/daily.js");
+  // 이미 지난 날짜(저장·공유된 결과 코드)는 바뀌지 않는다
+  for (const key of ["2026-11-18", "2026-11-22", "2026-11-30"]) assert.equal(dailyBase(key), SPRINT_40, key);
+  assert.equal(ROTATION_START, "2026-12-01");
+  assert.deepEqual(
+    ["2026-12-01", "2026-12-02", "2026-12-03", "2026-12-04", "2027-01-01"].map(k => dailyBase(k).id),
+    ["sprint40", "ultra", "dig", "sprint40", dailyBase("2027-01-01").id]
+  );
+  // 달·해가 바뀌어도 날 수로 이어진다(12월 31일 다음 날)
+  const order = [SPRINT_40.id, ULTRA.id, DIG.id];
+  const next = order[(order.indexOf(dailyBase("2026-12-31").id) + 1) % 3];
+  assert.equal(dailyBase("2027-01-01").id, next);
+  // 같은 날짜는 언제 만들어도 같은 모드(리플레이 검증이 이 값에 기댄다)
+  const ultraDay = dailyMode("2026-12-02");
+  assert.equal(ultraDay.timeLimit, ULTRA.timeLimit);
+  assert.equal(ultraDay.baseName, "Ultra");
+  assert.equal(findDaily("daily-20261202"), ultraDay);
+  assert.equal(dailyMode("2026-12-03").check.toString(), DIG.check.toString());
+});

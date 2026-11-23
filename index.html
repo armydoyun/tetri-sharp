@@ -22,7 +22,7 @@
         </h1>
         <p id="session-title" class="session-title"></p>
         <div class="header-actions">
-          <button id="pause-game" class="btn btn-ghost" type="button" aria-label="일시정지"><span data-icon="pause"></span></button>
+          <button id="pause-game" class="btn btn-ghost" type="button" aria-label="일시정지"><span data-icon="pause"></span><span class="header-label">일시정지</span></button>
           <button id="open-help" class="btn btn-ghost" type="button" aria-label="도움말"><span data-icon="help"></span><span class="header-label">도움말</span></button>
           <button id="open-settings" class="btn btn-ghost" type="button" aria-label="설정"><span data-icon="sliders"></span><span class="header-label">설정</span></button>
         </div>
@@ -50,6 +50,8 @@
             </div>
             <div class="welcome-actions">
               <button id="welcome-open" class="btn btn-primary btn-small" type="button"><span data-icon="help"></span><span class="btn-label">안내 보기</span></button>
+              <!-- 소리는 공용 PC를 생각해 기본으로 꺼 두지만, 처음 온 사람이 여기서 바로 켤 수 있게 한다 -->
+              <button id="welcome-sound" class="btn btn-small" type="button" aria-pressed="false"><span class="btn-label">소리 켜기</span></button>
               <button id="welcome-close" class="btn btn-ghost btn-small" type="button" aria-label="안내 닫기"><span data-icon="close"></span></button>
             </div>
           </section>
@@ -63,6 +65,8 @@
             </div>
             <div id="rule-tabs" class="segmented rule-tabs" role="group" aria-label="규칙"></div>
             <!-- 고른 규칙 설명: 두 줄 자리를 늘 차지한다 -->
+            <!-- Custom일 때: 내 규칙 고르기 + 공유. 다른 규칙일 때도 자리는 차지한다(탭을 바꿔도 아래가 움직이지 않게) -->
+            <div id="rule-slot-row" class="rule-slot-home"></div>
             <p id="rule-desc" class="rule-desc"></p>
           </section>
         </div>
@@ -76,40 +80,23 @@
               <button id="open-practice" class="tool-row" type="button"><span>연습</span><span data-icon="chevron-right"></span></button>
               <button id="open-puzzles" class="tool-row" type="button"><span>퍼즐</span><small id="puzzle-progress" class="tool-meta num"></small><span data-icon="chevron-right"></span></button>
               <button id="open-records" class="tool-row" type="button"><span>기록</span><span data-icon="chevron-right"></span></button>
+              <button id="open-achievements" class="tool-row" type="button"><span>업적</span><small id="achievement-progress" class="tool-meta num"></small><span data-icon="chevron-right"></span></button>
             </div>
           </section>
 
-          <section class="home-block race-entry" aria-labelledby="race-title">
-            <div class="block-head">
-              <h2 id="race-title" class="section-title">내 기록과 달리기</h2>
-            </div>
-            <p class="block-note">같은 규칙의 최고 기록 리플레이와 같은 블록 순서로 겨뤄요</p>
-            <p class="block-note race-empty">완주하면 같은 규칙의 내 기록과 달릴 수 있어요.</p>
-            <div id="race-modes" class="tool-list"></div>
-          </section>
-
+          <!-- 다시 보기: 마지막 판만. 리플레이 파일 열기와 백업은 설정의 데이터 탭,
+               내 기록과 달리기는 기록 대화상자와 결과 화면에서 한다 -->
           <section class="home-block" aria-labelledby="replay-tools-title">
             <div class="block-head">
-              <h2 id="replay-tools-title" class="section-title">리플레이</h2>
+              <h2 id="replay-tools-title" class="section-title">다시 보기</h2>
             </div>
             <div class="tool-list">
               <button id="watch-last" class="tool-row" type="button" disabled><span>마지막 판 다시 보기</span><small>저장된 판 없음</small><span data-icon="chevron-right"></span></button>
-              <button id="open-replay" class="tool-row" type="button"><span>파일 열기</span><span data-icon="folder"></span></button>
             </div>
-            <p id="replay-import-notice" class="inline-notice" role="status"></p>
-            <input id="replay-file" type="file" accept=".json,application/json" hidden />
           </section>
-
-          <section class="home-block" aria-labelledby="data-tools-title">
-            <div class="block-head">
-              <h2 id="data-tools-title" class="section-title">데이터</h2>
-            </div>
-            <div class="tool-list">
-              <button id="export-backup" class="tool-row" type="button"><span>백업 파일로 저장</span><span data-icon="download"></span></button>
-              <button id="import-backup" class="tool-row" type="button"><span>백업 불러오기</span><span data-icon="folder"></span></button>
-            </div>
-            <input id="backup-file" type="file" accept=".json,application/json" hidden />
-          </section>
+          <!-- 파일 고르기 창은 설정의 데이터 탭에서 연다(화면에는 보이지 않는다) -->
+          <input id="replay-file" type="file" accept=".json,application/json" hidden />
+          <input id="backup-file" type="file" accept=".json,application/json" hidden />
 
           <p id="menu-notice" class="notice-slot menu-notice" role="status"></p>
 
@@ -230,9 +217,9 @@
           <div id="confirm" class="panel" hidden>
             <div class="panel-card confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-desc">
               <h2 id="confirm-title" class="panel-title"></h2>
-              <p id="confirm-desc" class="confirm-desc">진행 중인 판은 기록되지 않고 사라져요.</p>
+              <p id="confirm-desc" class="confirm-desc">진행 중인 판은 저장되지 않고 사라져요.</p>
               <div class="actions-row">
-                <button type="button" class="btn" data-confirm="cancel"><span data-icon="play"></span><span class="confirm-cancel-text">계속하기</span> <kbd><kbd class="keycap">Esc</kbd></kbd></button>
+                <button type="button" class="btn" data-confirm="cancel"><span class="confirm-cancel-icon"></span><span class="confirm-cancel-text">계속하기</span> <kbd><kbd class="keycap">Esc</kbd></kbd></button>
                 <button type="button" class="btn btn-primary" data-confirm="ok"><span class="confirm-ok-icon"></span><span class="confirm-ok-text">다시 시작</span> <kbd class="confirm-ok-key"></kbd></button>
               </div>
             </div>
@@ -266,6 +253,8 @@
                 <!-- 새 기록일 때만 보이지만 자리는 늘 차지한다(원칙 2) -->
                 <p id="results-badge" class="badge is-invisible"><span data-icon="star"></span>새 기록</p>
                 <p id="race-result" class="race-result"></p>
+                <!-- 이번 판에 처음 이룬 업적(없으면 자리를 차지하지 않는다) -->
+                <p id="results-achievements" class="results-achievements" role="status"></p>
                 <dl id="results-stats" class="results-stats"></dl>
                 <details id="results-splits" class="results-splits">
                   <summary>구간 기록</summary>
@@ -349,7 +338,7 @@
               <button type="button" class="btn btn-ghost" data-replay="restart"><span data-icon="restart"></span><span>처음부터</span></button>
             </div>
             <div class="replay-actions">
-              <button type="button" class="btn" data-replay="practice" hidden><span class="btn-label">장면 연습</span></button>
+              <button type="button" class="btn btn-ghost" data-replay="practice" hidden><span class="btn-label">장면 연습</span></button>
               <button type="button" class="btn btn-ghost" data-replay="share"><span data-icon="link"></span><span>공유</span></button>
               <button type="button" class="btn btn-ghost" data-replay="race" hidden><span data-icon="play"></span><span>이 기록과 달리기</span></button>
             </div>
@@ -384,6 +373,7 @@
     <dialog id="share" class="dialog" aria-label="리플레이 공유"></dialog>
     <dialog id="versus" class="dialog" aria-label="CPU 대전"></dialog>
     <dialog id="daily" class="dialog" aria-label="오늘의 도전"></dialog>
+    <dialog id="achievements" class="dialog" aria-label="업적"></dialog>
     <!-- 화면 읽기 프로그램용 알림(보이지 않음): 줄 삭제·레벨업·결과 -->
     <p id="sr-status" class="sr-only" role="status" aria-live="polite"></p>
     <!-- ES Modules: 개발용 실행은 http://localhost를 사용한다. -->

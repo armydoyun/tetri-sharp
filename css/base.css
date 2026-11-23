@@ -14,6 +14,10 @@ body {
   font-size: var(--text-l);
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
+  /* 한국어는 어절 단위로만 줄을 바꾼다("홀드 제한 / 적 사용"처럼 낱말 중간에서 꺾이지 않게).
+     칸보다 긴 낱말만 예외로 끊는다(넘치지 않게). 영어에는 영향이 없다. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 /* 스크롤바 자리를 늘 비워 둔다: 조작법을 펼치는 등 페이지 길이가 바뀌어 스크롤바가 생기거나 없어져도
@@ -25,6 +29,18 @@ html {
 /* 게임 화면은 body 전체가 다크 → 비워 둔 스크롤바 자리(html 배경)도 같은 색 */
 html:has(> body:not([data-screen="menu"], [data-game-surface="scheme"])) {
   background: var(--game-bg);
+}
+
+/* 대화상자가 열리면 어두운 막(::backdrop)은 화면만 덮고 비워 둔 스크롤바 자리는 덮지 않는다
+   → 그 자리(html 배경)도 막을 겹친 색으로 칠해 오른쪽에 밝은 띠가 남지 않게.
+   스크롤바 자리에는 배경 색만 칠해지므로(그림 층은 안 된다) 겹친 결과를 불투명 색으로 만든다. */
+html:has(dialog:modal) {
+  background: color-mix(in srgb, var(--backdrop-mix), var(--bg));
+}
+
+/* 게임 화면은 라이트 모드에서도 body가 다크 값(tokens.css)이라 막도 다크 값(검정 60%)이다 */
+html:has(> body:not([data-screen="menu"], [data-game-surface="scheme"])):has(dialog:modal) {
+  background: color-mix(in srgb, rgb(0 0 0) 60%, var(--game-bg));
 }
 
 body {

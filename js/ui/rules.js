@@ -4,6 +4,7 @@ import { GRAVITY_OPTIONS, LIMITS, makeCustomRules, sanitizeRuleBody } from "../r
 import { button, el, fieldRow, fillDialog, rangeRow, slider, switchInput, tabBar } from "./dom.js";
 import { dropdown } from "./select.js";
 import { decodeRules, encodeRules, rulesLink } from "../rules/share.js";
+import { MAX_RULE_NAME, MAX_RULE_SLOTS } from "../storage/rule-slots.js";
 import { t } from "../i18n/index.js";
 
 const ms = frames => `${Math.round((frames * 1000) / 60)}ms`;
@@ -198,7 +199,11 @@ const TABS = [...FIELDS.filter(f => f.section).map(f => [f.section, f.section]),
 /**
  * @param {{ dialog: HTMLDialogElement, getRules: () => any, onChange: (body: any) => void, onClose?: () => void }} options
  */
-export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
+/**
+ * slots: 내 규칙(이름 붙인 Custom 규칙 여러 개). 편집기는 지금 고른 하나를 고친다.
+ *   read() → { slots: [{ name, body }], active }, rename(name), add(name, body) → 가득 찼으면 false, remove()
+ */
+export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) => {
   const control = (field, rules, disabled) => {
     const id = `rule-${field.path.replace(/\./g, "-")}`;
     const value = getPath(rules, field.path) ?? field.fallback;
@@ -284,7 +289,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
     });
     copyLink.addEventListener("click", async () => {
       message = (await copy(link, null))
-        ? t("링크를 복사했어요. 받은 사람이 열면 이 규칙이 Custom으로 들어가요")
+        ? t("링크를 복사했어요. 받은 사람이 열면 이 규칙이 내 규칙에 새로 들어가요")
         : t("복사하지 못했어요");
       notice.textContent = message;
     });
@@ -303,8 +308,12 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
         notice.textContent = t("읽을 수 없는 코드예요");
         return;
       }
-      onChange(body);
-      message = t("불러왔어요 · 기록표 {id}", { id: makeCustomRules(body).id });
+      // 받은 규칙은 지금 규칙을 덮어쓰지 않고 새 칸으로 들어간다
+      if (!slots.add(t("받은 규칙"), body)) {
+        notice.textContent = t("내 규칙이 가득 찼어요({n}개). 하나를 지우고 다시 불러와 주세요", { n: MAX_RULE_SLOTS });
+        return;
+      }
+      message = t("새 칸으로 불러왔어요 · 기록표 {id}", { id: makeCustomRules(body).id });
       render("rule-share-paste");
     };
     load.addEventListener("click", doLoad);
@@ -342,6 +351,60 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
     const rules = getRules();
     const scroll = keepScroll ? (dialog.querySelector(".dialog-body")?.scrollTop ?? 0) : 0;
     const body = el("div", {});
+
+    // 내 규칙 줄: 지금 고친 규칙의 이름, 새 규칙, 지우기(어느 탭에서든 보인다)
+    const state = slots.read();
+    const current = state.slots[state.active];
+    const nameInput = /** @type {HTMLInputElement} */ (
+      el("input", {
+        id: "rule-slot-name",
+        class: "text-input",
+        type: "text",
+        value: current.name,
+        maxLength: MAX_RULE_NAME,
+        "aria-label": t("규칙 이름"),
+        autocomplete: "off",
+      })
+    );
+    // 이름은 change에서만 저장한다(Enter도 change를 일으킨다). 저장하면 편집기를 다시 그리며 이 입력칸이 빠지는데,
+    // 그때 한 번 더 오는 change·blur에서 다시 그리면 그리는 도중에 또 그리게 되므로 한 번만 처리한다.
+    let saved = false;
+    const saveName = () => {
+      if (saved || !nameInput.isConnected || nameInput.value.trim() === current.name) return;
+      saved = true;
+      slots.rename(nameInput.value);
+      message = t("이름을 바꿨어요");
+      render("rule-slot-name");
+    };
+    nameInput.addEventListener("change", saveName);
+    const addSlot = button({ text: t("새 규칙"), iconName: "edit", className: "btn btn-small", id: "rule-slot-add" });
+    addSlot.disabled = state.slots.length >= MAX_RULE_SLOTS;
+    addSlot.addEventListener("click", () => {
+      if (!slots.add(t("내 규칙 {n}", { n: state.slots.length + 1 }), PRESET_LIST[0])) return;
+      message = t("새 규칙을 만들었어요(Modern 값에서 시작)");
+      render("rule-slot-name");
+    });
+    const removeSlot = button({
+      text: t("지우기"),
+      iconName: "close",
+      className: "btn btn-small",
+      id: "rule-slot-remove",
+    });
+    removeSlot.disabled = state.slots.length <= 1;
+    removeSlot.addEventListener("click", () => {
+      if (!window.confirm(t("‘{name}’ 규칙을 지울까요? 이 규칙의 기록은 남아요.", { name: current.name }))) return;
+      slots.remove();
+      message = t("규칙을 지웠어요");
+      render("rule-slot-name");
+    });
+    const slotRow = el(
+      "div",
+      { class: "rule-slot-row" },
+      el("span", { class: "field-help num", text: `${state.active + 1} / ${state.slots.length}` }),
+      nameInput,
+      addSlot,
+      removeSlot
+    );
 
     // 프리셋 줄과 탭은 몸통 위에 고정(어느 탭에서든 보인다)
     const presets = el(
@@ -397,7 +460,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
       notice,
       actions: [],
       closeId: "rules-close",
-      tabs: el("div", { class: "rule-tabs-head" }, presets, tabs),
+      tabs: el("div", { class: "rule-tabs-head" }, slotRow, presets, tabs),
     });
     body.scrollTop = scroll;
     if (focusId) /** @type {HTMLElement | null} */ (dialog.querySelector(`#${focusId}`))?.focus();
@@ -406,10 +469,14 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose }) => {
   dialog.addEventListener("close", () => onClose?.());
 
   return {
-    open() {
+    /** @param {"share"} [startTab] 공유 탭으로 바로 열기(첫 화면 규칙 카드의 공유 버튼) */
+    open(startTab) {
+      if (startTab === "share") tab = t("공유");
       render();
       dialog.showModal();
-      /** @type {HTMLElement | null} */ (dialog.querySelector("#rules-close"))?.focus();
+      /** @type {HTMLElement | null} */ (
+        dialog.querySelector(startTab === "share" ? "#rule-share-copy" : "#rules-close")
+      )?.focus();
     },
     get isOpen() {
       return dialog.open;

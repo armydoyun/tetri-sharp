@@ -184,6 +184,17 @@ export const masterGravity = level => {
 
 const MASTER_MAX = 999;
 
+/**
+ * Master 등급: 도달한 레벨만으로 정한다(표시 전용 — 진행·점수·리플레이와 무관).
+ * 0~899는 100마다 9급 → 1급, 900~998은 초단, 999에 닿으면 마스터.
+ */
+export const masterGrade = level =>
+  level >= MASTER_MAX
+    ? t("마스터")
+    : level >= 900
+      ? t("초단")
+      : t("{n}급", { n: 9 - Math.floor(Math.max(0, level) / 100) });
+
 /** @type {Mode} */
 export const MASTER = Object.freeze({
   id: "master",
@@ -207,10 +218,10 @@ export const MASTER = Object.freeze({
   hudTime: elapsed,
   summary: state => ({
     title: state.over === "clear" ? t("완료!") : t("게임 오버"),
-    main: t("레벨 {n}", { n: state.level }),
+    main: t("레벨 {n} · {grade}", { n: state.level, grade: masterGrade(state.level) }),
   }),
   record: Object.freeze({ metric: "level", order: "desc" }),
-  formatRecord: e => t("레벨 {n}", { n: e.level ?? 0 }),
+  formatRecord: e => t("레벨 {n} · {grade}", { n: e.level ?? 0, grade: masterGrade(e.level ?? 0) }),
   isRecordable: state => state.level > 0,
 });
 
@@ -323,11 +334,16 @@ export const SURVIVAL = Object.freeze({
   isRecordable: state => state.stats.pieces > 0,
 });
 
-/** @type {Mode} */
+/**
+ * 이전 Endless(id "zen"): 중력이 레벨 1에 고정이라 익숙해지면 끝나지 않는다.
+ * 메뉴에서는 빼고(ENDLESS가 대신한다), 저장된 기록·리플레이를 이전 규칙 그대로 보고 재생할 수 있게 남긴다.
+ * 리플레이는 열 때 지금의 모드 규칙으로 다시 계산해 검증하므로 이 모드의 규칙은 바꾸지 않는다.
+ * @type {Mode}
+ */
 export const ZEN = Object.freeze({
   id: "zen",
   hud: Object.freeze(["time", "score", "lines", "pieces", "pps"]),
-  name: "Endless",
+  name: t("Endless (이전 규칙)"),
   description: t("막힐 때까지 끝없이"),
   rules: MODERN,
   check: () => null,
@@ -339,7 +355,35 @@ export const ZEN = Object.freeze({
   isRecordable: state => state.stats.lines > 0,
 });
 
-export const MODES = Object.freeze([SPRINT_40, MARATHON, ULTRA, MASTER, DIG, SURVIVAL, ZEN]);
+export const ENDLESS_MAX_LEVEL = 20;
+
+/**
+ * Endless: 10줄마다 레벨이 오르고 레벨 20(가이드라인 곡선의 끝, 약 20G)까지 빨라진다 → 언젠가는 막힌다.
+ * 기록은 지운 줄 수. 이전 Endless(ZEN)와는 규칙이 달라 기록을 따로 둔다.
+ * @type {Mode}
+ */
+export const ENDLESS = Object.freeze({
+  id: "endless",
+  hud: Object.freeze(["time", "level", "lines", "pieces", "pps"]),
+  name: "Endless",
+  description: t("10줄마다 빨라지며 막힐 때까지"),
+  rules: MODERN,
+  check: () => null,
+  levelFor: state => Math.min(ENDLESS_MAX_LEVEL, 1 + Math.floor(state.stats.lines / LINES_PER_LEVEL)),
+  gravityFor: state => guidelineGravity(state.level),
+  hudLines: state => ({ label: t("줄"), value: String(state.stats.lines) }),
+  hudTime: elapsed,
+  summary: state => ({ title: t("게임 오버"), main: t("{n}줄", { n: state.stats.lines }) }),
+  record: Object.freeze({ metric: "lines", order: "desc" }),
+  formatRecord: recordLines,
+  isRecordable: state => state.stats.lines > 0,
+});
+
+export const MODES = Object.freeze([SPRINT_40, MARATHON, ULTRA, MASTER, DIG, SURVIVAL, ENDLESS]);
+/** 메뉴에는 없지만 저장된 기록·리플레이를 위해 찾을 수 있는 이전 규칙 모드 */
+export const LEGACY_MODES = Object.freeze([ZEN]);
+/** 기록 화면에서 고를 수 있는 모드: 지금 모드 + 이전 규칙 모드 */
+export const RECORD_MODES = Object.freeze([...MODES, ...LEGACY_MODES]);
 /** "내 기록과 달리기"를 할 수 있는 모드 */
 export const RACE_MODES = Object.freeze(MODES.filter(m => m.race));
-export const findMode = id => MODES.find(m => m.id === id) ?? findPractice(id) ?? findVersus(id) ?? SPRINT_40;
+export const findMode = id => RECORD_MODES.find(m => m.id === id) ?? findPractice(id) ?? findVersus(id) ?? SPRINT_40;

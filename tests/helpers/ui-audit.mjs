@@ -38,9 +38,13 @@ export const auditInPage = () => {
     }
     return { left, top, right: Math.min(right, innerWidth), bottom: Math.min(bottom, innerHeight) };
   };
-  // 열린 모달 대화상자가 있으면 그것만 본다(뒤 화면은 가려져 있다)
+  // 열린 모달 대화상자가 있으면 그것만 본다(뒤 화면은 가려져 있다).
+  // 좁거나 낮은 화면에서 화면 전체를 덮는 보드 패널(일시정지·확인·결과)도 같다.
+  const coveringPanel = [...document.querySelectorAll(".board-wrap > .panel:not([hidden])")].find(
+    p => getComputedStyle(p).position === "fixed"
+  );
   const modal = [...document.querySelectorAll("dialog[open]")].pop();
-  const root = modal ?? document.body;
+  const root = modal ?? coveringPanel ?? document.body;
   const all = [root, ...root.querySelectorAll("*")].filter(visible);
   const extra = modal ? [...document.querySelectorAll(".select-list")].filter(visible) : [];
 

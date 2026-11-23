@@ -51,32 +51,59 @@ export const applyBattleLock = (state, ev, events) => {
 
 /**
  * 난이도: pps = CPU가 1초에 놓는 피스 수, mistake = 가장 좋은 자리 대신 차선을 고를 확률(%),
- * hold = 홀드를 쓰는지, holdMinGain = 홀드로 바꿀 때 필요한 최소 배치 점수 차이.
+ * hold = 홀드를 쓰는지, holdMinGain = 홀드로 바꿀 때 필요한 최소 배치 점수 차이,
+ * tucks = 바닥에서 옆으로 밀어 넣는지, spins = T를 바닥에서 돌려 넣는지(T-spin).
  */
 export const LEVELS = Object.freeze([
   Object.freeze({ id: "easy", name: t("쉬움"), pps: 0.7, mistake: 20, hold: false }),
   Object.freeze({ id: "easy-plus", name: t("쉬움+"), pps: 0.95, mistake: 16, hold: true, holdMinGain: 3 }),
-  Object.freeze({ id: "normal", name: t("보통"), pps: 1.2, mistake: 12, hold: true }),
-  Object.freeze({ id: "normal-plus", name: t("보통+"), pps: 1.6, mistake: 8, hold: true }),
-  Object.freeze({ id: "hard", name: t("어려움"), pps: 2, mistake: 3, hold: true }),
-  Object.freeze({ id: "hard-plus", name: t("어려움+"), pps: 2.6, mistake: 1, hold: true }),
-  Object.freeze({ id: "master", name: t("최강"), pps: 3.2, mistake: 0, hold: true }),
+  Object.freeze({ id: "normal", name: t("보통"), pps: 1.2, mistake: 12, hold: true, tucks: true }),
+  Object.freeze({ id: "normal-plus", name: t("보통+"), pps: 1.6, mistake: 8, hold: true, tucks: true }),
+  Object.freeze({ id: "hard", name: t("어려움"), pps: 2, mistake: 3, hold: true, tucks: true, spins: true }),
+  Object.freeze({ id: "hard-plus", name: t("어려움+"), pps: 2.6, mistake: 1, hold: true, tucks: true, spins: true }),
+  Object.freeze({ id: "master", name: t("최강"), pps: 3.2, mistake: 0, hold: true, tucks: true, spins: true }),
 ]);
 
 /** 대전에서 상대를 이겼을 때 엔진에 넣는 결과 */
 export const WIN = "win";
 
+/**
+ * CPU 성향(난이도와 따로 고른다). 판을 보는 기준만 다르다(js/ai/bot.js STYLE_WEIGHTS).
+ * 같은 어려움 봇끼리 60판에서 균형 대비 4줄 노림 35%, 안정 53%.
+ */
+export const STYLES = Object.freeze([
+  Object.freeze({ id: "balanced", name: t("균형"), hint: t("4줄을 노리다가 판이 높아지면 무엇이든 지워요") }),
+  Object.freeze({
+    id: "quad",
+    name: t("4줄 노림"),
+    hint: t("한 칸 빈 줄을 쌓아 4줄로 크게 공격하지만, 쌓는 동안 공격에 약해요"),
+  }),
+  Object.freeze({ id: "safe", name: t("안정"), hint: t("판을 낮게 지키며 자주 지워요") }),
+]);
+
+/** 전적 열쇠: 균형은 난이도 id 그대로(이전 전적과 이어진다), 다른 성향은 "난이도-성향" */
+export const versusStatKey = (levelId, style = "balanced") => (style === "balanced" ? levelId : `${levelId}-${style}`);
+
 const cache = new Map();
 
-/** 난이도 → 모드 객체(같은 난이도는 같은 객체). 나와 CPU가 같은 모드 객체를 쓰고 상태만 따로 가진다. */
-export const versusMode = level => {
-  if (cache.has(level.id)) return cache.get(level.id);
+/**
+ * 난이도·성향 → 모드 객체(같은 조합은 같은 객체). 나와 CPU가 같은 모드 객체를 쓰고 상태만 따로 가진다.
+ * 균형은 이전과 같은 id("versus-hard")라 저장된 이어서 하기·전적과 그대로 맞는다.
+ */
+export const versusMode = (level, style = "balanced") => {
+  const key = `${level.id}|${style}`;
+  if (cache.has(key)) return cache.get(key);
+  const styleInfo = STYLES.find(x => x.id === style) ?? STYLES[0];
   const mode = Object.freeze({
-    id: `versus-${level.id}`,
-    name: t("CPU 대전 · {level}", { level: level.name }),
+    id: style === "balanced" ? `versus-${level.id}` : `versus-${level.id}-${style}`,
+    name:
+      style === "balanced"
+        ? t("CPU 대전 · {level}", { level: level.name })
+        : t("CPU 대전 · {level} · {style}", { level: level.name, style: styleInfo.name }),
     description: t("CPU와 쓰레기 줄을 주고받기 · 먼저 막히면 패배"),
     rules: MODERN,
-    versus: level,
+    // 봇이 읽는 값: 난이도(속도·실수·기술) + 성향
+    versus: Object.freeze({ ...level, style: styleInfo.id }),
     hud: Object.freeze(["time", "attack", "lines", "pieces", "pps"]),
     setup: setupBattleGarbage,
     onLock: applyBattleLock,
@@ -91,13 +118,17 @@ export const versusMode = level => {
     formatRecord: e => formatTime(e.frames),
     isRecordable: () => false,
   });
-  cache.set(level.id, mode);
+  cache.set(key, mode);
   return mode;
 };
 
 export const findVersus = id => {
-  const level = LEVELS.find(l => `versus-${l.id}` === id);
-  return level ? versusMode(level) : null;
+  for (const level of LEVELS)
+    for (const style of STYLES) {
+      const mode = versusMode(level, style.id);
+      if (mode.id === id) return mode;
+    }
+  return null;
 };
 
 /** 한 프레임 뒤: 서로 보낸 줄을 상대의 받을 쓰레기로 옮긴다. */

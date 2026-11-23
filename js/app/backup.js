@@ -7,33 +7,21 @@ import { t } from "../i18n/index.js";
  * @param {{
  *   store: ReturnType<typeof import("../storage/store.js").createStore>,
  *   findMode: (id: string) => any,
- *   exportButton: HTMLElement,
- *   importButton: HTMLElement,
  *   fileInput: HTMLInputElement,
  *   canImport: () => boolean,
  *   confirmImport: (message: string) => boolean,
  *   notify: (text: string) => void,
  *   onRestored: () => void,
  * }} options  onRestored: 메모리에 들고 있던 값들을 저장소에서 다시 읽는다
+ * @returns {{ exportBackup: () => void, importBackup: () => void }}  설정의 데이터 탭 버튼이 부른다
  */
-export const setupBackup = ({
-  store,
-  findMode,
-  exportButton,
-  importButton,
-  fileInput,
-  canImport,
-  confirmImport,
-  notify,
-  onRestored,
-}) => {
-  exportButton.addEventListener("click", () => {
+export const setupBackup = ({ store, findMode, fileInput, canImport, confirmImport, notify, onRestored }) => {
+  const exportBackup = () => {
     const backup = createBackup(store);
     downloadJson(backup, `tetri-sharp-backup-${backup.date.slice(0, 10).replace(/-/g, "")}.json`);
     notify(t("설정·기록·리플레이를 백업 파일로 저장했어요."));
-  });
-
-  importButton.addEventListener("click", () => fileInput.click());
+  };
+  const importBackup = () => fileInput.click();
   let request = 0;
   fileInput.addEventListener("change", async () => {
     const current = ++request;
@@ -73,4 +61,5 @@ export const setupBackup = ({
     onRestored();
     notify(t("백업을 불러왔어요 · 기록 {records}개, 리플레이 {replays}개", { records: count, replays: replayCount }));
   });
+  return { exportBackup, importBackup };
 };

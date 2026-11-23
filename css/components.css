@@ -469,6 +469,8 @@
 /* ---- 목록 줄(모드·연습): [번호 | 이름·설명 | 기록 | >] ---- */
 .menu-list {
   display: grid;
+  /* 열 폭을 화면 폭에 묶는다: 안 그러면 가장 긴 줄(영어 설명 등)의 최소 폭만큼 목록이 화면 밖으로 넓어진다 */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-1);
 }
 
@@ -513,6 +515,20 @@
   font-family: var(--font-num);
   font-size: var(--text-s);
   font-weight: 700;
+}
+
+/* 번호가 있는 목록(연습·CPU 대전 등): 번호는 제목 줄 높이에 맞춘다.
+   가운데 정렬이면 설명이 두 줄일 때 번호가 제목과 설명 사이에 떠 보인다. 화살표만 가운데. */
+.menu-row:has(> .menu-index) {
+  align-items: start;
+}
+
+.menu-row:has(> .menu-index) > .menu-index {
+  line-height: calc(var(--text-xl) * 1.2);
+}
+
+.menu-row:has(> .menu-index) > .icon {
+  align-self: center;
 }
 
 .menu-row:hover .menu-index,
@@ -690,6 +706,19 @@
   }
 }
 
+/* 좁은 화면: 탭 다섯 개가 4 + 1로 꺾여 하나만 덩그러니 남지 않게 한 줄에 셋씩(3 + 2).
+   선택지 네 개(조작감 등)는 한 줄에 넣으면 칸이 60px 안팎이라 "느긋하/게"처럼 꺾이므로 2 × 2로 */
+@media (max-width: 420px) {
+  .dialog-tabs .segmented > button {
+    flex-basis: 30%;
+  }
+
+  .choice:has(> button:nth-child(4):last-child) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: row;
+  }
+}
+
 .dialog-body {
   flex: 1;
   overflow: auto;
@@ -864,6 +893,39 @@
   gap: var(--space-3);
 }
 
+/* 편집기 머리: 내 규칙(번호 · 이름 · 새 규칙 · 지우기) */
+.rule-slot-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.rule-slot-row > .field-help {
+  margin: 0;
+  white-space: nowrap;
+}
+
+/* 좁은 화면: [번호 · 이름] / [새 규칙 · 지우기] 두 줄(한 줄이면 이름 칸이 0으로 찌그러진다) */
+@media (max-width: 480px) {
+  .rule-slot-row {
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .rule-slot-row > .text-input {
+    grid-column: 2 / -1;
+  }
+
+  .rule-slot-row > .btn {
+    grid-row: 2;
+  }
+
+  .rule-slot-row > #rule-slot-add {
+    grid-column: 1 / 3;
+  }
+}
+
 .rule-presets {
   display: grid;
   grid-template-columns: auto repeat(3, minmax(0, 1fr));
@@ -885,8 +947,8 @@
   }
 }
 
+/* 탭 줄은 설정 탭과 같은 규칙(넘치면 꺾이고, 좁으면 3 + 2)을 따른다 */
 .rule-tabs-head .segmented {
-  display: grid;
   width: 100%;
 }
 
@@ -911,6 +973,18 @@
 
 .record-name-form .text-input {
   height: var(--control-h);
+}
+
+/* 최고 기록의 랭크 · 다음 랭크 기준 */
+.records-rank {
+  margin: var(--space-3) 0 0;
+  color: var(--text-dim);
+  font-size: var(--text-m);
+}
+
+.records-rank strong {
+  color: var(--accent);
+  font-weight: 800;
 }
 
 .records-table {
@@ -947,7 +1021,7 @@
 }
 
 .records-table :is(th, td):nth-child(2) {
-  width: 22%;
+  width: 16%;
   text-align: left;
 }
 
@@ -955,12 +1029,24 @@
   font-weight: 800;
 }
 
+/* 기록 칸은 숫자 칸보다 넓게: Master는 "레벨 999 · 마스터"처럼 등급까지 적는다.
+   좁은 화면에서는 그래도 모자라 단어 사이에서 두 줄로 꺾는다(줄 높이 42px에 두 줄이 들어간다). */
+.records-table :is(th, td):nth-child(3) {
+  width: 21%;
+}
+
+.records-table td:nth-child(3) {
+  white-space: normal;
+  line-height: 1.2;
+}
+
 .records-table :is(th, td):nth-child(7) {
   width: 92px;
 }
 
+/* 리플레이 "▷ 보기 / ▷ Watch" 버튼(영어 84px) + 칸 안쪽 여백 */
 .records-table :is(th, td):last-child {
-  width: 84px;
+  width: 100px;
 }
 
 .records-table td.record-player {
@@ -1010,6 +1096,16 @@
 
   .records-table :is(th, td):last-child {
     width: 68px;
+  }
+
+  /* "▷ 보기"는 68px 칸을 넘어 대화상자 밖으로 잘린다 → 재생 표시만(이름은 aria-label "n위 리플레이 보기") */
+  .records-table td:last-child .btn-label {
+    display: none;
+  }
+
+  .records-table td:last-child .btn {
+    min-width: 44px;
+    padding-inline: var(--space-2);
   }
 }
 
@@ -1151,7 +1247,7 @@ body.touch-on :is(.btn, .btn-small, .key-slot, .select, .text-input, .choice > b
   gap: 2px;
 }
 
-.daily-today select {
+.daily-today .select {
   width: fit-content;
   max-width: 100%;
 }
@@ -1192,6 +1288,17 @@ body.touch-on :is(.btn, .btn-small, .key-slot, .select, .text-input, .choice > b
 @media (max-width: 560px) {
   .daily-head {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 좁은 휴대폰: 받은 코드 칸이 옆 버튼에 밀려 안내 글자가 잘리지 않게 칸을 한 줄 다 쓰고 버튼은 아래로 */
+@media (max-width: 420px) {
+  .inline-control:has(> #daily-paste) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .inline-control:has(> #daily-paste) > .btn {
+    justify-self: start;
   }
 }
 
@@ -1271,9 +1378,27 @@ body.touch-on :is(.btn, .btn-small, .key-slot, .select, .text-input, .choice > b
 }
 
 /* ---- 퍼즐 단계 격자 ---- */
+/* 장: 제목 줄(이름 · 깬 수) + 격자 */
+.puzzle-chapter-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-m);
+  font-weight: 800;
+}
+
+.puzzle-chapter-title small {
+  color: var(--text-dim);
+  font-size: var(--text-s);
+  font-weight: 700;
+}
+
+/* 넓으면 6열, 좁으면 3열 */
 .puzzle-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: var(--space-2);
   padding: var(--space-2) 0 var(--space-4);
 }
@@ -1420,6 +1545,17 @@ body.touch-on :is(.btn, .btn-small, .key-slot, .select, .text-input, .choice > b
 #records[open] { height: min(810px, calc(100dvh - 16px)); }
 .puzzle-tile small { text-align: center; overflow-wrap: anywhere; line-height: 1.2; }
 
+@media (max-width: 560px) {
+  .puzzle-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  /* 세 칸이면 "T-spin Double"이 한 줄로는 타일 가장자리에 닿는다 → 띄어쓰기에서 두 줄 */
+  .puzzle-tile small {
+    white-space: normal;
+  }
+}
+
 .puzzle-editor-board {
   display: grid;
   grid-template-columns: repeat(10, minmax(0, 1fr));
@@ -1491,4 +1627,83 @@ body.touch-on :is(.btn, .btn-small, .key-slot, .select, .text-input, .choice > b
 .sprint-history-chart .sprint-dnf {
   border: 1px solid var(--border-strong);
   background: transparent;
+}
+
+/* ---- 업적 대화상자: 묶음 제목(이룬 수) + 목록. 이룬 것은 체크와 날짜, 아직은 흐리게 ---- */
+.achievement-group-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-m);
+  font-weight: 800;
+}
+
+.achievement-group-title small {
+  color: var(--text-dim);
+  font-size: var(--text-s);
+}
+
+.achievement-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.achievement {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: var(--space-1) 0;
+  border-bottom: var(--border-w) solid var(--border);
+}
+
+.achievement-mark {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border-strong);
+  border-radius: var(--radius-s);
+}
+
+/* 아직 못 이룬 것: 흐린 점선 — 눌러서 고르는 체크 상자처럼 보이지 않게 */
+.achievement:not(.is-done) .achievement-mark {
+  border-style: dashed;
+  border-color: var(--border);
+}
+
+.achievement.is-done .achievement-mark {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.achievement-mark .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.achievement-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.achievement-text strong {
+  font-size: var(--text-m);
+}
+
+.achievement-text small,
+.achievement-date {
+  color: var(--text-dim);
+  font-size: var(--text-s);
+}
+
+.achievement:not(.is-done) .achievement-text strong {
+  color: var(--text-dim);
 }

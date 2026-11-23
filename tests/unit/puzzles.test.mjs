@@ -71,3 +71,41 @@ test("깬 단계 기록과 다음 단계", () => {
   store.set("puzzle:cleared", [1, "x", 99, 3]);
   assert.deepEqual([...progress.cleared()], [1, 3], "이상한 값은 버린다");
 });
+
+test("퍼즐 순서: 판 비우기 → T-spin Double → T-spin Triple 장, 장 안에서는 피스가 적은 것부터", async () => {
+  const { CHAPTERS } = await import("../../js/modes/puzzles.js");
+  assert.deepEqual(
+    PUZZLES.map(p => p.number),
+    PUZZLES.map((_, i) => i + 1),
+    "보이는 번호는 1부터 차례로"
+  );
+  const chapterIndex = PUZZLES.map(p => CHAPTERS.indexOf(p.kind));
+  assert.deepEqual(
+    chapterIndex,
+    [...chapterIndex].sort((a, b) => a - b),
+    "장 순서"
+  );
+  for (let i = 1; i < PUZZLES.length; i++) {
+    if (PUZZLES[i].kind === PUZZLES[i - 1].kind)
+      assert.ok(PUZZLES[i].pieces.length >= PUZZLES[i - 1].pieces.length, `단계 ${i + 1}: 피스 수가 줄지 않는다`);
+  }
+  assert.deepEqual(
+    PUZZLES.map(p => p.id).sort((a, b) => a - b),
+    PUZZLES.map((_, i) => i + 1),
+    "id는 만들 때의 번호 1~30"
+  );
+});
+
+test("퍼즐 id는 바뀌지 않는다: 예전 번호로 저장된 진행도·리플레이가 같은 판을 가리킨다", () => {
+  // 예전 17단계는 2피스 판 비우기였다(순서를 바꾸기 전 번호)
+  const old17 = findPuzzle("puzzle-17").puzzle;
+  assert.equal(old17.id, 17);
+  assert.equal(old17.kind, "pc");
+  assert.equal(old17.pieces.length, 2);
+  assert.notEqual(old17.number, 17, "보이는 번호는 바뀌었다");
+  const store = createStore(memoryBackend());
+  store.set("puzzle:cleared", [1, 17]);
+  const progress = createPuzzleProgress(store);
+  assert.ok(progress.cleared().has(old17.id));
+  assert.equal(progress.next().number, 2, "보이는 순서로 처음 안 깬 단계");
+});

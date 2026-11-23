@@ -145,7 +145,7 @@ test("이어서 하기: 일곱 기본 모드에서 새로고침 뒤 같은 보�
     }, n);
   const snapshot = () => page.locator("#board").evaluate(canvas => canvas.toDataURL());
   try {
-    for (const id of ["sprint40", "marathon", "ultra", "master", "dig", "survival", "zen"]) {
+    for (const id of ["sprint40", "marathon", "ultra", "master", "dig", "survival", "endless"]) {
       await page.click(`[data-mode="${id}"]`);
       await advance(24);
       await page.keyboard.press("Space");
@@ -293,7 +293,9 @@ test("이어서 하기: 날짜 도전, 최고 기록과 달리기, 리플레이 
     assert.equal(await text(page, "session-title"), daily);
     await discard();
 
-    await page.click('[data-race="sprint40"]');
+    // 내 기록과 달리기는 기록 대화상자에서 시작한다
+    await page.click("#open-records");
+    await page.click("#records-race");
     await advance(90);
     const race = await page.locator("#race-progress").evaluate(el => el.value);
     assert.ok(race > 0);
@@ -331,7 +333,7 @@ test("이어서 하기: 새 판을 취소한 뒤 Sprint를 완주하면 기록�
     await playReplayFrames(page, replay.inputs, 0, 241);
     await page.reload();
     const confirmation = page.waitForEvent("dialog").then(dialog => dialog.dismiss());
-    await page.click('[data-mode="zen"]');
+    await page.click('[data-mode="endless"]');
     await confirmation;
     assert.equal(await visible(page, "continue-run"), true);
     await page.click("#continue-run");
@@ -453,7 +455,7 @@ test("메뉴 → Sprint 40L: 하드 드롭·홀드·일시정지·재시작", as
 
 test("로고: 게임 중이면 물은 뒤 첫 화면으로, 결과 화면에서는 바로 첫 화면으로", async () => {
   const { context, page, errors } = await openPage();
-  await startMode(page, "zen");
+  await startMode(page, "endless");
   await page.keyboard.press("Space");
   await page.click("#go-home");
   assert.equal(await visible(page, "confirm"), true);
@@ -465,7 +467,7 @@ test("로고: 게임 중이면 물은 뒤 첫 화면으로, 결과 화면에서�
   assert.equal(await visible(page, "menu"), true);
 
   // 끝난 판: 묻지 않는다. 결과 화면의 R도 바로 다시 시작
-  await startMode(page, "zen");
+  await startMode(page, "endless");
   for (let i = 0; i < 40; i++) await page.keyboard.press("Space");
   await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
   await page.keyboard.press("KeyR");
@@ -476,7 +478,7 @@ test("로고: 게임 중이면 물은 뒤 첫 화면으로, 결과 화면에서�
   await page.keyboard.press("Escape");
   await page.click('#pause [data-action="menu"]');
   await page.click('[data-confirm="ok"]');
-  await startMode(page, "zen");
+  await startMode(page, "endless");
   for (let i = 0; i < 40; i++) await page.keyboard.press("Space");
   await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
   await page.click("#go-home");
@@ -487,7 +489,7 @@ test("로고: 게임 중이면 물은 뒤 첫 화면으로, 결과 화면에서�
 
 test("막히면 결과 화면이 뜨고, Space 연타로 건너뛰지 않으며, Esc로 메뉴", async () => {
   const { context, page, errors } = await openPage();
-  await startMode(page, "zen");
+  await startMode(page, "endless");
   for (let i = 0; i < 40; i++) await page.keyboard.press("Space");
   await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
   assert.equal(await text(page, "results-title"), "게임 오버");
@@ -648,7 +650,7 @@ test("Custom 규칙: 편집 내용이 저장되고 기록표 id가 바뀌며, �
 
 test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파일 저장 → 메뉴에서 열기", async () => {
   const { context, page, errors } = await openPage();
-  await startMode(page, "zen");
+  await startMode(page, "endless");
   for (let i = 0; i < 40; i++) await page.keyboard.press(i % 3 ? "Space" : "ArrowLeft");
   await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 5000 });
   const pieces = await text(page, "hud-pieces");
@@ -688,7 +690,7 @@ test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파�
   assert.equal(await page.locator('#share input[type="url"]').evaluate(el => el === document.activeElement), true);
   const [download] = await Promise.all([page.waitForEvent("download"), page.click("#share-file")]);
   await page.click("#share-close");
-  assert.match(download.suggestedFilename(), /^tetri-sharp-zen-.*\.json$/);
+  assert.match(download.suggestedFilename(), /^tetri-sharp-endless-.*\.json$/);
   const file = await download.path();
   const saved = JSON.parse(fs.readFileSync(file, "utf8"));
   assert.equal(saved.app, "tetri-sharp");
@@ -720,10 +722,10 @@ test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파�
   await page
     .locator("#replay-file")
     .setInputFiles({ name: "bad.json", mimeType: "application/json", buffer: Buffer.from("{oops") });
-  await page.waitForFunction(() => document.getElementById("replay-import-notice")?.textContent !== "", null, {
+  await page.waitForFunction(() => document.getElementById("menu-notice")?.textContent !== "", null, {
     timeout: 3000,
   });
-  assert.match(await text(page, "replay-import-notice"), /읽을 수 없는/);
+  assert.match(await text(page, "menu-notice"), /읽을 수 없는/);
   assert.deepEqual(errors, []);
   await context.close();
 });
@@ -810,7 +812,7 @@ test("레이아웃 고정: 규칙 탭을 바꾸거나 메뉴 알림이 생겨도
   await page
     .locator("#replay-file")
     .setInputFiles({ name: "x.json", mimeType: "application/json", buffer: Buffer.from("{") });
-  await page.waitForFunction(() => document.getElementById("replay-import-notice")?.textContent !== "");
+  await page.waitForFunction(() => document.getElementById("menu-notice")?.textContent !== "");
   assert.deepEqual(await rects(page, sels), before, "알림이 생긴 뒤");
   assert.deepEqual(errors, []);
   await context.close();
@@ -872,7 +874,7 @@ test("레이아웃 고정: 설정 알림이 생겨도 버튼이 움직이지 않
   assert.deepEqual(await rects(page, sels), before);
   await page.click("#settings-close");
 
-  await startMode(page, "zen");
+  await startMode(page, "endless");
   for (let i = 0; i < 40; i++) await page.keyboard.press("Space");
   await page.waitForFunction(() => !document.getElementById("results")?.hidden);
   const badge = await rects(page, ["#results-badge"]);
@@ -1039,11 +1041,15 @@ test("Sprint 최고 기록과 달리기: 같은 규칙에서 시작하고 상대
     localStorage.setItem("tetrisharp:records", JSON.stringify({ [key]: [record] }));
     localStorage.setItem("tetrisharp:replay:best", JSON.stringify({ [key]: replay }));
   }, fixture);
-  await page.click('[data-rules="retro"]');
-  assert.equal(await page.locator('[data-race="sprint40"]').isDisabled(), true);
-  await page.click('[data-rules="modern"]');
-  assert.equal(await page.locator('[data-race="ultra"]').isDisabled(), true, "Ultra 최고 기록은 없다");
-  await page.click('[data-race="sprint40"]');
+  // 기록 대화상자: 최고 기록 리플레이가 있는 모드·규칙에서만 "최고 기록과 달리기"가 보인다
+  await page.click("#open-records");
+  await choose(page, "records-rules", "retro");
+  assert.equal(await page.locator("#records-race").count(), 0, "Retro 최고 기록은 없다");
+  await choose(page, "records-rules", "modern");
+  await choose(page, "records-mode", "ultra");
+  assert.equal(await page.locator("#records-race").count(), 0, "Ultra 최고 기록은 없다");
+  await choose(page, "records-mode", "sprint40");
+  await page.click("#records-race");
   assert.equal(await visible(page, "race-board"), true);
   await page.waitForFunction(() => document.getElementById("race-progress").value > 0);
   await page.click("#pause-game");
@@ -1144,7 +1150,7 @@ test("게임패드 버튼 바꾸기: 설정에서 칸을 누르고 패드 버튼
 
 test("통계: 결과 화면에서 열면 이번 판 통계가 보인다", async () => {
   const { context, page, errors } = await openPage();
-  await startMode(page, "zen");
+  await startMode(page, "endless");
   for (let i = 0; i < 40; i++) await page.keyboard.press("Space");
   await page.waitForFunction(() => !document.getElementById("results")?.hidden);
   await page.click('[data-action="stats"]');
@@ -1158,7 +1164,7 @@ test("통계: 결과 화면에서 열면 이번 판 통계가 보인다", async 
   await context.close();
 });
 
-test("규칙 공유: 편집기에서 코드를 붙여 넣으면 불러오고, #rules= 링크로 열면 Custom으로 들어온다", async () => {
+test("규칙 공유: 받은 코드·링크는 지금 규칙을 덮어쓰지 않고 내 규칙에 새 칸으로 들어온다", async () => {
   const { context, page, errors } = await openPage();
   // Retro 내용의 코드를 편집기에서 얻는다
   await page.click('[data-rules="custom"]');
@@ -1170,13 +1176,21 @@ test("규칙 공유: 편집기에서 코드를 붙여 넣으면 불러오고, #r
   await page.click('[data-preset="modern"]');
   await page.locator("#rule-share-paste").fill(code);
   await page.click("#rule-share-load");
-  assert.match(await text(page, "rules-record"), /불러왔어요/);
+  assert.match(await text(page, "rules-record"), /새 칸으로 불러왔어요/);
+  assert.equal(await page.locator("#rule-slot-name").inputValue(), "받은 규칙");
   await page.click('.dialog-tabs [data-value="피스"]');
   assert.match(await page.locator("#rule-rotation .select-value").textContent(), /킥 없음/);
   await page.click('.dialog-tabs [data-value="공유"]');
   await page.locator("#rule-share-paste").fill("엉터리");
   await page.click("#rule-share-load");
   assert.match(await text(page, "rules-record"), /읽을 수 없는/);
+  await page.click("#rules-close");
+  // 첫 화면: 내 규칙 두 개, 원래 규칙(Modern 값)은 그대로
+  await choose(page, "rule-slot", "0");
+  await page.click("#edit-rules");
+  await page.click('.dialog-tabs [data-value="피스"]');
+  assert.equal(await page.locator("#rule-slot-name").inputValue(), "내 규칙 1");
+  assert.match(await page.locator("#rule-rotation .select-value").textContent(), /SRS/, "덮어쓰지 않았다");
   await page.click("#rules-close");
   await context.close();
 
@@ -1188,12 +1202,37 @@ test("규칙 공유: 편집기에서 코드를 붙여 넣으면 불러오고, #r
   await p2.goto(`${url}#rules=${code.slice(4)}`);
   await p2.waitForFunction(() => document.documentElement.dataset.ready === "1");
   assert.equal(await p2.locator('[data-rules="custom"]').getAttribute("aria-pressed"), "true");
-  assert.match(await p2.locator("#menu-notice").textContent(), /불러왔어요/);
+  assert.match(await p2.locator("#menu-notice").textContent(), /내 규칙에 새로 넣었어요/);
   assert.equal(new URL(p2.url()).hash, "", "주소의 해시는 지운다");
+  assert.equal(await p2.locator("#rule-slot .select-value").textContent(), "받은 규칙");
   await p2.click("#edit-rules");
   assert.match(await p2.locator("#rule-rotation .select-value").textContent(), /킥 없음/);
   assert.deepEqual([...errors, ...errs2], []);
   await fresh.close();
+});
+
+test("내 규칙: 첫 화면에서 고르고 공유 탭을 열며, 편집기에서 새 규칙·이름·지우기를 한다", async () => {
+  const { context, page, errors } = await openPage();
+  // Custom이 아닐 때는 내 규칙 줄이 보이지 않지만 자리는 그대로
+  assert.equal(await page.locator("#rule-slot-row").evaluate(el => getComputedStyle(el).visibility), "hidden");
+  await page.click('[data-rules="custom"]');
+  assert.equal(await page.locator("#rule-slot-row").evaluate(el => getComputedStyle(el).visibility), "visible");
+  await page.click("#rule-slot-share");
+  assert.equal(await page.locator("#rule-share-code").isVisible(), true, "공유 탭으로 열린다");
+  await page.click("#rule-slot-add");
+  await page.locator("#rule-slot-name").fill("대회용");
+  await page.keyboard.press("Enter");
+  assert.equal(await page.locator("#rule-slot-name").inputValue(), "대회용");
+  await page.click("#rules-close");
+  // 대화상자의 close 이벤트(첫 화면 다시 그리기)는 닫은 다음 차례에 온다
+  await page.waitForFunction(() => document.querySelector("#rule-slot .select-value")?.textContent === "대회용");
+  await page.click("#edit-rules");
+  page.once("dialog", dialog => dialog.accept());
+  await page.click("#rule-slot-remove");
+  assert.equal(await page.locator("#rule-slot-name").inputValue(), "내 규칙 1");
+  assert.equal(await page.locator("#rule-slot-remove").isDisabled(), true, "마지막 하나는 지울 수 없다");
+  assert.deepEqual(errors, []);
+  await context.close();
 });
 
 test("연습: 메뉴에서 고르면 시작하고, 놓을 때마다 성공/시도를 센다", async () => {
@@ -1640,7 +1679,12 @@ test("전체 흐름: Survival 한 판 → 결과·새 기록 → 기록표 리�
   assert.equal(await visible(page, "menu"), true);
 
   // 백업 저장
+  // 백업은 설정의 데이터 탭에 있다
+  await page.click("#open-settings");
+  await page.click('#settings .dialog-tabs [data-value="data"]');
   const [download] = await Promise.all([page.waitForEvent("download"), page.click("#export-backup")]);
+  assert.match(await text(page, "settings-notice"), /백업 파일로 저장했어요/, "결과는 설정의 알림 칸에");
+  await page.keyboard.press("Escape");
   const file = path.join(dir, "backup.json");
   await download.saveAs(file);
   const backup = JSON.parse(fs.readFileSync(file, "utf8"));
@@ -1840,7 +1884,7 @@ test("효과음: 소리를 켜면 게임 중 오디오를 만들고, 끄면 만�
   await page.click('.dialog-tabs [data-value="visual"]');
   await page.locator("#set-volume").fill("0");
   await page.click("#settings-close");
-  await startMode(page, "zen");
+  await startMode(page, "endless");
   await page.keyboard.press("Space");
   await page.waitForTimeout(100);
   assert.equal(await count(), 0, "끄면 오디오를 만들지 않는다");
@@ -1886,22 +1930,27 @@ test("드롭다운: 키보드로 열고 고르며, Esc는 목록만 닫고 대�
 test("조작법을 펼쳐 페이지가 길어져도(스크롤바가 생겨도) 첫 화면이 좌우로 움직이지 않는다", async () => {
   // 헤드리스는 스크롤바를 겹쳐 그려 자리를 차지하지 않으므로, 폭을 차지하는 스크롤바를 켜서 연다.
   const real = await chromium.launch({ ...launchOptions(chromium), ignoreDefaultArgs: ["--hide-scrollbars"] });
-  const page = await real.newPage({ locale: "ko-KR", viewport: { width: 1280, height: 900 } });
-  await page.goto(url);
-  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
-  const xs = () =>
-    page.evaluate(() =>
-      [".logo", ".home-main", ".home-side", "#mode-list"].map(s =>
-        Math.round(document.querySelector(s).getBoundingClientRect().x)
-      )
-    );
-  const closed = await xs();
-  await page.click("#help-title");
-  assert.ok(await page.evaluate(() => document.documentElement.scrollHeight > innerHeight), "펼치면 스크롤이 생긴다");
-  assert.deepEqual(await xs(), closed, "펼친 뒤");
-  await page.click("#help-title");
-  assert.deepEqual(await xs(), closed, "접은 뒤");
-  await real.close();
+  try {
+    // 접었을 때는 화면에 들어가고(약 700px) 펼치면 넘치는(약 860px) 높이
+    const page = await real.newPage({ locale: "ko-KR", viewport: { width: 1280, height: 760 } });
+    await page.goto(url);
+    await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+    const xs = () =>
+      page.evaluate(() =>
+        [".logo", ".home-main", ".home-side", "#mode-list"].map(s =>
+          Math.round(document.querySelector(s).getBoundingClientRect().x)
+        )
+      );
+    const closed = await xs();
+    await page.click("#help-title");
+    assert.ok(await page.evaluate(() => document.documentElement.scrollHeight > innerHeight), "펼치면 스크롤이 생긴다");
+    assert.deepEqual(await xs(), closed, "펼친 뒤");
+    await page.click("#help-title");
+    assert.deepEqual(await xs(), closed, "접은 뒤");
+  } finally {
+    // 따로 띄운 브라우저는 실패해도 닫는다(남으면 테스트 프로세스가 끝나지 않는다)
+    await real.close();
+  }
 });
 
 test("화면 색: 시스템이 라이트여도 다크를 고르면 첫 화면이 어두워지고, 새로고침 후에도 유지된다", async () => {
@@ -2086,26 +2135,30 @@ test("최근 도전: 날짜별 최고 기록을 다시 보고 같은 시드로 �
     await page.clock.setFixedTime(new Date(2026, 10, 21, 12));
     const open = () => page.click('[data-mode="daily"]');
     const picker = page.locator("#daily-date");
+    const pick = value => choose(page, "daily-date", value);
     await open();
-    assert.equal(await picker.inputValue(), "2026-11-21");
-    assert.equal(await picker.locator("option").count(), 7);
+    assert.equal(await picker.getAttribute("data-value"), "2026-11-21");
+    await picker.click();
+    assert.equal(await page.locator("#daily-date-list [role=option]").count(), 7);
+    await page.keyboard.press("Escape");
+    assert.equal(await visible(page, "daily"), true, "Esc는 목록만 닫는다");
     assert.equal(await text(page, "daily-best"), "이 날짜의 기록이 없어요");
-    await picker.selectOption(date);
+    await pick(date);
     assert.match(await text(page, "daily-best"), /최고 기록/);
     await page.locator("#daily-code").waitFor();
     const shared = await decodeReplayCode(await page.locator("#daily-code").inputValue());
     assert.equal(shared.mode, replay.mode);
     assert.equal(shared.seed, replay.seed);
-    await picker.selectOption("2026-11-20");
+    await pick("2026-11-20");
     assert.equal(await page.locator("#daily-watch").isVisible(), false);
     assert.equal(await page.locator("#daily-code").count(), 0);
 
-    await picker.selectOption(date);
+    await pick(date);
     await page.click("#daily-watch");
     assert.match(await text(page, "replay-title"), new RegExp(date));
     await page.click('[data-replay="exit"]');
     await open();
-    await picker.selectOption(date);
+    await pick(date);
     await page.click("#daily-start");
     assert.match(await text(page, "session-title"), new RegExp(date));
     for (let i = 0; i < 60 && !(await visible(page, "results")); i++) {
@@ -2756,7 +2809,7 @@ test("게임 중 화면: 기본은 늘 어둡고, '화면 색 따르기'를 고�
       return 0.2126 * r + 0.7152 * g + 0.0722 * b;
     }, sel);
   };
-  await startMode(page, "zen");
+  await startMode(page, "endless");
   assert.ok((await lum("body")) < 40, "기본: 게임 중에는 어둡다");
   assert.ok((await lum(".board-wrap")) < 40);
   await page.keyboard.press("Escape");
@@ -2874,7 +2927,7 @@ test("편의: 카운트다운 '없음'이면 바로 시작하고, 연습에서�
   await page.keyboard.press("Escape");
   await page.click('#pause [data-action="menu"]');
   await page.click('[data-confirm="ok"]');
-  await page.click('[data-mode="zen"]');
+  await page.click('[data-mode="endless"]');
   await page.waitForFunction(() => document.body.dataset.screen === "play");
   assert.equal(await visible(page, "undo-piece"), false, "연습이 아니면 되돌리기 없음");
   assert.deepEqual(errors, []);
@@ -2889,7 +2942,7 @@ test("편의: 제스처 방식이면 보드 아래 버튼 대신 보드를 튕�
   const page = await context.newPage();
   await page.goto(url);
   await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
-  await startMode(page, "zen");
+  await startMode(page, "endless");
   assert.equal(await visible(page, "touchpad"), false, "버튼은 감춘다");
   // 아래로 빠르게 튕기기 → 하드 드롭
   await page.evaluate(() => {
@@ -3043,6 +3096,237 @@ test("리플레이 링크: #replay= 로 열면 바로 재생하고, '이 기록�
   );
   assert.equal(await visible(page, "race-panel"), true);
   assert.equal(await text(page, "race-label"), "친구의 기록");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+// 실제 휴대폰 흉내(isMobile → pointer: coarse). hasTouch만 켠 창에서는 드러나지 않던 잘림을 잡는다.
+test("휴대폰: 일시정지·결과 카드가 잘리지 않고, 리플레이 보드는 알아볼 수 있는 크기다", async () => {
+  const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
+  for (const [width, height] of [
+    [320, 568],
+    [390, 664],
+    [750, 342],
+  ]) {
+    const where = `${width}×${height}`;
+    const context = await browser.newContext({
+      locale: "ko-KR",
+      viewport: { width, height },
+      hasTouch: true,
+      isMobile: true,
+    });
+    await context.addInitScript(({ replay, record }) => {
+      localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
+      localStorage.setItem("tetrisharp:replay:last", JSON.stringify(replay));
+      localStorage.setItem("tetrisharp:records", JSON.stringify({ "sprint40|modern": [record] }));
+    }, fixture);
+    const page = await context.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push(e.message));
+    await page.goto(url);
+    assert.equal(await page.evaluate(() => matchMedia("(pointer: coarse)").matches), true);
+
+    /** 버튼이 화면 안에 다 보이고, 가운데를 누르면 그 버튼이 눌리는가 */
+    const reachable = selector =>
+      page.$$eval(selector, els =>
+        els
+          .filter(el => el.checkVisibility())
+          .map(el => {
+            const r = el.getBoundingClientRect();
+            const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+            const inside = r.left >= -1 && r.top >= -1 && r.right <= innerWidth + 1 && r.bottom <= innerHeight + 1;
+            return inside && !!hit && el.contains(hit) ? "" : el.textContent.trim();
+          })
+          .filter(Boolean)
+      );
+    /** 글자가 한 줄을 넘게 꺾인 버튼 라벨 */
+    const wrappedLabels = selector =>
+      page.$$eval(selector, els =>
+        els
+          .filter(el => el.checkVisibility())
+          .filter(el => el.getBoundingClientRect().height > parseFloat(getComputedStyle(el).lineHeight) * 1.5)
+          .map(el => el.textContent.trim())
+      );
+
+    await page.tap('[data-mode="sprint40"]');
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    await page.tap('[data-touch="PAUSE"]');
+    await page.waitForFunction(() => document.body.dataset.screen === "paused");
+    assert.deepEqual(await reachable("#pause .btn"), [], `일시정지 버튼이 다 보인다 · ${where}`);
+
+    await page.tap('#pause [data-action="menu"]');
+    assert.deepEqual(await reachable("#confirm .btn"), [], `확인 버튼이 다 보인다 · ${where}`);
+    await page.tap('[data-confirm="cancel"]');
+    await page.tap('#pause [data-action="resume"]');
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    for (let i = 0; i < 40 && (await page.evaluate(() => document.body.dataset.screen)) !== "results"; i++)
+      await page.tap('[data-touch="HARD"]').catch(() => {});
+    await page.waitForFunction(() => document.body.dataset.screen === "results");
+    assert.deepEqual(await reachable("#results .actions .btn"), [], `결과 버튼이 다 보인다 · ${where}`);
+    assert.deepEqual(
+      await wrappedLabels("#results .actions .btn-label"),
+      [],
+      `결과 버튼 글자가 꺾이지 않는다 · ${where}`
+    );
+    assert.equal(await page.locator("#results-stats").isVisible(), true, `결과 통계가 보인다 · ${where}`);
+
+    await page.goto(url);
+    await page.tap("#watch-last");
+    await page.waitForFunction(() => document.body.dataset.screen === "replay");
+    await page.waitForTimeout(100);
+    const board = await page.locator("#board").boundingBox();
+    assert.ok(board.width >= 110 && board.height >= 150, `리플레이 보드 ${board.width}×${board.height} · ${where}`);
+    await page.locator('[data-replay="share"]').scrollIntoViewIfNeeded();
+    assert.deepEqual(await reachable(".replay-bar .btn"), [], `리플레이 조작이 스크롤로 다 닿는다 · ${where}`);
+    assert.deepEqual(errors, []);
+    await context.close();
+  }
+});
+
+test("리플레이: 끝까지 보면 재생 단추가 '다시 재생'이 되고, 누르면 처음부터 재생한다", async () => {
+  const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
+  const { context, page, errors } = await openPage(({ replay }) => {
+    localStorage.setItem("tetrisharp:replay:last", JSON.stringify(replay));
+  }, fixture);
+  const toggle = page.locator('[data-replay="toggle"]');
+  const label = toggle.locator(".replay-toggle-text");
+  const progress = page.locator("#replay-progress");
+  await page.click("#watch-last");
+  await page.waitForFunction(() => document.body.dataset.screen === "replay");
+  await progress.fill(await progress.getAttribute("max"));
+  await page.waitForFunction(() => document.querySelector(".replay-toggle-text")?.textContent === "다시 재생");
+  assert.equal(await toggle.isEnabled(), true);
+  await toggle.click();
+  assert.ok(Number(await progress.inputValue()) < 60, "처음부터 다시 재생한다");
+  assert.equal(await label.textContent(), "일시정지");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("처음 안내 줄에서 소리를 켜고 끌 수 있고, 설정의 효과음 크기와 같은 값이다", async () => {
+  const { context, page, errors } = await openPage();
+  const sound = page.locator("#welcome-sound");
+  const volume = () => page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:settings") ?? "{}").volume ?? 0);
+  assert.equal(await sound.getAttribute("aria-pressed"), "false");
+  assert.equal(await volume(), 0, "공용 PC를 생각해 기본은 꺼져 있다");
+  await sound.click();
+  assert.equal(await sound.getAttribute("aria-pressed"), "true");
+  assert.equal(await sound.textContent(), "소리 끄기");
+  assert.ok((await volume()) > 0);
+  await sound.click();
+  assert.equal(await volume(), 0);
+  assert.equal(await sound.textContent(), "소리 켜기");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("오늘의 도전: 날마다 바뀌는 모드가 첫 화면·대화상자·게임에 그대로 나온다", async () => {
+  const context = await browser.newContext({ locale: "ko-KR", viewport: { width: 1280, height: 900 } });
+  await context.addInitScript(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  const page = await context.newPage();
+  const errors = [];
+  page.on("pageerror", e => errors.push(e.message));
+  await page.clock.setFixedTime(new Date(2026, 11, 2, 12));
+  await page.goto(url);
+  assert.match(await page.locator('[data-mode="daily"]').textContent(), /2026-12-02 · Ultra · 모두 같은 블록 순서/);
+  await page.click('[data-mode="daily"]');
+  assert.equal(await text(page, "daily-mode"), "Ultra · Modern · 모두 같은 블록 순서");
+  await choose(page, "daily-date", "2026-11-30");
+  assert.equal(await text(page, "daily-mode"), "Sprint 40L · Modern · 모두 같은 블록 순서", "시작일 전은 Sprint");
+  await choose(page, "daily-date", "2026-12-02");
+  await page.click("#daily-start");
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  // 정보 칸은 시작할 때 모드로 정해진다: Ultra는 점수 칸이 있고 Sprint의 "최고 기록 대비" 칸은 없다
+  const shown = cell => page.locator(`.hud [data-hud="${cell}"]`).evaluate(el => !el.classList.contains("is-off"));
+  assert.equal(await shown("score"), true, "Ultra 정보 칸");
+  assert.equal(await shown("split"), false);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("첫 화면 정리: 백업·리플레이 파일은 설정의 데이터 탭, 내 기록과 달리기는 기록 대화상자에서", async () => {
+  const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
+  const { context, page, errors } = await openPage(({ replay, record }) => {
+    localStorage.setItem("tetrisharp:records", JSON.stringify({ "sprint40|modern": [record] }));
+    localStorage.setItem("tetrisharp:replay:best", JSON.stringify({ "sprint40|modern": [replay] }));
+  }, fixture);
+  // 첫 화면 오른쪽은 두 블록: 연습과 기록 · 다시 보기
+  assert.equal(await page.locator(".home-side .home-block").count(), 2);
+  for (const gone of ["#export-backup", "#import-backup", "#open-replay", "#race-modes"])
+    assert.equal(await page.locator(`#menu ${gone}`).count(), 0, `${gone}는 첫 화면에 없다`);
+
+  // 데이터 탭: 첫 화면에서 열면 불러오기도 된다
+  await page.click("#open-settings");
+  await page.click('#settings .dialog-tabs [data-value="data"]');
+  assert.equal(await page.locator("#import-backup").isEnabled(), true);
+  assert.equal(await page.locator("#open-replay").isEnabled(), true);
+  await page.keyboard.press("Escape");
+
+  // 기록 대화상자에서 최고 기록과 달리기
+  await page.click("#open-records");
+  await page.click("#records-race");
+  await page.waitForFunction(() => ["countdown", "play"].includes(document.body.dataset.screen));
+  assert.equal(await visible(page, "race-panel"), true);
+
+  // 게임 중에 연 설정에서는 불러오기를 끈다(판을 덮어쓰지 않게)
+  await page.click("#open-settings");
+  await page.click('#settings .dialog-tabs [data-value="data"]');
+  assert.equal(await page.locator("#import-backup").isDisabled(), true);
+  assert.equal(await page.locator("#export-backup").isEnabled(), true);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("업적: 이룬 판의 결과 화면에 알리고, 첫 화면 개수와 업적 대화상자에 남는다", async () => {
+  // 판 비우기 장에서 1단계만 남겨 두고 1단계를 푼다
+  const others = PUZZLES.filter(p => p.kind === "pc" && p.number !== 1).map(p => p.id);
+  const { context, page, errors } = await openPage(rest => {
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
+    localStorage.setItem("tetrisharp:puzzle:cleared", JSON.stringify(rest));
+  }, others);
+  assert.match(await text(page, "achievement-progress"), /^0 \/ \d+$/);
+  await page.click("#open-puzzles");
+  await page.click('[data-puzzle="1"]');
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  for (const key of keysFor(solvePuzzle(PUZZLES[0]))) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(20);
+  }
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
+  assert.equal(await text(page, "results-achievements"), "업적 달성 · 판 비우기 장");
+  await page.keyboard.press("Escape");
+  assert.match(await text(page, "achievement-progress"), /^1 \/ \d+$/);
+  await page.click("#open-achievements");
+  assert.equal(await page.locator('#achievements [data-achievement="puzzle-pc"].is-done').count(), 1);
+  assert.equal(await page.locator('#achievements [data-achievement="puzzle-all"].is-done').count(), 0);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("CPU 성향: 대전 목록 위에서 고르고 기억하며, 전적은 성향마다 따로 보인다", async () => {
+  const { context, page, errors } = await openPage(() => {
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
+    localStorage.setItem("tetrisharp:versus:stats", JSON.stringify({ easy: { win: 2, loss: 1 } }));
+  });
+  await page.click('[data-mode="versus"]');
+  const easyRow = page.locator('#versus [data-level="easy"]');
+  assert.match(await easyRow.textContent(), /2승 1패/, "균형 전적은 예전 전적 그대로");
+  await page.click('#versus-style [data-value="quad"]');
+  assert.equal(await page.locator('#versus-style [data-value="quad"]').getAttribute("aria-pressed"), "true");
+  assert.doesNotMatch(await easyRow.textContent(), /승/, "4줄 노림 전적은 따로");
+  await easyRow.click();
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  assert.equal(await text(page, "session-title"), "CPU · 쉬움 · 4줄 노림");
+  await page.click("#go-home");
+  await page.click('[data-confirm="ok"]');
+  await page.click('[data-mode="versus"]');
+  assert.equal(
+    await page.locator('#versus-style [data-value="quad"]').getAttribute("aria-pressed"),
+    "true",
+    "마지막 성향을 기억한다"
+  );
   assert.deepEqual(errors, []);
   await context.close();
 });

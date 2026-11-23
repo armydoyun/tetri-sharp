@@ -32,7 +32,8 @@ if (typeof document !== "undefined") {
  * @returns {HTMLButtonElement}  열기 버튼(id가 붙는다). 고른 값은 data-value에 있다.
  */
 export const dropdown = ({ id, label, options, value, onChange, disabled = false }) => {
-  const selectedIndex = Math.max(
+  // 고른 항목은 열기 버튼에도 바로 반영한다(부르는 쪽이 대화상자를 다시 그리지 않아도 맞도록)
+  let selectedIndex = Math.max(
     0,
     options.findIndex(o => o.value === value)
   );
@@ -92,7 +93,12 @@ export const dropdown = ({ id, label, options, value, onChange, disabled = false
   const choose = i => {
     const next = options[i];
     close(true);
-    if (next && next.value !== options[selectedIndex].value) onChange(next.value);
+    if (!next || next.value === options[selectedIndex].value) return;
+    selectedIndex = i;
+    active = i;
+    trigger.dataset.value = String(next.value);
+    /** @type {HTMLElement} */ (trigger.querySelector(".select-value")).textContent = next.label;
+    onChange(next.value);
   };
 
   /** 열기 버튼 아래(모자라면 위)에 목록을 둔다 */

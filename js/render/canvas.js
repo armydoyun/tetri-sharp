@@ -33,11 +33,15 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
   let cell = 0;
   let side = 0;
   let gridPath = new Path2D();
-  /** devicePixelRatio를 반영해 캔버스 해상도를 정하고 셀 크기를 정수로 맞춘다(번짐 방지). */
+  /**
+   * devicePixelRatio를 반영해 캔버스 해상도를 정하고 셀 크기를 정수로 맞춘다(번짐 방지).
+   * 넓은 화면에서 캔버스가 기본 셀(28px)보다 크게 보이면 보이는 크기에 맞춰 그린다 — 늘려 보이면 흐려진다.
+   */
   const fit = () => {
     const dpr = window.devicePixelRatio || 1;
-    const next = Math.max(8, Math.round((compact ? 14 : CSS_CELL) * dpr));
     const nextSide = compact ? 0 : narrow.matches ? 3 : 5;
+    const shown = compact ? 0 : canvas.clientWidth / (COLS + nextSide * 2);
+    const next = Math.max(8, Math.round((compact ? 14 : Math.max(CSS_CELL, shown)) * dpr));
     if (next === cell && nextSide === side) return false;
     cell = next;
     side = nextSide;
@@ -48,7 +52,6 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     if (labels) {
       labels.width = canvas.width;
       labels.height = 2 * cell;
-      labelCtx.font = `600 ${Math.round(cell * 0.46)}px system-ui, sans-serif`;
       labelCtx.textBaseline = "top";
     }
     const bx = side * cell;
@@ -267,8 +270,18 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       labelCtx.clearRect(0, 0, labels.width, labels.height);
       labelCtx.fillStyle = getComputedStyle(canvas).color || "#b1b9b0";
       // 일부 글꼴은 top 기준선 위에도 글자가 조금 나오므로 윗줄을 남겨 둔다.
-      if (game.rules.hold.enabled) labelCtx.fillText(t("홀드"), sidePad, cell);
-      if (game.rules.previewCount > 0) labelCtx.fillText(t("다음 피스"), nx, cell);
+      // 좁은 화면은 캔버스가 많이 줄어 보이므로 글자를 키우고 이름을 줄인다("다음 피스" → "다음").
+      // 그래도 옆 칸 폭을 넘으면 넘지 않을 만큼 줄인다.
+      const base = Math.round(cell * (narrow.matches ? 0.66 : 0.46));
+      const room = side * cell - sidePad;
+      const label = (text, x) => {
+        labelCtx.font = `600 ${base}px system-ui, sans-serif`;
+        const width = labelCtx.measureText(text).width;
+        if (width > room) labelCtx.font = `600 ${Math.floor((base * room) / width)}px system-ui, sans-serif`;
+        labelCtx.fillText(text, x, cell);
+      };
+      if (game.rules.hold.enabled) label(t("홀드"), sidePad);
+      if (game.rules.previewCount > 0) label(narrow.matches ? t("다음") : t("다음 피스"), nx);
     }
     ctx.drawImage(labels, 0, by - cell);
     if (game.rules.hold.enabled) {

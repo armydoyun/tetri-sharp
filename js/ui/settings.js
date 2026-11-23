@@ -65,6 +65,7 @@ const TABS = [
   ["access", t("접근성")],
   ["keys", t("키보드")],
   ["pad", t("게임패드")],
+  ["data", t("데이터")],
 ];
 
 const formatValue = (key, v) => (key === "sdf" ? (v >= SDF_INFINITE ? t("즉시") : t("{n}배", { n: v })) : `${v} ms`);
@@ -111,7 +112,10 @@ const TOUCH_HINTS = {
  *   onLanguage?: (lang: string) => void,
  * }} options
  */
-export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPreviewSound, onLanguage }) => {
+/**
+ * data: 데이터 탭의 동작(백업 저장·불러오기, 리플레이 파일 열기). canImport가 false면(게임 중) 불러오기는 끈다.
+ */
+export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPreviewSound, onLanguage, data }) => {
   /** 키 입력을 기다리는 칸 */
   let capture = null;
   const notice = el("p", { class: "notice-slot", role: "status", id: "settings-notice" });
@@ -640,6 +644,56 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
   };
 
   let tab = "control";
+  /** 데이터: 백업 파일로 저장·불러오기, 받은 리플레이 파일 열기 */
+  const dataSection = () => {
+    const menuOnly = !data.canImport();
+    const exportBackup = button({
+      text: t("저장"),
+      iconName: "download",
+      className: "btn btn-small",
+      id: "export-backup",
+    });
+    exportBackup.addEventListener("click", () => data.exportBackup());
+    const importBackup = button({
+      text: t("불러오기"),
+      iconName: "folder",
+      className: "btn btn-small",
+      id: "import-backup",
+      disabled: menuOnly,
+    });
+    importBackup.addEventListener("click", () => data.importBackup());
+    const openReplay = button({
+      text: t("파일 열기"),
+      iconName: "folder",
+      className: "btn btn-small",
+      id: "open-replay",
+      disabled: menuOnly,
+    });
+    openReplay.addEventListener("click", () => data.openReplay());
+    return el(
+      "section",
+      { class: "field-section" },
+      fieldRow({
+        id: "export-backup",
+        label: t("백업 파일로 저장"),
+        hint: t("설정·기록·리플레이·연습 진행도를 파일 하나로"),
+        control: exportBackup,
+      }),
+      fieldRow({
+        id: "import-backup",
+        label: t("백업 불러오기"),
+        hint: menuOnly ? t("첫 화면에서 열었을 때만 불러올 수 있어요") : t("불러오기 전에 담긴 항목 수를 확인해요"),
+        control: importBackup,
+      }),
+      fieldRow({
+        id: "open-replay",
+        label: t("리플레이 파일 열기"),
+        hint: menuOnly ? t("첫 화면에서 열었을 때만 열 수 있어요") : t("받은 리플레이 파일(.json)을 재생해요"),
+        control: openReplay,
+      })
+    );
+  };
+
   const sectionFor = t =>
     t === "control"
       ? handlingSection()
@@ -647,7 +701,9 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
         ? visualSection()
         : t === "access"
           ? accessSection()
-          : bindingSection(t === "keys" ? "key" : "pad");
+          : t === "data"
+            ? dataSection()
+            : bindingSection(t === "keys" ? "key" : "pad");
 
   const render = () => {
     stopThemePreview();
@@ -783,6 +839,13 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
     },
     get isOpen() {
       return dialog.open;
+    },
+    /** 알림 칸에 글을 띄운다(데이터 탭의 결과 등) */
+    notify(text) {
+      notice.textContent = text;
+    },
+    close() {
+      if (dialog.open) dialog.close();
     },
   };
 };

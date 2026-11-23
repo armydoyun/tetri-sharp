@@ -7,6 +7,7 @@ import { recordKey } from "../storage/records.js";
 import { MAX_RANKED } from "../replay/replay.js";
 import { button, el, fillDialog, fieldRow } from "./dom.js";
 import { dropdown } from "./select.js";
+import { RANK_STEPS, nextRankStep, rankLabel, rankOf } from "../modes/ranks.js";
 import { t } from "../i18n/index.js";
 
 const ROWS = 10;
@@ -61,9 +62,11 @@ const renderSprintHistory = (runs, personalBest) => {
  *   sprintHistory: ReturnType<typeof import("../storage/sprint-history.js").createSprintHistory>,
  *   replayFor: (key: string, entry: any) => any,
  *   onWatch: (replay: any) => void,
+ *   canRace: (modeId: string, rulesId: string) => boolean,
+ *   onRace: (modeId: string, rulesId: string) => void,
  * }} options
  */
-export const createRecordsUI = ({ dialog, modes, records, sprintHistory, replayFor, onWatch }) => {
+export const createRecordsUI = ({ dialog, modes, records, sprintHistory, replayFor, onWatch, canRace, onRace }) => {
   let modeId = modes[0].id;
   let rulesId = "modern";
   const notice = el("p", { class: "notice-slot", role: "status", id: "records-notice" });
@@ -176,6 +179,25 @@ export const createRecordsUI = ({ dialog, modes, records, sprintHistory, replayF
       );
     });
 
+    // 최고 기록의 랭크와 다음 랭크 기준(랭크가 있는 모드만)
+    const rank = rankOf(mode, list[0]);
+    const next = nextRankStep(mode, list[0]);
+    const rankLine = rank
+      ? el(
+          "p",
+          { class: "records-rank", id: "records-rank" },
+          el("strong", { text: rankLabel(rank) }),
+          " ",
+          el("span", {
+            text: next
+              ? t("다음 {rank}: {record}", {
+                  rank: next.rank,
+                  record: mode.formatRecord({ [RANK_STEPS[mode.id].metric]: next.value }),
+                })
+              : t("가장 높은 랭크예요"),
+          })
+        )
+      : null;
     const empty = el("p", {
       class: "records-empty",
       text: t("아직 기록이 없어요. 이 모드와 규칙으로 한 판을 끝내면 여기에 표시돼요."),
@@ -195,6 +217,7 @@ export const createRecordsUI = ({ dialog, modes, records, sprintHistory, replayF
         fieldRow({ id: "records-mode", label: t("모드"), control: modeSelect }),
         fieldRow({ id: "records-rules", label: t("규칙"), control: rulesSelect })
       ),
+      ...(rankLine ? [rankLine] : []),
       ...(list.length
         ? [el("table", { class: "records-table" }, el("thead", {}, head), el("tbody", {}, ...rows))]
         : [empty]),
@@ -207,7 +230,14 @@ export const createRecordsUI = ({ dialog, modes, records, sprintHistory, replayF
         : t("상위 {n}개 기록의 리플레이는 이 기능이 생긴 뒤 세운 기록부터 남아요", { n: MAX_RANKED })
       : "";
     const scroll = dialog.querySelector(".dialog-body")?.scrollTop ?? 0;
-    fillDialog(dialog, { title: t("기록"), body, notice, actions: [], closeId: "records-close" });
+    // 이 모드·규칙의 최고 기록 리플레이와 같은 블록 순서로 달리기(달릴 수 있을 때만 보인다)
+    const race = button({ text: t("최고 기록과 달리기"), iconName: "play", id: "records-race" });
+    race.addEventListener("click", () => {
+      dialog.close();
+      onRace(mode.id, rulesId);
+    });
+    const actions = mode.race && canRace(mode.id, rulesId) ? [race] : [];
+    fillDialog(dialog, { title: t("기록"), body, notice, actions, closeId: "records-close" });
     body.scrollTop = scroll;
   };
 

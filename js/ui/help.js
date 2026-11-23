@@ -59,7 +59,7 @@ export const createHelpUI = ({ dialog, getSettings, isTouch, onOpenSettings, onS
     el("section", { class: "help-section" }, el("h3", { text: title }), ...children);
   const steps = items => el("ol", { class: "help-steps" }, ...items.map(text => el("li", { text })));
 
-  const render = () => {
+  const render = (fromWelcome = false) => {
     const toSettings = tab => {
       dialog.close();
       onOpenSettings(tab);
@@ -115,13 +115,15 @@ export const createHelpUI = ({ dialog, getSettings, isTouch, onOpenSettings, onS
         el("div", { class: "help-actions" }, control, access)
       )
     );
-    notice.textContent = t("이 안내는 머리글의 도움말에서 언제든 다시 볼 수 있어요.");
+    // 처음 오신 분 안내에서 열었을 때만: 머리글 도움말로 열었으면 같은 말을 되풀이하게 된다
+    notice.textContent = fromWelcome ? t("이 안내는 머리글의 도움말에서 언제든 다시 볼 수 있어요.") : "";
     fillDialog(dialog, { title: t("도움말"), body, notice, actions: [], closeId: "help-close" });
   };
 
   return {
-    open() {
-      render();
+    /** @param {{ fromWelcome?: boolean }} [options] */
+    open({ fromWelcome = false } = {}) {
+      render(fromWelcome);
       dialog.showModal();
       /** @type {HTMLElement | null} */ (dialog.querySelector("#help-close"))?.focus();
     },

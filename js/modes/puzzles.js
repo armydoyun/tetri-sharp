@@ -82,21 +82,35 @@ const makeStage = index => {
   throw new Error(`퍼즐 단계를 만들 수 없습니다: ${index + 1}`);
 };
 
-/** 모든 단계(앞에서 한 번 만들어 둔다) */
-export const PUZZLES = Object.freeze(PLAN.map((_, i) => Object.freeze({ number: i + 1, ...makeStage(i) })));
-
 export const KIND_NAMES = Object.freeze({
   pc: t("판 비우기"),
   tsd: "T-spin Double",
   tst: "T-spin Triple",
 });
 
+/** 장 순서: 판 비우기 → T-spin Double → T-spin Triple */
+export const CHAPTERS = Object.freeze(["pc", "tsd", "tst"]);
+
+/**
+ * 모든 단계(앞에서 한 번 만들어 둔다). 보여 주는 순서는 장별로, 장 안에서는 피스가 적은 것부터.
+ * - id: 만들 때의 번호(PLAN 순서). 판을 만드는 시드, 모드 id("puzzle-<id>"), 깬 단계 저장이 이 값을 쓴다
+ *   → 순서를 바꿔도 저장된 진행도·리플레이·이어서 하기가 그대로 맞는다.
+ * - number: 화면에 보이는 단계 번호(보여 주는 순서).
+ */
+export const PUZZLES = Object.freeze(
+  PLAN.map((_, i) => ({ id: i + 1, ...makeStage(i) }))
+    .sort(
+      (a, b) => CHAPTERS.indexOf(a.kind) - CHAPTERS.indexOf(b.kind) || a.pieces.length - b.pieces.length || a.id - b.id
+    )
+    .map((stage, i) => Object.freeze({ ...stage, number: i + 1 }))
+);
+
 const cache = new Map();
 
 export const makePuzzleMode = (puzzle, rules = MODERN) => {
   const need = puzzle.pieces.length;
   return Object.freeze({
-    id: puzzle.number ? `puzzle-${puzzle.number}` : "custom-puzzle",
+    id: puzzle.number ? `puzzle-${puzzle.id}` : "custom-puzzle",
     name: puzzle.number ? t("퍼즐 {n} · {kind}", { n: puzzle.number, kind: KIND_NAMES[puzzle.kind] }) : t("만든 퍼즐"),
     description: KIND_NAMES[puzzle.kind],
     rules,
@@ -131,17 +145,18 @@ export const makePuzzleMode = (puzzle, rules = MODERN) => {
 
 /** 단계 → 모드 */
 export const puzzleMode = puzzle => {
-  if (!cache.has(puzzle.number)) cache.set(puzzle.number, makePuzzleMode(puzzle));
-  return cache.get(puzzle.number);
+  if (!cache.has(puzzle.id)) cache.set(puzzle.id, makePuzzleMode(puzzle));
+  return cache.get(puzzle.id);
 };
 
+/** "puzzle-<id>" → 그 단계의 모드(id는 만들 때의 번호) */
 export const findPuzzle = id => {
   const m = /^puzzle-(\d+)$/.exec(String(id));
-  const p = m && PUZZLES[Number(m[1]) - 1];
+  const p = m && PUZZLES.find(stage => stage.id === Number(m[1]));
   return p ? puzzleMode(p) : null;
 };
 
-/** 깬 단계(이 기기) */
+/** 깬 단계(이 기기). 저장하는 값은 단계 id(만들 때의 번호) */
 export const createPuzzleProgress = store => {
   const read = () => {
     const raw = store.get("puzzle:cleared", []);
@@ -157,10 +172,10 @@ export const createPuzzleProgress = store => {
         [...s].sort((a, b) => a - b)
       );
     },
-    /** 다음에 할 단계: 아직 안 깬 가장 앞 단계 */
+    /** 다음에 할 단계: 보여 주는 순서로 아직 안 깬 가장 앞 단계 */
     next() {
       const s = read();
-      return PUZZLES.find(p => !s.has(p.number)) ?? PUZZLES[PUZZLES.length - 1];
+      return PUZZLES.find(p => !s.has(p.id)) ?? PUZZLES[PUZZLES.length - 1];
     },
   };
 };

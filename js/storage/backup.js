@@ -4,6 +4,8 @@ import { sanitizeSettings } from "./settings.js";
 import { PUZZLES } from "../modes/puzzles.js";
 import { PRACTICE_PROGRESS_KEY, sanitizePracticeProgress } from "./practice-progress.js";
 import { SPRINT_HISTORY_KEY, sanitizeSprintHistory } from "./sprint-history.js";
+import { ACHIEVEMENTS_KEY, sanitizeAchievements } from "./achievements.js";
+import { RULE_SLOTS_KEY, sanitizeRuleSlots } from "./rule-slots.js";
 import { isEntry } from "./records.js";
 import { sanitizeRuleBody } from "../rules/sanitize.js";
 import { sanitizeReplay } from "../replay/replay.js";
@@ -26,6 +28,8 @@ export const BACKUP_KEYS = Object.freeze([
   "puzzle:cleared",
   PRACTICE_PROGRESS_KEY,
   SPRINT_HISTORY_KEY,
+  ACHIEVEMENTS_KEY,
+  RULE_SLOTS_KEY,
 ]);
 
 const MAX_TABLES = 500;
@@ -67,6 +71,9 @@ export const parseBackup = (raw, findMode) => {
     data[PRACTICE_PROGRESS_KEY] = sanitizePracticeProgress(src[PRACTICE_PROGRESS_KEY]);
   }
   if (src[SPRINT_HISTORY_KEY] !== undefined) data[SPRINT_HISTORY_KEY] = sanitizeSprintHistory(src[SPRINT_HISTORY_KEY]);
+  if (src[ACHIEVEMENTS_KEY] !== undefined) data[ACHIEVEMENTS_KEY] = sanitizeAchievements(src[ACHIEVEMENTS_KEY]);
+  const slots = src[RULE_SLOTS_KEY] !== undefined ? sanitizeRuleSlots(src[RULE_SLOTS_KEY]) : null;
+  if (slots) data[RULE_SLOTS_KEY] = slots;
   if (src.settings !== undefined) data.settings = sanitizeSettings(src.settings);
   if (isPlainObject(src.records)) {
     const records = {};
@@ -105,7 +112,8 @@ export const parseBackup = (raw, findMode) => {
   if (isPlainObject(src["versus:stats"])) {
     const stats = {};
     const count = v => (Number.isInteger(v) && v >= 0 ? Math.min(v, 1e6) : 0);
-    for (const [key, value] of Object.entries(src["versus:stats"]).slice(0, 20)) {
+    // 난이도 7 × 성향 3 = 21칸
+    for (const [key, value] of Object.entries(src["versus:stats"]).slice(0, 40)) {
       if (!/^[\w-]{1,20}$/.test(key) || !isPlainObject(value)) continue;
       stats[key] = { win: count(value.win), loss: count(value.loss) };
     }
@@ -133,7 +141,11 @@ export const restoreBackup = (store, parsed) => {
   for (const key of BACKUP_KEYS) {
     // 이전 버전의 백업에는 이 진행도 항목이 없으므로 기존 값을 보존한다.
     if (
-      (key === "puzzle:cleared" || key === PRACTICE_PROGRESS_KEY || key === SPRINT_HISTORY_KEY) &&
+      (key === "puzzle:cleared" ||
+        key === PRACTICE_PROGRESS_KEY ||
+        key === SPRINT_HISTORY_KEY ||
+        key === ACHIEVEMENTS_KEY ||
+        key === RULE_SLOTS_KEY) &&
       !(key in parsed.data)
     )
       continue;
