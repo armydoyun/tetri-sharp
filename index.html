@@ -11,6 +11,7 @@
     <!-- 스타일시트: 위에서 아래 순서가 곧 우선순위. 빌드는 이 순서대로 이어 붙인다(tools/build.mjs). docs/DESIGN_SYSTEM.md -->
     <link rel="stylesheet" href="./css/tokens.css">
     <link rel="stylesheet" href="./css/base.css">
+    <link rel="stylesheet" href="./css/controls.css">
     <link rel="stylesheet" href="./css/components.css">
     <link rel="stylesheet" href="./css/game.css">
   </head>
@@ -77,10 +78,10 @@
               <h2 id="training-tools-title" class="section-title">연습과 기록</h2>
             </div>
             <div class="tool-list">
-              <button id="open-practice" class="tool-row" type="button"><span>연습</span><span data-icon="chevron-right"></span></button>
-              <button id="open-puzzles" class="tool-row" type="button"><span>퍼즐</span><small id="puzzle-progress" class="tool-meta num"></small><span data-icon="chevron-right"></span></button>
-              <button id="open-records" class="tool-row" type="button"><span>기록</span><span data-icon="chevron-right"></span></button>
-              <button id="open-achievements" class="tool-row" type="button"><span>업적</span><small id="achievement-progress" class="tool-meta num"></small><span data-icon="chevron-right"></span></button>
+              <button id="open-practice" class="tool-row" type="button"><span class="tool-label">연습</span><span data-icon="chevron-right"></span></button>
+              <button id="open-puzzles" class="tool-row" type="button"><span class="tool-label">퍼즐</span><small id="puzzle-progress" class="tool-meta num"></small><span data-icon="chevron-right"></span></button>
+              <button id="open-records" class="tool-row" type="button"><span class="tool-label">기록</span><span data-icon="chevron-right"></span></button>
+              <button id="open-achievements" class="tool-row" type="button"><span class="tool-label">업적</span><small id="achievement-progress" class="tool-meta num"></small><span data-icon="chevron-right"></span></button>
             </div>
           </section>
 
@@ -91,7 +92,7 @@
               <h2 id="replay-tools-title" class="section-title">다시 보기</h2>
             </div>
             <div class="tool-list">
-              <button id="watch-last" class="tool-row" type="button" disabled><span>마지막 판 다시 보기</span><small>저장된 판 없음</small><span data-icon="chevron-right"></span></button>
+              <button id="watch-last" class="tool-row" type="button" disabled><span class="tool-label">마지막 판 다시 보기</span><small class="tool-note">저장된 판 없음</small><span data-icon="chevron-right"></span></button>
             </div>
           </section>
           <!-- 파일 고르기 창은 설정의 데이터 탭에서 연다(화면에는 보이지 않는다) -->
