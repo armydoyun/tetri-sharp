@@ -6,6 +6,8 @@
   min-height: 100vh;
   min-height: 100dvh;
   display: grid;
+  /* 열을 화면 폭에 묶는다: 자동 폭이면 안쪽에서 가장 긴 줄의 최소 폭만큼 화면 밖으로 넓어진다(영어 320px에서 334px) */
+  grid-template-columns: minmax(0, 1fr);
   justify-items: center;
   align-content: start;
   gap: var(--space-4);
@@ -1583,6 +1585,10 @@ body.gestures-mode {
   .welcome-text,
   .welcome-actions {
     flex: 1 1 100%;
+  }
+
+  .welcome-actions {
+    flex-wrap: wrap;
   }
 
   #welcome-close {

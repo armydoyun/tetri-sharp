@@ -469,6 +469,8 @@
 /* ---- 목록 줄(모드·연습): [번호 | 이름·설명 | 기록 | >] ---- */
 .menu-list {
   display: grid;
+  /* 열 폭을 화면 폭에 묶는다: 안 그러면 가장 긴 줄(영어 설명 등)의 최소 폭만큼 목록이 화면 밖으로 넓어진다 */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-1);
 }
 
@@ -912,8 +914,8 @@
   }
 }
 
+/* 탭 줄은 설정 탭과 같은 규칙(넘치면 꺾이고, 좁으면 3 + 2)을 따른다 */
 .rule-tabs-head .segmented {
-  display: grid;
   width: 100%;
 }
 
