@@ -2169,9 +2169,10 @@ test("최근 도전: 날짜별 최고 기록을 다시 보고 같은 시드로 �
       await page.waitForTimeout(20);
     }
     assert.ok(await visible(page, "results"));
-    const attempt = await page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:replay:last")));
-    assert.equal(attempt.mode, replay.mode);
-    assert.equal(attempt.seed, replay.seed);
+    // 연타로 금방 막힌 판은 "마지막 판"으로 남기지 않는다(F21) → 결과의 다시 보기로 같은 날짜(시드) 판인지 본다
+    assert.equal(await page.evaluate(() => localStorage.getItem("tetrisharp:replay:last")), null);
+    await page.click('#results [data-action="watch"]');
+    assert.match(await text(page, "replay-title"), new RegExp(date));
     assert.deepEqual(errors, []);
   } finally {
     await context.close();
