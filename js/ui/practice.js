@@ -74,7 +74,7 @@ export const createPracticeUI = ({ dialog, onPick, progress, onStage }) => {
       const build = {
         id: "build-training",
         name: t("빌드 연습"),
-        description: t("4줄 우물과 T스핀 자리를 직접 만들기"),
+        description: t("4줄 우물과 T-spin 자리를 직접 만들기"),
         lessons: BUILD_LESSONS,
       };
       const drills = [

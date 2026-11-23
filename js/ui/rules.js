@@ -319,7 +319,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
         notice.textContent = t("내 규칙이 가득 찼어요({n}개). 하나를 지우고 다시 불러와 주세요", { n: MAX_RULE_SLOTS });
         return;
       }
-      message = t("새 칸으로 불러왔어요 · 기록표 {id}", { id: makeCustomRules(body).id });
+      message = t("새 칸으로 불러왔어요");
       render("rule-share-paste");
     };
     load.addEventListener("click", doLoad);
@@ -381,7 +381,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
       render("rule-slot-name");
     };
     nameInput.addEventListener("change", saveName);
-    const addSlot = button({ label: t("새 규칙"), icon: "edit", size: "s", id: "rule-slot-add" });
+    const addSlot = button({ label: t("새 규칙"), icon: "plus", size: "s", id: "rule-slot-add" });
     addSlot.disabled = state.slots.length >= MAX_RULE_SLOTS;
     addSlot.addEventListener("click", () => {
       if (!slots.add(t("내 규칙 {n}", { n: state.slots.length + 1 }), PRESET_LIST[0])) return;

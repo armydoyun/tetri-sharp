@@ -2622,7 +2622,7 @@ const importRulesFromLink = () => {
   customBody = ruleSlots.active().body;
   ruleChoice = "custom";
   store.set("lastRules", "custom");
-  showMenuNotice(t("링크로 받은 규칙을 내 규칙에 새로 넣었어요 · 기록표 {id}", { id: makeCustomRules(body).id }));
+  showMenuNotice(t("링크로 받은 규칙을 내 규칙에 새로 넣었어요"));
   return true;
 };
 

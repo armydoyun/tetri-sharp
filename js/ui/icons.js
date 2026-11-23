@@ -19,6 +19,7 @@ export const ICONS = Object.freeze({
   forward: [["path", { d: "M4 6.5v11l7-5.5zM13 6.5v11l7-5.5z" }]],
   restart: [["path", { d: "M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v4h4" }]],
   close: [["path", { d: "M6 6l12 12M18 6 6 18" }]],
+  plus: [["path", { d: "M12 5v14M5 12h14" }]],
   menu: [["path", { d: "M5 7h14M5 12h14M5 17h14" }]],
   download: [["path", { d: "M12 4v11M7 10l5 5 5-5M5 20h14" }]],
   folder: [["path", { d: "M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" }]],

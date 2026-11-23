@@ -1454,7 +1454,7 @@ test("빌드 연습: 빈칸·배치 힌트, 초기화와 힌트 없는 4줄 완�
     await page.click('#results [data-action="next-puzzle"]');
     await page.evaluate(() => window.advanceFrame());
     assert.equal(await text(page, "hud-lines"), "3");
-    assert.match(await text(page, "session-title"), /T스핀 더블/);
+    assert.match(await text(page, "session-title"), /T-spin Double 자리/);
     assert.deepEqual(errors, []);
   } finally {
     await context.close();

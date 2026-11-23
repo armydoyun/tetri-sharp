@@ -13,12 +13,12 @@ export const EN = {
   "다른 창에서 저장된 판이 바뀌었어요.": "The saved game changed in another window.",
 
   "빌드 연습": "Build practice",
-  "4줄 우물과 T스핀 자리를 직접 만들기": "Build a four-line well and a T-spin setup",
+  "4줄 우물과 T-spin 자리를 직접 만들기": "Build a four-line well and a T-spin setup",
   "4줄 우물 만들기": "Build a four-line well",
   "오른쪽 한 열을 남기고 쌓은 뒤 I 피스로 4줄을 지우세요.":
     "Leave the right column open, then clear four lines with the I piece.",
   "마지막 I 피스를 위해 점선 열을 비워 두세요.": "Keep the outlined column open for the final I piece.",
-  "T스핀 더블 자리 만들기": "Build a T-spin Double setup",
+  "T-spin Double 자리 만들기": "Build a T-spin Double setup",
   "왼쪽 빈 열을 채우고 지붕을 만든 뒤 T를 돌려 2줄을 지우세요.":
     "Fill the left column, build the roof, then rotate T into place to clear two lines.",
   "마지막 T가 들어갈 점선 칸을 비워 두세요.": "Keep the outlined cells open for the final T piece.",
@@ -364,8 +364,8 @@ export const EN = {
   "{n}줄 보냄": "{n} sent",
   "공격 0줄": "No attack",
   "일반 {n}줄": "{n}-line clear",
-  "미니 T스핀 {n}줄": "{n}-line mini T-spin",
-  "T스핀 {n}줄": "{n}-line T-spin",
+  "T-spin Mini {n}줄": "{n}-line mini T-spin",
+  "T-spin {n}줄": "{n}-line T-spin",
   "백투백 +{n}": "B2B +{n}",
   "콤보 +{n}": "Combo +{n}",
   "퍼펙트 클리어 +{n}": "Perfect clear +{n}",
@@ -462,21 +462,21 @@ export const EN = {
   "내 규칙이 가득 찼어요({n}개). 하나를 지우고 다시 불러와 주세요": "My rules is full ({n}). Delete one and load again",
   "내 규칙이 가득 찼어요({n}개). 하나를 지우고 링크를 다시 열어 주세요":
     "My rules is full ({n}). Delete one and open the link again",
-  "링크로 받은 규칙을 내 규칙에 새로 넣었어요 · 기록표 {id}": "Added the linked rules to My rules · records {id}",
+  "링크로 받은 규칙을 내 규칙에 새로 넣었어요": "Added the linked rules to My rules",
   "링크를 복사했어요. 받은 사람이 열면 이 규칙이 내 규칙에 새로 들어가요":
     "Link copied. Opening it adds these rules to the recipient's My rules",
   "받은 규칙": "Received rules",
   "새 규칙": "New rules",
   "새 규칙을 만들었어요(Modern 값에서 시작)": "New rules created (starting from Modern)",
-  "새 칸으로 불러왔어요 · 기록표 {id}": "Loaded as new rules · records {id}",
+  "새 칸으로 불러왔어요": "Loaded as new rules",
   "이름을 바꿨어요": "Renamed",
   지우기: "Delete",
   // ---- 업적 ----
   업적: "Achievements",
   "업적 달성 · {names}": "Achievement unlocked · {names}",
-  "{date}에 이룸": "Unlocked {date}",
+  "{date}에 달성": "Unlocked {date}",
   아직: "Not yet",
-  "{done} / {total}개 이룸 · 이 기기에 저장되고 백업에 들어가요":
+  "{done} / {total} 달성 · 이 기기에 저장되고 백업에 들어가요":
     "{done} / {total} unlocked · saved on this device and in backups",
   "첫 줄": "First line",
   "줄을 처음으로 지우기": "Clear your first line",
@@ -486,7 +486,7 @@ export const EN = {
   "T를 돌려 넣어 3줄 지우기": "Spin a T in to clear 3 lines",
   "판을 완전히 비우기": "Empty the whole board",
   "5콤보": "5 combo",
-  "줄을 지우는 고정 6번 연속": "6 line-clearing pieces in a row",
+  "줄 삭제 6번 연속(5콤보)": "6 line-clearing pieces in a row",
   "백투백 4연속": "4 back-to-backs",
   "4줄·T-spin 같은 어려운 삭제 4번 연속": "4 difficult clears (quads, T-spins) in a row",
   "Sprint 완주": "Sprint finished",

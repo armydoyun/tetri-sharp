@@ -50,7 +50,7 @@ export const createAchievementsUI = ({ dialog, achievements }) => {
                   el("span", {
                     class: "achievement-date num",
                     text: done[a.id] ? formatDate(done[a.id]) : "",
-                    "aria-label": done[a.id] ? t("{date}에 이룸", { date: formatDate(done[a.id]) }) : t("아직"),
+                    "aria-label": done[a.id] ? t("{date}에 달성", { date: formatDate(done[a.id]) }) : t("아직"),
                   })
                 )
               )
@@ -58,7 +58,7 @@ export const createAchievementsUI = ({ dialog, achievements }) => {
           );
         })
       );
-      notice.textContent = t("{done} / {total}개 이룸 · 이 기기에 저장되고 백업에 들어가요", {
+      notice.textContent = t("{done} / {total} 달성 · 이 기기에 저장되고 백업에 들어가요", {
         done: count,
         total: ACHIEVEMENTS.length,
       });

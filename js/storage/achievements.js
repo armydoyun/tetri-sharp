@@ -39,7 +39,7 @@ export const ACHIEVEMENTS = Object.freeze([
   play("tsd", "T-spin Double", t("T를 돌려 넣어 2줄 지우기"), s => clears(s, "full-2")),
   play("tst", "T-spin Triple", t("T를 돌려 넣어 3줄 지우기"), s => clears(s, "full-3")),
   play("perfect", t("퍼펙트 클리어"), t("판을 완전히 비우기"), s => (s.tally?.perfect ?? 0) > 0),
-  play("combo5", t("5콤보"), t("줄을 지우는 고정 6번 연속"), s => (s.tally?.maxCombo ?? 0) >= 5),
+  play("combo5", t("5콤보"), t("줄 삭제 6번 연속(5콤보)"), s => (s.tally?.maxCombo ?? 0) >= 5),
   play("b2b4", t("백투백 4연속"), t("4줄·T-spin 같은 어려운 삭제 4번 연속"), s => (s.tally?.maxB2b ?? 0) >= 4),
 
   inMode("sprint-clear", "sprint40", t("Sprint 완주"), t("Sprint 40L 끝까지"), s => s.over === "clear"),
