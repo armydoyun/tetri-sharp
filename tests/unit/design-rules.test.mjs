@@ -87,3 +87,130 @@ test("CSS 파일마다 중괄호 짝이 맞는다(하나라도 빠지면 그 뒤
     assert.equal(depth, 0, `${file}: 닫히지 않은 규칙이 있다`);
   }
 });
+
+// ---- 컴포넌트 약속(docs/DESIGN_SYSTEM.md "컴포넌트") ----
+
+/** CSS 규칙 목록: { file, selector, props } (@media 안 규칙 포함) */
+const cssRules = file => {
+  let text = fs.readFileSync(path.join(ROOT, file), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  // 버튼·세그먼트의 바탕 정의는 검사하지 않는다(여기서만 여백·높이를 정한다)
+  if (file === "css/components.css") {
+    const start = text.indexOf(".btn {");
+    const end = text.indexOf(".select {");
+    text = text.slice(0, start) + text.slice(end);
+  }
+  const rules = [];
+  for (const m of text.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const selector = m[1].replace(/@media[^{]*$/, "").trim();
+    const props = m[2]
+      .split(";")
+      .map(d => d.split(":")[0].trim())
+      .filter(Boolean);
+    rules.push({ file, selector, props });
+  }
+  return rules;
+};
+
+/** 선택자 목록을 맨 바깥 쉼표로 나눈다(:is(a, b) 안의 쉼표는 그대로) */
+const splitSelectors = selector => {
+  const out = [];
+  let depth = 0;
+  let cur = "";
+  for (const ch of selector) {
+    if (ch === "(") depth++;
+    if (ch === ")") depth--;
+    if (ch === "," && depth === 0) {
+      out.push(cur.trim());
+      cur = "";
+    } else cur += ch;
+  }
+  return [...out, cur.trim()].filter(Boolean);
+};
+
+/** 선택자의 마지막 덩어리(실제로 꾸미는 요소) */
+const subject = sel => {
+  let depth = 0;
+  let last = 0;
+  for (let i = 0; i < sel.length; i++) {
+    if (sel[i] === "(") depth++;
+    if (sel[i] === ")") depth--;
+    if (depth === 0 && /[\s>+~]/.test(sel[i])) last = i + 1;
+  }
+  return sel.slice(last);
+};
+
+// 이 속성들은 버튼 면의 가운데 맞춤·크기를 정한다 → 화면 CSS에서는 --btn-*·--seg-* 변수로만 바꾼다
+const LAYOUT_PROPS = new Set([
+  "padding",
+  "padding-top",
+  "padding-bottom",
+  "padding-left",
+  "padding-right",
+  "padding-block",
+  "padding-inline",
+  "padding-block-start",
+  "padding-block-end",
+  "height",
+  "min-height",
+  "max-height",
+  "line-height",
+  "display",
+  "align-items",
+  "justify-content",
+  "gap",
+  "font-size",
+  "box-shadow",
+  "transform",
+]);
+
+test("컴포넌트: 화면 CSS는 버튼·세그먼트 칸의 여백·높이·정렬을 직접 덮어쓰지 않는다(--btn-*·--seg-* 변수로)", () => {
+  const isSegmentItem = sel => /(segmented|choice|rule-tabs)\b[^,]*>\s*button/.test(sel) && subject(sel) === "button";
+  const bad = walk("css")
+    .filter(f => f.endsWith(".css"))
+    .flatMap(cssRules)
+    .flatMap(({ file, selector, props }) =>
+      splitSelectors(selector)
+        .filter(sel => /\.btn(?![\w-])/.test(subject(sel)) || isSegmentItem(sel))
+        .flatMap(sel => props.filter(p => LAYOUT_PROPS.has(p)).map(p => `${file}: ${sel} { ${p} }`))
+    );
+  assert.deepEqual(bad, []);
+});
+
+test("컴포넌트: index.html의 버튼은 [아이콘][.btn-label][.btn-meta][kbd] 구조만 쓴다(맨 글자 없음)", () => {
+  const html = stripComments("index.html", fs.readFileSync(path.join(ROOT, "index.html"), "utf8"));
+  const bad = [];
+  for (const m of html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)) {
+    const cls = /class="([^"]*)"/.exec(m[1])?.[1].split(/\s+/) ?? [];
+    if (!cls.includes("btn")) continue;
+    const rest = m[2]
+      .replace(/<kbd\b[^>]*>(?:<kbd\b[^>]*>[^<]*<\/kbd>|[^<])*<\/kbd>/g, "")
+      .replace(/<span data-icon="[\w-]+"><\/span>/g, "")
+      .replace(/<span class="btn-icon[^"]*">(?:<span data-icon="[\w-]+"><\/span>)?<\/span>/g, "")
+      .replace(/<span class="btn-label[^"]*">[^<]*<\/span>/g, "")
+      .replace(/<small\b[^>]*class="btn-meta"[^>]*><\/small>/g, "");
+    if (rest.trim()) bad.push(`${/id="([^"]*)"/.exec(m[1])?.[1] ?? m[1].trim()}: ${rest.trim().slice(0, 60)}`);
+  }
+  assert.deepEqual(bad, []);
+});
+
+test("컴포넌트: 화면 코드는 버튼·입력을 직접 만들지 않는다 — js/ui/components.js를 쓴다", () => {
+  // 모양이 따로 정해진 특수 버튼만 예외(색 견본·키 칸·퍼즐 칸·리플레이 표시)
+  const ALLOWED = new Set([
+    "js/ui/settings.js:color-swatch",
+    "js/ui/settings.js:key-slot",
+    "js/ui/puzzle-editor.js:puzzle-editor-cell",
+    "js/main.js:replay-mark",
+  ]);
+  const bad = [];
+  for (const f of walk("js").filter(f => f.endsWith(".js") && f !== "js/ui/components.js")) {
+    const text = stripComments(f, fs.readFileSync(path.join(ROOT, f), "utf8"));
+    for (const m of text.matchAll(
+      /el\("(button|input|select|textarea)"|createElement\("(button|input|select|textarea)"\)/g
+    )) {
+      const near = text.slice(m.index, m.index + 400);
+      const cls = /class(?:Name)?:?\s*=?\s*[`"]([\w-]+)/.exec(near)?.[1] ?? "?";
+      if (!ALLOWED.has(`${f}:${cls}`)) bad.push(`${f}: ${m[0]} (${cls})`);
+    }
+  }
+  assert.deepEqual(bad, []);
+});
