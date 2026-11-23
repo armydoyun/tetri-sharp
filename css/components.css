@@ -1072,3 +1072,59 @@
 .achievement:not(.is-done) .achievement-text strong {
   color: var(--text-dim);
 }
+
+/* 낮은 가로 화면(휴대폰 가로): 탭 있는 대화상자는 화면을 채우고 [세로 탭 | 제목·내용·발] 두 칸으로 나눈다.
+   위아래로 쌓으면 머리·탭·발만으로 높이가 차서 내용이 한 줄 반만 보인다(U9).
+   탭 칸은 높이를 다 쓴다 → 터치 44px 탭 여섯 개가 높이 320px 화면에서도 다 보인다. */
+@media (orientation: landscape) and (max-height: 520px) {
+  /* 탭 칸에 탭 줄만 있는 대화상자(설정 등). 규칙 편집처럼 탭 칸에 다른 조작이 있으면 위아래 배치 그대로 */
+  .dialog-tabbed[open]:has(> .dialog-tabs > .segmented:only-child) {
+    display: grid;
+    grid-template-columns: minmax(124px, 24%) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "tabs head"
+      "tabs body"
+      "tabs foot";
+    width: calc(100vw - 16px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+    max-width: none;
+    height: calc(100dvh - 16px);
+    max-height: none;
+  }
+
+  .dialog-tabbed:has(> .dialog-tabs > .segmented:only-child) > .dialog-head {
+    grid-area: head;
+    padding: var(--space-2) var(--space-2) var(--space-1) var(--space-5);
+  }
+
+  .dialog-tabbed:has(> .dialog-tabs > .segmented:only-child) .dialog-title {
+    font-size: var(--text-xl);
+  }
+
+  .dialog-tabbed:has(> .dialog-tabs > .segmented:only-child) > .dialog-tabs {
+    grid-area: tabs;
+    overflow-y: auto;
+    padding: var(--space-3) var(--space-3) var(--space-3) var(--space-3);
+  }
+
+  .dialog-tabbed:has(> .dialog-tabs > .segmented:only-child) > .dialog-tabs .segmented {
+    flex-direction: column;
+    flex-wrap: nowrap;
+  }
+
+  .dialog-tabbed:has(> .dialog-tabs > .segmented:only-child) > .dialog-tabs .segmented > button {
+    flex: none;
+  }
+
+  .dialog-tabbed:has(> .dialog-tabs > .segmented:only-child) > :is(.dialog-head, .dialog-body, .dialog-foot) {
+    border-left: var(--border-w) solid var(--border);
+  }
+
+  .dialog-tabbed:has(> .dialog-tabs > .segmented:only-child) > .dialog-body {
+    grid-area: body;
+  }
+
+  .dialog-tabbed:has(> .dialog-tabs > .segmented:only-child) > .dialog-foot {
+    grid-area: foot;
+  }
+}

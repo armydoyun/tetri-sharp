@@ -107,7 +107,9 @@ export const segmented = ({ id, label, options, value, onChange, wrap = false, c
       const buttons = [...group.querySelectorAll("button")];
       const current = buttons.findIndex(b => b === e.target);
       if (current < 0) return;
-      const offset = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+      // 세로로 늘어설 때(휴대폰 가로의 대화상자 탭)도 쓰도록 위아래 화살표도 받는다
+      const offset =
+        e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
       const next =
         e.key === "Home"
           ? 0
