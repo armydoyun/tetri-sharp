@@ -30,6 +30,8 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
   const narrow = window.matchMedia(
     "(max-width: 720px) and (not ((orientation: landscape) and (max-height: 520px) and (pointer: coarse)))"
   );
+  // 휴대폰 가로(낮은 화면): 배치는 넓은 쪽이지만 보드가 작아 이름표도 좁은 화면처럼 키운다(2차 평가 U41)
+  const lowLandscape = window.matchMedia("(orientation: landscape) and (max-height: 520px) and (pointer: coarse)");
   let cell = 0;
   let side = 0;
   let gridPath = new Path2D();
@@ -272,7 +274,8 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       // 일부 글꼴은 top 기준선 위에도 글자가 조금 나오므로 윗줄을 남겨 둔다.
       // 좁은 화면은 캔버스가 많이 줄어 보이므로 글자를 키우고 이름을 줄인다("다음 피스" → "다음").
       // 그래도 옆 칸 폭을 넘으면 넘지 않을 만큼 줄인다.
-      const base = Math.round(cell * (narrow.matches ? 0.66 : 0.46));
+      const big = narrow.matches || lowLandscape.matches;
+      const base = Math.round(cell * (big ? 0.66 : 0.46));
       const room = side * cell - sidePad;
       const label = (text, x) => {
         labelCtx.font = `600 ${base}px system-ui, sans-serif`;
@@ -281,7 +284,7 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
         labelCtx.fillText(text, x, cell);
       };
       if (game.rules.hold.enabled) label(t("홀드"), sidePad);
-      if (game.rules.previewCount > 0) label(narrow.matches ? t("다음") : t("다음 피스"), nx);
+      if (game.rules.previewCount > 0) label(big ? t("다음") : t("다음 피스"), nx);
     }
     ctx.drawImage(labels, 0, by - cell);
     if (game.rules.hold.enabled) {

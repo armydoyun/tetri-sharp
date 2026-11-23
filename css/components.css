@@ -249,6 +249,11 @@
   }
 }
 
+/* 설정 줄의 버튼 하나(데이터 탭 저장·불러오기 등)는 칸 폭으로 늘이지 않고 글자 폭으로(다른 작은 버튼과 같게, U37) */
+.field-row > .btn {
+  justify-self: start;
+}
+
 .field-row.is-disabled {
   opacity: 0.4;
 }
