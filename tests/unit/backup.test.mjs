@@ -152,3 +152,9 @@ test("복원 쓰기가 실패하면 예전 키와 이미 복원한 데이터가 
   assert.equal(observer.get("playerName", null), "복원 뒤 이름");
   assert.equal(restoreBackup(createStore(null), oldBackup), false);
 });
+
+test("백업: 고른 CPU 성향도 옮기고, 모르는 이름은 버린다", () => {
+  const wrap = style => ({ app: "tetri-sharp", kind: "backup", v: 1, data: { "versus:style": style } });
+  assert.equal(parseBackup(wrap("quad"), findMode)?.data["versus:style"], "quad");
+  assert.equal(parseBackup(wrap("<b>"), findMode)?.data["versus:style"], undefined);
+});
