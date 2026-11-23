@@ -366,16 +366,17 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
         autocomplete: "off",
       })
     );
+    // 이름은 change에서만 저장한다(Enter도 change를 일으킨다). 저장하면 편집기를 다시 그리며 이 입력칸이 빠지는데,
+    // 그때 한 번 더 오는 change·blur에서 다시 그리면 그리는 도중에 또 그리게 되므로 한 번만 처리한다.
+    let saved = false;
     const saveName = () => {
-      if (nameInput.value.trim() === current.name) return;
+      if (saved || !nameInput.isConnected || nameInput.value.trim() === current.name) return;
+      saved = true;
       slots.rename(nameInput.value);
       message = t("이름을 바꿨어요");
       render("rule-slot-name");
     };
     nameInput.addEventListener("change", saveName);
-    nameInput.addEventListener("keydown", e => {
-      if (e.key === "Enter") saveName();
-    });
     const addSlot = button({ text: t("새 규칙"), iconName: "edit", className: "btn btn-small", id: "rule-slot-add" });
     addSlot.disabled = state.slots.length >= MAX_RULE_SLOTS;
     addSlot.addEventListener("click", () => {
