@@ -7,6 +7,7 @@ import { createTouch, touchVisible } from "./input/touch.js";
 import { compilePadmap, createGamepad } from "./input/gamepad.js";
 import { ACTIONS, compileKeymap, keyLabel } from "./input/keymap.js";
 import { RANK_STEPS, rankLabel, rankOf } from "./modes/ranks.js";
+import { MAX_RULE_SLOTS, createRuleSlots } from "./storage/rule-slots.js";
 import { ACHIEVEMENTS, createAchievements } from "./storage/achievements.js";
 import { createAchievementsUI } from "./ui/achievements.js";
 import { MODES, RECORD_MODES, SURVIVAL_MILESTONES, findMode as findBaseMode } from "./modes/index.js";
@@ -26,6 +27,8 @@ import { loadSettings, sanitizeSettings, saveSettings, toEngineHandling } from "
 import { createRecords } from "./storage/records.js";
 import { createSettingsUI } from "./ui/settings.js";
 import { createRulesUI } from "./ui/rules.js";
+import { button } from "./ui/dom.js";
+import { dropdown } from "./ui/select.js";
 import { createRecordsUI } from "./ui/records.js";
 import { createStatsUI } from "./ui/stats.js";
 import { createPracticeUI } from "./ui/practice.js";
@@ -199,11 +202,17 @@ let mode = findMode(store.get("lastMode", null));
 
 const RULE_CHOICES = [...PRESET_LIST.map(p => p.id), "custom"];
 let ruleChoice = RULE_CHOICES.includes(store.get("lastRules", null)) ? store.get("lastRules", null) : "modern";
-let customBody = sanitizeRuleBody(store.get("customRules", MODERN));
+// 내 규칙(이름 붙인 Custom 규칙 여러 개). customBody는 지금 고른 규칙의 내용
+const ruleSlots = createRuleSlots(store);
+let customBody = ruleSlots.active().body;
 /** 지금 고른 규칙 */
 const currentRules = () => (ruleChoice === "custom" ? makeCustomRules(customBody) : PRESETS[ruleChoice]);
 /** 규칙 id → 규칙: 프리셋이거나 지금 쓰는 Custom 규칙일 때만(다른 Custom 내용은 기록에 id만 있다) */
-const rulesById = id => PRESETS[id] ?? (makeCustomRules(customBody).id === id ? makeCustomRules(customBody) : null);
+const rulesById = id => {
+  if (PRESETS[id]) return PRESETS[id];
+  const slot = ruleSlots.read().slots.find(x => makeCustomRules(x.body).id === id);
+  return slot ? makeCustomRules(slot.body) : null;
+};
 /** 이번 판에 쓰는 규칙(게임 중에 Custom을 고쳐도 이번 판 기록은 시작할 때 규칙으로 남는다) */
 let rules = currentRules();
 let runPlayerName = "";
@@ -346,6 +355,29 @@ const RULE_DESCRIPTIONS = {
   arcade: t("아케이드 느낌: ARS 회전, 최근 4개를 피하는 생성기, 생성·줄 삭제 지연, 미리 회전(IRS)."),
 };
 
+/** 첫 화면 규칙 카드의 내 규칙 줄(Custom일 때만 보이고, 자리는 늘 차지한다) */
+const renderRuleSlotRow = () => {
+  const row = $("rule-slot-row");
+  const state = ruleSlots.read();
+  const picker = dropdown({
+    id: "rule-slot",
+    label: t("내 규칙"),
+    options: state.slots.map((slot, i) => ({ value: i, label: slot.name })),
+    value: state.active,
+    onChange: i => {
+      ruleSlots.select(i);
+      customBody = ruleSlots.active().body;
+      renderMenu();
+      renderKeyHelp();
+      /** @type {HTMLElement | null} */ ($("rule-slot"))?.focus();
+    },
+  });
+  const share = button({ text: t("공유"), iconName: "link", className: "btn btn-small", id: "rule-slot-share" });
+  share.addEventListener("click", () => rulesUI.open("share"));
+  row.replaceChildren(picker, share);
+  row.classList.toggle("is-off", ruleChoice !== "custom");
+};
+
 const renderRuleTabs = () => {
   const tabs = $("rule-tabs");
   tabs.replaceChildren(
@@ -366,6 +398,7 @@ const renderRuleTabs = () => {
       return b;
     })
   );
+  renderRuleSlotRow();
   // 편집 버튼은 늘 같은 자리에 있다. Custom이 아닐 때는 비활성(원칙 2) — 이유는 설명 줄에.
   /** @type {HTMLButtonElement} */ ($("edit-rules")).disabled = ruleChoice !== "custom";
   $("rule-desc").textContent =
@@ -1194,8 +1227,23 @@ const rulesUI = createRulesUI({
   dialog: /** @type {HTMLDialogElement} */ ($("rules-editor")),
   getRules: () => customBody,
   onChange: body => {
-    customBody = sanitizeRuleBody(body);
-    store.set("customRules", customBody);
+    ruleSlots.update(body);
+    customBody = ruleSlots.active().body;
+  },
+  // 편집기의 내 규칙 줄(이름·새 규칙·지우기)과 받은 코드: 바꾼 뒤 지금 고른 규칙을 다시 읽는다
+  slots: {
+    read: ruleSlots.read,
+    rename: name => ruleSlots.rename(name),
+    add: (name, body) => {
+      const added = ruleSlots.add(name, body);
+      customBody = ruleSlots.active().body;
+      return added;
+    },
+    remove: () => {
+      const removed = ruleSlots.remove();
+      customBody = ruleSlots.active().body;
+      return removed;
+    },
   },
   onClose: () => {
     renderMenu();
@@ -2284,7 +2332,10 @@ const reloadFromStore = () => {
   padBindings = compilePadmap(settings.padmap);
   records.reload();
   applyScheme();
-  customBody = sanitizeRuleBody(store.get("customRules", MODERN) ?? MODERN);
+  // 내 규칙이 없는 이전 백업이면 백업의 Custom 규칙을 지금 고른 칸에 넣는다
+  const restoredCustom = sanitizeRuleBody(store.get("customRules", MODERN) ?? MODERN);
+  if (JSON.stringify(restoredCustom) !== JSON.stringify(ruleSlots.active().body)) ruleSlots.update(restoredCustom);
+  customBody = ruleSlots.active().body;
   const last = store.get("lastRules", null);
   ruleChoice = RULE_CHOICES.includes(last) ? last : "modern";
   mode = findMode(store.get("lastMode", null));
@@ -2567,11 +2618,15 @@ const importRulesFromLink = () => {
     showMenuNotice(t("링크의 규칙 코드를 읽을 수 없었어요."));
     return false;
   }
-  customBody = body;
-  store.set("customRules", customBody);
+  // 지금 규칙을 덮어쓰지 않고 내 규칙에 새 칸으로
+  if (!ruleSlots.add(t("받은 규칙"), body)) {
+    showMenuNotice(t("내 규칙이 가득 찼어요({n}개). 하나를 지우고 링크를 다시 열어 주세요", { n: MAX_RULE_SLOTS }));
+    return false;
+  }
+  customBody = ruleSlots.active().body;
   ruleChoice = "custom";
   store.set("lastRules", "custom");
-  showMenuNotice(t("링크로 받은 규칙을 Custom에 불러왔어요 · 기록표 {id}", { id: makeCustomRules(body).id }));
+  showMenuNotice(t("링크로 받은 규칙을 내 규칙에 새로 넣었어요 · 기록표 {id}", { id: makeCustomRules(body).id }));
   return true;
 };
 

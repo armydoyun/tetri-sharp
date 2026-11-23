@@ -5,6 +5,7 @@ import { PUZZLES } from "../modes/puzzles.js";
 import { PRACTICE_PROGRESS_KEY, sanitizePracticeProgress } from "./practice-progress.js";
 import { SPRINT_HISTORY_KEY, sanitizeSprintHistory } from "./sprint-history.js";
 import { ACHIEVEMENTS_KEY, sanitizeAchievements } from "./achievements.js";
+import { RULE_SLOTS_KEY, sanitizeRuleSlots } from "./rule-slots.js";
 import { isEntry } from "./records.js";
 import { sanitizeRuleBody } from "../rules/sanitize.js";
 import { sanitizeReplay } from "../replay/replay.js";
@@ -28,6 +29,7 @@ export const BACKUP_KEYS = Object.freeze([
   PRACTICE_PROGRESS_KEY,
   SPRINT_HISTORY_KEY,
   ACHIEVEMENTS_KEY,
+  RULE_SLOTS_KEY,
 ]);
 
 const MAX_TABLES = 500;
@@ -70,6 +72,8 @@ export const parseBackup = (raw, findMode) => {
   }
   if (src[SPRINT_HISTORY_KEY] !== undefined) data[SPRINT_HISTORY_KEY] = sanitizeSprintHistory(src[SPRINT_HISTORY_KEY]);
   if (src[ACHIEVEMENTS_KEY] !== undefined) data[ACHIEVEMENTS_KEY] = sanitizeAchievements(src[ACHIEVEMENTS_KEY]);
+  const slots = src[RULE_SLOTS_KEY] !== undefined ? sanitizeRuleSlots(src[RULE_SLOTS_KEY]) : null;
+  if (slots) data[RULE_SLOTS_KEY] = slots;
   if (src.settings !== undefined) data.settings = sanitizeSettings(src.settings);
   if (isPlainObject(src.records)) {
     const records = {};
@@ -140,7 +144,8 @@ export const restoreBackup = (store, parsed) => {
       (key === "puzzle:cleared" ||
         key === PRACTICE_PROGRESS_KEY ||
         key === SPRINT_HISTORY_KEY ||
-        key === ACHIEVEMENTS_KEY) &&
+        key === ACHIEVEMENTS_KEY ||
+        key === RULE_SLOTS_KEY) &&
       !(key in parsed.data)
     )
       continue;

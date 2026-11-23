@@ -1164,7 +1164,7 @@ test("통계: 결과 화면에서 열면 이번 판 통계가 보인다", async 
   await context.close();
 });
 
-test("규칙 공유: 편집기에서 코드를 붙여 넣으면 불러오고, #rules= 링크로 열면 Custom으로 들어온다", async () => {
+test("규칙 공유: 받은 코드·링크는 지금 규칙을 덮어쓰지 않고 내 규칙에 새 칸으로 들어온다", async () => {
   const { context, page, errors } = await openPage();
   // Retro 내용의 코드를 편집기에서 얻는다
   await page.click('[data-rules="custom"]');
@@ -1176,13 +1176,21 @@ test("규칙 공유: 편집기에서 코드를 붙여 넣으면 불러오고, #r
   await page.click('[data-preset="modern"]');
   await page.locator("#rule-share-paste").fill(code);
   await page.click("#rule-share-load");
-  assert.match(await text(page, "rules-record"), /불러왔어요/);
+  assert.match(await text(page, "rules-record"), /새 칸으로 불러왔어요/);
+  assert.equal(await page.locator("#rule-slot-name").inputValue(), "받은 규칙");
   await page.click('.dialog-tabs [data-value="피스"]');
   assert.match(await page.locator("#rule-rotation .select-value").textContent(), /킥 없음/);
   await page.click('.dialog-tabs [data-value="공유"]');
   await page.locator("#rule-share-paste").fill("엉터리");
   await page.click("#rule-share-load");
   assert.match(await text(page, "rules-record"), /읽을 수 없는/);
+  await page.click("#rules-close");
+  // 첫 화면: 내 규칙 두 개, 원래 규칙(Modern 값)은 그대로
+  await choose(page, "rule-slot", "0");
+  await page.click("#edit-rules");
+  await page.click('.dialog-tabs [data-value="피스"]');
+  assert.equal(await page.locator("#rule-slot-name").inputValue(), "내 규칙 1");
+  assert.match(await page.locator("#rule-rotation .select-value").textContent(), /SRS/, "덮어쓰지 않았다");
   await page.click("#rules-close");
   await context.close();
 
@@ -1194,12 +1202,37 @@ test("규칙 공유: 편집기에서 코드를 붙여 넣으면 불러오고, #r
   await p2.goto(`${url}#rules=${code.slice(4)}`);
   await p2.waitForFunction(() => document.documentElement.dataset.ready === "1");
   assert.equal(await p2.locator('[data-rules="custom"]').getAttribute("aria-pressed"), "true");
-  assert.match(await p2.locator("#menu-notice").textContent(), /불러왔어요/);
+  assert.match(await p2.locator("#menu-notice").textContent(), /내 규칙에 새로 넣었어요/);
   assert.equal(new URL(p2.url()).hash, "", "주소의 해시는 지운다");
+  assert.equal(await p2.locator("#rule-slot .select-value").textContent(), "받은 규칙");
   await p2.click("#edit-rules");
   assert.match(await p2.locator("#rule-rotation .select-value").textContent(), /킥 없음/);
   assert.deepEqual([...errors, ...errs2], []);
   await fresh.close();
+});
+
+test("내 규칙: 첫 화면에서 고르고 공유 탭을 열며, 편집기에서 새 규칙·이름·지우기를 한다", async () => {
+  const { context, page, errors } = await openPage();
+  // Custom이 아닐 때는 내 규칙 줄이 보이지 않지만 자리는 그대로
+  assert.equal(await page.locator("#rule-slot-row").evaluate(el => getComputedStyle(el).visibility), "hidden");
+  await page.click('[data-rules="custom"]');
+  assert.equal(await page.locator("#rule-slot-row").evaluate(el => getComputedStyle(el).visibility), "visible");
+  await page.click("#rule-slot-share");
+  assert.equal(await page.locator("#rule-share-code").isVisible(), true, "공유 탭으로 열린다");
+  await page.click("#rule-slot-add");
+  await page.locator("#rule-slot-name").fill("대회용");
+  await page.keyboard.press("Enter");
+  assert.equal(await page.locator("#rule-slot-name").inputValue(), "대회용");
+  await page.click("#rules-close");
+  // 대화상자의 close 이벤트(첫 화면 다시 그리기)는 닫은 다음 차례에 온다
+  await page.waitForFunction(() => document.querySelector("#rule-slot .select-value")?.textContent === "대회용");
+  await page.click("#edit-rules");
+  page.once("dialog", dialog => dialog.accept());
+  await page.click("#rule-slot-remove");
+  assert.equal(await page.locator("#rule-slot-name").inputValue(), "내 규칙 1");
+  assert.equal(await page.locator("#rule-slot-remove").isDisabled(), true, "마지막 하나는 지울 수 없다");
+  assert.deepEqual(errors, []);
+  await context.close();
 });
 
 test("연습: 메뉴에서 고르면 시작하고, 놓을 때마다 성공/시도를 센다", async () => {

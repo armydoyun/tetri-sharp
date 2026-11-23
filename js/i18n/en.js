@@ -449,6 +449,24 @@ export const EN = {
   랭크: "Rank",
   "다음 {rank}: {record}": "Next {rank}: {record}",
   "가장 높은 랭크예요": "Top rank",
+  // ---- 내 규칙 ----
+  "‘{name}’ 규칙을 지울까요? 이 규칙의 기록은 남아요.": "Delete the rules ‘{name}’? Records made with them stay.",
+  "규칙 이름": "Rules name",
+  "규칙을 지웠어요": "Rules deleted",
+  "내 규칙": "My rules",
+  "내 규칙 {n}": "My rules {n}",
+  "내 규칙이 가득 찼어요({n}개). 하나를 지우고 다시 불러와 주세요": "My rules is full ({n}). Delete one and load again",
+  "내 규칙이 가득 찼어요({n}개). 하나를 지우고 링크를 다시 열어 주세요":
+    "My rules is full ({n}). Delete one and open the link again",
+  "링크로 받은 규칙을 내 규칙에 새로 넣었어요 · 기록표 {id}": "Added the linked rules to My rules · records {id}",
+  "링크를 복사했어요. 받은 사람이 열면 이 규칙이 내 규칙에 새로 들어가요":
+    "Link copied. Opening it adds these rules to the recipient's My rules",
+  "받은 규칙": "Received rules",
+  "새 규칙": "New rules",
+  "새 규칙을 만들었어요(Modern 값에서 시작)": "New rules created (starting from Modern)",
+  "새 칸으로 불러왔어요 · 기록표 {id}": "Loaded as new rules · records {id}",
+  "이름을 바꿨어요": "Renamed",
+  지우기: "Delete",
   // ---- 업적 ----
   업적: "Achievements",
   "업적 달성 · {names}": "Achievement unlocked · {names}",

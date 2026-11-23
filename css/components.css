@@ -893,6 +893,39 @@
   gap: var(--space-3);
 }
 
+/* 편집기 머리: 내 규칙(번호 · 이름 · 새 규칙 · 지우기) */
+.rule-slot-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.rule-slot-row > .field-help {
+  margin: 0;
+  white-space: nowrap;
+}
+
+/* 좁은 화면: [번호 · 이름] / [새 규칙 · 지우기] 두 줄(한 줄이면 이름 칸이 0으로 찌그러진다) */
+@media (max-width: 480px) {
+  .rule-slot-row {
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .rule-slot-row > .text-input {
+    grid-column: 2 / -1;
+  }
+
+  .rule-slot-row > .btn {
+    grid-row: 2;
+  }
+
+  .rule-slot-row > #rule-slot-add {
+    grid-column: 1 / 3;
+  }
+}
+
 .rule-presets {
   display: grid;
   grid-template-columns: auto repeat(3, minmax(0, 1fr));
