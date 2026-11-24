@@ -1,7 +1,9 @@
 // 퍼즐 모드: 정해진 판과 정해진 피스로 목표를 이루는 단계형 문제. 중력 없음, 늘 Modern 규칙.
 //  - 판 비우기: 아래 두 줄의 구멍을 주어진 피스로 채워 퍼펙트 클리어(피스 1~4개)
 //  - 4줄 만들기: 한 열을 우물로 남긴 아래 네 줄의 구멍을 앞 피스로 채우고 마지막 I로 4줄(피스 2~4개)
+//  - 콤보 이어 가기: 4칸 우물에 피스를 하나씩 넣어 피스마다 한 줄 이상 지우기(콤보가 끊기면 실패)
 //  - 밀어 넣기: 처마 아래 빈칸에 피스 하나를 소프트 드롭으로 내린 뒤 옆으로 밀어 넣어 2줄(곧장 떨어뜨려서는 안 풀린다)
+//  - 돌려 넣기: S·Z·L·J 하나를 바닥 근처에서 돌려(벽 차기) 틈에 끼워 2줄(곧장 떨어뜨리거나 밀어 넣어서는 안 풀린다)
 //  - T-spin Double / Triple: 주어진 T 하나로
 // 단계는 시드로 만들어 어디서나 같고, 모든 단계는 풀 수 있게 만든다(단위 테스트가 탐색기로 확인한다).
 import { MODERN } from "../rules/presets.js";
@@ -16,7 +18,7 @@ const TYPES = ["I", "J", "L", "O", "S", "T", "Z"];
 /**
  * 단계 계획: [종류, 피스 수]. 앞쪽은 쉽게(피스 하나), 뒤로 갈수록 피스가 늘고 T-spin이 섞인다.
  * 뒤에 붙인 단계(31~)는 나중에 더한 장이다. 이미 있는 단계의 번호(id)·시드는 바꾸지 않는다(진행도·리플레이가 id로 맞는다).
- * @type {ReadonlyArray<[ "pc" | "quad" | "tuck" | "tsd" | "tst", number ]>}
+ * @type {ReadonlyArray<[ "pc" | "quad" | "tuck" | "combo" | "spin" | "tsd" | "tst", number ]>}
  */
 const PLAN = Object.freeze([
   ["pc", 1],
@@ -67,6 +69,24 @@ const PLAN = Object.freeze([
   ["tuck", 1],
   ["tuck", 1],
   ["tuck", 1],
+  // 콤보 이어 가기(판은 아래 COMBO_BOARDS, 피스 수는 판에 적힌 피스 수)
+  ["combo", 3],
+  ["combo", 3],
+  ["combo", 4],
+  ["combo", 4],
+  ["combo", 5],
+  ["combo", 5],
+  ["combo", 6],
+  ["combo", 7],
+  // 돌려 넣기(판은 아래 SPIN_BOARDS)
+  ["spin", 1],
+  ["spin", 1],
+  ["spin", 1],
+  ["spin", 1],
+  ["spin", 1],
+  ["spin", 1],
+  ["spin", 1],
+  ["spin", 1],
 ]);
 
 /**
@@ -86,6 +106,54 @@ const TUCK_BOARDS = Object.freeze([
   ["T", [".....##...", "...#.#....", "######...#", "#######.##"]],
   ["T", ["...##.....", "....#....#", "#...######", "##.#######"]],
 ]);
+
+/**
+ * 돌려 넣기 판(아래 서너 줄, 위에서부터). 틈이 피스 모양이지만 처마나 어긋난 칸 때문에 곧장 떨어뜨리거나
+ * 바닥에서 옆으로 밀어서는 들어가지 않고, 근처에서 돌려야(벽 차기) 들어간다.
+ * 무작위 판 가운데 "돌리면 2줄, 위에서만 돌리고 내리기·밀기로는 2줄 못 지움"을 탐색기로 고른 것(단위 테스트가 다시 확인한다).
+ * 180° 회전 없이 풀리는 판만 쓴다(휴대폰 버튼·제스처에는 180° 회전이 없다).
+ * 눕힌 S·Z부터 세운 S, L·J까지.
+ */
+/** @type {ReadonlyArray<[string, string[]]>} */
+const SPIN_BOARDS = Object.freeze([
+  ["Z", ["........#.", "####..####", "#####..###"]],
+  ["S", ["#.........", "#.#.....#.", "####..####", "###..#####"]],
+  ["J", ["#.#.......", "#####.####", "#####...##"]],
+  ["L", [".#......#.", "#######...", "#######.##"]],
+  ["S", [".##.......", "..........", "##..######", "###.######"]],
+  ["Z", [".#...#....", ".##..#..#.", "#####..###", "######..##"]],
+  ["J", [".......#..", "###....#..", "###.######", "###...####"]],
+  ["L", ["##..#....#", "########.#", "######...#"]],
+]);
+
+/** 판 그림(행 문자열, 위에서부터)을 보드 맨 아래에 그린다 */
+const drawRows = (board, rows) => {
+  board.cells.fill(0);
+  const top = board.height - rows.length;
+  rows.forEach((row, dy) => {
+    for (let x = 0; x < WIDTH; x++) if (row[x] === "#") board.cells[(top + dy) * WIDTH + x] = GARBAGE;
+  });
+};
+
+/**
+ * 콤보 판: [피스 순서, 우물 왼쪽 열(0 또는 6), 맨 아래 줄 우물에서 비운 칸(0~3)].
+ * 4칸 폭 우물 밖은 피스 수+1 줄 높이로 채우고, 우물 맨 아래에는 세 칸이 남아 있다(4-wide 콤보 자리).
+ * 피스마다 한 줄 이상 지우는 길이 있는 순서만 골랐다(단위 테스트가 탐색기로 다시 확인한다).
+ */
+/** @type {ReadonlyArray<[string, number, number]>} */
+const COMBO_BOARDS = Object.freeze([
+  ["LZT", 0, 1],
+  ["JTS", 0, 0],
+  ["JJLT", 6, 2],
+  ["TLTZ", 6, 1],
+  ["ZJLTL", 6, 0],
+  ["TJLIS", 6, 2],
+  ["JZLJSZ", 6, 0],
+  ["JLTJITZ", 6, 2],
+]);
+
+/** 같은 종류 단계 가운데 몇 번째인가(판 목록에서 고를 때) */
+const nthOfKind = index => PLAN.slice(0, index).filter(([k]) => k === PLAN[index][0]).length;
 
 /** 아래 네 줄에서 우물 열을 뺀 빈칸이 몇 덩어리(상하좌우로 이어진)인가 */
 const holeGroups = (board, well) => {
@@ -144,19 +212,28 @@ const makeStage = index => {
       goal: ev => ev.tspin === "full" && ev.lines === (kind === "tsd" ? 2 : 3),
     };
   }
-  if (kind === "tuck") {
-    const [piece, rows] = TUCK_BOARDS[PLAN.slice(0, index).filter(([k]) => k === "tuck").length];
+  if (kind === "tuck" || kind === "spin") {
+    const [piece, rows] = (kind === "tuck" ? TUCK_BOARDS : SPIN_BOARDS)[nthOfKind(index)];
+    return { kind, pieces: [piece], build: board => drawRows(board, rows), goal: ev => ev.lines === 2 };
+  }
+  if (kind === "combo") {
+    const [order, left, gap] = COMBO_BOARDS[nthOfKind(index)];
+    const pieces = [...order];
+    if (pieces.length !== count) throw new Error(`콤보 단계 피스 수가 맞지 않습니다: ${index + 1}`);
     return {
       kind,
-      pieces: [piece],
+      pieces,
       build: board => {
         board.cells.fill(0);
-        const top = board.height - rows.length;
-        rows.forEach((row, dy) => {
-          for (let x = 0; x < WIDTH; x++) if (row[x] === "#") board.cells[(top + dy) * WIDTH + x] = GARBAGE;
-        });
+        for (let y = board.height - count - 1; y < board.height; y++)
+          for (let x = 0; x < WIDTH; x++) {
+            const inWell = x >= left && x < left + 4;
+            if (!inWell || (y === board.height - 1 && x !== left + gap)) board.cells[y * WIDTH + x] = GARBAGE;
+          }
       },
-      goal: ev => ev.lines === 2,
+      // 피스마다 줄을 지워 콤보가 피스 수 - 1까지 이어지면 성공, 한 번이라도 못 지우면 바로 실패
+      goal: ev => ev.lines > 0 && ev.combo === count - 1,
+      broken: ev => ev.lines === 0,
     };
   }
   if (kind === "quad") {
@@ -200,12 +277,14 @@ export const KIND_NAMES = Object.freeze({
   pc: t("판 비우기"),
   quad: t("4줄 만들기"),
   tuck: t("처마 밀어 넣기"),
+  combo: t("콤보 이어 가기"),
+  spin: t("돌려 넣기"),
   tsd: "T-spin Double",
   tst: "T-spin Triple",
 });
 
-/** 장 순서(쉬운 것부터): 판 비우기 → 4줄 만들기 → 밀어 넣기 → T-spin Double → T-spin Triple */
-export const CHAPTERS = Object.freeze(["pc", "quad", "tuck", "tsd", "tst"]);
+/** 장 순서(쉬운 것부터): 판 비우기 → 4줄 만들기 → 콤보 → 밀어 넣기 → 돌려 넣기 → T-spin Double → T-spin Triple */
+export const CHAPTERS = Object.freeze(["pc", "quad", "combo", "tuck", "spin", "tsd", "tst"]);
 
 /**
  * 모든 단계(앞에서 한 번 만들어 둔다). 보여 주는 순서는 장별로, 장 안에서는 피스가 적은 것부터.
@@ -242,7 +321,7 @@ export const makePuzzleMode = (puzzle, rules = MODERN) => {
       const p = state.puzzle;
       p.placed += 1;
       if (puzzle.goal(ev)) p.result = "clear";
-      else if (p.placed >= need) p.result = "fail";
+      else if (p.placed >= need || puzzle.broken?.(ev)) p.result = "fail";
       return false;
     },
     check: state => (state.puzzle.result ? { result: state.puzzle.result } : null),
