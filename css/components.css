@@ -665,6 +665,11 @@
   color: var(--text-dim);
 }
 
+.theme-stage-actions {
+  display: flex;
+  margin-top: var(--space-1);
+}
+
 .theme-stage-desc {
   font-size: var(--text-s);
   line-height: 1.45;

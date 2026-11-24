@@ -3553,18 +3553,22 @@ test("키보드: 대화상자는 열면 안으로 포커스가 가고, Esc로 �
 });
 
 test("퍼즐 4줄 만들기: 우물을 남기고 앞 피스를 채운 뒤 I로 4줄을 지우면 성공", async () => {
-  const { context, page, errors } = await openPage(() =>
-    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  // 프레임 단위로 누른다: 실제 시간으로 누르면 바쁜 기계에서 키가 길게 눌린 것으로 잡혀(자동 이동) 가끔 엇나갔다
+  const { context, page, errors } = await openPage(
+    () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } })),
+    undefined,
+    { frameClock: true }
   );
   const first = PUZZLES.find(p => p.kind === "quad");
   await page.click("#open-puzzles");
   assert.match(await page.locator("#puzzles").textContent(), /4줄 만들기/);
   await page.click(`[data-puzzle="${first.number}"]`);
   await page.waitForFunction(() => document.body.dataset.screen === "play");
-  for (const key of keysFor(solvePuzzle(first))) {
-    await page.keyboard.press(key);
-    await page.waitForTimeout(20);
-  }
+  await page.evaluate(() => window.advanceFrame());
+  await runKeys(
+    page,
+    keysFor(solvePuzzle(first)).map(key => [key, 1])
+  );
   await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
   assert.equal(await text(page, "results-title"), "성공!");
   assert.deepEqual(errors, []);
@@ -3812,4 +3816,24 @@ test("첫 화면 로고: 여섯 번은 아무 일 없고, 3초 안에 일곱 번
   } finally {
     await context.close();
   }
+});
+
+test("업적: Custom 규칙 판은 결과에 '업적에 들어가지 않아요'를 알려 주고, 업적 목록은 기본 규칙에서 쌓인다고 적는다", async () => {
+  const { context, page, errors } = await openPage(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  await page.click('[data-rules="custom"]');
+  await startMode(page, "sprint40");
+  // 가운데에 계속 떨어뜨려 금방 막힌다
+  for (let i = 0; i < 40 && (await page.locator("#results").isHidden()); i++) {
+    await page.keyboard.press("Space");
+    await page.waitForTimeout(30);
+  }
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  assert.equal(await text(page, "results-achievements"), "Custom 규칙 판은 업적에 들어가지 않아요");
+  await page.click('#results [data-action="menu"]');
+  await page.click("#open-achievements");
+  assert.match(await page.locator("#achievements .notice-slot").textContent(), /기본 규칙/);
+  assert.deepEqual(errors, []);
+  await context.close();
 });

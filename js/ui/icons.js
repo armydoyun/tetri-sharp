@@ -16,6 +16,8 @@ export const ICONS = Object.freeze({
   edit: [["path", { d: "M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" }]],
   play: [["path", { d: "M8 5.5v13L18.5 12z" }]],
   pause: [["path", { d: "M9 5.5v13M15 5.5v13" }]],
+  // 소리: 스피커와 소리 물결 하나
+  sound: [["path", { d: "M4.5 9.5v5h3.5l4.5 4v-13l-4.5 4zM16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11" }]],
   forward: [["path", { d: "M4 6.5v11l7-5.5zM13 6.5v11l7-5.5z" }]],
   restart: [["path", { d: "M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v4h4" }]],
   close: [["path", { d: "M6 6l12 12M18 6 6 18" }]],

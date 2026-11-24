@@ -471,8 +471,9 @@ export const EN = {
   "업적 달성 · {names}": "Achievement unlocked · {names}",
   "{date}에 달성": "Unlocked {date}",
   아직: "Not yet",
-  "{done} / {total} 달성 · 이 기기에 저장되고 백업에 들어가요":
-    "{done} / {total} unlocked · saved on this device and in backups",
+  "{done} / {total} 달성 · 기본 규칙(Modern·Retro·Arcade) 판에서 쌓여요":
+    "{done} / {total} earned · Counted in games with preset rules (Modern, Retro, Arcade)",
+  "Custom 규칙 판은 업적에 들어가지 않아요": "Games with Custom rules don't count toward achievements",
   "첫 줄": "First line",
   "줄을 처음으로 지우기": "Clear your first line",
   "4줄 한 번에": "Four at once",
@@ -964,6 +965,20 @@ export const EN = {
   "돌려 넣기": "Spin-ins",
   "돌려 넣기 장": "Spin-in chapter",
   "Mini 장": "Mini chapter",
+  "효과음 종류": "Sound set",
+  "테마 따라": "Match theme",
+  기본: "Default",
+  "종이·나무": "Paper & wood",
+  "유리·종": "Glass & bells",
+  "거의 무음": "Near silent",
+  "소리 들어 보기": "Hear it",
+  "게임 테마마다 다른 소리. 뜻과 박자는 같고 음색만 달라요":
+    "Each game theme has its own sound. Same cues and timing, different tone",
+  "깔끔한 클릭과 짧은 음(스튜디오·프레임·화이트)": "Clean clicks and short tones (Studio, Frame, White)",
+  "연필 톡, 나무 블록, 마림바(페이퍼·샌드·포레스트)": "Pencil taps, wood blocks, marimba (Paper, Sand, Forest)",
+  "맑은 종소리와 짧은 잔향(미드나잇·블루프린트)": "Clear bells with a short ring (Midnight, Blueprint)",
+  "조작은 아주 작게, 쓰레기 경고와 게임 오버만 또렷하게(그라파이트)":
+    "Very soft controls; only garbage warnings and game over stand out (Graphite)",
   "쓴 피스": "Pieces used",
   "깬 단계": "Stages solved",
   "T-spin Mini 퍼즐을 모두 풀기": "Solve every T-spin Mini puzzle",

@@ -86,6 +86,7 @@ import { createKeyHelp } from "./app/key-help.js";
 import { setupBackup } from "./app/backup.js";
 import { downloadJson } from "./app/download.js";
 import { takeLinkHash } from "./app/links.js";
+import { findTheme } from "./render/themes.js";
 
 const FRAME_MS = 1000 / 60;
 const MAX_CATCH_UP_MS = 250; // 시간이 크게 튀면(탭 복귀 등) 한꺼번에 따라잡지 않는다.
@@ -140,7 +141,10 @@ const applyScheme = () => {
 };
 
 const renderer = createRenderer(canvas, { getVisual: () => settings.visual });
-const sfx = createSfx({ getVolume: () => settings.volume });
+/** 지금 쓸 효과음 묶음: 고정했으면 그것, 아니면 게임 테마의 묶음 */
+const soundSetFor = (themeId = settings.visual.theme) =>
+  settings.sound === "theme" ? findTheme(themeId).sound : settings.sound;
+const sfx = createSfx({ getVolume: () => settings.volume, getSet: () => soundSetFor() });
 const racePanel = $("race-panel");
 const raceProgress = /** @type {HTMLProgressElement} */ ($("race-progress"));
 const raceLabel = $("race-progress-label");
@@ -831,10 +835,36 @@ const cancelConfirm = () => {
   else resume();
 };
 
+/** 업적을 셀 수 있는 판: 메뉴의 실제 모드·오늘의 도전·CPU 대전(연습·퍼즐·장면 연습 제외) */
+const playCounts = () => !scenePractice && (MODES.includes(mode) || Boolean(mode.daily) || Boolean(mode.versus));
+
+/** 업적 판정에 넘길 이번 판 정보 */
+const achievementContext = (state, abandoned = false) => ({
+  mode,
+  state,
+  // Custom 규칙 판은 업적을 주지 않는다(퍼즐 업적은 규칙과 무관) — 2차 평가 F22
+  real: playCounts() && isRankedRules(rules),
+  won: Boolean(mode.versus) && state.over === WIN,
+  short: isShortGame(state),
+  abandoned,
+  puzzlesCleared: puzzleProgress.cleared(),
+  puzzles: PUZZLES,
+});
+
+/**
+ * 판을 중간에 그만둘 때(첫 화면으로·다시 하기): 그때까지 이룬 플레이 업적(첫 줄·4줄 등)은 남긴다.
+ * 예전에는 끝까지 가야만 판정해서, 줄을 지우고 나가면 업적이 안 쌓였다. 누적 합계에는 더하지 않는다.
+ */
+const keepAbandonedAchievements = () => {
+  if (!game || game.state.over || !playCounts() || !isRankedRules(rules)) return [];
+  return achievements.evaluate(achievementContext(game.state, true));
+};
+
 const acceptConfirm = () => {
   const kind = confirming;
   if (!kind) return;
   confirming = null;
+  const kept = keepAbandonedAchievements();
   if (kind === "restart") start(mode, rules, race?.target);
   else {
     clearRun();
@@ -843,6 +873,7 @@ const acceptConfirm = () => {
       stopReplay();
     }
     toMenu();
+    if (kept.length) showMenuNotice(t("업적 달성 · {names}", { names: kept.map(a => a.name).join(", ") }));
   }
 };
 
@@ -1107,20 +1138,13 @@ const finish = () => {
   if (mode.puzzle?.number && state.over === "clear") puzzleProgress.markCleared(mode.puzzle.id);
   if (mode.trialCode && state.over === "clear") puzzleEditor.markCleared(mode.trialCode);
   // 업적: 이번 판에 처음 이룬 것(플레이 업적은 실제 모드·오늘의 도전·CPU 대전에서만)
-  const freshAchievements = achievements.evaluate({
-    mode,
-    state,
-    // Custom 규칙 판은 업적을 주지 않는다(퍼즐 업적은 규칙과 무관) — 2차 평가 F22
-    real:
-      !scenePractice && isRankedRules(rules) && (MODES.includes(mode) || Boolean(mode.daily) || Boolean(mode.versus)),
-    won: Boolean(mode.versus) && state.over === WIN,
-    short: isShortGame(state),
-    puzzlesCleared: puzzleProgress.cleared(),
-    puzzles: PUZZLES,
-  });
+  const freshAchievements = achievements.evaluate(achievementContext(state));
+  // Custom 규칙 판은 업적이 쌓이지 않는다 → 결과에서 그렇다고 알려 준다(말없이 안 쌓여 고장처럼 보였다)
   $("results-achievements").textContent = freshAchievements.length
     ? t("업적 달성 · {names}", { names: freshAchievements.map(a => a.name).join(", ") })
-    : "";
+    : playCounts() && !isRankedRules(rules)
+      ? t("Custom 규칙 판은 업적에 들어가지 않아요")
+      : "";
   const nextPuzzle = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="next-puzzle"]'));
   const nextLesson = nextPracticeLesson();
   const hasNext = nextLesson || (mode.puzzle?.number && mode.puzzle.number < PUZZLES.length);
@@ -1299,6 +1323,8 @@ const settingsUI = createSettingsUI({
     renderKeyHelp();
   },
   onPreviewSound: () => sfx.play("clear2"),
+  // 테마 미리보기의 "소리 들어 보기": 이 테마로 게임하면 들릴 묶음. 소리를 꺼 뒀어도 눌렀을 때는 들려준다
+  onPreviewTheme: themeId => sfx.preview(soundSetFor(themeId), settings.volume || 50),
   openedThemes: () => (achievements.unlocked()["secret-sharp"] ? ["sharp"] : []),
   // 모드 이름처럼 시작할 때 만든 글자까지 바꾸려면 다시 불러오는 게 가장 확실하다.
   onLanguage: () => location.reload(),

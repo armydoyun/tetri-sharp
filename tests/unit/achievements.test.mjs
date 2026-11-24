@@ -162,3 +162,18 @@ test("숨은 업적: 판으로는 열리지 않고 unlock으로만 한 번 열�
   assert.equal(sanitizeVisual({ theme: "sharp" }).theme, "sharp");
   assert.equal(sanitizeVisual({ theme: "없음" }).theme, "modern");
 });
+
+test("중간에 그만둔 판: 그때까지 이룬 플레이 업적은 남기고, 누적 합계에는 더하지 않는다", () => {
+  const store = createStore(memoryBackend());
+  const achievements = createAchievements(store);
+  const sprint = findMode("sprint40");
+  const partial = finished(undefined, { frame: 40 * 60, stats: { lines: 1, pieces: 12 } });
+  const ids = achievements.evaluate(context(sprint, partial, { abandoned: true })).map(a => a.id);
+  assert.ok(ids.includes("first-line"), "줄을 지우고 나가도 '첫 줄'");
+  assert.ok(!ids.includes("sprint-clear"), "모드 업적은 끝까지 가야");
+  assert.equal(achievements.totals().games, 0, "그만둔 판은 판 수에 안 들어간다");
+  assert.equal(achievements.totals().lines, 0);
+  // Custom 규칙 판(real=false)은 그만둬도 없다
+  const other = createAchievements(createStore(memoryBackend()));
+  assert.deepEqual(other.evaluate(context(sprint, partial, { abandoned: true, real: false })), []);
+});

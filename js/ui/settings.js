@@ -23,6 +23,7 @@ import {
 } from "../storage/settings.js";
 import { el, fieldRow, fillDialog, focusKey, restoreFocus } from "./dom.js";
 import { button, choiceCards, confirmButton, rangeRow, segmented, slider, tabBar } from "./components.js";
+import { dropdown } from "./select.js";
 import { COLOR_SWATCHES, PIECE_ORDER, THEMES, THEME_IDS, findTheme, paletteFor } from "../render/themes.js";
 import { keycap } from "./keycap.js";
 import { createThemeStage, drawThemeSwatch } from "../render/preview.js";
@@ -87,6 +88,13 @@ const SCHEME_HINTS = {
   light: "첫 화면과 메뉴를 밝게 써요",
   dark: "첫 화면과 메뉴를 어둡게 써요",
 };
+const SOUND_HINTS = {
+  theme: "게임 테마마다 다른 소리. 뜻과 박자는 같고 음색만 달라요",
+  clean: "깔끔한 클릭과 짧은 음(스튜디오·프레임·화이트)",
+  wood: "연필 톡, 나무 블록, 마림바(페이퍼·샌드·포레스트)",
+  glass: "맑은 종소리와 짧은 잔향(미드나잇·블루프린트)",
+  quiet: "조작은 아주 작게, 쓰레기 경고와 게임 오버만 또렷하게(그라파이트)",
+};
 const GAME_SURFACE_HINTS = {
   dark: "게임 중 보드 둘레는 화면 색과 상관없이 어두워요. 보드 색은 게임 테마가 정하고, 아래 미리보기에 그대로 보여요",
   scheme: "게임 중 보드 둘레도 위의 화면 색을 따라요. 보드 색은 게임 테마가 정하고, 아래 미리보기에 그대로 보여요",
@@ -110,6 +118,7 @@ const TOUCH_HINTS = {
  *   onChange: (settings: any) => void,
  *   onClose?: () => void,
  *   onPreviewSound?: () => void,
+ *   onPreviewTheme?: (themeId: string) => void,
  *   onLanguage?: (lang: string) => void,
  * }} options
  */
@@ -125,6 +134,7 @@ export const createSettingsUI = ({
   onLanguage,
   data,
   openedThemes = () => /** @type {string[]} */ ([]),
+  onPreviewTheme,
 }) => {
   /** 키 입력을 기다리는 칸 */
   let capture = null;
@@ -414,7 +424,17 @@ export const createSettingsUI = ({
     const state = el("span", { class: "theme-stage-state" });
     const desc = el("small", { class: "theme-stage-desc" });
     const stage = createThemeStage(canvas);
+    // 지금 미리보기에 보이는 테마(칩에 올리면 바뀐다) → "소리 들어 보기"가 그 테마의 소리를 낸다
+    let shown = visual.theme;
+    const listen = button({
+      label: t("소리 들어 보기"),
+      icon: "sound",
+      size: "s",
+      id: "theme-listen",
+      onClick: () => onPreviewTheme?.(shown),
+    });
     const showTheme = id => {
+      shown = id;
       const theme = findTheme(id);
       stage.show(theme, paletteFor(visual, theme), visual);
       name.textContent = theme.name;
@@ -461,7 +481,13 @@ export const createSettingsUI = ({
         // 미리보기 둘레는 게임 중 화면과 같은 색(늘 어둡게 / 화면 색 따르기)
         { class: "theme-stage surface-game" },
         canvas,
-        el("div", { class: "theme-stage-caption" }, el("div", { class: "theme-stage-title" }, name, state), desc)
+        el(
+          "div",
+          { class: "theme-stage-caption" },
+          el("div", { class: "theme-stage-title" }, name, state),
+          desc,
+          el("div", { class: "theme-stage-actions" }, listen)
+        )
       ),
       cards
     );
@@ -474,6 +500,7 @@ export const createSettingsUI = ({
       "section",
       { class: "field-section" },
       volumeRow(),
+      soundRow(),
       fieldRow({
         id: "set-scheme",
         label: t("화면 색"),
@@ -623,6 +650,33 @@ export const createSettingsUI = ({
       label: t("효과음"),
       hint: t("블록 이동·회전·줄 삭제 소리의 크기. 맨 왼쪽은 끄기"),
       control: rangeRow(input, output, formatVolume),
+    });
+  };
+
+  /** 효과음 종류: 테마 따라가기, 또는 하나로 고정(기록을 노릴 때 소리가 바뀌지 않게) */
+  const soundRow = () => {
+    const value = getSettings().sound;
+    return fieldRow({
+      id: "set-sound",
+      label: t("효과음 종류"),
+      hint: t(SOUND_HINTS[value] ?? SOUND_HINTS.theme),
+      // 다섯 가지라 세그먼트는 휴대폰에서 글자가 두 줄로 찌그러진다 → 목록(설명은 목록 안에)
+      control: dropdown({
+        id: "set-sound",
+        label: t("효과음 종류"),
+        options: /** @type {const} */ ([
+          ["theme", t("테마 따라")],
+          ["clean", t("기본")],
+          ["wood", t("종이·나무")],
+          ["glass", t("유리·종")],
+          ["quiet", t("거의 무음")],
+        ]).map(([v, label]) => ({ value: v, label, hint: t(SOUND_HINTS[v]) })),
+        value,
+        onChange: v => {
+          update({ sound: v });
+          render();
+        },
+      }),
     });
   };
 
