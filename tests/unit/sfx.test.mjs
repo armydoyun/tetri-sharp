@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SOUND_NAMES, SOUND_SETS, SOUND_SET_IDS, createSfx, soundsFor } from "../../js/audio/sfx.js";
+import { SOUND_NAMES, SOUND_SETS, createSfx, soundsFor } from "../../js/audio/sfx.js";
 import { THEMES } from "../../js/render/themes.js";
 import { createGame } from "../../js/core/engine.js";
 import { MODERN } from "../../js/rules/presets.js";
@@ -103,11 +103,13 @@ test("같은 프레임의 클리어는 조작과 하드 드롭보다 앞에 들�
   }
 });
 
-test("효과음 묶음: 모든 묶음이 모든 소리를 갖고, 테마마다 묶음이 정해져 있다", () => {
+test("효과음 묶음: 테마마다 하나, 모든 묶음이 모든 소리를 갖고 서로 다르다", () => {
+  assert.deepEqual(Object.keys(SOUND_SETS).sort(), Object.keys(THEMES).sort());
   for (const [id, set] of Object.entries(SOUND_SETS))
     for (const name of SOUND_NAMES) assert.ok(set[name]?.length, `${id}.${name}`);
-  for (const theme of Object.values(THEMES)) assert.ok(SOUND_SETS[theme.sound], theme.name);
-  assert.deepEqual([...SOUND_SET_IDS], ["clean", "wood", "glass", "quiet"]);
+  // 같은 사건이라도 묶음마다 음색이 다르다(이동·착지·1줄 셋을 묶어 비교)
+  const sig = set => JSON.stringify([set.move, set.lock, set.clear1]);
+  assert.equal(new Set(Object.values(SOUND_SETS).map(sig)).size, Object.keys(SOUND_SETS).length);
   // 고전 게임기 느낌(네모파·톱니파)은 쓰지 않는다
   for (const [id, set] of Object.entries(SOUND_SETS))
     for (const [name, parts] of Object.entries(set))
@@ -118,13 +120,19 @@ test("효과음 묶음: 크기가 고르다(조각 하나 0.4 이하), 쓰레기
   const loud = parts => Math.max(...parts.map(p => p.gain * (1 + (p.partials ?? []).reduce((s, [, g]) => s + g, 0))));
   for (const [id, set] of Object.entries(SOUND_SETS)) {
     for (const [name, parts] of Object.entries(set)) assert.ok(loud(parts) <= 0.4, `${id}.${name} ${loud(parts)}`);
-    for (const name of ["garbage", "gameOver"]) assert.ok(loud(set[name]) >= 0.15, `${id}.${name}`);
-    // 조작 소리(이동)는 줄 삭제보다 작다
+    for (const name of ["garbage", "gameOver"]) assert.ok(loud(set[name]) >= 0.15, `${id}.${name} ${loud(set[name])}`);
     assert.ok(loud(set.move) < loud(set.clear1), `${id}: 이동 < 1줄`);
   }
 });
 
-test("샤프 묶음은 기본 묶음을 반음 올린 것이다", () => {
-  const ratio = SOUND_SETS.sharp.clear1[0].f / SOUND_SETS.clean.clear1[0].f;
+test("샤프 묶음은 스튜디오 묶음을 반음 올린 것이다", () => {
+  const ratio = SOUND_SETS.sharp.clear1[0].f / SOUND_SETS.modern.clear1[0].f;
   assert.ok(Math.abs(ratio - Math.pow(2, 1 / 12)) < 1e-9);
+});
+
+test("효과음 설정: 예전 묶음 이름은 그 소리를 쓰던 테마로 옮긴다", () => {
+  assert.equal(sanitizeSettings({ sound: "wood" }).sound, "forest");
+  assert.equal(sanitizeSettings({ sound: "quiet" }).sound, "graphite");
+  assert.equal(sanitizeSettings({ sound: "retro" }).sound, "retro");
+  assert.equal(sanitizeSettings({ sound: "없음" }).sound, "theme");
 });

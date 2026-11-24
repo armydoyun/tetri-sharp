@@ -19,8 +19,10 @@ export const TOUCH_OPTIONS = Object.freeze(["auto", "on", "off"]);
 export const SCHEME_OPTIONS = Object.freeze(["system", "light", "dark"]);
 /** 게임 화면: dark(늘 어둡게) · scheme(화면 색 따르기) */
 export const GAME_SURFACE_OPTIONS = Object.freeze(["dark", "scheme"]);
-/** 효과음 묶음: theme(테마 따라가기) 또는 하나로 고정(js/audio/sfx.js SOUND_SET_IDS) */
-export const SOUND_OPTIONS = Object.freeze(["theme", "clean", "wood", "glass", "quiet"]);
+/** 효과음: theme(테마 따라가기) 또는 한 테마의 소리로 고정(테마 키 — js/audio/sound-sets.js) */
+export const SOUND_OPTIONS = Object.freeze(["theme", ...ALL_THEME_IDS]);
+/** 예전 묶음 이름 → 그 소리를 쓰던 테마 */
+const OLD_SOUND = Object.freeze({ clean: "modern", wood: "forest", glass: "midnight", quiet: "graphite" });
 
 export const VISUAL_OPTIONS = Object.freeze({
   // 게임 테마(블록·격자·움직임·연출의 모습) — js/render/themes.js
@@ -159,7 +161,7 @@ export const sanitizeSettings = raw => {
     touch: TOUCH_OPTIONS.includes(s.touch) ? s.touch : "auto",
     visual: sanitizeVisual(s.visual),
     volume: clampNum(s.volume, VOLUME_LIMITS),
-    sound: SOUND_OPTIONS.includes(s.sound) ? s.sound : "theme",
+    sound: SOUND_OPTIONS.includes(OLD_SOUND[s.sound] ?? s.sound) ? (OLD_SOUND[s.sound] ?? s.sound) : "theme",
     lang: LANG_OPTIONS.includes(s.lang) ? s.lang : "auto",
     scheme: SCHEME_OPTIONS.includes(s.scheme) ? s.scheme : "system",
     gameSurface: GAME_SURFACE_OPTIONS.includes(s.gameSurface) ? s.gameSurface : "dark",

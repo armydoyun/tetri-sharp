@@ -86,7 +86,6 @@ import { createKeyHelp } from "./app/key-help.js";
 import { setupBackup } from "./app/backup.js";
 import { downloadJson } from "./app/download.js";
 import { takeLinkHash } from "./app/links.js";
-import { findTheme } from "./render/themes.js";
 
 const FRAME_MS = 1000 / 60;
 const MAX_CATCH_UP_MS = 250; // 시간이 크게 튀면(탭 복귀 등) 한꺼번에 따라잡지 않는다.
@@ -141,9 +140,8 @@ const applyScheme = () => {
 };
 
 const renderer = createRenderer(canvas, { getVisual: () => settings.visual });
-/** 지금 쓸 효과음 묶음: 고정했으면 그것, 아니면 게임 테마의 묶음 */
-const soundSetFor = (themeId = settings.visual.theme) =>
-  settings.sound === "theme" ? findTheme(themeId).sound : settings.sound;
+/** 지금 쓸 효과음 묶음(테마 키): 고정했으면 그 테마의 소리, 아니면 게임 테마의 소리 */
+const soundSetFor = (themeId = settings.visual.theme) => (settings.sound === "theme" ? themeId : settings.sound);
 const sfx = createSfx({ getVolume: () => settings.volume, getSet: () => soundSetFor() });
 const racePanel = $("race-panel");
 const raceProgress = /** @type {HTMLProgressElement} */ ($("race-progress"));
