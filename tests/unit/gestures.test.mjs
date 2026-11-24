@@ -163,3 +163,44 @@ test("밀어 넣기: 천천히 내려 소프트 드롭한 뒤 더 내려가지 �
   assert.ok(pressed & BTN.RIGHT, "멈춘 뒤 옆으로 밀면 이동");
   assert.equal(pressed & BTN.HARD, 0);
 });
+
+test("밀어 넣기는 한 칸 반 밀면 정확히 한 칸, 더 밀면 한 칸 폭마다 한 칸 더(두 칸 가 버리지 않는다)", () => {
+  const listeners = {};
+  const root = {
+    addEventListener: (type, fn) => (listeners[type] = fn),
+    setPointerCapture: () => {},
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 180, height: 360 }),
+    classList: { toggle: () => {} },
+  };
+  const g = createGestures({ root: /** @type {any} */ (root), cellSize: () => CELL });
+  g.setEnabled(true);
+  const fire = (type, x, y, t) =>
+    listeners[type]({
+      type,
+      pointerId: 1,
+      pointerType: "touch",
+      clientX: x,
+      clientY: y,
+      timeStamp: t,
+      preventDefault() {},
+    });
+  const lefts = () => {
+    let n = 0;
+    for (let p = g.takePressed(); p; p = g.takePressed()) if (p & BTN.LEFT) n += 1;
+    return n;
+  };
+  fire("pointerdown", 100, 100, 0);
+  fire("pointermove", 100, 140, 200);
+  fire("pointermove", 100, 180, 400);
+  assert.equal(lefts(), 0);
+  fire("pointermove", 100 - CELL * 1.2, 182, 600);
+  assert.equal(lefts(), 0, "한 칸 남짓은 아직 세로");
+  fire("pointermove", 100 - CELL * 1.6, 182, 700);
+  assert.equal(lefts(), 1, "한 칸 반을 넘으면 한 칸");
+  fire("pointermove", 100 - CELL * 2.4, 182, 800);
+  assert.equal(lefts(), 0, "그 자리에서 한 칸 폭이 안 되면 그대로");
+  fire("pointermove", 100 - CELL * 2.7, 182, 900);
+  assert.equal(lefts(), 1, "한 칸 폭을 더 밀면 한 칸 더");
+  fire("pointerup", 100 - CELL * 2.7, 182, 950);
+  assert.equal(g.takePressed() & BTN.HARD, 0, "하드 드롭은 없다");
+});
