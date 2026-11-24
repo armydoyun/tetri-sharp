@@ -275,6 +275,13 @@ export const auditInPage = () => {
       problems.push(`접근성 · ${describe(modal)} 대화상자 이름 없음`);
     if (document.activeElement && !modal.contains(document.activeElement))
       problems.push(`접근성 · ${describe(modal)} 포커스가 대화상자 밖(${describe(document.activeElement)})`);
+    // 스크롤 칸이 너무 작은 대화상자: 창 전체가 스크롤될 것처럼 생겼는데 실제로는 아래 조금만 움직인다(휴대폰 규칙 편집)
+    const scroller = modal.querySelector(":scope > .dialog-body");
+    if (scroller && scroller.scrollHeight > scroller.clientHeight + 1) {
+      const share = scroller.clientHeight / modal.clientHeight;
+      if (share < 0.4)
+        problems.push(`스크롤 칸 좁음 · ${describe(modal)} 몸통이 창 높이의 ${Math.round(share * 100)}%(40% 미만)`);
+    }
   }
   return [...new Set(problems)];
 };

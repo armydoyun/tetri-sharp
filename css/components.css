@@ -124,6 +124,12 @@
 
 .dialog-tabs {
   padding: 0 var(--space-5) var(--space-3);
+  /* 고정된 탭과 스크롤되는 몸통의 경계: 내용이 탭 밑으로 들어가는 자리를 선으로 보인다 */
+  border-bottom: var(--border-w) solid var(--border);
+}
+
+.dialog-tabbed > .dialog-body {
+  padding-top: var(--space-2);
 }
 
 .dialog-tabs .segmented {
@@ -352,6 +358,13 @@
   .rule-presets .field-help {
     grid-column: 1 / -1;
   }
+}
+
+/* 휴대폰: 내 규칙·프리셋 줄이 몸통 맨 위에서 함께 스크롤된다. 아래 설정과 구분선으로 나눈다 */
+.rule-tabs-head.is-in-body {
+  padding: var(--space-3) 0;
+  margin-bottom: var(--space-2);
+  border-bottom: var(--border-w) solid var(--border);
 }
 
 /* 탭 줄은 설정 탭과 같은 규칙(넘치면 꺾이고, 좁으면 3 + 2)을 따른다 */
@@ -656,6 +669,22 @@
   font-size: var(--text-s);
   line-height: 1.45;
   color: var(--text-dim);
+}
+
+/* 휴대폰: 미리보기를 줄여 처음 열었을 때 칩 세 줄이 함께 보이게 */
+@media (max-width: 600px) {
+  .theme-stage {
+    padding: var(--space-2);
+    gap: var(--space-1);
+  }
+
+  .theme-stage-canvas {
+    max-width: 210px;
+  }
+
+  .theme-stage-desc {
+    line-height: 1.35;
+  }
 }
 
 /* 견본 칩: 견본 띠 + 이름. 테마 9개가 빈칸 없이 3×3으로 */
@@ -1203,6 +1232,8 @@
     grid-area: tabs;
     overflow-y: auto;
     padding: var(--space-3) var(--space-3) var(--space-3) var(--space-3);
+    /* 옆 탭: 위아래 경계선 대신 몸통과의 세로 경계는 배치가 나눈다 */
+    border-bottom: 0;
   }
 
   .dialog-tabbed:has(> .dialog-tabs > .segmented:only-child) > .dialog-tabs .segmented {

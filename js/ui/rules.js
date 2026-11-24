@@ -351,6 +351,8 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
   };
 
   let tab = TABS[0][0];
+  // 좁거나 낮은 화면(휴대폰): 고정 머리가 크면 스크롤 칸이 아래 조금만 남는다 → 내 규칙·프리셋 줄은 몸통과 함께 스크롤, 탭만 고정
+  const compact = window.matchMedia("(max-width: 720px), (max-height: 600px)");
 
   /** @param {string} [focusId] 다시 그린 뒤 포커스를 돌려줄 컨트롤 */
   const render = (focusId, keepScroll = true) => {
@@ -413,7 +415,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
       removeSlot
     );
 
-    // 프리셋 줄과 탭은 몸통 위에 고정(어느 탭에서든 보인다)
+    // 프리셋 줄과 탭은 몸통 위에 고정(어느 탭에서든 보인다). 휴대폰에서는 탭만 고정하고 두 줄은 몸통 맨 위로
     const presets = el(
       "div",
       { class: "rule-presets" },
@@ -443,6 +445,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
       },
     });
 
+    if (compact.matches) body.append(el("div", { class: "rule-tabs-head is-in-body" }, slotRow, presets));
     if (tab === t("공유")) {
       body.append(shareSection(rules));
     } else {
@@ -482,13 +485,19 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
       notice,
       actions: [undoButton],
       closeId: "rules-close",
-      tabs: el("div", { class: "rule-tabs-head" }, slotRow, presets, tabs),
+      tabs: compact.matches
+        ? el("div", { class: "rule-tabs-head" }, tabs)
+        : el("div", { class: "rule-tabs-head" }, slotRow, presets, tabs),
     });
     body.scrollTop = scroll;
     if (focusId) /** @type {HTMLElement | null} */ (dialog.querySelector(`#${focusId}`))?.focus();
   };
 
   dialog.addEventListener("close", () => onClose?.());
+  // 화면을 돌리거나 창 크기를 바꿔 기준을 넘으면 그 배치로 다시 그린다
+  compact.addEventListener("change", () => {
+    if (dialog.open) render(undefined, false);
+  });
 
   return {
     /** @param {"share"} [startTab] 공유 탭으로 바로 열기(첫 화면 규칙 카드의 공유 버튼) */
