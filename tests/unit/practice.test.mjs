@@ -225,3 +225,33 @@ test("소프트 드롭 속도는 중력이 1칸/초 이상이면 예전과 같�
   const fell = a.state.active.y - y0;
   assert.ok(fell >= 2 && fell <= 3, `30프레임 × 6/60 ≈ 3칸 (실제 ${fell})`);
 });
+
+test("퍼펙트 클리어 마무리: 다음 피스가 무엇이든 빈 판이 나오지 않는다(S·Z가 먼저 와도)", async () => {
+  const { buildPcRound } = await import("../../js/modes/practice.js");
+  const { createBoard, isEmpty } = await import("../../js/core/board.js");
+  const { createRng } = await import("../../js/core/rng.js");
+  const types = ["I", "J", "L", "O", "S", "T", "Z"];
+  for (let s = 0; s < 1500; s++) {
+    const rng = createRng(s + 1);
+    const bag = () => {
+      const b = [...types];
+      for (let i = b.length - 1; i > 0; i--) {
+        const j = rng.int(i + 1);
+        [b[i], b[j]] = [b[j], b[i]];
+      }
+      return b;
+    };
+    const k = rng.int(7);
+    const queue = [...bag(), ...bag()].slice(k, k + 6);
+    const board = createBoard();
+    const need = buildPcRound(board, queue, createRng(s));
+    assert.ok(need >= 1 && need <= 4, `need ${need}`);
+    assert.equal(isEmpty(board), false, `빈 판: ${queue.join("")}`);
+    assert.equal(queue.length, 6, "피스 수는 그대로");
+  }
+  // 예전에 빈 판이 나오던 순서
+  const queue = ["Z", "S", "Z", "S", "Z", "S"];
+  const board = createBoard();
+  assert.ok(buildPcRound(board, queue, createRng(1)) >= 1);
+  assert.equal(isEmpty(board), false);
+});
