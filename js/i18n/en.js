@@ -576,8 +576,8 @@ export const EN = {
   "{n}피스": "{n} pcs",
   "{done} / {total}단계 깸 · 중력 없음, 정해진 피스만 써요":
     "{done} / {total} solved · no gravity, only the given pieces",
-  "판 비우기는 아래 두 줄을 모두 지우고, 4줄 만들기는 우물을 남겨 채운 뒤 I로 4줄, T-spin은 T 하나로 해내요.":
-    "Board clears empty the bottom two rows, quads fill around a well and finish with an I for four lines, and T-spins use a single T.",
+  "판 비우기는 아래 두 줄을 모두 지우고, 4줄 만들기는 우물을 남겨 채운 뒤 I로 4줄, 밀어 넣기는 내린 뒤 처마 아래로 밀고, T-spin은 T 하나로 해내요.":
+    "Board clears empty the bottom two rows, quads fill around a well then finish with an I, tucks drop and slide under an overhang, and T-spins use a single T.",
 
   // ---- 리플레이 공유 ----
   "이 리플레이": "this replay",
@@ -941,6 +941,11 @@ export const EN = {
   "백업을 불러올까요?": "Load this backup?",
   "{label} — 한 번 더 누르면 실행해요": "{label} — press again to do it",
   "4줄 만들기": "Quad builds",
+  "처마 밀어 넣기": "Tucks",
+  "밀어 넣기 장": "Tuck chapter",
+  "밀어 넣기 퍼즐을 모두 풀기": "Solve every tuck puzzle",
+  "목표 · 소프트 드롭으로 내린 뒤 처마 아래로 밀어 넣어 2줄 지우기":
+    "Goal · Soft drop, then slide under the overhang to clear two lines",
   "4줄 만들기 장": "Quad chapter",
   "4줄 만들기 퍼즐을 모두 풀기": "Solve every quad build puzzle",
   "목표 · 우물을 남기고 채운 뒤 마지막 I로 4줄 지우기":

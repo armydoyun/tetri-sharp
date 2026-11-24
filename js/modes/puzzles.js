@@ -1,11 +1,13 @@
 // 퍼즐 모드: 정해진 판과 정해진 피스로 목표를 이루는 단계형 문제. 중력 없음, 늘 Modern 규칙.
 //  - 판 비우기: 아래 두 줄의 구멍을 주어진 피스로 채워 퍼펙트 클리어(피스 1~4개)
 //  - 4줄 만들기: 한 열을 우물로 남긴 아래 네 줄의 구멍을 앞 피스로 채우고 마지막 I로 4줄(피스 2~4개)
+//  - 밀어 넣기: 처마 아래 빈칸에 피스 하나를 소프트 드롭으로 내린 뒤 옆으로 밀어 넣어 2줄(곧장 떨어뜨려서는 안 풀린다)
 //  - T-spin Double / Triple: 주어진 T 하나로
 // 단계는 시드로 만들어 어디서나 같고, 모든 단계는 풀 수 있게 만든다(단위 테스트가 탐색기로 확인한다).
 import { MODERN } from "../rules/presets.js";
 import { createRng } from "../core/rng.js";
 import { WIDTH } from "../core/board.js";
+import { GARBAGE } from "../core/pieces.js";
 import { buildPcExact, buildQuadExact, buildTsd, buildTst } from "./practice.js";
 import { t } from "../i18n/index.js";
 
@@ -14,7 +16,7 @@ const TYPES = ["I", "J", "L", "O", "S", "T", "Z"];
 /**
  * 단계 계획: [종류, 피스 수]. 앞쪽은 쉽게(피스 하나), 뒤로 갈수록 피스가 늘고 T-spin이 섞인다.
  * 뒤에 붙인 단계(31~)는 나중에 더한 장이다. 이미 있는 단계의 번호(id)·시드는 바꾸지 않는다(진행도·리플레이가 id로 맞는다).
- * @type {ReadonlyArray<[ "pc" | "quad" | "tsd" | "tst", number ]>}
+ * @type {ReadonlyArray<[ "pc" | "quad" | "tuck" | "tsd" | "tst", number ]>}
  */
 const PLAN = Object.freeze([
   ["pc", 1],
@@ -56,6 +58,33 @@ const PLAN = Object.freeze([
   ["quad", 3],
   ["quad", 4],
   ["quad", 4],
+  // 밀어 넣기(판은 아래 TUCK_BOARDS)
+  ["tuck", 1],
+  ["tuck", 1],
+  ["tuck", 1],
+  ["tuck", 1],
+  ["tuck", 1],
+  ["tuck", 1],
+  ["tuck", 1],
+  ["tuck", 1],
+]);
+
+/**
+ * 밀어 넣기 판(아래 네 줄, 위에서부터). "#" 블록, "." 빈칸.
+ * 처마가 빈칸 바로 위를 덮어, 피스를 옆에 내린 뒤 밀어 넣어야만 아래 두 줄이 찬다.
+ * 무작위로 만든 판 가운데 "밀어 넣으면 2줄, 곧장 떨어뜨리면 못 지움"을 탐색기로 확인한 것만 골랐다(단위 테스트가 다시 확인한다).
+ * 피스 수가 같으니 쉬운 모양(I·L)부터 T까지.
+ */
+/** @type {ReadonlyArray<[string, string[]]>} */
+const TUCK_BOARDS = Object.freeze([
+  ["I", ["..##......", ".##.......", "###....###", "##########"]],
+  ["I", ["....##....", ".#..#.....", "#####....#", "##########"]],
+  ["L", ["##........", "#.........", "#...######", "#.########"]],
+  ["L", ["...##.....", "...#......", "####...###", "####.#####"]],
+  ["J", ["......##..", "..#....#..", "####...###", "######.###"]],
+  ["T", ["...##.....", "...#......", "####...###", "#####.####"]],
+  ["T", [".....##...", "...#.#....", "######...#", "#######.##"]],
+  ["T", ["...##.....", "....#....#", "#...######", "##.#######"]],
 ]);
 
 /** 아래 네 줄에서 우물 열을 뺀 빈칸이 몇 덩어리(상하좌우로 이어진)인가 */
@@ -115,6 +144,21 @@ const makeStage = index => {
       goal: ev => ev.tspin === "full" && ev.lines === (kind === "tsd" ? 2 : 3),
     };
   }
+  if (kind === "tuck") {
+    const [piece, rows] = TUCK_BOARDS[PLAN.slice(0, index).filter(([k]) => k === "tuck").length];
+    return {
+      kind,
+      pieces: [piece],
+      build: board => {
+        board.cells.fill(0);
+        const top = board.height - rows.length;
+        rows.forEach((row, dy) => {
+          for (let x = 0; x < WIDTH; x++) if (row[x] === "#") board.cells[(top + dy) * WIDTH + x] = GARBAGE;
+        });
+      },
+      goal: ev => ev.lines === 2,
+    };
+  }
   if (kind === "quad") {
     for (let attempt = 0; attempt < 200; attempt++) {
       const rng = createRng(12001 + index * 977 + attempt);
@@ -155,12 +199,13 @@ const makeStage = index => {
 export const KIND_NAMES = Object.freeze({
   pc: t("판 비우기"),
   quad: t("4줄 만들기"),
+  tuck: t("처마 밀어 넣기"),
   tsd: "T-spin Double",
   tst: "T-spin Triple",
 });
 
-/** 장 순서(쉬운 것부터): 판 비우기 → 4줄 만들기 → T-spin Double → T-spin Triple */
-export const CHAPTERS = Object.freeze(["pc", "quad", "tsd", "tst"]);
+/** 장 순서(쉬운 것부터): 판 비우기 → 4줄 만들기 → 밀어 넣기 → T-spin Double → T-spin Triple */
+export const CHAPTERS = Object.freeze(["pc", "quad", "tuck", "tsd", "tst"]);
 
 /**
  * 모든 단계(앞에서 한 번 만들어 둔다). 보여 주는 순서는 장별로, 장 안에서는 피스가 적은 것부터.

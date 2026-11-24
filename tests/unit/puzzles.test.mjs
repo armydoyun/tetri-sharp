@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { placements } from "../helpers/solver.mjs";
-import { HEIGHT, clearLines, createBoard, place } from "../../js/core/board.js";
+import { HEIGHT, clearLines, collides, createBoard, place } from "../../js/core/board.js";
 import { ROTATIONS } from "../../js/rules/rotation/index.js";
 import { BTN, createGame } from "../../js/core/engine.js";
 import { MODERN } from "../../js/rules/presets.js";
@@ -34,13 +34,36 @@ const solvesQuad = (board, pieces) => {
   });
 };
 
-test("퍼즐 38단계는 모두 주어진 피스로 풀 수 있다", () => {
-  assert.equal(PUZZLES.length, 38);
+/** 곧장 떨어뜨리기만으로(회전·좌우만 하고 하드 드롭) 2줄을 지울 수 있는가 */
+const hardDropClears = (board, type, lines) => {
+  for (let rot = 0; rot < 4; rot++) {
+    const cells = ROTATIONS.srs.cells(type, rot);
+    for (let x = -3; x < 12; x++) {
+      let y = HEIGHT - 22;
+      if (collides(board, cells, x, y)) continue;
+      while (!collides(board, cells, x, y + 1)) y += 1;
+      const next = { ...board, cells: board.cells.slice() };
+      place(next, cells, x, y, 1);
+      if (clearLines(next).length === lines) return true;
+    }
+  }
+  return false;
+};
+
+test("퍼즐 46단계는 모두 주어진 피스로 풀 수 있다", () => {
+  assert.equal(PUZZLES.length, 46);
   for (const p of PUZZLES) {
     const board = createBoard();
     p.build(board);
     if (p.kind === "pc") assert.ok(solvesPc(board, p.pieces), `단계 ${p.number}: ${p.pieces.join("")}`);
-    else if (p.kind === "quad") {
+    else if (p.kind === "tuck") {
+      // 밀어 넣으면(내리고 옆으로) 2줄을 지울 수 있고, 곧장 떨어뜨려서는 못 지운다
+      assert.ok(
+        placements(board, p.pieces[0]).some(q => q.lines === 2),
+        `단계 ${p.number}: 밀어 넣어 2줄`
+      );
+      assert.equal(hardDropClears(board, p.pieces[0], 2), false, `단계 ${p.number}: 곧장 떨어뜨려서는 안 풀린다`);
+    } else if (p.kind === "quad") {
       assert.equal(p.pieces.at(-1), "I", "마지막은 I");
       assert.ok(solvesQuad(board, p.pieces), `단계 ${p.number}: ${p.pieces.join("")}`);
     } else {
@@ -88,7 +111,7 @@ test("깬 단계 기록과 다음 단계", () => {
   assert.deepEqual([...progress.cleared()], [1, 3], "이상한 값은 버린다");
 });
 
-test("퍼즐 순서: 판 비우기 → 4줄 만들기 → T-spin Double → T-spin Triple 장, 장 안에서는 피스가 적은 것부터", async () => {
+test("퍼즐 순서: 판 비우기 → 4줄 만들기 → 밀어 넣기 → T-spin Double → T-spin Triple 장, 장 안에서는 피스가 적은 것부터", async () => {
   const { CHAPTERS } = await import("../../js/modes/puzzles.js");
   assert.deepEqual(
     PUZZLES.map(p => p.number),
@@ -108,7 +131,7 @@ test("퍼즐 순서: 판 비우기 → 4줄 만들기 → T-spin Double → T-sp
   assert.deepEqual(
     PUZZLES.map(p => p.id).sort((a, b) => a - b),
     PUZZLES.map((_, i) => i + 1),
-    "id는 만들 때의 번호 1~38(4줄 만들기는 31~)"
+    "id는 만들 때의 번호 1~46(4줄 만들기 31~, 밀어 넣기 39~)"
   );
 });
 

@@ -3556,3 +3556,52 @@ test("퍼즐 4줄 만들기: 우물을 남기고 앞 피스를 채운 뒤 I로 4
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("퍼즐 밀어 넣기: 곧장 떨어뜨리면 처마에 걸리고, 소프트 드롭으로 내린 뒤 옆으로 밀어 넣으면 성공", async () => {
+  const { context, page, errors } = await openPage(
+    () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } })),
+    undefined,
+    { frameClock: true }
+  );
+  // 키를 누르고 떼며 프레임을 진행한다(실제 시간에 기대지 않게)
+  const key = (code, type) => window.dispatchEvent(new KeyboardEvent(type, { code, cancelable: true }));
+  const run = steps =>
+    page.evaluate(
+      ([steps, keySrc]) => {
+        const key = new Function(`return ${keySrc}`)();
+        for (const [code, frames] of steps) {
+          key(code, "keydown");
+          for (let i = 0; i < frames; i++) window.advanceFrame();
+          key(code, "keyup");
+          window.advanceFrame();
+        }
+      },
+      [steps, key.toString()]
+    );
+  // 첫 밀어 넣기 단계: I 하나, 처마가 빈칸 왼쪽 위를 덮는다
+  const first = PUZZLES.find(p => p.kind === "tuck");
+  const play = async () => {
+    await page.click("#open-puzzles");
+    await page.click(`[data-puzzle="${first.number}"]`);
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    await page.evaluate(() => window.advanceFrame());
+  };
+  await play();
+  assert.match(await text(page, "mode-objective"), /밀어 넣어/);
+  await run([["Space", 1]]);
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  assert.equal(await text(page, "results-title"), "실패", "곧장 떨어뜨리면 처마에 걸린다");
+  await page.click('#results [data-action="menu"]');
+  await play();
+  // 오른쪽 한 칸 → 소프트 드롭으로 바닥까지(중력 없음: 3프레임에 한 칸) → 왼쪽으로 밀어 처마 아래 → 하드 드롭
+  await run([
+    ["ArrowRight", 1],
+    ["ArrowDown", 70],
+    ["ArrowLeft", 1],
+    ["Space", 1],
+  ]);
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  assert.equal(await text(page, "results-title"), "성공!");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
