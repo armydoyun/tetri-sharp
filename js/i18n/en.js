@@ -799,9 +799,10 @@ export const EN = {
   "게임 중 화면": "While playing",
   "늘 어둡게": "Always dark",
   "화면 색 따르기": "Match appearance",
-  "게임 중에는 화면 색과 상관없이 어둡게 써요. 보드에 집중하기 좋아요":
-    "Stays dark while playing, whatever the appearance. Helps you focus on the board",
-  "게임 중에도 위의 화면 색을 그대로 써요": "Uses the appearance above while playing too",
+  "게임 중 보드 둘레는 화면 색과 상관없이 어두워요. 보드 색은 게임 테마가 정하고, 아래 미리보기에 그대로 보여요":
+    "Around the board stays dark while playing, whatever the appearance. The board itself follows the game theme, as the preview below shows",
+  "게임 중 보드 둘레도 위의 화면 색을 따라요. 보드 색은 게임 테마가 정하고, 아래 미리보기에 그대로 보여요":
+    "Around the board follows the appearance above while playing. The board itself follows the game theme, as the preview below shows",
   "색각 친화": "Color-blind friendly",
   효과음: "Sound effects",
   "블록 이동·회전·줄 삭제 소리의 크기. 맨 왼쪽은 끄기": "Volume of move, rotate and line clear sounds. Far left is off",
@@ -947,6 +948,12 @@ export const EN = {
   "4줄 만들기": "Quad builds",
   "처마 밀어 넣기": "Tucks",
   "콤보 이어 가기": "Combos",
+  샤프: "Sharp",
+  "먹색 판에 # 격자, 흑백에 연두 한 가지": "Ink-black board with a # grid, monochrome plus one lime",
+  "샵을 찾았다": "Found the sharp",
+  "로고의 비밀": "The logo's secret",
+  "어딘가를 여러 번…": "Somewhere, many times…",
+  "무언가 열렸어요": "Something opened",
   "돌려 넣기": "Spin-ins",
   "돌려 넣기 장": "Spin-in chapter",
   "돌려 넣기 퍼즐을 모두 풀기": "Solve every spin-in puzzle",

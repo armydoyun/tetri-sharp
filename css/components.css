@@ -606,7 +606,8 @@
   padding: var(--space-3);
   border: var(--border-w) solid var(--border);
   border-radius: var(--radius-m);
-  background: var(--surface-2);
+  /* .surface-game과 함께: 게임 중 화면의 바탕색(늘 어둡게면 라이트 화면에서도 어둡다) */
+  background: var(--bg);
   /* 캔버스 안 "홀드·다음" 글자색(게임 화면 옆 칸 글자처럼) */
   color: var(--text-dim);
 }
