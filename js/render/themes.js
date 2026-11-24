@@ -33,9 +33,9 @@ const cellPath = (ctx, x, y, size, inset, radius) => {
 };
 
 /**
- * 셀 하나. 마감(finish)이 블록의 질감을 정한다:
- *  flat 단색 · edge 단색 + 윗면만 살짝 밝게 · frame 어두운 속 + 피스 색 테두리
- * 그림자 흐림(shadowBlur)은 쓰지 않는다 — 공용 PC에서도 매 프레임 가볍게.
+ * 셀 하나. 마감(finish)이 블록의 질감을 정한다(광택·입체·빛 번짐 없이, 인쇄물처럼 납작하게):
+ *  flat 단색 · inset 단색 + 안쪽에 보드색 가는 선(찍어 낸 타일처럼) · frame 어두운 속 + 피스 색 테두리
+ * 그림자 흐림(shadowBlur)·그라데이션은 쓰지 않는다 — 고전 게임 느낌이 나고, 공용 PC에서 무겁다.
  */
 const drawCell = (ctx, x, y, size, theme, color, outline) => {
   const inset = size * theme.gap;
@@ -62,12 +62,15 @@ const drawCell = (ctx, x, y, size, theme, color, outline) => {
     return;
   }
   ctx.fill();
-  if (finish === "edge") {
-    // 단색인데 납작해 보이지 않게
-    const edge = size - inset * 2;
+  if (finish === "inset") {
+    // 안쪽 가는 선: 칸이 또렷이 나뉘어 보이되 입체감은 없다
+    const line = Math.max(1, size * 0.055);
+    cellPath(ctx, x, y, size, inset + size * 0.17, theme.radius * 0.6);
     ctx.save();
-    ctx.fillStyle = "rgb(255 255 255 / 0.18)";
-    ctx.fillRect(x + inset, y + inset, edge, Math.max(1, size * 0.08));
+    ctx.globalAlpha *= 0.5;
+    ctx.strokeStyle = theme.board.bg;
+    ctx.lineWidth = line;
+    ctx.stroke();
     ctx.restore();
   }
 };
@@ -137,6 +140,18 @@ export const drawMark = (ctx, x, y, size, value, color) => {
   ctx.restore();
 };
 
+/**
+ * 점 격자 경로: 안쪽 칸 모서리가 만나는 곳마다 작은 네모(선 격자보다 조용하고 종이·도면 느낌)
+ * @returns {Path2D}
+ */
+export const gridDots = (bx, by, cols, rows, cell) => {
+  const path = new Path2D();
+  const d = Math.max(1, Math.round(cell * 0.09));
+  for (let x = 1; x < cols; x++)
+    for (let y = 1; y < rows; y++) path.rect(bx + x * cell - d / 2, by + y * cell - d / 2, d, d);
+  return path;
+};
+
 /** 고스트 진하기 → [윤곽 투명도, 채움 투명도] */
 const GHOST_LEVEL = { faint: [0.32, 0], normal: [0.58, 0], strong: [0.95, 0.22] };
 
@@ -164,14 +179,25 @@ const makeTheme = spec => {
   });
 };
 
+/**
+ * 테마 디자인 원칙(docs/DESIGN_SYSTEM.md "보드 테마"):
+ *  - 고전 게임 느낌을 내지 않는다: 광택·입체(베벨)·빛 번짐·그라데이션·원색 무지개 없음.
+ *  - 빈티지: 인쇄 잉크·종이·도면처럼 채도를 한 단계 눌러 담은 색.
+ *  - 모던·깔끔: 납작한 면, 가는 선, 짧고 단정한 효과.
+ *  - 명료: 일곱 피스는 보드와 3:1 넘게 대비되고 서로도 확실히 다르다(단위 테스트가 잰다).
+ * 테마마다 보드색·격자(선·점·없음)·블록 마감·모서리·효과를 묶어 성격을 나눈다.
+ * 저장 키는 예전 그대로 둔다(minimal = 블루프린트, stone = 샌드).
+ */
 export const THEMES = Object.freeze({
   modern: makeTheme({
     name: t("스튜디오"),
-    description: t("차콜 보드와 선명한 무광 블록"),
+    description: t("차콜 보드에 또렷한 무광 블록 · 기본"),
     palette: ["#8ed6cd", "#9baff4", "#f5ab87", "#d6ed84", "#8bc994", "#c4a6ec", "#ee9095", "#727b74"],
     board: { bg: "#202421", grid: "#2b312c", edge: "#414941", ink: "#d6ed84" },
+    gridStyle: "lines",
     gap: 0.045,
     radius: 0.15,
+    finish: "flat",
     motion: {
       slideMs: 42,
       landMs: 165,
@@ -187,11 +213,13 @@ export const THEMES = Object.freeze({
   }),
   retro: makeTheme({
     name: t("페이퍼"),
-    description: t("종이색 보드와 차분한 잉크색 블록"),
-    palette: ["#3e817b", "#526ab1", "#b76540", "#9b741d", "#58844b", "#82639e", "#b85060", "#797c74"],
-    board: { bg: "#eeede3", grid: "#dfded2", edge: "#cfcec0", ink: "#52624a" },
-    gap: 0.055,
-    radius: 0.06,
+    description: t("미색 종이에 인쇄 잉크색 블록, 점 격자"),
+    palette: ["#26727a", "#344f99", "#b0532a", "#8f6c14", "#4b7a33", "#6e4686", "#a73636", "#8a857a"],
+    board: { bg: "#f2eee3", grid: "#c9c1ae", edge: "#d6cfbe", ink: "#3d3a33" },
+    gridStyle: "dots",
+    gap: 0.06,
+    radius: 0.04,
+    finish: "flat",
     motion: {
       slideMs: 24,
       landMs: 115,
@@ -206,12 +234,14 @@ export const THEMES = Object.freeze({
     },
   }),
   minimal: makeTheme({
-    name: t("슬레이트"),
-    description: t("푸른 회색 보드와 낮은 채도의 블록"),
-    palette: ["#8caeb7", "#8d9ac4", "#c6a28b", "#c8c29c", "#9eb4a3", "#ada4bf", "#c59fa8", "#73808b"],
-    board: { bg: "#262d35", grid: "#323c46", edge: "#46525d", ink: "#adc9d1" },
-    gap: 0.085,
-    radius: 0.1,
+    name: t("블루프린트"),
+    description: t("코발트 도면 위에 옅은 색 타일, 가는 선 격자"),
+    palette: ["#9fe0e8", "#a6bcff", "#ffc29a", "#f3dc8a", "#ade0a0", "#e3bcff", "#ffa9b3", "#5f78a6"],
+    board: { bg: "#1c3461", grid: "#2a4677", edge: "#456596", ink: "#e7eefb" },
+    gridStyle: "lines",
+    gap: 0.07,
+    radius: 0,
+    finish: "inset",
     motion: {
       slideMs: 56,
       landMs: 215,
@@ -227,12 +257,13 @@ export const THEMES = Object.freeze({
   }),
   graphite: makeTheme({
     name: t("그라파이트"),
-    description: t("무채색 숯빛 보드와 채도를 낮춘 블록"),
-    palette: ["#6fa9b0", "#6f84b8", "#c08a62", "#c4b06a", "#7fa77a", "#9a86b8", "#c07479", "#5e6266"],
-    board: { bg: "#17181a", grid: "#222326", edge: "#34363a", ink: "#c9cdd2" },
-    gap: 0.04,
-    radius: 0.04,
-    finish: "edge",
+    description: t("격자 없는 무채색 보드에 각진 블록 · 집중용"),
+    palette: ["#6fb0b6", "#7187c8", "#c98d63", "#c9b46b", "#7fae7f", "#ae8cc4", "#c97a7f", "#5d6166"],
+    board: { bg: "#151617", grid: "#202224", edge: "#33363a", ink: "#d4d7db" },
+    gridStyle: "none",
+    gap: 0.06,
+    radius: 0,
+    finish: "flat",
     motion: {
       slideMs: 36,
       landMs: 150,
@@ -248,9 +279,10 @@ export const THEMES = Object.freeze({
   }),
   frame: makeTheme({
     name: t("프레임"),
-    description: t("검은 보드와 테두리만 색이 있는 블록"),
+    description: t("검은 보드에 테두리만 색이 있는 선 블록"),
     palette: ["#45c6d6", "#5d82e0", "#e08a45", "#e0c04a", "#55c07a", "#a77ad8", "#e05a72", "#6b7080"],
     board: { bg: "#0f1012", grid: "#1b1c20", edge: "#2c2e34", ink: "#d8dde4" },
+    gridStyle: "lines",
     gap: 0.06,
     radius: 0.07,
     finish: "frame",
@@ -268,12 +300,13 @@ export const THEMES = Object.freeze({
     },
   }),
   stone: makeTheme({
-    name: t("스톤"),
-    description: t("밝은 돌빛 보드와 흙빛이 도는 각진 블록"),
-    palette: ["#3f7f86", "#465f9a", "#a5603a", "#a88a2e", "#4f7f4a", "#735a95", "#a24a52", "#8b8a85"],
-    board: { bg: "#e4e2dc", grid: "#d4d1ca", edge: "#bfbbb2", ink: "#3b3a36" },
-    gap: 0.045,
-    radius: 0,
+    name: t("샌드"),
+    description: t("모래빛 보드에 테라코타·머스터드 둥근 블록"),
+    palette: ["#24787a", "#2f4f86", "#b4532c", "#9a7213", "#59782b", "#7a3f6d", "#a8352f", "#9c9180"],
+    board: { bg: "#ebe2d0", grid: "#dfd4bf", edge: "#cbbd9f", ink: "#4a3f33" },
+    gridStyle: "lines",
+    gap: 0.07,
+    radius: 0.26,
     finish: "flat",
     motion: {
       slideMs: 28,
@@ -290,11 +323,12 @@ export const THEMES = Object.freeze({
   }),
   midnight: makeTheme({
     name: t("미드나잇"),
-    description: t("짙은 남색 보드와 보석빛을 눌러 담은 블록"),
-    palette: ["#4e9fb3", "#5672b8", "#c47e4f", "#c9a446", "#5c9a6d", "#8a6bb3", "#b85a66", "#4a5268"],
-    board: { bg: "#111827", grid: "#1b2436", edge: "#2c3a52", ink: "#a9c2e6" },
+    description: t("짙은 남색에 보석빛 블록, 점 격자"),
+    palette: ["#4fb0c4", "#6b88d6", "#d38a58", "#d2ae52", "#62a877", "#9a7bc6", "#cc6675", "#4c5670"],
+    board: { bg: "#10172a", grid: "#2a3754", edge: "#2c3a52", ink: "#b4c8ea" },
+    gridStyle: "dots",
     gap: 0.05,
-    radius: 0.08,
+    radius: 0.1,
     finish: "flat",
     motion: {
       slideMs: 44,
@@ -311,12 +345,13 @@ export const THEMES = Object.freeze({
   }),
   forest: makeTheme({
     name: t("포레스트"),
-    description: t("짙은 숲빛 보드와 이끼·흙빛 블록"),
-    palette: ["#6fb2a0", "#6f8fb0", "#c98f5a", "#cdb46a", "#8db36a", "#a08ab8", "#c47766", "#56635a"],
-    board: { bg: "#151d18", grid: "#1f2a23", edge: "#324238", ink: "#c6dccb" },
-    gap: 0.05,
-    radius: 0.05,
-    finish: "edge",
+    description: t("짙은 숲빛에 이끼·흙빛 블록, 부드러운 모서리"),
+    palette: ["#6fb8a4", "#7896ba", "#d2945c", "#d2bb6c", "#93ba6c", "#a892c0", "#cd7c6a", "#56645a"],
+    board: { bg: "#16201a", grid: "#202b24", edge: "#34453a", ink: "#c6dccb" },
+    gridStyle: "lines",
+    gap: 0.055,
+    radius: 0.3,
+    finish: "flat",
     motion: {
       slideMs: 50,
       landMs: 185,
@@ -332,11 +367,12 @@ export const THEMES = Object.freeze({
   }),
   white: makeTheme({
     name: t("화이트"),
-    description: t("깨끗한 흰 보드와 선명하고 묵직한 블록"),
-    palette: ["#1f9db0", "#3159c4", "#e06a2c", "#e0a81c", "#2f9e57", "#7d4fc4", "#d43c52", "#9aa0a6"],
-    board: { bg: "#fafafa", grid: "#ececec", edge: "#d6d6d6", ink: "#2b2b2b" },
+    description: t("깨끗한 흰 보드에 선명하고 묵직한 블록"),
+    palette: ["#0f7f91", "#2850b8", "#c8551d", "#9a7400", "#24813f", "#6c3fb3", "#c22e45", "#a2a7ad"],
+    board: { bg: "#fbfbfa", grid: "#ededeb", edge: "#d8d8d4", ink: "#2b2b2b" },
+    gridStyle: "lines",
     gap: 0.05,
-    radius: 0.12,
+    radius: 0.08,
     finish: "flat",
     motion: {
       slideMs: 26,
@@ -352,7 +388,6 @@ export const THEMES = Object.freeze({
     },
   }),
 });
-
 /** 블록 색 직접 고르기에 쓰는 견본(어두운·밝은 보드 모두에서 잘 보이는 색) */
 export const COLOR_SWATCHES = Object.freeze([
   "#8ed6cd",

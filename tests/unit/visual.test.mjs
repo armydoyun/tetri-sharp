@@ -61,14 +61,79 @@ test("테마마다 8색이 모두 다르고, 블록·고스트를 그린다", ()
   assert.equal(new Set(CONTRAST_PALETTE.slice(1)).size, 8);
 });
 
-test("테마마다 보드 색 · 블록 모서리 · 줄 삭제 모양이 서로 다르다", () => {
+test("테마마다 보드 색 · 격자·마감·모서리 묶음 · 줄 삭제 모양이 서로 다르다", () => {
   const themes = Object.values(THEMES);
   assert.equal(new Set(themes.map(theme => theme.board.bg)).size, themes.length);
-  assert.equal(new Set(themes.map(theme => theme.radius)).size, themes.length);
+  assert.equal(
+    new Set(themes.map(theme => `${theme.gridStyle}/${theme.finish}/${theme.radius}`)).size,
+    themes.length,
+    "격자·마감·모서리가 모두 같은 테마는 없다"
+  );
   assert.equal(new Set(themes.map(theme => theme.motion.clear)).size, themes.length);
+  for (const theme of themes) {
+    assert.ok(["lines", "dots", "none"].includes(theme.gridStyle), theme.name);
+    assert.ok(["flat", "inset", "frame"].includes(theme.finish), theme.name);
+  }
 });
 
-test("블록 마감: 그라파이트는 윗면을 더 칠하고 프레임은 속 + 테두리, 고스트는 늘 윤곽선", () => {
+// 상대 휘도·대비(WCAG)와 색 차이(CIE76 ΔE)
+const channels = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+const linear = c => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const luminance = hex => {
+  const [r, g, b] = channels(hex).map(linear);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a, b) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+const lab = hex => {
+  const [r, g, b] = channels(hex).map(linear);
+  const f = v => (v > 0.008856 ? Math.cbrt(v) : 7.787 * v + 16 / 116);
+  const x = f((0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047);
+  const y = f(0.2126 * r + 0.7152 * g + 0.0722 * b);
+  const z = f((0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883);
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+};
+const deltaE = (a, b) => Math.hypot(...lab(a).map((v, i) => v - lab(b)[i]));
+
+test("테마 원칙 '명료': 일곱 피스는 보드와 3:1 넘게 대비되고 서로 ΔE 15 넘게 다르다. 쓰레기도 보인다", () => {
+  for (const theme of Object.values(THEMES)) {
+    const pieces = theme.palette.slice(1, 8);
+    for (const [i, color] of pieces.entries())
+      assert.ok(contrast(color, theme.board.bg) >= 3, `${theme.name} ${"IJLOSTZ"[i]} 대비`);
+    for (let i = 0; i < 7; i++)
+      for (let j = i + 1; j < 7; j++)
+        assert.ok(deltaE(pieces[i], pieces[j]) >= 15, `${theme.name} ${"IJLOSTZ"[i]}·${"IJLOSTZ"[j]} 구분`);
+    assert.ok(contrast(theme.palette[8], theme.board.bg) >= 2.2, `${theme.name} 쓰레기`);
+  }
+});
+
+test("테마 원칙 '고전 느낌 없이': 블록·고스트에 그라데이션·그림자·빛 번짐을 쓰지 않는다", () => {
+  for (const theme of Object.values(THEMES)) {
+    const calls = [];
+    const ctx = new Proxy(
+      {},
+      {
+        get:
+          (_, name) =>
+          (...args) =>
+            calls.push([name, ...args]),
+        set: (_, name) => {
+          calls.push([`set:${String(name)}`]);
+          return true;
+        },
+      }
+    );
+    theme.block(ctx, 0, 0, 30, theme.palette[1]);
+    theme.ghost(ctx, 0, 0, 30, theme.palette[1], "strong");
+    const names = calls.map(([name]) => name);
+    for (const banned of ["createLinearGradient", "createRadialGradient", "set:shadowBlur", "set:shadowColor"])
+      assert.ok(!names.includes(banned), `${theme.name}: ${banned}`);
+  }
+});
+
+test("블록 마감: 단색은 한 번, 안쪽 선(inset)과 프레임은 면 + 선, 고스트는 늘 윤곽선", () => {
   const count = theme => {
     const calls = [];
     theme.block(fakeCtx(calls), 0, 0, 30, theme.palette[1]);
@@ -77,9 +142,7 @@ test("블록 마감: 그라파이트는 윗면을 더 칠하고 프레임은 속
   assert.equal(count(THEMES.modern), 1);
   assert.equal(count(THEMES.stone), 1);
   assert.equal(count(THEMES.frame), 2);
-  const edge = [];
-  THEMES.graphite.block(fakeCtx(edge), 0, 0, 30, "#fff");
-  assert.equal(edge.filter(([name]) => name === "fillRect").length, 1, "윗면 밝게");
+  assert.equal(count(THEMES.minimal), 2, "블루프린트도 안쪽 선");
   const ghost = [];
   THEMES.frame.ghost(fakeCtx(ghost), 0, 0, 30, "#fff");
   assert.deepEqual(
@@ -177,7 +240,7 @@ test("하드 드롭은 테마마다 다른 압축과 짧은 잔상을 만들고 
   assert.equal(samples[0], 0.8);
 });
 
-test("줄 삭제는 스튜디오에서 가운데로부터, 페이퍼에서 왼쪽부터, 슬레이트에서 두 줄로 그린다", () => {
+test("줄 삭제는 스튜디오에서 가운데로부터, 페이퍼에서 왼쪽부터, 블루프린트에서 두 줄로 그린다", () => {
   const marks = Object.values(THEMES).map(({ motion }) => {
     const fx = createEffects();
     fx.add([clearEvent], "full", 0, motion);

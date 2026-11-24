@@ -529,7 +529,10 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
       fieldRow({
         id: "set-grid",
         label: t("격자 선"),
-        hint: visual.grid === "off" ? t("격자 선 없이 블록만 보여요") : t("보드에 칸을 나누는 선을 그려요"),
+        hint:
+          visual.grid === "off"
+            ? t("격자 선 없이 블록만 보여요")
+            : t("테마의 격자(선이나 점)를 그려요. 그라파이트는 원래 격자가 없어요"),
         control: segmented({
           wrap: true,
           id: "set-grid",
