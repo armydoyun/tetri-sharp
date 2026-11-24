@@ -9,6 +9,18 @@ import { t } from "../i18n/index.js";
 /**
  * @param {{ dialog: HTMLDialogElement, progress: ReturnType<typeof import("../modes/puzzles.js").createPuzzleProgress>, onPick: (puzzle: any) => void, onCreate: () => void }} options
  */
+/** 장마다 한 줄 목표 */
+const CHAPTER_GOALS = Object.freeze({
+  pc: t("아래 두 줄을 모두 지워 판 비우기"),
+  quad: t("우물을 남겨 채운 뒤 마지막 I로 4줄"),
+  combo: t("피스마다 한 줄 이상 지워 콤보 잇기"),
+  tuck: t("내린 뒤 처마 아래로 밀어 넣어 2줄"),
+  spin: t("틈 앞에서 돌려 끼워 넣어 2줄"),
+  mini: t("T를 마지막에 돌려 넣어 Mini로 한 줄"),
+  tsd: t("T 하나로 T-spin Double"),
+  tst: t("T 하나로 T-spin Triple"),
+});
+
 export const createPuzzleUI = ({ dialog, progress, onPick, onCreate }) => {
   const notice = el("p", { class: "notice-slot", role: "status" });
   return {
@@ -56,6 +68,8 @@ export const createPuzzleUI = ({ dialog, progress, onPick, onCreate }) => {
               el("span", { text: KIND_NAMES[kind] }),
               el("small", { class: "num", text: `${done} / ${stages.length}` })
             ),
+            // 장마다 한 줄 목표(예전: 맨 위 긴 문단 하나 — 장이 늘며 휴대폰에서 일곱 줄이 됐다, 4차 평가 U51)
+            el("p", { class: "puzzle-chapter-goal", text: CHAPTER_GOALS[kind] }),
             el("div", { class: "puzzle-grid" }, ...stages.map(tile))
           );
         })
@@ -71,17 +85,7 @@ export const createPuzzleUI = ({ dialog, progress, onPick, onCreate }) => {
       });
       fillDialog(dialog, {
         title: t("퍼즐"),
-        body: el(
-          "div",
-          {},
-          el("p", {
-            class: "field-help",
-            text: t(
-              "판 비우기는 아래 두 줄을 모두 지우고, 4줄 만들기는 우물을 남겨 채운 뒤 I로 4줄, 콤보는 피스마다 줄을 지우고, 밀어 넣기는 내린 뒤 처마 아래로 밀고, 돌려 넣기는 틈 앞에서 돌리고, T-spin(Mini·Double·Triple)은 T 하나로 해내요."
-            ),
-          }),
-          grid
-        ),
+        body: el("div", {}, el("p", { class: "field-help", text: t("장마다 쉬운 것부터 차례로 풀어요.") }), grid),
         notice,
         actions: [create],
         closeId: "puzzle-close",

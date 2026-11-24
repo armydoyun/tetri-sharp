@@ -3605,6 +3605,12 @@ test("퍼즐 콤보 이어 가기: 줄을 못 지운 피스가 나오면 남은 
   await runKeys(page, [["Space", 1]]);
   await page.waitForFunction(() => !document.getElementById("results")?.hidden);
   assert.equal(await text(page, "results-title"), "실패");
+  // 퍼즐 결과: "너무 일찍 끝난 판" 안내 없이, 점수·레벨 대신 쓴 피스·깬 단계(4차 평가 F37)
+  assert.equal(await text(page, "race-result"), "");
+  const stats = await text(page, "results-stats");
+  assert.match(stats, /쓴 피스1 \/ \d/);
+  assert.match(stats, /깬 단계0 \/ \d+/);
+  assert.doesNotMatch(stats, /점수|레벨|순위/);
   assert.deepEqual(errors, []);
   await context.close();
 });

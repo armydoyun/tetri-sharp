@@ -716,6 +716,14 @@
   word-break: keep-all;
 }
 
+/* 아주 좁은 화면(iPhone SE 등): 영어 이름(Blueprint)이 글자 중간에서 꺾이지 않게 한 단계 작게(4차 평가 U50) */
+@media (max-width: 360px) {
+  .choice-cards.is-compact .choice-card strong {
+    font-size: var(--text-s);
+    overflow-wrap: normal;
+  }
+}
+
 .theme-swatch {
   display: block;
   width: 100%;
@@ -888,6 +896,13 @@
   margin: var(--space-3) 0 0;
   font-size: var(--text-m);
   font-weight: 800;
+}
+
+.puzzle-chapter-goal {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-s);
+  line-height: 1.4;
+  color: var(--text-dim);
 }
 
 .puzzle-chapter-title small {

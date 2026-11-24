@@ -577,8 +577,15 @@ export const EN = {
   "{n}피스": "{n} pcs",
   "{done} / {total}단계 깸 · 중력 없음, 정해진 피스만 써요":
     "{done} / {total} solved · no gravity, only the given pieces",
-  "판 비우기는 아래 두 줄을 모두 지우고, 4줄 만들기는 우물을 남겨 채운 뒤 I로 4줄, 콤보는 피스마다 줄을 지우고, 밀어 넣기는 내린 뒤 처마 아래로 밀고, 돌려 넣기는 틈 앞에서 돌리고, T-spin(Mini·Double·Triple)은 T 하나로 해내요.":
-    "Board clears empty the bottom two rows, quads fill around a well then finish with an I, combos clear a line with every piece, tucks drop and slide under an overhang, spin-ins rotate into a twisted gap, and T-spins (Mini, Double, Triple) use a single T.",
+  "장마다 쉬운 것부터 차례로 풀어요.": "Each chapter starts easy and builds up.",
+  "아래 두 줄을 모두 지워 판 비우기": "Clear the bottom two rows completely",
+  "우물을 남겨 채운 뒤 마지막 I로 4줄": "Fill around a well, then clear four with the last I",
+  "피스마다 한 줄 이상 지워 콤보 잇기": "Clear a line with every piece to keep the combo",
+  "내린 뒤 처마 아래로 밀어 넣어 2줄": "Drop, then slide under the overhang for two lines",
+  "틈 앞에서 돌려 끼워 넣어 2줄": "Rotate into the twisted gap for two lines",
+  "T를 마지막에 돌려 넣어 Mini로 한 줄": "Rotate the T in last for a Mini single",
+  "T 하나로 T-spin Double": "A T-spin Double with one T",
+  "T 하나로 T-spin Triple": "A T-spin Triple with one T",
 
   // ---- 리플레이 공유 ----
   "이 리플레이": "this replay",
@@ -957,6 +964,8 @@ export const EN = {
   "돌려 넣기": "Spin-ins",
   "돌려 넣기 장": "Spin-in chapter",
   "Mini 장": "Mini chapter",
+  "쓴 피스": "Pieces used",
+  "깬 단계": "Stages solved",
   "T-spin Mini 퍼즐을 모두 풀기": "Solve every T-spin Mini puzzle",
   "목표 · T를 마지막에 돌려 넣어 T-spin Mini로 줄 지우기":
     "Goal · Rotate the T in last to clear a line with a T-spin Mini",

@@ -901,6 +901,8 @@ $("go-home").addEventListener("click", () => {
 const SHORT_GAME_SECONDS = 20;
 const SHORT_GAME_PIECES = 10;
 const isShortGame = state => {
+  // 퍼즐은 원래 피스 몇 개로 금방 끝난다 → "너무 일찍 끝난 판"이 아니다(4차 평가 F37)
+  if (mode.puzzle) return false;
   if (state.over === "clear" || state.frame >= SHORT_GAME_SECONDS * 60) return false;
   // 버틴 시간이 기록인 모드(Survival)는 줄을 안 지워도 제대로 된 판일 수 있다 → 피스 수만 본다
   const survives = mode.record?.metric === "frames" && mode.record.order === "desc";
@@ -1202,6 +1204,17 @@ const finish = () => {
   }
   if (mode.battleLesson) {
     rows.splice(0, rows.length, [t("받은 쓰레기"), String(state.garbage.received)]);
+  }
+  // 퍼즐: 점수·레벨·최고 기록·순위는 뜻이 없다 → 쓴 피스, 지운 줄, 깬 단계(4차 평가 F37)
+  if (mode.puzzle) {
+    rows.splice(
+      0,
+      rows.length,
+      [t("시간"), formatTime(state.frame)],
+      [t("쓴 피스"), `${state.stats.pieces} / ${mode.puzzle.pieces.length}`],
+      [t("줄"), String(state.stats.lines)],
+      [t("깬 단계"), mode.puzzle.number ? `${puzzleProgress.cleared().size} / ${PUZZLES.length}` : "—"]
+    );
   }
   if (mode.lesson) {
     const path = mode.lesson.path;
