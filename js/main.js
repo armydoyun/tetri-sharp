@@ -27,6 +27,7 @@ import { loadSettings, sanitizeSettings, saveSettings, toEngineHandling } from "
 import { createRecords } from "./storage/records.js";
 import { createSettingsUI } from "./ui/settings.js";
 import { createRulesUI } from "./ui/rules.js";
+import { createAsk } from "./ui/ask.js";
 import { button, menuRow, segmentButtons } from "./ui/components.js";
 import { el } from "./ui/dom.js";
 import { dropdown } from "./ui/select.js";
@@ -311,12 +312,21 @@ const clearRun = () => {
   if (runJournal && savedRun()?.id === runJournal.entry.id) store.set(SUSPENDED_RUN_KEY, null);
   runJournal = null;
 };
-const canReplaceRun = () => {
+/** 이어서 할 판이 저장돼 있는데 다른 판을 시작하려 하는가(그러면 먼저 묻는다) */
+const replacesSavedRun = () => {
   const current = savedRun();
-  return (
-    !current || (runJournal && current.id === savedRunId) || window.confirm(t("저장된 판을 지우고 새 판을 시작할까요?"))
-  );
+  return Boolean(current) && !(runJournal && current.id === savedRunId);
 };
+/** 저장된 판을 버릴지 앱 안의 확인 대화상자로 묻고, 그러자고 하면 then을 부른다 */
+const confirmReplaceRun = then =>
+  ask({
+    title: t("저장된 판을 지울까요?"),
+    message: t("이어서 할 수 있게 저장해 둔 판이 있어요. 새 판을 시작하면 그 판은 지워져요."),
+    okLabel: t("지우고 새 판 시작"),
+    okIcon: "play",
+  }).then(ok => {
+    if (ok) then();
+  });
 
 // ---- 표시 도우미 ----
 
@@ -552,8 +562,19 @@ const dailyUI = createDailyUI({
   onWatch: replay => startReplay(replay, "menu", "", true),
   onRace: raceFromCode,
 });
+/**
+ * 대화상자를 닫은 뒤 연 버튼으로 포커스를 돌려준다. close 이벤트는 조금 늦게 오므로,
+ * 그 사이 사용자가 다른 조작으로 옮겨 갔으면(포커스가 body가 아니면) 빼앗지 않는다.
+ * @param {Element | null} target
+ */
+const returnFocus = target => {
+  const active = document.activeElement;
+  if (!active || active === document.body || active === document.documentElement)
+    /** @type {HTMLElement | null} */ (target)?.focus();
+};
+
 $("daily").addEventListener("close", () => {
-  if (screen === "menu") /** @type {HTMLElement | null} */ (document.querySelector('[data-mode="daily"]'))?.focus();
+  if (screen === "menu") returnFocus(document.querySelector('[data-mode="daily"]'));
 });
 const formatSurvivalGoal = frames => formatTime(frames).split(".")[0];
 
@@ -616,13 +637,16 @@ const setScreen = next => {
       : mode.puzzle
         ? mode.puzzle.kind === "pc"
           ? t("목표 · 주어진 피스로 판 비우기")
-          : t("목표 · T 하나로 {kind} 만들기", { kind: mode.description })
+          : mode.puzzle.kind === "quad"
+            ? t("목표 · 우물을 남기고 채운 뒤 마지막 I로 4줄 지우기")
+            : t("목표 · T 하나로 {kind} 만들기", { kind: mode.description })
         : mode.practice
           ? mode.description
           : "";
 };
 
-const toMenu = (initial = false) => {
+/** @param {boolean} [initial] 처음 열 때 @param {boolean} [keepFocus] 포커스는 옮기지 않는다(대화상자를 닫고 다시 그릴 때) */
+const toMenu = (initial = false, keepFocus = false) => {
   confirming = null;
   game = null;
   race = null;
@@ -640,9 +664,10 @@ const toMenu = (initial = false) => {
   const defaultMode = /** @type {HTMLElement | null} */ (panels.menu.querySelector(`[data-mode="${mode.id}"]`));
   // 처음 열 때는 포커스만 두고(Enter로 바로 시작) 테두리는 그리지 않는다 — "골라 둔 모드"처럼 보이지 않게.
   // 게임에서 돌아올 때는 키보드로 오가는 중일 수 있으니 브라우저가 정한 대로 보인다.
-  (continueRun.hidden ? defaultMode : continueRun)?.focus(
-    /** @type {FocusOptions} */ ({ preventScroll: initial, ...(initial ? { focusVisible: false } : {}) })
-  );
+  if (!keepFocus)
+    (continueRun.hidden ? defaultMode : continueRun)?.focus(
+      /** @type {FocusOptions} */ ({ preventScroll: initial, ...(initial ? { focusVisible: false } : {}) })
+    );
 };
 
 const showModeHud = (m, replay = false) => {
@@ -658,9 +683,15 @@ const start = (
   selectedRules = currentRules(),
   target = null,
   retrySeed = /** @type {number | undefined} */ (undefined),
-  restored = null
+  restored = null,
+  confirmed = false
 ) => {
-  if (restoringRun ? !restored : !canReplaceRun()) return;
+  if (restoringRun) {
+    if (!restored) return;
+  } else if (!confirmed && replacesSavedRun()) {
+    confirmReplaceRun(() => start(m, selectedRules, target, retrySeed, restored, true));
+    return;
+  }
   confirming = null;
   if (screen === "replay") stopReplay();
   mode = m;
@@ -1225,11 +1256,17 @@ const settingsUI = createSettingsUI({
     },
   },
   onClose: () => {
-    if (screen === "menu") toMenu();
-    else if (screen === "paused") showPanel("pause");
+    // 첫 화면은 다시 그리되(언어·화면 색 등), 포커스는 연 버튼(머리글 설정)으로 돌려준다
+    if (screen === "menu") {
+      toMenu(false, true);
+      returnFocus($("open-settings"));
+    } else if (screen === "paused") showPanel("pause");
     else if (screen === "results") showPanel("results");
   },
 });
+
+/** 앱 안 확인 대화상자(브라우저 확인창 대신) */
+const ask = createAsk(/** @type {HTMLDialogElement} */ ($("ask")));
 
 const rulesUI = createRulesUI({
   dialog: /** @type {HTMLDialogElement} */ ($("rules-editor")),
@@ -1335,7 +1372,7 @@ const puzzleUI = createPuzzleUI({
 });
 $("open-puzzles").addEventListener("click", () => puzzleUI.open());
 $("puzzles").addEventListener("close", () => {
-  if (!puzzleDialog.open && screen === "menu") $("open-puzzles").focus();
+  if (!puzzleDialog.open && screen === "menu") returnFocus($("open-puzzles"));
   if (!puzzleDialog.open && screen === "results" && mode.trialCode)
     /** @type {HTMLElement | null} */ (panels.results.querySelector('[data-action="export"]'))?.focus();
 });
@@ -1349,7 +1386,7 @@ const renderPuzzleProgress = () => {
   $("puzzle-progress").textContent = `${puzzleProgress.cleared().size} / ${PUZZLES.length}`;
 };
 $("practice").addEventListener("close", () => {
-  if (screen === "menu") /** @type {HTMLElement | null} */ ($("open-practice"))?.focus();
+  if (screen === "menu") returnFocus($("open-practice"));
 });
 
 const versusUI = createVersusUI({
@@ -1360,7 +1397,7 @@ const versusUI = createVersusUI({
   setStyle: style => store.set("versus:style", style),
 });
 $("versus").addEventListener("close", () => {
-  if (screen === "menu") /** @type {HTMLElement | null} */ (document.querySelector('[data-mode="versus"]'))?.focus();
+  if (screen === "menu") returnFocus(document.querySelector('[data-mode="versus"]'));
 });
 
 const statsUI = createStatsUI({ dialog: /** @type {HTMLDialogElement} */ ($("stats")) });
@@ -1383,7 +1420,7 @@ const achievementsUI = createAchievementsUI({
 });
 $("open-achievements").addEventListener("click", () => achievementsUI.open());
 $("achievements").addEventListener("close", () => {
-  if (screen === "menu") /** @type {HTMLElement | null} */ ($("open-achievements"))?.focus();
+  if (screen === "menu") returnFocus($("open-achievements"));
 });
 
 const recordsUI = createRecordsUI({
@@ -1405,7 +1442,7 @@ const recordsUI = createRecordsUI({
 });
 $("open-records").addEventListener("click", () => recordsUI.open({ modeId: mode.id, rulesId: currentRules().id }));
 $("records").addEventListener("close", () => {
-  if (screen === "menu") /** @type {HTMLElement | null} */ ($("open-records"))?.focus();
+  if (screen === "menu") returnFocus($("open-records"));
 });
 
 const handleSystem = (action, code = "") => {
@@ -2153,9 +2190,12 @@ const resetSceneAttempt = (restored = null) => {
 };
 
 /** @param {SceneSplit | null} split @param {FinesseScene | null} target */
-const enterScenePractice = (split = null, target = null, rescue = null, restored = null) => {
+const enterScenePractice = (split = null, target = null, rescue = null, restored = null, confirmed = false) => {
   if (!replayPaused || !(canPracticeScene() || (rescue && player && !player.done))) return;
-  if (!restoringRun && !canReplaceRun()) return;
+  if (!restoringRun && !confirmed && replacesSavedRun()) {
+    confirmReplaceRun(() => enterScenePractice(split, target, rescue, restored, true));
+    return;
+  }
   scenePractice = {
     spawnFrame: restored?.scene.spawnFrame ?? rescue?.spawnFrame ?? target?.spawnFrame ?? player.spawnFrame,
     split,
@@ -2387,7 +2427,8 @@ const backupActions = setupBackup({
   findMode,
   fileInput: /** @type {HTMLInputElement} */ ($("backup-file")),
   canImport: () => screen === "menu",
-  confirmImport: message => window.confirm(message),
+  confirmImport: message =>
+    ask({ title: t("백업을 불러올까요?"), message: message.split("\n"), okLabel: t("불러오기"), okIcon: "folder" }),
   notify: notifyData,
   onRestored: reloadFromStore,
 });

@@ -21,7 +21,7 @@ import {
   defaultVisual,
   handlingPresetOf,
 } from "../storage/settings.js";
-import { el, fieldRow, fillDialog } from "./dom.js";
+import { el, fieldRow, fillDialog, focusKey, restoreFocus } from "./dom.js";
 import { button, choiceCards, confirmButton, rangeRow, segmented, slider, tabBar } from "./components.js";
 import { COLOR_SWATCHES, PIECE_ORDER, THEMES, THEME_IDS, findTheme, paletteFor } from "../render/themes.js";
 import { keycap } from "./keycap.js";
@@ -741,6 +741,8 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
   const render = () => {
     stopThemePreview();
     const scroll = dialog.querySelector(".dialog-body")?.scrollTop ?? 0;
+    // 값을 바꾸면 내용을 다시 그린다 → 포커스가 있던 조작을 기억했다가 돌려준다(키보드로 쓸 때 자리를 잃지 않게)
+    const focused = dialog.contains(document.activeElement) ? focusKey(document.activeElement) : null;
     // "설정"만 되돌린다(기록·리플레이·업적은 그대로 — 지우기는 데이터 탭). 두 번 눌러 확정(U40)
     const reset = confirmButton({
       label: t("설정 초기화"),
@@ -784,6 +786,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
     const body = el("div", {}, sectionFor(tab));
     fillDialog(dialog, { title: t("설정"), body, notice, actions: [reset], closeId: "settings-close", tabs });
     body.scrollTop = scroll;
+    if (dialog.open && !dialog.contains(document.activeElement)) restoreFocus(dialog, focused);
   };
 
   const slotSelector = c => `.key-slot[data-kind="${c.kind}"][data-action="${c.action}"][data-slot="${c.slot}"]`;

@@ -66,3 +66,27 @@ export const fieldRow = ({ id, label, hint, control, disabled = false, className
     ),
     control
   );
+
+/**
+ * 다시 그리기 전에 포커스 자리를 기억할 열쇠: id, 없으면 가장 가까운 id 있는 조상 + data-* 속성.
+ * 대화상자 내용을 통째로 바꿔도 같은 조작으로 포커스를 돌려줘 키보드 사용자가 자리를 잃지 않게 한다.
+ * @param {Element | null} el
+ * @returns {string | null} querySelector에 쓸 선택자
+ */
+export const focusKey = el => {
+  if (!(el instanceof HTMLElement)) return null;
+  if (el.id) return `#${CSS.escape(el.id)}`;
+  const data = [...el.attributes]
+    .filter(a => a.name.startsWith("data-") && a.name !== "data-armed")
+    .map(a => `[${a.name}="${CSS.escape(a.value)}"]`)
+    .join("");
+  if (!data) return null;
+  const scope = el.parentElement?.closest("[id]");
+  return `${scope ? `#${CSS.escape(scope.id)} ` : ""}${el.tagName.toLowerCase()}${data}`;
+};
+
+/** focusKey로 기억한 조작에 포커스를 돌려준다(스크롤은 움직이지 않는다) */
+export const restoreFocus = (root, key) => {
+  if (!key) return;
+  /** @type {HTMLElement | null} */ (root.querySelector(key))?.focus({ preventScroll: true });
+};

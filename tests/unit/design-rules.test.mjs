@@ -252,17 +252,13 @@ test("컴포넌트: 화면 코드는 버튼·입력을 직접 만들지 않는�
   assert.deepEqual(bad, []);
 });
 
-test("컴포넌트: 브라우저 확인창(window.confirm)을 새로 쓰지 않는다 — confirmButton으로", () => {
-  // 대화상자 밖 흐름 두 곳만 아직 남아 있다(저장된 판을 두고 새 판 시작, 백업 불러오기 확인) — 2차 평가 처리 현황
-  const ALLOWED = 2;
+test("컴포넌트: 브라우저 확인창(window.confirm·alert·prompt)을 쓰지 않는다 — confirmButton·ask 대화상자로", () => {
   const uses = walk("js")
     .filter(f => f.endsWith(".js"))
     .flatMap(f =>
-      findAll(stripComments(f, fs.readFileSync(path.join(ROOT, f), "utf8")), /window\.confirm\(/).map(h => `${f}:${h}`)
+      findAll(stripComments(f, fs.readFileSync(path.join(ROOT, f), "utf8")), /window\.(confirm|alert|prompt)\(/).map(
+        h => `${f}:${h}`
+      )
     );
-  assert.ok(uses.length <= ALLOWED, uses.join("\n"));
-  assert.ok(
-    uses.every(u => u.startsWith("js/main.js:")),
-    uses.join("\n")
-  );
+  assert.deepEqual(uses, []);
 });

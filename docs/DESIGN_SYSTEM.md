@@ -195,7 +195,7 @@ fieldRow({ id, label: t("고스트"), control: segmented({ id, label: t("고스�
 
 | 하지 말 것 | 대신 |
 | --- | --- |
-| `window.confirm(…)`(브라우저 기본 확인창) | `confirmButton()` — 앱 안에서 두 번 눌러 확정 |
+| `window.confirm(…)`·`alert`·`prompt`(브라우저 기본 창) | 대화상자 안 한 버튼이면 `confirmButton()`(두 번 눌러 확정), 대화상자 밖 흐름이면 `ask({ title, message, okLabel })`(`js/ui/ask.js`, 앱 안 확인 대화상자 · Promise) |
 | `document.createElement("button")`, `el("button", …)`, `el("input", …)`(여러 줄로 써도 같다) | `button()` `iconButton()` `segmented()` `toggle()` `slider()` `textInput()` `menuRow()` |
 | `<button class="btn">편집</button>` (맨 글자) | `<button class="btn"><span class="btn-label">편집</span></button>` |
 | 아이콘만 있는 버튼에 글자 없이 `class="btn"` | `iconButton({ icon, label })` 또는 `.btn-icon-only` + `aria-label` |
@@ -207,6 +207,14 @@ fieldRow({ id, label: t("고스트"), control: segmented({ id, label: t("고스�
 | 새 색·새 크기 값 직접 쓰기(`#333`, `37px`) | `css/tokens.css` 변수(`--surface-2`, `--control-h`) |
 | `#mode-list .menu-row { grid-template-columns: … }`처럼 화면에서 줄 배치를 새로 짜기 | `controls.css`에 변형 class를 더하고 `menuRow()`에 선택지로 |
 | 컨트롤 안쪽 요소(`.btn-label` `.menu-text` 등)에 `line-height`·`padding`·`margin`·`grid-row` | 컨트롤 변수, 또는 `controls.css`의 변형 |
+
+### 키보드 · 화면 읽기
+
+- 대화상자는 열면 안쪽(닫기나 첫 조작)으로 포커스가 가고, 닫으면 **연 버튼으로 돌아온다**.
+- 값을 바꿔 내용을 다시 그릴 때는 `focusKey()`로 포커스 자리를 기억했다가 `restoreFocus()`로 같은 조작에 돌려준다(`js/ui/dom.js`).
+- 누를 수 있는 것과 입력은 모두 이름이 있다(글자, `aria-label`, 연결된 `label`). 아이콘은 `aria-hidden`.
+- 알림 칸(`.notice-slot`)은 `role="status"`. 상태가 바뀌는 버튼(두 번 눌러 확정)은 숨은 `aria-live`로 알린다.
+- `tabindex`는 0이나 -1만 쓴다.
 
 ### 검사
 
@@ -220,6 +228,8 @@ fieldRow({ id, label: t("고스트"), control: segmented({ id, label: t("고스�
   - 버튼·세그먼트 칸: 구조, **내용 덩어리가 턱을 뺀 면의 가운데에서 가로·세로 1px 안**
   - 드롭다운·키 칸: 내용이 (턱을 뺀) 면의 세로 가운데 1px 안. 목록 줄·도구 줄: 오른쪽 화살표가 세로 가운데 1px 안, 정해진 구조
   - 글자 입력: 위아래 여백이 같다. 스위치: 48×26
+  - 빈 자리(보이지 않는데 자리만 차지하는 블록), 목록 줄 글자의 세로 가운데
+  - 접근성: 이름 없는 조작, 양수 tabindex, 이름 없는 대화상자, 포커스가 열린 대화상자 밖
 
 ## 화면
 

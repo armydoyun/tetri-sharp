@@ -146,8 +146,8 @@
   grid-area: 1 / 1;
 }
 
-.btn-confirm:not([data-armed]) .btn-swap > span:last-child,
-.btn-confirm[data-armed] .btn-swap > span:first-child {
+.btn-confirm:not([data-armed]) .btn-swap > span:nth-child(2),
+.btn-confirm[data-armed] .btn-swap > span:nth-child(1) {
   visibility: hidden;
 }
 

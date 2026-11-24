@@ -85,14 +85,23 @@ export const confirmButton = ({ label, confirmLabel, onConfirm, icon, variant, s
       class: buttonClass({ variant, size, extra: ["btn-confirm", extra].filter(Boolean).join(" ") }),
     },
     ...(icon ? [iconSvg(icon)] : []),
-    el("span", { class: "btn-label btn-swap" }, el("span", { text: label }), el("span", { text: confirmLabel }))
+    el(
+      "span",
+      { class: "btn-label btn-swap" },
+      el("span", { text: label }),
+      el("span", { text: confirmLabel }),
+      // 화면 읽기 프로그램에 "한 번 더 누르면 실행"을 알린다(겹친 이름이 바뀌는 것만으로는 읽어 주지 않는다)
+      el("span", { class: "sr-only", "aria-live": "polite" })
+    )
   );
+  const live = /** @type {HTMLElement} */ (b.querySelector(".sr-only"));
   /** @type {ReturnType<typeof setTimeout> | undefined} */
   let timer;
   const disarm = () => {
     clearTimeout(timer);
     delete b.dataset.armed;
     b.removeAttribute("aria-label");
+    live.textContent = "";
   };
   b.addEventListener("click", () => {
     if (b.dataset.armed) {
@@ -102,6 +111,7 @@ export const confirmButton = ({ label, confirmLabel, onConfirm, icon, variant, s
     }
     b.dataset.armed = "1";
     b.setAttribute("aria-label", confirmLabel);
+    live.textContent = t("{label} — 한 번 더 누르면 실행해요", { label: confirmLabel });
     timer = setTimeout(disarm, 4000);
   });
   b.addEventListener("blur", disarm);

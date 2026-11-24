@@ -332,9 +332,11 @@ test("이어서 하기: 새 판을 취소한 뒤 Sprint를 완주하면 기록�
     await startMode(page, "sprint40");
     await playReplayFrames(page, replay.inputs, 0, 241);
     await page.reload();
-    const confirmation = page.waitForEvent("dialog").then(dialog => dialog.dismiss());
+    // 저장된 판이 있으면 앱 안의 확인 대화상자로 묻는다(브라우저 확인창 아님). 닫기 = 취소
     await page.click('[data-mode="endless"]');
-    await confirmation;
+    await page.locator("#ask").waitFor({ state: "visible" });
+    assert.match(await page.locator("#ask").textContent(), /저장된 판을 지울까요/);
+    await page.click("#ask-cancel");
     assert.equal(await visible(page, "continue-run"), true);
     await page.click("#continue-run");
     await playReplayFrames(page, replay.inputs, 241, replay.result.frames);
@@ -1712,8 +1714,8 @@ test("전체 흐름: Survival 한 판 → 결과·새 기록 → 기록표 리�
   await page.reload();
   await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
   assert.equal(await page.locator('[data-mode="survival"] .mode-best').textContent(), "");
-  page.once("dialog", dialog => dialog.accept());
   await page.setInputFiles("#backup-file", file);
+  await page.click("#ask-ok");
   await page.waitForFunction(() => /백업을 불러왔어요/.test(document.getElementById("menu-notice")?.textContent ?? ""));
   assert.match(await page.locator('[data-mode="survival"] .mode-best').textContent(), /최고 기록/);
   assert.equal(await page.locator("#watch-last").isDisabled(), false, "마지막 판 리플레이도 돌아온다");
@@ -1786,12 +1788,10 @@ test("네트워크 없이 단일 HTML에서 이전 백업을 확인하고 안전
       };
     });
 
-    const messages = [];
-    page.on("dialog", async dialog => {
-      messages.push(dialog.message());
-      await dialog.accept();
-    });
     await page.setInputFiles("#backup-file", file);
+    await page.locator("#ask").waitFor({ state: "visible" });
+    const messages = [await page.locator("#ask .ask-body").textContent()];
+    await page.click("#ask-ok");
     await page.waitForFunction(() => document.getElementById("menu-notice")?.textContent.includes("저장하지 못했어요"));
     assert.match(messages[0], /기록 1개, 리플레이 2개/);
     assert.match(messages[0], /퍼즐 완료 0개 · 훈련 완료 0개 · Sprint 시도 0개/);
@@ -1801,6 +1801,7 @@ test("네트워크 없이 단일 HTML에서 이전 백업을 확인하고 안전
     await page.reload();
     await ready(page);
     await page.setInputFiles("#backup-file", file);
+    await page.click("#ask-ok");
     await page.waitForFunction(() => document.getElementById("menu-notice")?.textContent.includes("백업을 불러왔어요"));
     await page.reload();
     await ready(page);
@@ -3368,8 +3369,8 @@ test("피스 몇 개 만에 막힌 판: PPS는 —, 공유는 끄고 이유를 �
     await page.keyboard.press("Space");
   }
   await page.waitForFunction(() => !document.getElementById("results")?.hidden);
-  const pieces = Number(await text(page, "hud-pieces"));
-  assert.ok(pieces < 10, `세워서 떨어뜨리기만 하면 ${pieces}개 만에 막힌다`);
+  // 블록 순서는 무작위라 막히기까지 피스 수는 판마다 조금 다르다. 짧은 판 기준(20초 안, 줄 0개)에 드는지만 본다
+  assert.equal(await text(page, "hud-lines"), "0", "세워서 떨어뜨리기만 하면 줄을 못 지우고 금방 막힌다");
   assert.match(await text(page, "results-stats"), /PPS—/);
   assert.equal(await page.locator('#results [data-action="export"]').isDisabled(), true);
   assert.match(await text(page, "race-result"), /너무 일찍 끝난 판/);
@@ -3497,6 +3498,61 @@ test("기록 지우기: 데이터 탭에서 두 번 눌러 기록·리플레이�
   await page.waitForFunction(() => document.querySelector('[data-mode="sprint40"] .mode-best')?.textContent === "");
   assert.equal(await page.locator('[data-mode="versus"] .mode-best').textContent(), "");
   assert.match(await text(page, "achievement-progress"), /^1 \//, "업적은 남는다");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("키보드: 대화상자는 열면 안으로 포커스가 가고, Esc로 닫으면 연 버튼으로 돌아온다", async () => {
+  const { context, page, errors } = await openPage();
+  const active = () => page.evaluate(() => document.activeElement?.id || document.activeElement?.dataset.mode || "");
+  for (const [opener, id] of [
+    ["open-settings", "settings"],
+    ["open-help", "help"],
+    ["open-practice", "practice"],
+    ["open-puzzles", "puzzles"],
+    ["open-records", "records"],
+    ["open-achievements", "achievements"],
+  ]) {
+    await page.focus(`#${opener}`);
+    await page.keyboard.press("Enter");
+    // 몇몇 대화상자는 그린 다음 차례에 포커스를 옮긴다(느린 CI 기계에서는 바로 재면 아직 밖에 있다)
+    await page
+      .waitForFunction(d => document.getElementById(d).contains(document.activeElement), id, { timeout: 3000 })
+      .catch(async () => assert.fail(`${id} 열기: 포커스 ${await active()}`));
+    await page.keyboard.press("Escape");
+    await page
+      .waitForFunction(o => document.activeElement?.id === o, opener, { timeout: 3000 })
+      .catch(async () => assert.fail(`${id} 닫기: 포커스 ${await active()}`));
+    assert.equal(await active(), opener);
+  }
+  // 설정에서 값을 바꿔 다시 그려도 포커스는 같은 조작에 남는다
+  await page.focus("#open-settings");
+  await page.keyboard.press("Enter");
+  await page.focus('#set-handling-preset [data-value="relaxed"]');
+  await page.keyboard.press("Enter");
+  assert.equal(
+    await page.evaluate(() => document.activeElement?.matches('#set-handling-preset [data-value="relaxed"]')),
+    true
+  );
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("퍼즐 4줄 만들기: 우물을 남기고 앞 피스를 채운 뒤 I로 4줄을 지우면 성공", async () => {
+  const { context, page, errors } = await openPage(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  const first = PUZZLES.find(p => p.kind === "quad");
+  await page.click("#open-puzzles");
+  assert.match(await page.locator("#puzzles").textContent(), /4줄 만들기/);
+  await page.click(`[data-puzzle="${first.number}"]`);
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  for (const key of keysFor(solvePuzzle(first))) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(20);
+  }
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
+  assert.equal(await text(page, "results-title"), "성공!");
   assert.deepEqual(errors, []);
   await context.close();
 });

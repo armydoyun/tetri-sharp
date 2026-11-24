@@ -5,7 +5,6 @@ export const EN = {
   "이어서 하기": "Continue saved game",
   "창을 닫아도 이 판은 이 기기에 남아요.": "This game stays on this device even if you close the window.",
   "{mode} · {time} · {lines}줄": "{mode} · {time} · {lines} lines",
-  "저장된 판을 지우고 새 판을 시작할까요?": "Replace the saved game and start a new one?",
   "저장된 판을 불러오는 중…": "Restoring your saved game…",
   "저장된 판을 이어서 할 수 없어요.": "Could not continue the saved game.",
   "저장 공간을 확인해 주세요. 이번 진행을 저장하지 못했어요.":
@@ -577,8 +576,8 @@ export const EN = {
   "{n}피스": "{n} pcs",
   "{done} / {total}단계 깸 · 중력 없음, 정해진 피스만 써요":
     "{done} / {total} solved · no gravity, only the given pieces",
-  "판 비우기는 주어진 피스로 아래 두 줄을 모두 지우고, T-spin은 T 하나로 해내요.":
-    "Clear the board: use the given pieces to clear the bottom two lines. T-spin stages: do it with a single T.",
+  "판 비우기는 아래 두 줄을 모두 지우고, 4줄 만들기는 우물을 남겨 채운 뒤 I로 4줄, T-spin은 T 하나로 해내요.":
+    "Board clears empty the bottom two rows, quads fill around a well and finish with an I for four lines, and T-spins use a single T.",
 
   // ---- 리플레이 공유 ----
   "이 리플레이": "this replay",
@@ -934,6 +933,18 @@ export const EN = {
   "CPU 대전에서 모두 50번 이기기": "Win 50 CPU battles in total",
   "장면 목록": "Scenes",
   "표시할 장면이 없어요": "No marked scenes",
+  확인: "Confirm",
+  "저장된 판을 지울까요?": "Delete the saved game?",
+  "이어서 할 수 있게 저장해 둔 판이 있어요. 새 판을 시작하면 그 판은 지워져요.":
+    "You have a game saved to continue. Starting a new one deletes it.",
+  "지우고 새 판 시작": "Delete and start",
+  "백업을 불러올까요?": "Load this backup?",
+  "{label} — 한 번 더 누르면 실행해요": "{label} — press again to do it",
+  "4줄 만들기": "Quad builds",
+  "4줄 만들기 장": "Quad chapter",
+  "4줄 만들기 퍼즐을 모두 풀기": "Solve every quad build puzzle",
+  "목표 · 우물을 남기고 채운 뒤 마지막 I로 4줄 지우기":
+    "Goal · Fill around the well, then clear four lines with the last I",
   "설정 초기화": "Reset settings",
   "정말 초기화": "Confirm reset",
   "조작감·키·화면 설정을 기본값으로 되돌려요. 기록은 지우지 않아요.":

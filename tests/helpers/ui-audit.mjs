@@ -247,5 +247,27 @@ export const auditInPage = () => {
     if (Math.round(r.width) !== 48 || Math.round(r.height) !== 26)
       problems.push(`컨트롤 크기 · ${describe(c)} ${Math.round(r.width)}×${Math.round(r.height)} (48×26)`);
   }
+  // 7) 접근성: 누를 수 있는 것과 입력은 이름이 있다(글자·aria-label·연결된 label), 양수 tabindex 없음,
+  //    열린 대화상자는 이름이 있고 포커스가 그 안에 있다
+  const nameOf = el => {
+    const label = el.getAttribute("aria-label") || el.getAttribute("aria-labelledby");
+    if (label) return label;
+    const id = el.id;
+    if (id && document.querySelector(`label[for="${CSS.escape(id)}"]`)) return "label";
+    if (el.closest("label")) return "label";
+    return (el.textContent || el.getAttribute("title") || "").trim();
+  };
+  for (const c of all.filter(el => el.matches("button, input, select, textarea, a[href], [role='switch']"))) {
+    if (c.matches("input[type=file]")) continue;
+    if (!nameOf(c)) problems.push(`접근성 · ${describe(c)} 이름 없음(글자·aria-label·label)`);
+  }
+  for (const c of root.querySelectorAll("[tabindex]"))
+    if (Number(c.getAttribute("tabindex")) > 0) problems.push(`접근성 · ${describe(c)} 양수 tabindex`);
+  if (modal) {
+    if (!nameOf(modal) && !modal.querySelector(".dialog-title")?.textContent)
+      problems.push(`접근성 · ${describe(modal)} 대화상자 이름 없음`);
+    if (document.activeElement && !modal.contains(document.activeElement))
+      problems.push(`접근성 · ${describe(modal)} 포커스가 대화상자 밖(${describe(document.activeElement)})`);
+  }
   return [...new Set(problems)];
 };
