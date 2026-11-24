@@ -645,7 +645,9 @@ const setScreen = next => {
                 ? t("목표 · 피스마다 한 줄 이상 지워 콤보 끊지 않기")
                 : mode.puzzle.kind === "spin"
                   ? t("목표 · 틈 근처까지 내린 뒤 돌려 끼워 넣어 2줄 지우기")
-                  : t("목표 · T 하나로 {kind} 만들기", { kind: mode.description })
+                  : mode.puzzle.kind === "mini"
+                    ? t("목표 · T를 마지막에 돌려 넣어 T-spin Mini로 줄 지우기")
+                    : t("목표 · T 하나로 {kind} 만들기", { kind: mode.description })
         : mode.practice
           ? mode.description
           : "";
@@ -847,6 +849,24 @@ for (const btn of panels.confirm.querySelectorAll("[data-confirm]")) {
   btn.addEventListener("click", () => (btn.getAttribute("data-confirm") === "ok" ? acceptConfirm() : cancelConfirm()));
 }
 
+/**
+ * 첫 화면에서 로고를 3초 안에 일곱 번(피스 일곱 종류) 누르면 숨은 테마가 열리고 그 테마로 바뀐다.
+ * 이미 열렸으면 테마만 다시 바꿔 준다. 여섯 번까지는 아무 반응이 없다.
+ */
+let logoTapTimes = /** @type {number[]} */ ([]);
+const logoTaps = () => {
+  const now = performance.now();
+  logoTapTimes = [...logoTapTimes.filter(time => now - time < 3000), now];
+  if (logoTapTimes.length < 7) return;
+  logoTapTimes = [];
+  const fresh = achievements.unlock("secret-sharp");
+  settings = sanitizeSettings({ ...settings, visual: { ...settings.visual, theme: "sharp" } });
+  saveSettings(store, settings);
+  renderAchievementProgress();
+  showMenuNotice(fresh ? t("무언가 열렸어요") : t("샤프"));
+  sfx.play("clear2");
+};
+
 /** 로고: 첫 화면으로. 게임 중이면 먼저 묻는다 */
 $("go-home").addEventListener("click", () => {
   if (
@@ -863,7 +883,10 @@ $("go-home").addEventListener("click", () => {
     shareUI.isOpen
   )
     return;
-  if (screen === "menu") return window.scrollTo(0, 0);
+  if (screen === "menu") {
+    logoTaps();
+    return window.scrollTo(0, 0);
+  }
   if (scenePractice) exitScenePractice();
   if (inProgress()) return askConfirm("menu");
   if (screen === "replay") stopReplay();
@@ -878,6 +901,8 @@ $("go-home").addEventListener("click", () => {
 const SHORT_GAME_SECONDS = 20;
 const SHORT_GAME_PIECES = 10;
 const isShortGame = state => {
+  // 퍼즐은 원래 피스 몇 개로 금방 끝난다 → "너무 일찍 끝난 판"이 아니다(4차 평가 F37)
+  if (mode.puzzle) return false;
   if (state.over === "clear" || state.frame >= SHORT_GAME_SECONDS * 60) return false;
   // 버틴 시간이 기록인 모드(Survival)는 줄을 안 지워도 제대로 된 판일 수 있다 → 피스 수만 본다
   const survives = mode.record?.metric === "frames" && mode.record.order === "desc";
@@ -1180,6 +1205,17 @@ const finish = () => {
   if (mode.battleLesson) {
     rows.splice(0, rows.length, [t("받은 쓰레기"), String(state.garbage.received)]);
   }
+  // 퍼즐: 점수·레벨·최고 기록·순위는 뜻이 없다 → 쓴 피스, 지운 줄, 깬 단계(4차 평가 F37)
+  if (mode.puzzle) {
+    rows.splice(
+      0,
+      rows.length,
+      [t("시간"), formatTime(state.frame)],
+      [t("쓴 피스"), `${state.stats.pieces} / ${mode.puzzle.pieces.length}`],
+      [t("줄"), String(state.stats.lines)],
+      [t("깬 단계"), mode.puzzle.number ? `${puzzleProgress.cleared().size} / ${PUZZLES.length}` : "—"]
+    );
+  }
   if (mode.lesson) {
     const path = mode.lesson.path;
     const steps = [...path, { action: "HARD" }].map(({ action, hold }) => {
@@ -1244,6 +1280,7 @@ const settingsUI = createSettingsUI({
     renderKeyHelp();
   },
   onPreviewSound: () => sfx.play("clear2"),
+  openedThemes: () => (achievements.unlocked()["secret-sharp"] ? ["sharp"] : []),
   // 모드 이름처럼 시작할 때 만든 글자까지 바꾸려면 다시 불러오는 게 가장 확실하다.
   onLanguage: () => location.reload(),
   // 데이터 탭: 백업과 리플레이 파일(첫 화면에서 연 경우에만 불러오기). 버튼을 누를 때 부르므로 아래 정의를 쓴다.

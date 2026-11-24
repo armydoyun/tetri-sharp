@@ -124,6 +124,12 @@
 
 .dialog-tabs {
   padding: 0 var(--space-5) var(--space-3);
+  /* 고정된 탭과 스크롤되는 몸통의 경계: 내용이 탭 밑으로 들어가는 자리를 선으로 보인다 */
+  border-bottom: var(--border-w) solid var(--border);
+}
+
+.dialog-tabbed > .dialog-body {
+  padding-top: var(--space-2);
 }
 
 .dialog-tabs .segmented {
@@ -352,6 +358,13 @@
   .rule-presets .field-help {
     grid-column: 1 / -1;
   }
+}
+
+/* 휴대폰: 내 규칙·프리셋 줄이 몸통 맨 위에서 함께 스크롤된다. 아래 설정과 구분선으로 나눈다 */
+.rule-tabs-head.is-in-body {
+  padding: var(--space-3) 0;
+  margin-bottom: var(--space-2);
+  border-bottom: var(--border-w) solid var(--border);
 }
 
 /* 탭 줄은 설정 탭과 같은 규칙(넘치면 꺾이고, 좁으면 3 + 2)을 따른다 */
@@ -606,7 +619,8 @@
   padding: var(--space-3);
   border: var(--border-w) solid var(--border);
   border-radius: var(--radius-m);
-  background: var(--surface-2);
+  /* .surface-game과 함께: 게임 중 화면의 바탕색(늘 어둡게면 라이트 화면에서도 어둡다) */
+  background: var(--bg);
   /* 캔버스 안 "홀드·다음" 글자색(게임 화면 옆 칸 글자처럼) */
   color: var(--text-dim);
 }
@@ -657,6 +671,22 @@
   color: var(--text-dim);
 }
 
+/* 휴대폰: 미리보기를 줄여 처음 열었을 때 칩 세 줄이 함께 보이게 */
+@media (max-width: 600px) {
+  .theme-stage {
+    padding: var(--space-2);
+    gap: var(--space-1);
+  }
+
+  .theme-stage-canvas {
+    max-width: 210px;
+  }
+
+  .theme-stage-desc {
+    line-height: 1.35;
+  }
+}
+
 /* 견본 칩: 견본 띠 + 이름. 테마 9개가 빈칸 없이 3×3으로 */
 .choice-cards.is-compact {
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -684,6 +714,14 @@
   font-weight: 700;
   /* 한국어 이름이 글자 중간에서 끊기지 않게(좁으면 단어째 넘긴다) */
   word-break: keep-all;
+}
+
+/* 아주 좁은 화면(iPhone SE 등): 영어 이름(Blueprint)이 글자 중간에서 꺾이지 않게 한 단계 작게(4차 평가 U50) */
+@media (max-width: 360px) {
+  .choice-cards.is-compact .choice-card strong {
+    font-size: var(--text-s);
+    overflow-wrap: normal;
+  }
 }
 
 .theme-swatch {
@@ -858,6 +896,13 @@
   margin: var(--space-3) 0 0;
   font-size: var(--text-m);
   font-weight: 800;
+}
+
+.puzzle-chapter-goal {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-s);
+  line-height: 1.4;
+  color: var(--text-dim);
 }
 
 .puzzle-chapter-title small {
@@ -1202,6 +1247,8 @@
     grid-area: tabs;
     overflow-y: auto;
     padding: var(--space-3) var(--space-3) var(--space-3) var(--space-3);
+    /* 옆 탭: 위아래 경계선 대신 몸통과의 세로 경계는 배치가 나눈다 */
+    border-bottom: 0;
   }
 
   .dialog-tabbed:has(> .dialog-tabs > .segmented:only-child) > .dialog-tabs .segmented {

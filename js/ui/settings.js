@@ -88,8 +88,8 @@ const SCHEME_HINTS = {
   dark: "첫 화면과 메뉴를 어둡게 써요",
 };
 const GAME_SURFACE_HINTS = {
-  dark: "게임 중에는 화면 색과 상관없이 어둡게 써요. 보드에 집중하기 좋아요",
-  scheme: "게임 중에도 위의 화면 색을 그대로 써요",
+  dark: "게임 중 보드 둘레는 화면 색과 상관없이 어두워요. 보드 색은 게임 테마가 정하고, 아래 미리보기에 그대로 보여요",
+  scheme: "게임 중 보드 둘레도 위의 화면 색을 따라요. 보드 색은 게임 테마가 정하고, 아래 미리보기에 그대로 보여요",
 };
 /** @type {ReadonlyArray<[string, string]>} */
 const TOUCH_OPTIONS = [
@@ -116,7 +116,16 @@ const TOUCH_HINTS = {
 /**
  * data: 데이터 탭의 동작(백업 저장·불러오기, 리플레이 파일 열기). canImport가 false면(게임 중) 불러오기는 끈다.
  */
-export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPreviewSound, onLanguage, data }) => {
+export const createSettingsUI = ({
+  dialog,
+  getSettings,
+  onChange,
+  onClose,
+  onPreviewSound,
+  onLanguage,
+  data,
+  openedThemes = () => /** @type {string[]} */ ([]),
+}) => {
   /** 키 입력을 기다리는 칸 */
   let capture = null;
   const notice = el("p", { class: "notice-slot", role: "status", id: "settings-notice" });
@@ -415,11 +424,13 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
       state.classList.toggle("is-preview", !current);
     };
     showTheme(visual.theme);
+    // 열린 숨은 테마는 목록 끝에 붙는다
+    const ids = [...THEME_IDS, ...openedThemes()];
     const cards = choiceCards({
       id: "set-theme",
       label: t("게임 테마"),
       compact: true,
-      options: THEME_IDS.map(id => {
+      options: ids.map(id => {
         const swatch = el("canvas", { class: "theme-swatch", "aria-hidden": "true" });
         drawThemeSwatch(swatch, THEMES[id], paletteFor(visual, THEMES[id]));
         return { value: id, title: THEMES[id].name, preview: swatch };
@@ -428,7 +439,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
       onChange: v => setVisual("theme", v),
     });
     cards.querySelectorAll("button").forEach((card, index) => {
-      const id = THEME_IDS[index];
+      const id = ids[index];
       card.addEventListener("pointerenter", e => {
         if (e.pointerType === "mouse") showTheme(id);
       });
@@ -447,7 +458,8 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
       { class: "theme-picker" },
       el(
         "div",
-        { class: "theme-stage" },
+        // 미리보기 둘레는 게임 중 화면과 같은 색(늘 어둡게 / 화면 색 따르기)
+        { class: "theme-stage surface-game" },
         canvas,
         el("div", { class: "theme-stage-caption" }, el("div", { class: "theme-stage-title" }, name, state), desc)
       ),

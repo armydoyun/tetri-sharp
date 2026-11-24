@@ -3605,6 +3605,43 @@ test("퍼즐 콤보 이어 가기: 줄을 못 지운 피스가 나오면 남은 
   await runKeys(page, [["Space", 1]]);
   await page.waitForFunction(() => !document.getElementById("results")?.hidden);
   assert.equal(await text(page, "results-title"), "실패");
+  // 퍼즐 결과: "너무 일찍 끝난 판" 안내 없이, 점수·레벨 대신 쓴 피스·깬 단계(4차 평가 F37)
+  assert.equal(await text(page, "race-result"), "");
+  const stats = await text(page, "results-stats");
+  assert.match(stats, /쓴 피스1 \/ \d/);
+  assert.match(stats, /깬 단계0 \/ \d+/);
+  assert.doesNotMatch(stats, /점수|레벨|순위/);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("퍼즐 T-spin Mini: 곧장 떨어뜨리면 실패, 바닥까지 내린 뒤 마지막에 돌려 넣으면 Mini로 성공", async () => {
+  const { context, page, errors } = await openPage(
+    () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } })),
+    undefined,
+    { frameClock: true }
+  );
+  // 첫 Mini 단계: 오른쪽 벽 아래 한 칸 빈 줄
+  const first = PUZZLES.find(p => p.kind === "mini");
+  await openPuzzle(page, first.number);
+  assert.match(await text(page, "mode-objective"), /Mini/);
+  await runKeys(page, [["Space", 1]]);
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  assert.equal(await text(page, "results-title"), "실패");
+  await page.click('#results [data-action="menu"]');
+  await openPuzzle(page, first.number);
+  // 오른쪽 네 칸 → 바닥까지 소프트 드롭 → 반시계로 돌려 넣고, 그대로 두면(고정 지연) 회전이 마지막 동작으로 남는다
+  await runKeys(page, [
+    ["ArrowRight", 1],
+    ["ArrowRight", 1],
+    ["ArrowRight", 1],
+    ["ArrowRight", 1],
+    ["ArrowDown", 70],
+    ["KeyZ", 1],
+    ["F24", 60],
+  ]);
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  assert.equal(await text(page, "results-title"), "성공!");
   assert.deepEqual(errors, []);
   await context.close();
 });
@@ -3733,4 +3770,42 @@ test("퍼즐 밀어 넣기: 곧장 떨어뜨리면 처마에 걸리고, 소프�
   assert.equal(await text(page, "results-title"), "성공!");
   assert.deepEqual(errors, []);
   await context.close();
+});
+
+test("첫 화면 로고: 여섯 번은 아무 일 없고, 3초 안에 일곱 번이면 숨은 테마·업적이 열린다", async () => {
+  const { context, page, errors } = await openPage();
+  try {
+    const tap = async n => {
+      for (let i = 0; i < n; i++) await page.click("#go-home");
+    };
+    const themeChips = () => page.locator("#set-theme button").count();
+    await tap(6);
+    assert.equal(await text(page, "menu-notice"), "", "여섯 번은 조용하다");
+    await page.click("#open-settings");
+    await page.click('.dialog-tabs [data-value="visual"]');
+    assert.equal(await themeChips(), 9, "아직 숨어 있다");
+    await page.click("#settings-close");
+
+    await page.waitForTimeout(3100); // 앞의 여섯 번은 3초가 지나 사라진다
+    await tap(6);
+    assert.equal(await text(page, "menu-notice"), "");
+    await tap(1);
+    assert.equal(await text(page, "menu-notice"), "무언가 열렸어요");
+    assert.equal(
+      await page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:settings") || "{}").visual?.theme),
+      "sharp"
+    );
+    await page.click("#open-settings");
+    await page.click('.dialog-tabs [data-value="visual"]');
+    assert.equal(await themeChips(), 10);
+    assert.equal(await page.locator('#set-theme [data-value="sharp"]').getAttribute("aria-pressed"), "true");
+    assert.equal(await page.locator(".theme-stage-name").textContent(), "샤프");
+    await page.click("#settings-close");
+
+    await page.click("#open-achievements");
+    assert.match(await page.locator('[data-achievement="secret-sharp"]').textContent(), /샵을 찾았다/);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
 });

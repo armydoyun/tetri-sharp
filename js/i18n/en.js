@@ -577,8 +577,15 @@ export const EN = {
   "{n}피스": "{n} pcs",
   "{done} / {total}단계 깸 · 중력 없음, 정해진 피스만 써요":
     "{done} / {total} solved · no gravity, only the given pieces",
-  "판 비우기는 아래 두 줄을 모두 지우고, 4줄 만들기는 우물을 남겨 채운 뒤 I로 4줄, 콤보는 피스마다 줄을 지우고, 밀어 넣기는 내린 뒤 처마 아래로 밀고, 돌려 넣기는 틈 앞에서 돌리고, T-spin은 T 하나로 해내요.":
-    "Board clears empty the bottom two rows, quads fill around a well then finish with an I, combos clear a line with every piece, tucks drop and slide under an overhang, spin-ins rotate into a twisted gap, and T-spins use a single T.",
+  "장마다 쉬운 것부터 차례로 풀어요.": "Each chapter starts easy and builds up.",
+  "아래 두 줄을 모두 지워 판 비우기": "Clear the bottom two rows completely",
+  "우물을 남겨 채운 뒤 마지막 I로 4줄": "Fill around a well, then clear four with the last I",
+  "피스마다 한 줄 이상 지워 콤보 잇기": "Clear a line with every piece to keep the combo",
+  "내린 뒤 처마 아래로 밀어 넣어 2줄": "Drop, then slide under the overhang for two lines",
+  "틈 앞에서 돌려 끼워 넣어 2줄": "Rotate into the twisted gap for two lines",
+  "T를 마지막에 돌려 넣어 Mini로 한 줄": "Rotate the T in last for a Mini single",
+  "T 하나로 T-spin Double": "A T-spin Double with one T",
+  "T 하나로 T-spin Triple": "A T-spin Triple with one T",
 
   // ---- 리플레이 공유 ----
   "이 리플레이": "this replay",
@@ -799,9 +806,10 @@ export const EN = {
   "게임 중 화면": "While playing",
   "늘 어둡게": "Always dark",
   "화면 색 따르기": "Match appearance",
-  "게임 중에는 화면 색과 상관없이 어둡게 써요. 보드에 집중하기 좋아요":
-    "Stays dark while playing, whatever the appearance. Helps you focus on the board",
-  "게임 중에도 위의 화면 색을 그대로 써요": "Uses the appearance above while playing too",
+  "게임 중 보드 둘레는 화면 색과 상관없이 어두워요. 보드 색은 게임 테마가 정하고, 아래 미리보기에 그대로 보여요":
+    "Around the board stays dark while playing, whatever the appearance. The board itself follows the game theme, as the preview below shows",
+  "게임 중 보드 둘레도 위의 화면 색을 따라요. 보드 색은 게임 테마가 정하고, 아래 미리보기에 그대로 보여요":
+    "Around the board follows the appearance above while playing. The board itself follows the game theme, as the preview below shows",
   "색각 친화": "Color-blind friendly",
   효과음: "Sound effects",
   "블록 이동·회전·줄 삭제 소리의 크기. 맨 왼쪽은 끄기": "Volume of move, rotate and line clear sounds. Far left is off",
@@ -947,8 +955,20 @@ export const EN = {
   "4줄 만들기": "Quad builds",
   "처마 밀어 넣기": "Tucks",
   "콤보 이어 가기": "Combos",
+  샤프: "Sharp",
+  "먹색 판에 # 격자, 흑백에 연두 한 가지": "Ink-black board with a # grid, monochrome plus one lime",
+  "샵을 찾았다": "Found the sharp",
+  "로고의 비밀": "The logo's secret",
+  "어딘가를 여러 번…": "Somewhere, many times…",
+  "무언가 열렸어요": "Something opened",
   "돌려 넣기": "Spin-ins",
   "돌려 넣기 장": "Spin-in chapter",
+  "Mini 장": "Mini chapter",
+  "쓴 피스": "Pieces used",
+  "깬 단계": "Stages solved",
+  "T-spin Mini 퍼즐을 모두 풀기": "Solve every T-spin Mini puzzle",
+  "목표 · T를 마지막에 돌려 넣어 T-spin Mini로 줄 지우기":
+    "Goal · Rotate the T in last to clear a line with a T-spin Mini",
   "돌려 넣기 퍼즐을 모두 풀기": "Solve every spin-in puzzle",
   "목표 · 틈 근처까지 내린 뒤 돌려 끼워 넣어 2줄 지우기":
     "Goal · Lower the piece near the gap, then rotate it in to clear 2 lines",

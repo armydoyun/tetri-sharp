@@ -46,8 +46,9 @@ export const createAchievementsUI = ({ dialog, achievements }) => {
                   el(
                     "span",
                     { class: "achievement-text" },
-                    el("strong", { text: a.name }),
-                    el("small", { text: a.description })
+                    // 숨은 업적은 열리기 전까지 이름을 가린다
+                    el("strong", { text: a.secret && !done[a.id] ? "???" : a.name }),
+                    el("small", { text: a.secret && !done[a.id] ? t("어딘가를 여러 번…") : a.description })
                   ),
                   el("span", {
                     class: "achievement-date num",
