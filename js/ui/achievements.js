@@ -66,7 +66,7 @@ export const createAchievementsUI = ({ dialog, achievements }) => {
           );
         })
       );
-      notice.textContent = t("{done} / {total} 달성 · 이 기기에 저장되고 백업에 들어가요", {
+      notice.textContent = t("{done} / {total} 달성 · 기본 규칙(Modern·Retro·Arcade) 판에서 쌓여요", {
         done: count,
         total: ACHIEVEMENTS.length,
       });

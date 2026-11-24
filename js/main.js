@@ -835,10 +835,36 @@ const cancelConfirm = () => {
   else resume();
 };
 
+/** 업적을 셀 수 있는 판: 메뉴의 실제 모드·오늘의 도전·CPU 대전(연습·퍼즐·장면 연습 제외) */
+const playCounts = () => !scenePractice && (MODES.includes(mode) || Boolean(mode.daily) || Boolean(mode.versus));
+
+/** 업적 판정에 넘길 이번 판 정보 */
+const achievementContext = (state, abandoned = false) => ({
+  mode,
+  state,
+  // Custom 규칙 판은 업적을 주지 않는다(퍼즐 업적은 규칙과 무관) — 2차 평가 F22
+  real: playCounts() && isRankedRules(rules),
+  won: Boolean(mode.versus) && state.over === WIN,
+  short: isShortGame(state),
+  abandoned,
+  puzzlesCleared: puzzleProgress.cleared(),
+  puzzles: PUZZLES,
+});
+
+/**
+ * 판을 중간에 그만둘 때(첫 화면으로·다시 하기): 그때까지 이룬 플레이 업적(첫 줄·4줄 등)은 남긴다.
+ * 예전에는 끝까지 가야만 판정해서, 줄을 지우고 나가면 업적이 안 쌓였다. 누적 합계에는 더하지 않는다.
+ */
+const keepAbandonedAchievements = () => {
+  if (!game || game.state.over || !playCounts() || !isRankedRules(rules)) return [];
+  return achievements.evaluate(achievementContext(game.state, true));
+};
+
 const acceptConfirm = () => {
   const kind = confirming;
   if (!kind) return;
   confirming = null;
+  const kept = keepAbandonedAchievements();
   if (kind === "restart") start(mode, rules, race?.target);
   else {
     clearRun();
@@ -847,6 +873,7 @@ const acceptConfirm = () => {
       stopReplay();
     }
     toMenu();
+    if (kept.length) showMenuNotice(t("업적 달성 · {names}", { names: kept.map(a => a.name).join(", ") }));
   }
 };
 
@@ -1111,20 +1138,13 @@ const finish = () => {
   if (mode.puzzle?.number && state.over === "clear") puzzleProgress.markCleared(mode.puzzle.id);
   if (mode.trialCode && state.over === "clear") puzzleEditor.markCleared(mode.trialCode);
   // 업적: 이번 판에 처음 이룬 것(플레이 업적은 실제 모드·오늘의 도전·CPU 대전에서만)
-  const freshAchievements = achievements.evaluate({
-    mode,
-    state,
-    // Custom 규칙 판은 업적을 주지 않는다(퍼즐 업적은 규칙과 무관) — 2차 평가 F22
-    real:
-      !scenePractice && isRankedRules(rules) && (MODES.includes(mode) || Boolean(mode.daily) || Boolean(mode.versus)),
-    won: Boolean(mode.versus) && state.over === WIN,
-    short: isShortGame(state),
-    puzzlesCleared: puzzleProgress.cleared(),
-    puzzles: PUZZLES,
-  });
+  const freshAchievements = achievements.evaluate(achievementContext(state));
+  // Custom 규칙 판은 업적이 쌓이지 않는다 → 결과에서 그렇다고 알려 준다(말없이 안 쌓여 고장처럼 보였다)
   $("results-achievements").textContent = freshAchievements.length
     ? t("업적 달성 · {names}", { names: freshAchievements.map(a => a.name).join(", ") })
-    : "";
+    : playCounts() && !isRankedRules(rules)
+      ? t("Custom 규칙 판은 업적에 들어가지 않아요")
+      : "";
   const nextPuzzle = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="next-puzzle"]'));
   const nextLesson = nextPracticeLesson();
   const hasNext = nextLesson || (mode.puzzle?.number && mode.puzzle.number < PUZZLES.length);

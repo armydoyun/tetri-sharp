@@ -3817,3 +3817,23 @@ test("첫 화면 로고: 여섯 번은 아무 일 없고, 3초 안에 일곱 번
     await context.close();
   }
 });
+
+test("업적: Custom 규칙 판은 결과에 '업적에 들어가지 않아요'를 알려 주고, 업적 목록은 기본 규칙에서 쌓인다고 적는다", async () => {
+  const { context, page, errors } = await openPage(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  await page.click('[data-rules="custom"]');
+  await startMode(page, "sprint40");
+  // 가운데에 계속 떨어뜨려 금방 막힌다
+  for (let i = 0; i < 40 && (await page.locator("#results").isHidden()); i++) {
+    await page.keyboard.press("Space");
+    await page.waitForTimeout(30);
+  }
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  assert.equal(await text(page, "results-achievements"), "Custom 규칙 판은 업적에 들어가지 않아요");
+  await page.click('#results [data-action="menu"]');
+  await page.click("#open-achievements");
+  assert.match(await page.locator("#achievements .notice-slot").textContent(), /기본 규칙/);
+  assert.deepEqual(errors, []);
+  await context.close();
+});

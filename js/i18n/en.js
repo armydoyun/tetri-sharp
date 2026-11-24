@@ -471,8 +471,9 @@ export const EN = {
   "업적 달성 · {names}": "Achievement unlocked · {names}",
   "{date}에 달성": "Unlocked {date}",
   아직: "Not yet",
-  "{done} / {total} 달성 · 이 기기에 저장되고 백업에 들어가요":
-    "{done} / {total} unlocked · saved on this device and in backups",
+  "{done} / {total} 달성 · 기본 규칙(Modern·Retro·Arcade) 판에서 쌓여요":
+    "{done} / {total} earned · Counted in games with preset rules (Modern, Retro, Arcade)",
+  "Custom 규칙 판은 업적에 들어가지 않아요": "Games with Custom rules don't count toward achievements",
   "첫 줄": "First line",
   "줄을 처음으로 지우기": "Clear your first line",
   "4줄 한 번에": "Four at once",
