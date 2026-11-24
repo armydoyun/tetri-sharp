@@ -15,7 +15,8 @@ const MIN = 3600; // 1분 = 3600프레임
  * @typedef {{ mode: any, state: any, real: boolean, won: boolean, puzzlesCleared: Set<number>, puzzles: readonly any[], totals?: Record<string, number>, short?: boolean }} Context
  *   real: 실제 플레이(메뉴의 모드·오늘의 도전·CPU 대전, 기본 규칙). won: CPU 대전에서 이겼는가
  *   totals: 이번 판까지 더한 누적 합계(evaluate가 채운다)
- * @typedef {{ id: string, group: string, name: string, description: string, test: (c: Context) => boolean, total?: string, goal?: number }} Achievement
+ * @typedef {{ id: string, group: string, name: string, description: string, test: (c: Context) => boolean, total?: string, goal?: number, secret?: boolean }} Achievement
+ *   secret: 판 결과로는 열리지 않고(unlock으로만), 열리기 전에는 목록에 이름이 가려진다
  */
 
 const play = (id, name, description, test) => ({
@@ -152,6 +153,15 @@ export const ACHIEVEMENTS = Object.freeze([
     description: t("모든 퍼즐 풀기"),
     test: c => c.puzzles.every(p => c.puzzlesCleared.has(p.id)),
   },
+  // 숨은 업적: 판이 아니라 다른 곳에서 열린다(main.js unlock). 열리기 전에는 "???"
+  {
+    id: "secret-sharp",
+    group: "play",
+    name: t("샵을 찾았다"),
+    description: t("로고의 비밀"),
+    secret: true,
+    test: () => false,
+  },
   total("games-100", "games", 100, t("100판"), t("실제 판 100번 끝까지")),
   total("lines-1000", "lines", 1000, t("줄 1,000개"), t("여러 판에 걸쳐 줄 1,000개 지우기")),
   total("lines-10000", "lines", 10000, t("줄 10,000개"), t("여러 판에 걸쳐 줄 10,000개 지우기")),
@@ -215,6 +225,17 @@ export const createAchievements = store => {
     unlocked: read,
     /** @returns {Record<string, number>} 누적 합계 */
     totals: readTotals,
+    /**
+     * 판과 상관없이 하나를 연다(숨은 업적). 처음 열었으면 true
+     * @param {string} id
+     */
+    unlock(id, date = new Date().toISOString()) {
+      const done = read();
+      if (!IDS.has(id) || done[id]) return false;
+      done[id] = date;
+      store.set(ACHIEVEMENTS_KEY, done);
+      return true;
+    },
     /**
      * 판이 끝났을 때: 이번에 처음 이룬 업적을 남기고 돌려준다.
      * @param {Context} context

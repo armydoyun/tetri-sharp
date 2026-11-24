@@ -12,6 +12,10 @@ export const THEME_IDS = Object.freeze([
   "white",
 ]);
 export const DEFAULT_THEME = "modern";
+/** 처음에는 목록에 없다가 열리는 테마(열렸는지는 업적이 기억한다 — js/storage/achievements.js) */
+export const SECRET_THEME_IDS = Object.freeze(["sharp"]);
+/** 저장해도 되는 테마 키 전부 */
+export const ALL_THEME_IDS = Object.freeze([...THEME_IDS, ...SECRET_THEME_IDS]);
 
 export const CONTRAST_PALETTE = Object.freeze([
   "",
@@ -149,6 +153,28 @@ export const gridDots = (bx, by, cols, rows, cell) => {
   const d = Math.max(1, Math.round(cell * 0.09));
   for (let x = 1; x < cols; x++)
     for (let y = 1; y < rows; y++) path.rect(bx + x * cell - d / 2, by + y * cell - d / 2, d, d);
+  return path;
+};
+
+/**
+ * '#' 격자 경로: 두 칸마다 칸 모서리에 작은 '#'(가로 둘·세로 둘)
+ * @returns {Path2D}
+ */
+export const gridHashes = (bx, by, cols, rows, cell) => {
+  const path = new Path2D();
+  const r = cell * 0.13;
+  const g = cell * 0.05;
+  for (let x = 2; x < cols; x += 2)
+    for (let y = 2; y < rows; y += 2) {
+      const cx = Math.round(bx + x * cell) + 0.5;
+      const cy = Math.round(by + y * cell) + 0.5;
+      for (const d of [-g, g]) {
+        path.moveTo(cx - r, cy + d);
+        path.lineTo(cx + r, cy + d);
+        path.moveTo(cx + d, cy - r);
+        path.lineTo(cx + d, cy + r);
+      }
+    }
   return path;
 };
 
@@ -384,6 +410,28 @@ export const THEMES = Object.freeze({
       clear: "sink",
       accent: "dash",
       accentSize: 0.12,
+      clearMs: 200,
+    },
+  }),
+  sharp: makeTheme({
+    name: t("샤프"),
+    description: t("먹색 판에 # 격자, 흑백에 연두 한 가지"),
+    palette: ["#d4f06a", "#f2f2ee", "#c4c4bf", "#9a9a93", "#6b6c66", "#93b53c", "#62802a", "#505153"],
+    board: { bg: "#111214", grid: "#3a3c40", edge: "#2a2c30", ink: "#d6ed84" },
+    gridStyle: "hash",
+    gap: 0.06,
+    radius: 0.02,
+    finish: "flat",
+    motion: {
+      slideMs: 32,
+      landMs: 140,
+      depth: 0.105,
+      rebound: 0.02,
+      trailMs: 100,
+      trailCells: 2,
+      clear: "hash",
+      accent: "chip",
+      accentSize: 0.16,
       clearMs: 200,
     },
   }),

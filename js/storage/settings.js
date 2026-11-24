@@ -2,7 +2,7 @@
 import { msToFrames } from "../core/engine.js";
 import { DEFAULT_KEYMAP, sanitizeKeymap } from "../input/keymap.js";
 import { DEFAULT_PADMAP, sanitizePadmap } from "../input/gamepad.js";
-import { DEFAULT_THEME, THEME_IDS } from "../render/themes.js";
+import { ALL_THEME_IDS, DEFAULT_THEME } from "../render/themes.js";
 import { LANG_OPTIONS } from "../i18n/index.js";
 
 export const SETTINGS_VERSION = 1;
@@ -22,7 +22,7 @@ export const GAME_SURFACE_OPTIONS = Object.freeze(["dark", "scheme"]);
 
 export const VISUAL_OPTIONS = Object.freeze({
   // 게임 테마(블록·격자·움직임·연출의 모습) — js/render/themes.js
-  theme: THEME_IDS,
+  theme: ALL_THEME_IDS,
   // 접근성: 테마와 상관없이 적용
   effects: Object.freeze(["full", "reduced", "off"]),
   palette: Object.freeze(["theme", "contrast", "custom"]),

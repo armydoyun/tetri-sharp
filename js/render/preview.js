@@ -4,7 +4,7 @@
 //    다음 T가 하드 드롭으로 두 줄을 지우는 장면이 천천히 되풀이된다 → 일곱 피스 색, 쓰레기 줄, 고스트, 효과를 한눈에.
 //  - 견본(drawThemeSwatch): 선택 칩 안의 작은 띠. 테마 보드색 위에 일곱 피스를 한 칸씩.
 import { createEffects } from "./effects.js";
-import { drawMark, gridDots } from "./themes.js";
+import { drawMark, gridDots, gridHashes } from "./themes.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
 import { t } from "../i18n/index.js";
 
@@ -151,6 +151,9 @@ export const createThemeStage = canvas => {
     if (visual.grid !== "off" && theme.gridStyle === "dots") {
       ctx.fillStyle = grid;
       ctx.fill(gridDots(bx, 0, COLS, ROWS, cell));
+    } else if (visual.grid !== "off" && theme.gridStyle === "hash") {
+      ctx.strokeStyle = grid;
+      ctx.stroke(gridHashes(bx, 0, COLS, ROWS, cell));
     } else if (visual.grid !== "off" && theme.gridStyle !== "none") {
       ctx.strokeStyle = grid;
       ctx.beginPath();

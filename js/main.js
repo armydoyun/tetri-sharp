@@ -847,6 +847,24 @@ for (const btn of panels.confirm.querySelectorAll("[data-confirm]")) {
   btn.addEventListener("click", () => (btn.getAttribute("data-confirm") === "ok" ? acceptConfirm() : cancelConfirm()));
 }
 
+/**
+ * 첫 화면에서 로고를 3초 안에 일곱 번(피스 일곱 종류) 누르면 숨은 테마가 열리고 그 테마로 바뀐다.
+ * 이미 열렸으면 테마만 다시 바꿔 준다. 여섯 번까지는 아무 반응이 없다.
+ */
+let logoTapTimes = /** @type {number[]} */ ([]);
+const logoTaps = () => {
+  const now = performance.now();
+  logoTapTimes = [...logoTapTimes.filter(time => now - time < 3000), now];
+  if (logoTapTimes.length < 7) return;
+  logoTapTimes = [];
+  const fresh = achievements.unlock("secret-sharp");
+  settings = sanitizeSettings({ ...settings, visual: { ...settings.visual, theme: "sharp" } });
+  saveSettings(store, settings);
+  renderAchievementProgress();
+  showMenuNotice(fresh ? t("무언가 열렸어요") : t("샤프"));
+  sfx.play("clear2");
+};
+
 /** 로고: 첫 화면으로. 게임 중이면 먼저 묻는다 */
 $("go-home").addEventListener("click", () => {
   if (
@@ -863,7 +881,10 @@ $("go-home").addEventListener("click", () => {
     shareUI.isOpen
   )
     return;
-  if (screen === "menu") return window.scrollTo(0, 0);
+  if (screen === "menu") {
+    logoTaps();
+    return window.scrollTo(0, 0);
+  }
   if (scenePractice) exitScenePractice();
   if (inProgress()) return askConfirm("menu");
   if (screen === "replay") stopReplay();
@@ -1244,6 +1265,7 @@ const settingsUI = createSettingsUI({
     renderKeyHelp();
   },
   onPreviewSound: () => sfx.play("clear2"),
+  openedThemes: () => (achievements.unlocked()["secret-sharp"] ? ["sharp"] : []),
   // 모드 이름처럼 시작할 때 만든 글자까지 바꾸려면 다시 불러오는 게 가장 확실하다.
   onLanguage: () => location.reload(),
   // 데이터 탭: 백업과 리플레이 파일(첫 화면에서 연 경우에만 불러오기). 버튼을 누를 때 부르므로 아래 정의를 쓴다.

@@ -183,6 +183,14 @@ export const createEffects = () => {
         } else if (motion.clear === "wipe") {
           const span = width * Math.min(1, t * 2.8);
           ctx.fillRect(bx, middle - cell * 0.1, span, cell * 0.2);
+        } else if (motion.clear === "hash") {
+          // 두 가는 가로선을 두 칸마다 짧은 세로선이 꿰뚫고(#), 함께 옅어진다
+          const gap = cell * (0.16 + 0.1 * t);
+          const thin = Math.max(1, cell * 0.06);
+          ctx.fillRect(bx, middle - gap - thin / 2, width, thin);
+          ctx.fillRect(bx, middle + gap - thin / 2, width, thin);
+          const tick = cell * (0.3 + 0.25 * remaining);
+          for (let c = 1; c < cols; c += 2) ctx.fillRect(bx + c * cell - thin / 2, middle - tick, thin, tick * 2);
         } else if (motion.clear === "flash") {
           // 줄 전체가 번쩍였다가 가늘어진다
           const height = cell * (0.08 + 0.92 * remaining ** 2);

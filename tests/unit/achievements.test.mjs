@@ -141,3 +141,24 @@ test("누적 업적: 너무 일찍 끝난 판(short)은 합계에 더하지 않�
   a.evaluate(ctx);
   assert.equal(a.totals().games, 0);
 });
+
+test("숨은 업적: 판으로는 열리지 않고 unlock으로만 한 번 열린다. 설정은 숨은 테마 키를 받는다", async () => {
+  const store = createStore(memoryBackend());
+  const achievements = createAchievements(store);
+  const secret = ACHIEVEMENTS.find(a => a.id === "secret-sharp");
+  assert.ok(secret?.secret);
+  const everything = finished("clear", {
+    frame: 30 * 60,
+    stats: { lines: 40, pieces: 100 },
+    tally: { clears: { "none-4": 9, "full-3": 3 }, perfect: 2, maxCombo: 9, maxB2b: 9 },
+  });
+  const ids = achievements.evaluate(context(findMode("sprint40"), everything)).map(a => a.id);
+  assert.ok(!ids.includes("secret-sharp"), "판 결과로는 안 열린다");
+  assert.equal(achievements.unlock("secret-sharp", "2026-11-24T00:00:00Z"), true);
+  assert.equal(achievements.unlock("secret-sharp"), false, "두 번째에는 새로 열리지 않는다");
+  assert.equal(achievements.unlock("없는-업적"), false);
+  assert.equal(achievements.unlocked()["secret-sharp"], "2026-11-24T00:00:00Z");
+  const { sanitizeVisual } = await import("../../js/storage/settings.js");
+  assert.equal(sanitizeVisual({ theme: "sharp" }).theme, "sharp");
+  assert.equal(sanitizeVisual({ theme: "없음" }).theme, "modern");
+});

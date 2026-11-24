@@ -7,7 +7,7 @@ import { CELL_ID } from "../core/pieces.js";
 import { VISIBLE_TOP } from "../core/engine.js";
 import { createEffects } from "./effects.js";
 import { createSlide } from "./motion.js";
-import { drawMark, findTheme, gridDots, paletteFor } from "./themes.js";
+import { drawMark, findTheme, gridDots, gridHashes, paletteFor } from "./themes.js";
 
 const MARGIN_TOP = 2; // 보드 위 여유 줄
 const ROWS = VISIBLE_ROWS + MARGIN_TOP;
@@ -37,6 +37,7 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
   let gridPath = new Path2D();
   /** 점 격자(테마 gridStyle "dots"): 칸 모서리가 만나는 곳마다 작은 네모 */
   let dotPath = new Path2D();
+  let hashPath = new Path2D();
   /**
    * devicePixelRatio를 반영해 캔버스 해상도를 정하고 셀 크기를 정수로 맞춘다(번짐 방지).
    * 넓은 화면에서 캔버스가 기본 셀(28px)보다 크게 보이면 보이는 크기에 맞춰 그린다 — 늘려 보이면 흐려진다.
@@ -72,6 +73,7 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       gridPath.lineTo(bx + width, by + y * cell + 0.5);
     }
     dotPath = gridDots(bx, by, COLS, VISIBLE_ROWS, cell);
+    hashPath = gridHashes(bx, by, COLS, VISIBLE_ROWS, cell);
     return true;
   };
 
@@ -104,6 +106,9 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     if (lines && gridStyle === "dots") {
       ctx.fillStyle = grid;
       ctx.fill(dotPath);
+    } else if (lines && gridStyle === "hash") {
+      ctx.strokeStyle = grid;
+      ctx.stroke(hashPath);
     } else if (lines && gridStyle !== "none") {
       ctx.strokeStyle = grid;
       ctx.stroke(gridPath);

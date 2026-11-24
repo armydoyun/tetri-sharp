@@ -3734,3 +3734,41 @@ test("퍼즐 밀어 넣기: 곧장 떨어뜨리면 처마에 걸리고, 소프�
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("첫 화면 로고: 여섯 번은 아무 일 없고, 3초 안에 일곱 번이면 숨은 테마·업적이 열린다", async () => {
+  const { context, page, errors } = await openPage();
+  try {
+    const tap = async n => {
+      for (let i = 0; i < n; i++) await page.click("#go-home");
+    };
+    const themeChips = () => page.locator("#set-theme button").count();
+    await tap(6);
+    assert.equal(await text(page, "menu-notice"), "", "여섯 번은 조용하다");
+    await page.click("#open-settings");
+    await page.click('.dialog-tabs [data-value="visual"]');
+    assert.equal(await themeChips(), 9, "아직 숨어 있다");
+    await page.click("#settings-close");
+
+    await page.waitForTimeout(3100); // 앞의 여섯 번은 3초가 지나 사라진다
+    await tap(6);
+    assert.equal(await text(page, "menu-notice"), "");
+    await tap(1);
+    assert.equal(await text(page, "menu-notice"), "무언가 열렸어요");
+    assert.equal(
+      await page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:settings") || "{}").visual?.theme),
+      "sharp"
+    );
+    await page.click("#open-settings");
+    await page.click('.dialog-tabs [data-value="visual"]');
+    assert.equal(await themeChips(), 10);
+    assert.equal(await page.locator('#set-theme [data-value="sharp"]').getAttribute("aria-pressed"), "true");
+    assert.equal(await page.locator(".theme-stage-name").textContent(), "샤프");
+    await page.click("#settings-close");
+
+    await page.click("#open-achievements");
+    assert.match(await page.locator('[data-achievement="secret-sharp"]').textContent(), /샵을 찾았다/);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});

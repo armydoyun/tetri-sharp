@@ -71,7 +71,7 @@ test("테마마다 보드 색 · 격자·마감·모서리 묶음 · 줄 삭제 
   );
   assert.equal(new Set(themes.map(theme => theme.motion.clear)).size, themes.length);
   for (const theme of themes) {
-    assert.ok(["lines", "dots", "none"].includes(theme.gridStyle), theme.name);
+    assert.ok(["lines", "dots", "none", "hash"].includes(theme.gridStyle), theme.name);
     assert.ok(["flat", "inset", "frame"].includes(theme.finish), theme.name);
   }
 });
