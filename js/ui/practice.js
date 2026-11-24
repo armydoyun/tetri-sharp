@@ -12,7 +12,8 @@ import { t } from "../i18n/index.js";
 /** @param {{ dialog: HTMLDialogElement, onPick: (drill: any) => void, progress: ReturnType<typeof import("../storage/practice-progress.js").createPracticeProgress>, onStage: (mode: any) => void }} options */
 export const createPracticeUI = ({ dialog, onPick, progress, onStage }) => {
   const notice = el("p", { class: "notice-slot", role: "status" });
-  const openStages = ({ name, lessons }) => {
+  /** 단계 목록. focusId: 포커스를 둘 단계(게임에서 "연습 목록으로" 돌아왔을 때 방금 한 단계) */
+  const openStages = ({ name, lessons }, focusId = "") => {
     const completed = progress.read();
     const stages = lessons.map((mode, index) => {
       const result = completed[mode.id];
@@ -43,10 +44,15 @@ export const createPracticeUI = ({ dialog, onPick, progress, onStage }) => {
       actions: [back],
       closeId: "practice-close",
     });
-    stages[0].focus();
+    if (!dialog.open) dialog.showModal();
+    (stages.find(s => s.dataset.practiceStage === focusId) ?? stages[0]).focus();
   };
   const ui = {
-    open() {
+    /**
+     * @param {string} [from] 게임에서 돌아올 때: 방금 한 연습의 id(묶음이면 그 단계 목록을 연다)
+     * @param {string} [stageId] 묶음 안에서 방금 한 단계
+     */
+    open(from = "", stageId = "") {
       const lesson = {
         id: "finesse-lesson",
         name: t("피네스 훈련"),
@@ -124,7 +130,11 @@ export const createPracticeUI = ({ dialog, onPick, progress, onStage }) => {
         closeId: "practice-close",
       });
       if (!dialog.open) dialog.showModal();
-      /** @type {HTMLElement | null} */ (dialog.querySelector(".menu-row"))?.focus();
+      const group = drills.find(d => d.id === from);
+      if (group && "lessons" in group) return openStages(group, stageId);
+      /** @type {HTMLElement | null} */ (
+        dialog.querySelector(`[data-drill="${from}"]`) ?? dialog.querySelector(".menu-row")
+      )?.focus();
     },
     get isOpen() {
       return dialog.open;

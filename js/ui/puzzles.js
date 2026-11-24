@@ -24,7 +24,8 @@ const CHAPTER_GOALS = Object.freeze({
 export const createPuzzleUI = ({ dialog, progress, onPick, onCreate }) => {
   const notice = el("p", { class: "notice-slot", role: "status" });
   return {
-    open() {
+    /** @param {number} [focusNumber] 포커스를 둘 단계(게임에서 "퍼즐 목록으로" 돌아왔을 때 방금 한 단계) */
+    open(focusNumber) {
       const cleared = progress.cleared();
       const next = progress.next().number;
       const tile = p => {
@@ -91,7 +92,7 @@ export const createPuzzleUI = ({ dialog, progress, onPick, onCreate }) => {
         closeId: "puzzle-close",
       });
       dialog.showModal();
-      /** @type {HTMLElement | null} */ (dialog.querySelector(`[data-puzzle="${next}"]`))?.focus();
+      /** @type {HTMLElement | null} */ (dialog.querySelector(`[data-puzzle="${focusNumber ?? next}"]`))?.focus();
     },
     get isOpen() {
       return dialog.open;

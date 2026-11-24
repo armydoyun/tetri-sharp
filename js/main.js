@@ -74,6 +74,7 @@ import { createGestures } from "./input/gestures.js";
 import { createUndo } from "./modes/undo.js";
 import { createHelpUI } from "./ui/help.js";
 import { PUZZLES, createPuzzleProgress, findPuzzle, puzzleMode } from "./modes/puzzles.js";
+import { describeSteps, findFirstMove } from "./modes/puzzle-hint.js";
 import { customPuzzleMode, decodePuzzle } from "./modes/custom-puzzle.js";
 import { createPuzzleEditor } from "./ui/puzzle-editor.js";
 import { createPuzzleUI } from "./ui/puzzles.js";
@@ -629,7 +630,7 @@ const setScreen = next => {
   touch.setEnabled(next === "play" || next === "countdown");
   gestures.setEnabled((next === "play" || next === "countdown") && gesturesOn());
   document.body.classList.toggle("is-practice", Boolean(mode.practice && !isGuidedPractice()) && next !== "menu");
-  document.body.classList.toggle("has-lesson-hints", hasLessonHints(mode) && next !== "menu");
+  document.body.classList.toggle("has-lesson-hints", hasHintControls(mode) && next !== "menu");
   document.body.classList.toggle("is-finesse-lesson", Boolean(mode.lesson) && next !== "menu");
   const modeTitle = mode.versus ? versusTitle(mode.versus) : mode.name;
   $("session-title").textContent = next === "menu" ? "" : scenePractice ? scenePracticeTitle() : modeTitle;
@@ -749,7 +750,8 @@ const start = (
   }
   acc = 0;
   countdown = hasLessonHints(m) || m.battleLesson ? 0 : (COUNTDOWN_FRAMES[settings.access.countdown] ?? READY_FRAMES);
-  if (hasLessonHints(m)) resetLessonHint();
+  if (hasHintControls(m)) resetLessonHint();
+  updateBackLabels();
   goTimer = 0;
   undo.reset();
   showPanel(null);
@@ -802,6 +804,49 @@ let confirmWasPaused = false;
 /** 게임이 진행 중(끝나지 않음)이라 버리면 잃는 게 있는가 */
 const inProgress = () => screen === "play" || screen === "countdown" || screen === "paused";
 
+/**
+ * 판을 마치거나 그만둘 때 돌아갈 목록: 퍼즐·연습이면 그 목록(방금 한 단계에 포커스), 아니면 null(첫 화면).
+ * 목록은 첫 화면 위에 열리므로, 목록을 닫으면 그대로 첫 화면이다.
+ */
+const backList = () => {
+  if (scenePractice) return null;
+  const number = mode.puzzle?.number;
+  if (number) return { label: t("퍼즐 목록"), open: () => puzzleUI.open(number) };
+  const group = mode.intro
+    ? "intro"
+    : mode.lesson
+      ? "finesse-lesson"
+      : mode.downstack
+        ? "downstack"
+        : mode.buildLesson
+          ? "build-training"
+          : mode.battleLesson
+            ? "battle-training"
+            : null;
+  const stageId = mode.id;
+  if (group) return { label: t("연습 목록"), open: () => practiceUI.open(group, stageId) };
+  if (mode.practice) return { label: t("연습 목록"), open: () => practiceUI.open(stageId.replace(/^practice-/, "")) };
+  return null;
+};
+
+/** 결과·일시정지의 "첫 화면" 단추: 퍼즐·연습이면 "퍼즐 목록"·"연습 목록" */
+const updateBackLabels = () => {
+  const back = backList();
+  /** @type {HTMLElement} */ (panels.results.querySelector('[data-action="menu"] .btn-label')).textContent =
+    back?.label ?? t("첫 화면");
+  if (!scenePractice)
+    /** @type {HTMLElement} */ (panels.pause.querySelector('[data-action="menu"] .btn-label')).textContent = back
+      ? t("{list}으로", { list: back.label })
+      : t("첫 화면으로");
+};
+
+/** 첫 화면으로 — 퍼즐·연습이면 그 목록을 위에 연다 */
+const leaveToMenu = () => {
+  const back = backList();
+  toMenu(false, Boolean(back));
+  back?.open();
+};
+
 const askConfirm = kind => {
   if (!inProgress() || confirming) return;
   confirmWasPaused = screen === "paused";
@@ -813,12 +858,19 @@ const askConfirm = kind => {
   /** @type {HTMLElement} */ (panels.confirm.querySelector(".confirm-cancel-icon")).replaceChildren(
     icon(confirmWasPaused ? "arrow-left" : "play")
   );
-  $("confirm-title").textContent = restart ? t("다시 시작할까요?") : t("첫 화면으로 갈까요?");
+  const back = backList();
+  $("confirm-title").textContent = restart
+    ? t("다시 시작할까요?")
+    : back
+      ? t("{list}으로 갈까요?", { list: back.label })
+      : t("첫 화면으로 갈까요?");
   const ok = /** @type {HTMLElement} */ (panels.confirm.querySelector('[data-confirm="ok"]'));
   /** @type {HTMLElement} */ (ok.querySelector(".confirm-ok-icon")).replaceChildren(icon(restart ? "restart" : "menu"));
   /** @type {HTMLElement} */ (ok.querySelector(".confirm-ok-text")).textContent = restart
     ? t("다시 시작")
-    : t("첫 화면으로");
+    : back
+      ? t("{list}으로", { list: back.label })
+      : t("첫 화면으로");
   const first = keysOf("RESTART")[0];
   /** @type {HTMLElement} */ (ok.querySelector(".confirm-ok-key")).replaceChildren(
     ...(restart && first ? [keycap(first)] : [])
@@ -871,7 +923,7 @@ const acceptConfirm = () => {
       exitScenePractice();
       stopReplay();
     }
-    toMenu();
+    leaveToMenu();
     if (kept.length) showMenuNotice(t("업적 달성 · {names}", { names: kept.map(a => a.name).join(", ") }));
   }
 };
@@ -1391,6 +1443,8 @@ $("active-rules").addEventListener("click", e => {
 $("edit-rules").addEventListener("click", () => rulesUI.open());
 
 const hasLessonHints = m => Boolean(m.downstack || m.buildLesson);
+/** 힌트 단추를 보이는 판: 파내기·빌드 연습, 퍼즐(첫 수 보기) */
+const hasHintControls = m => hasLessonHints(m) || Boolean(m.puzzle);
 const lessonHintState = state => state.downstack ?? state.buildLesson;
 const isGuidedPractice = (m = mode) => m.lesson || hasLessonHints(m) || m.intro || m.battleLesson;
 const nextPracticeLesson = () =>
@@ -1407,8 +1461,37 @@ const nextPracticeLesson = () =>
             : null;
 const downstackHint = $("downstack-hint");
 const resetLessonHint = () => {
-  downstackHint.textContent = t("힌트");
+  downstackHint.textContent = mode.puzzle ? t("첫 수 보기") : t("힌트");
   $("downstack-status").textContent = "";
+  if (game?.state.puzzle) game.state.puzzle.hintCells = [];
+};
+
+/**
+ * 퍼즐 첫 수 보기: 지금 피스를 놓을 자리(점선 칸)와 누를 순서. 한 번 더 누르면 숨긴다.
+ * 지금 판에서 더 풀 수 없으면(이미 다른 자리에 놓았으면) 다시 하라고 알려 준다.
+ */
+const togglePuzzleHint = () => {
+  const p = game.state.puzzle;
+  if (p.hintCells?.length) return resetLessonHint();
+  const active = game.state.active;
+  // 남은 피스: 지금 피스(홀드로 바꿨을 수도 있다)를 한 개 뺀 나머지
+  const remaining = mode.puzzle.pieces.slice(p.placed);
+  const at = remaining.indexOf(active.type);
+  const rest = at >= 0 ? [...remaining.slice(0, at), ...remaining.slice(at + 1)] : remaining.slice(1);
+  const move = findFirstMove(
+    mode.puzzle,
+    { board: game.state.board, active, combo: game.state.combo ?? -1 },
+    rest,
+    ROTATIONS[rules.rotation]
+  );
+  if (!move) {
+    $("downstack-status").textContent = t("이 판에서는 더 풀 수 없어요. 다시 시작해 보세요");
+    return;
+  }
+  p.hintCells = move.cells;
+  const spinLast = ["mini", "tsd", "tst"].includes(mode.puzzle.kind);
+  $("downstack-status").textContent = t("첫 수 · {steps}", { steps: describeSteps(move.steps, spinLast) });
+  downstackHint.textContent = t("힌트 숨기기");
 };
 const downstackRetry = $("downstack-retry");
 for (const control of [downstackHint, downstackRetry]) {
@@ -1422,13 +1505,14 @@ const applyLessonHint = () => {
   downstackHint.textContent = t(["힌트", "자리 힌트", "힌트 숨기기"][lessonHintState(game.state).hintLevel]);
 };
 downstackHint.addEventListener("click", event => {
-  if (!hasLessonHints(mode) || screen !== "play" || !game?.state.active) return;
-  applyLessonHint();
+  if (!hasHintControls(mode) || screen !== "play" || !game?.state.active) return;
+  if (mode.puzzle) togglePuzzleHint();
+  else applyLessonHint();
   runJournal?.action("hint");
   if (event.detail > 0) downstackHint.blur();
 });
 downstackRetry.addEventListener("click", () => {
-  if (hasLessonHints(mode) && screen === "play") start(mode, rules);
+  if (hasHintControls(mode) && screen === "play") start(mode, rules);
 });
 
 const practiceUI = createPracticeUI({
@@ -1579,7 +1663,7 @@ const handleSystem = (action, code = "") => {
   if (action !== "pause") return;
   if (screen === "play" || screen === "countdown") pause();
   else if (screen === "paused") resume();
-  else if (screen === "results") toMenu();
+  else if (screen === "results") leaveToMenu();
 };
 
 const keyboard = createKeyboard({ getBindings: () => bindings, onSystem: handleSystem });
@@ -1755,7 +1839,7 @@ for (const btn of document.querySelectorAll("[data-action]")) {
     }
     if (action === "menu") {
       if (inProgress()) askConfirm("menu");
-      else toMenu();
+      else leaveToMenu();
     }
     if (action === "watch" && lastReplay) startReplay(lastReplay, "results", "", true);
     if (action === "stats" && game)
@@ -2207,9 +2291,8 @@ const setScenePauseLabels = () => {
   panels.pause.querySelector('[data-action="retry"] .btn-label').textContent = scenePractice
     ? sceneRetryLabel()
     : t("다시 시작");
-  panels.pause.querySelector('[data-action="menu"] .btn-label').textContent = scenePractice
-    ? t("리플레이로")
-    : t("첫 화면으로");
+  if (scenePractice) panels.pause.querySelector('[data-action="menu"] .btn-label').textContent = t("리플레이로");
+  else updateBackLabels();
 };
 
 const resetSceneAttempt = (restored = null) => {
@@ -2570,7 +2653,7 @@ const advanceRun = (held, pressed, reconstructing = false) => {
     versus.cpu.step(cpuInput);
     settleBattleFrame(game, versus.cpu, events);
   }
-  if (hasLessonHints(mode) && events.some(event => event.type === "lock")) resetLessonHint();
+  if (hasHintControls(mode) && events.some(event => event.type === "lock")) resetLessonHint();
   const extra = finesse?.frame(held, pressed, hadActive, events) ?? 0;
   if (!reconstructing && extra > 0 && mode.finesse) announceText([t("피네스 +{n}", { n: extra })]);
   if (mode.splits) splits = advanceSplits(mode.splits, splits, game.state.stats.lines, game.state.frame);

@@ -136,7 +136,8 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     const holdUsed = state?.holdUsed;
     const queue = state?.queue ?? emptyQueue;
     const pending = Math.min(VISIBLE_ROWS, state?.garbage?.pending ?? 0);
-    const hintCells = state?.downstack?.hintCells ?? state?.buildLesson?.hintCells ?? state?.finesseTarget;
+    const hintCells =
+      state?.downstack?.hintCells ?? state?.buildLesson?.hintCells ?? state?.puzzle?.hintCells ?? state?.finesseTarget;
     const lockTimer = active ? state.lock.timer : 0;
     const shown = state?.puzzle ? Math.max(0, state.puzzle.need - state.puzzle.placed - 1) : game?.rules.previewCount;
 
