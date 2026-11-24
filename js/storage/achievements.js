@@ -126,6 +126,13 @@ export const ACHIEVEMENTS = Object.freeze([
     test: c => c.puzzles.filter(p => p.kind === "combo").every(p => c.puzzlesCleared.has(p.id)),
   },
   {
+    id: "puzzle-mini",
+    group: "puzzle",
+    name: t("Mini 장"),
+    description: t("T-spin Mini 퍼즐을 모두 풀기"),
+    test: c => c.puzzles.filter(p => p.kind === "mini").every(p => c.puzzlesCleared.has(p.id)),
+  },
+  {
     id: "puzzle-spin",
     group: "puzzle",
     name: t("돌려 넣기 장"),

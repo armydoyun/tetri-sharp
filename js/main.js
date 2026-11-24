@@ -645,7 +645,9 @@ const setScreen = next => {
                 ? t("목표 · 피스마다 한 줄 이상 지워 콤보 끊지 않기")
                 : mode.puzzle.kind === "spin"
                   ? t("목표 · 틈 근처까지 내린 뒤 돌려 끼워 넣어 2줄 지우기")
-                  : t("목표 · T 하나로 {kind} 만들기", { kind: mode.description })
+                  : mode.puzzle.kind === "mini"
+                    ? t("목표 · T를 마지막에 돌려 넣어 T-spin Mini로 줄 지우기")
+                    : t("목표 · T 하나로 {kind} 만들기", { kind: mode.description })
         : mode.practice
           ? mode.description
           : "";

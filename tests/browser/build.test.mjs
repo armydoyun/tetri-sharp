@@ -3609,6 +3609,37 @@ test("퍼즐 콤보 이어 가기: 줄을 못 지운 피스가 나오면 남은 
   await context.close();
 });
 
+test("퍼즐 T-spin Mini: 곧장 떨어뜨리면 실패, 바닥까지 내린 뒤 마지막에 돌려 넣으면 Mini로 성공", async () => {
+  const { context, page, errors } = await openPage(
+    () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } })),
+    undefined,
+    { frameClock: true }
+  );
+  // 첫 Mini 단계: 오른쪽 벽 아래 한 칸 빈 줄
+  const first = PUZZLES.find(p => p.kind === "mini");
+  await openPuzzle(page, first.number);
+  assert.match(await text(page, "mode-objective"), /Mini/);
+  await runKeys(page, [["Space", 1]]);
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  assert.equal(await text(page, "results-title"), "실패");
+  await page.click('#results [data-action="menu"]');
+  await openPuzzle(page, first.number);
+  // 오른쪽 네 칸 → 바닥까지 소프트 드롭 → 반시계로 돌려 넣고, 그대로 두면(고정 지연) 회전이 마지막 동작으로 남는다
+  await runKeys(page, [
+    ["ArrowRight", 1],
+    ["ArrowRight", 1],
+    ["ArrowRight", 1],
+    ["ArrowRight", 1],
+    ["ArrowDown", 70],
+    ["KeyZ", 1],
+    ["F24", 60],
+  ]);
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  assert.equal(await text(page, "results-title"), "성공!");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
 test("퍼즐 돌려 넣기: 곧장 떨어뜨리면 틈에 안 들어가고, 바닥까지 내린 뒤 돌려 끼우면 성공", async () => {
   const { context, page, errors } = await openPage(
     () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } })),

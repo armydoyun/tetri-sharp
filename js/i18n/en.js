@@ -577,8 +577,8 @@ export const EN = {
   "{n}피스": "{n} pcs",
   "{done} / {total}단계 깸 · 중력 없음, 정해진 피스만 써요":
     "{done} / {total} solved · no gravity, only the given pieces",
-  "판 비우기는 아래 두 줄을 모두 지우고, 4줄 만들기는 우물을 남겨 채운 뒤 I로 4줄, 콤보는 피스마다 줄을 지우고, 밀어 넣기는 내린 뒤 처마 아래로 밀고, 돌려 넣기는 틈 앞에서 돌리고, T-spin은 T 하나로 해내요.":
-    "Board clears empty the bottom two rows, quads fill around a well then finish with an I, combos clear a line with every piece, tucks drop and slide under an overhang, spin-ins rotate into a twisted gap, and T-spins use a single T.",
+  "판 비우기는 아래 두 줄을 모두 지우고, 4줄 만들기는 우물을 남겨 채운 뒤 I로 4줄, 콤보는 피스마다 줄을 지우고, 밀어 넣기는 내린 뒤 처마 아래로 밀고, 돌려 넣기는 틈 앞에서 돌리고, T-spin(Mini·Double·Triple)은 T 하나로 해내요.":
+    "Board clears empty the bottom two rows, quads fill around a well then finish with an I, combos clear a line with every piece, tucks drop and slide under an overhang, spin-ins rotate into a twisted gap, and T-spins (Mini, Double, Triple) use a single T.",
 
   // ---- 리플레이 공유 ----
   "이 리플레이": "this replay",
@@ -956,6 +956,10 @@ export const EN = {
   "무언가 열렸어요": "Something opened",
   "돌려 넣기": "Spin-ins",
   "돌려 넣기 장": "Spin-in chapter",
+  "Mini 장": "Mini chapter",
+  "T-spin Mini 퍼즐을 모두 풀기": "Solve every T-spin Mini puzzle",
+  "목표 · T를 마지막에 돌려 넣어 T-spin Mini로 줄 지우기":
+    "Goal · Rotate the T in last to clear a line with a T-spin Mini",
   "돌려 넣기 퍼즐을 모두 풀기": "Solve every spin-in puzzle",
   "목표 · 틈 근처까지 내린 뒤 돌려 끼워 넣어 2줄 지우기":
     "Goal · Lower the piece near the gap, then rotate it in to clear 2 lines",

@@ -4,6 +4,7 @@
 //  - 콤보 이어 가기: 4칸 우물에 피스를 하나씩 넣어 피스마다 한 줄 이상 지우기(콤보가 끊기면 실패)
 //  - 밀어 넣기: 처마 아래 빈칸에 피스 하나를 소프트 드롭으로 내린 뒤 옆으로 밀어 넣어 2줄(곧장 떨어뜨려서는 안 풀린다)
 //  - 돌려 넣기: S·Z·L·J 하나를 바닥 근처에서 돌려(벽 차기) 틈에 끼워 2줄(곧장 떨어뜨리거나 밀어 넣어서는 안 풀린다)
+//  - T-spin Mini: T 하나를 벽이나 턱 옆에서 돌려 넣어 Mini로 줄 지우기(곧장 떨어뜨리면 Mini가 아니다)
 //  - T-spin Double / Triple: 주어진 T 하나로
 // 단계는 시드로 만들어 어디서나 같고, 모든 단계는 풀 수 있게 만든다(단위 테스트가 탐색기로 확인한다).
 import { MODERN } from "../rules/presets.js";
@@ -18,7 +19,7 @@ const TYPES = ["I", "J", "L", "O", "S", "T", "Z"];
 /**
  * 단계 계획: [종류, 피스 수]. 앞쪽은 쉽게(피스 하나), 뒤로 갈수록 피스가 늘고 T-spin이 섞인다.
  * 뒤에 붙인 단계(31~)는 나중에 더한 장이다. 이미 있는 단계의 번호(id)·시드는 바꾸지 않는다(진행도·리플레이가 id로 맞는다).
- * @type {ReadonlyArray<[ "pc" | "quad" | "tuck" | "combo" | "spin" | "tsd" | "tst", number ]>}
+ * @type {ReadonlyArray<[ "pc" | "quad" | "tuck" | "combo" | "spin" | "mini" | "tsd" | "tst", number ]>}
  */
 const PLAN = Object.freeze([
   ["pc", 1],
@@ -87,6 +88,15 @@ const PLAN = Object.freeze([
   ["spin", 1],
   ["spin", 1],
   ["spin", 1],
+  // T-spin Mini(판은 아래 MINI_BOARDS)
+  ["mini", 1],
+  ["mini", 1],
+  ["mini", 1],
+  ["mini", 1],
+  ["mini", 1],
+  ["mini", 1],
+  ["mini", 1],
+  ["mini", 1],
 ]);
 
 /**
@@ -124,6 +134,23 @@ const SPIN_BOARDS = Object.freeze([
   ["Z", [".#...#....", ".##..#..#.", "#####..###", "######..##"]],
   ["J", [".......#..", "###....#..", "###.######", "###...####"]],
   ["L", ["##..#....#", "########.#", "######...#"]],
+]);
+
+/**
+ * T-spin Mini 판: T를 돌려 마지막에 넣으면 모서리 셋이 막혀 Mini가 되고 맨 아래 한 줄이 지워진다.
+ * 무작위 판 가운데 "180° 회전 없이 Mini로 한 줄"이 되는 것을 탐색기로 골랐다(단위 테스트가 다시 확인한다).
+ * 벽에 붙은 자리부터 턱 사이 자리까지.
+ */
+/** @type {ReadonlyArray<[string, string[]]>} */
+const MINI_BOARDS = Object.freeze([
+  ["T", ["....#.....", "#########."]],
+  ["T", ["...#......", ".#########"]],
+  ["T", ["..#.......", "..........", "###.######"]],
+  ["T", ["......#...", ".#........", "#######.##"]],
+  ["T", ["...#......", "......#...", "##.#######"]],
+  ["T", [".#..##.#..", "#######..."]],
+  ["T", ["...#...#..", ".......##.", "####.#####"]],
+  ["T", [".....#....", "#......#..", "####.#####"]],
 ]);
 
 /** 판 그림(행 문자열, 위에서부터)을 보드 맨 아래에 그린다 */
@@ -216,6 +243,15 @@ const makeStage = index => {
     const [piece, rows] = (kind === "tuck" ? TUCK_BOARDS : SPIN_BOARDS)[nthOfKind(index)];
     return { kind, pieces: [piece], build: board => drawRows(board, rows), goal: ev => ev.lines === 2 };
   }
+  if (kind === "mini") {
+    const [piece, rows] = MINI_BOARDS[nthOfKind(index)];
+    return {
+      kind,
+      pieces: [piece],
+      build: board => drawRows(board, rows),
+      goal: ev => ev.tspin === "mini" && ev.lines >= 1,
+    };
+  }
   if (kind === "combo") {
     const [order, left, gap] = COMBO_BOARDS[nthOfKind(index)];
     const pieces = [...order];
@@ -279,12 +315,13 @@ export const KIND_NAMES = Object.freeze({
   tuck: t("처마 밀어 넣기"),
   combo: t("콤보 이어 가기"),
   spin: t("돌려 넣기"),
+  mini: "T-spin Mini",
   tsd: "T-spin Double",
   tst: "T-spin Triple",
 });
 
-/** 장 순서(쉬운 것부터): 판 비우기 → 4줄 만들기 → 콤보 → 밀어 넣기 → 돌려 넣기 → T-spin Double → T-spin Triple */
-export const CHAPTERS = Object.freeze(["pc", "quad", "combo", "tuck", "spin", "tsd", "tst"]);
+/** 장 순서(쉬운 것부터): 판 비우기 → 4줄 만들기 → 콤보 → 밀어 넣기 → 돌려 넣기 → T-spin Mini → Double → Triple */
+export const CHAPTERS = Object.freeze(["pc", "quad", "combo", "tuck", "spin", "mini", "tsd", "tst"]);
 
 /**
  * 모든 단계(앞에서 한 번 만들어 둔다). 보여 주는 순서는 장별로, 장 안에서는 피스가 적은 것부터.

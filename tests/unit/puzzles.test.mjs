@@ -63,8 +63,8 @@ const hardDropClears = (board, type, lines) => {
   return false;
 };
 
-test("퍼즐 62단계는 모두 주어진 피스로 풀 수 있다", () => {
-  assert.equal(PUZZLES.length, 62);
+test("퍼즐 70단계는 모두 주어진 피스로 풀 수 있다", () => {
+  assert.equal(PUZZLES.length, 70);
   for (const p of PUZZLES) {
     const board = createBoard();
     p.build(board);
@@ -88,6 +88,12 @@ test("퍼즐 62단계는 모두 주어진 피스로 풀 수 있다", () => {
         `단계 ${p.number}: 돌리지 않고는 안 풀린다`
       );
       assert.equal(hardDropClears(board, p.pieces[0], 2), false);
+    } else if (p.kind === "mini") {
+      // 180° 회전 없이 Mini로 한 줄(곧장 떨어뜨리면 회전이 마지막이 아니라 Mini가 아니다)
+      assert.ok(
+        placements(board, "T", "srs", { half: false }).some(q => q.tspin === "mini" && q.lines >= 1),
+        `단계 ${p.number}: Mini`
+      );
     } else if (p.kind === "combo") {
       assert.ok(solvesCombo(board, p.pieces), `단계 ${p.number}: ${p.pieces.join("")}`);
     } else if (p.kind === "quad") {
@@ -138,7 +144,7 @@ test("깬 단계 기록과 다음 단계", () => {
   assert.deepEqual([...progress.cleared()], [1, 3], "이상한 값은 버린다");
 });
 
-test("퍼즐 순서: 판 비우기 → 4줄 만들기 → 콤보 → 밀어 넣기 → 돌려 넣기 → T-spin Double → T-spin Triple 장, 장 안에서는 피스가 적은 것부터", async () => {
+test("퍼즐 순서: 판 비우기 → 4줄 만들기 → 콤보 → 밀어 넣기 → 돌려 넣기 → T-spin Mini → Double → T-spin Triple 장, 장 안에서는 피스가 적은 것부터", async () => {
   const { CHAPTERS } = await import("../../js/modes/puzzles.js");
   assert.deepEqual(
     PUZZLES.map(p => p.number),
@@ -158,7 +164,7 @@ test("퍼즐 순서: 판 비우기 → 4줄 만들기 → 콤보 → 밀어 넣�
   assert.deepEqual(
     PUZZLES.map(p => p.id).sort((a, b) => a - b),
     PUZZLES.map((_, i) => i + 1),
-    "id는 만들 때의 번호 1~62(4줄 만들기 31~, 밀어 넣기 39~, 콤보 47~, 돌려 넣기 55~)"
+    "id는 만들 때의 번호 1~70(4줄 만들기 31~, 밀어 넣기 39~, 콤보 47~, 돌려 넣기 55~, Mini 63~)"
   );
 });
 
