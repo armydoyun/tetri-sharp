@@ -27,11 +27,12 @@ export const el = (tag, attrs = {}, ...children) => {
  * 대화상자 내용을 [머리(제목·닫기) | 몸통 | 발(알림 칸·버튼)]으로 채운다.
  * 알림 칸(.notice-slot)은 늘 두 줄 자리를 차지해 글이 생겨도 버튼이 움직이지 않는다.
  * @param {HTMLDialogElement} dialog
- * @param {{ title: string, body: HTMLElement, notice: HTMLElement, actions: HTMLElement[], closeId: string, tabs?: HTMLElement | null }} parts
+ * @param {{ title: string, body: HTMLElement, notice: HTMLElement, actions: HTMLElement[], closeId: string, tabs?: HTMLElement | null, closeLabel?: string }} parts
+ *   closeLabel: 아래 닫기 버튼 이름(묻는 창은 "취소")
  */
-export const fillDialog = (dialog, { title, body, notice, actions, closeId, tabs = null }) => {
+export const fillDialog = (dialog, { title, body, notice, actions, closeId, tabs = null, closeLabel }) => {
   const close = iconButton({ icon: "close", label: t("닫기"), onClick: () => dialog.close() });
-  const done = button({ label: t("닫기"), id: closeId, onClick: () => dialog.close() });
+  const done = button({ label: closeLabel ?? t("닫기"), id: closeId, onClick: () => dialog.close() });
   body.classList.add("dialog-body");
   dialog.classList.toggle("dialog-tabbed", Boolean(tabs));
   // 같은 구역의 슬라이더는 값 칸 폭을 가장 긴 것에 맞춘다 → 막대 끝이 줄마다 나란하다
