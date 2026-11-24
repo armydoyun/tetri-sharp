@@ -25,7 +25,7 @@ import { el, fieldRow, fillDialog, focusKey, restoreFocus } from "./dom.js";
 import { button, choiceCards, confirmButton, rangeRow, segmented, slider, tabBar } from "./components.js";
 import { COLOR_SWATCHES, PIECE_ORDER, THEMES, THEME_IDS, findTheme, paletteFor } from "../render/themes.js";
 import { keycap } from "./keycap.js";
-import { createThemePreview } from "../render/preview.js";
+import { createThemeStage, drawThemeSwatch } from "../render/preview.js";
 import { t } from "../i18n/index.js";
 
 const HANDLING_ROWS = [
@@ -121,7 +121,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
   let capture = null;
   const notice = el("p", { class: "notice-slot", role: "status", id: "settings-notice" });
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-  /** @type {ReturnType<typeof createThemePreview> | null} */
+  /** @type {ReturnType<typeof createThemeStage> | null} */
   let playingPreview = null;
   const stopThemePreview = () => {
     playingPreview?.stop();
@@ -394,43 +394,65 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
     ...(visual.palette === "custom" ? [colorPicker(visual)] : []),
   ];
 
+  /**
+   * 게임 테마: 위에 큰 미리보기(작은 게임 화면) 하나, 아래에 견본 칩.
+   * 칩에 마우스를 올리거나 키보드로 옮기면 미리보기만 그 테마로 바뀌고, 누르면 적용한다.
+   * 미리보기는 지금 화면 설정(색 구성·무늬·고스트·격자·효과)을 그대로 따른다.
+   */
   const themeCards = visual => {
-    const demos = THEME_IDS.map(id => {
-      const theme = THEMES[id];
-      const preview = el("canvas", { class: "theme-preview", "aria-hidden": "true" });
-      return {
-        option: { value: id, title: theme.name, desc: theme.description, preview },
-        demo: createThemePreview(preview, theme, paletteFor(visual, theme)),
-      };
-    });
+    const canvas = el("canvas", { class: "theme-stage-canvas", "aria-hidden": "true" });
+    const name = el("strong", { class: "theme-stage-name" });
+    const state = el("span", { class: "theme-stage-state" });
+    const desc = el("small", { class: "theme-stage-desc" });
+    const stage = createThemeStage(canvas);
+    const showTheme = id => {
+      const theme = findTheme(id);
+      stage.show(theme, paletteFor(visual, theme), visual);
+      name.textContent = theme.name;
+      desc.textContent = theme.description;
+      const current = id === visual.theme;
+      state.textContent = current ? t("사용 중") : t("미리보기");
+      state.classList.toggle("is-preview", !current);
+    };
+    showTheme(visual.theme);
     const cards = choiceCards({
       id: "set-theme",
       label: t("게임 테마"),
-      options: demos.map(({ option }) => option),
+      compact: true,
+      options: THEME_IDS.map(id => {
+        const swatch = el("canvas", { class: "theme-swatch", "aria-hidden": "true" });
+        drawThemeSwatch(swatch, THEMES[id], paletteFor(visual, THEMES[id]));
+        return { value: id, title: THEMES[id].name, preview: swatch };
+      }),
       value: visual.theme,
       onChange: v => setVisual("theme", v),
     });
     cards.querySelectorAll("button").forEach((card, index) => {
-      const { demo } = demos[index];
-      const play = () => {
-        if (reducedMotion.matches || playingPreview === demo) return;
-        stopThemePreview();
-        playingPreview = demo;
-        demo.play();
-      };
-      const stop = () => {
-        if (playingPreview === demo) stopThemePreview();
-      };
+      const id = THEME_IDS[index];
       card.addEventListener("pointerenter", e => {
-        if (e.pointerType === "mouse") play();
+        if (e.pointerType === "mouse") showTheme(id);
       });
-      card.addEventListener("pointerleave", stop);
+      card.addEventListener("pointerleave", () => showTheme(visual.theme));
       card.addEventListener("focus", () => {
-        if (card.matches(":focus-visible")) play();
+        if (card.matches(":focus-visible")) showTheme(id);
       });
-      card.addEventListener("blur", stop);
+      card.addEventListener("blur", () => showTheme(visual.theme));
     });
-    return cards;
+    if (!reducedMotion.matches) {
+      playingPreview = stage;
+      stage.play();
+    }
+    return el(
+      "div",
+      { class: "theme-picker" },
+      el(
+        "div",
+        { class: "theme-stage" },
+        canvas,
+        el("div", { class: "theme-stage-caption" }, el("div", { class: "theme-stage-title" }, name, state), desc)
+      ),
+      cards
+    );
   };
 
   const visualSection = () => {
@@ -482,7 +504,7 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
       fieldRow({
         id: "set-theme",
         label: t("게임 테마"),
-        hint: t("격자 색과 블록의 색·모서리를 바꿔요"),
+        hint: t("보드·블록의 색과 모양, 효과가 바뀌어요. 미리보기는 지금 화면 설정을 따라요"),
         className: "is-wide",
         control: themeCards(visual),
       }),
@@ -507,7 +529,10 @@ export const createSettingsUI = ({ dialog, getSettings, onChange, onClose, onPre
       fieldRow({
         id: "set-grid",
         label: t("격자 선"),
-        hint: visual.grid === "off" ? t("격자 선 없이 블록만 보여요") : t("보드에 칸을 나누는 선을 그려요"),
+        hint:
+          visual.grid === "off"
+            ? t("격자 선 없이 블록만 보여요")
+            : t("테마의 격자(선이나 점)를 그려요. 그라파이트는 원래 격자가 없어요"),
         control: segmented({
           wrap: true,
           id: "set-grid",

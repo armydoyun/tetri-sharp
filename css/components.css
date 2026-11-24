@@ -594,11 +594,103 @@
   background: var(--accent-soft);
 }
 
-.theme-preview {
+/* 게임 테마: 큰 미리보기(작은 게임 화면) + 견본 칩 */
+.theme-picker {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.theme-stage {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--surface-2);
+  /* 캔버스 안 "홀드·다음" 글자색(게임 화면 옆 칸 글자처럼) */
+  color: var(--text-dim);
+}
+
+.theme-stage-canvas {
   display: block;
   width: 100%;
+  max-width: 440px;
   height: auto;
-  margin-bottom: var(--space-2);
+  margin-inline: auto;
+}
+
+.theme-stage-caption {
+  display: grid;
+  gap: 2px;
+  color: var(--text);
+}
+
+.theme-stage-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.theme-stage-name {
+  font-size: var(--text-l);
+  font-weight: 800;
+}
+
+.theme-stage-state {
+  padding: 0 var(--space-1);
+  border: 1px solid var(--accent-ledge);
+  border-radius: var(--radius-s);
+  font-size: var(--text-s);
+  font-weight: 700;
+}
+
+.theme-stage-state.is-preview {
+  border-style: dashed;
+  border-color: var(--border-strong);
+  color: var(--text-dim);
+}
+
+.theme-stage-desc {
+  font-size: var(--text-s);
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+/* 견본 칩: 견본 띠 + 이름. 테마 9개가 빈칸 없이 3×3으로 */
+.choice-cards.is-compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: start;
+}
+
+/* 넓은 화면: 미리보기 왼쪽, 칩 오른쪽(칩에 올리면 옆에서 바로 바뀐다) */
+@media (min-width: 900px) {
+  .theme-picker {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+.choice-cards.is-compact .choice-card {
+  /* 견본 캔버스의 원래 폭이 칸을 밀어내지 않게 */
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-1) var(--space-2) var(--space-2);
+}
+
+.choice-cards.is-compact .choice-card strong {
+  font-size: var(--text-m);
+  font-weight: 700;
+  /* 한국어 이름이 글자 중간에서 끊기지 않게(좁으면 단어째 넘긴다) */
+  word-break: keep-all;
+}
+
+.theme-swatch {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: auto;
   border-radius: var(--radius-s);
 }
 
