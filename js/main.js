@@ -972,7 +972,7 @@ const renderResultSplits = () => {
       })
     : rows.length === 0
       ? // 첫 구간(10줄) 전에 끝났으면 펼쳐도 표가 없다 → 안에 있는 "같은 순서로 재시작"을 이름으로(U44)
-        t("같은 블록 순서로 다시 · 구간 기록은 10줄부터")
+        t("같은 순서로 다시 하기")
       : t("구간 기록");
 };
 
@@ -1064,6 +1064,7 @@ const finish = () => {
     real:
       !scenePractice && isRankedRules(rules) && (MODES.includes(mode) || Boolean(mode.daily) || Boolean(mode.versus)),
     won: Boolean(mode.versus) && state.over === WIN,
+    short: isShortGame(state),
     puzzlesCleared: puzzleProgress.cleared(),
     puzzles: PUZZLES,
   });

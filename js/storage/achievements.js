@@ -12,7 +12,7 @@ export const TOTAL_KEYS = Object.freeze(["games", "lines", "quads", "tspins", "w
 const MIN = 3600; // 1분 = 3600프레임
 
 /**
- * @typedef {{ mode: any, state: any, real: boolean, won: boolean, puzzlesCleared: Set<number>, puzzles: readonly any[], totals?: Record<string, number> }} Context
+ * @typedef {{ mode: any, state: any, real: boolean, won: boolean, puzzlesCleared: Set<number>, puzzles: readonly any[], totals?: Record<string, number>, short?: boolean }} Context
  *   real: 실제 플레이(메뉴의 모드·오늘의 도전·CPU 대전, 기본 규칙). won: CPU 대전에서 이겼는가
  *   totals: 이번 판까지 더한 누적 합계(evaluate가 채운다)
  * @typedef {{ id: string, group: string, name: string, description: string, test: (c: Context) => boolean, total?: string, goal?: number }} Achievement
@@ -128,7 +128,7 @@ export const ACHIEVEMENTS = Object.freeze([
     id: "puzzle-all",
     group: "puzzle",
     name: t("퍼즐 완주"),
-    description: t("퍼즐 30단계 모두"),
+    description: t("모든 퍼즐 풀기"),
     test: c => c.puzzles.every(p => c.puzzlesCleared.has(p.id)),
   },
   total("games-100", "games", 100, t("100판"), t("실제 판 100번 끝까지")),
@@ -201,9 +201,9 @@ export const createAchievements = store => {
      */
     evaluate(context, date = new Date().toISOString()) {
       const done = read();
-      // 누적 합계는 실제 판에서만 더한다
+      // 누적 합계는 실제 판에서만 더한다. 너무 일찍 끝난 판(short: 하드 드롭 연타 등)은 빼서 "100판"을 쉽게 쌓지 못하게
       const totals = readTotals();
-      if (context.real) {
+      if (context.real && !context.short) {
         const add = gameTotals(context.state, context.won);
         for (const key of TOTAL_KEYS) totals[key] += add[key];
         store.set(ACHIEVEMENT_TOTALS_KEY, totals);

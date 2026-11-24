@@ -122,3 +122,22 @@ test("누적 업적: 실제 판에서만 줄·4줄·T-spin·판·승을 더하�
   assert.ok(fresh.includes("lines-1000"));
   assert.ok(store.get(ACHIEVEMENT_TOTALS_KEY, null));
 });
+
+test("누적 업적: 너무 일찍 끝난 판(short)은 합계에 더하지 않는다", async () => {
+  const { createAchievements } = await import("../../js/storage/achievements.js");
+  const { createStore, memoryBackend } = await import("../../js/storage/store.js");
+  const { findMode } = await import("../../js/modes/index.js");
+  const a = createAchievements(createStore(memoryBackend()));
+  const state = { over: "topOut", frame: 60, score: 0, level: 1, stats: { lines: 0 }, tally: {} };
+  const ctx = {
+    mode: findMode("sprint40"),
+    state,
+    real: true,
+    short: true,
+    won: false,
+    puzzlesCleared: new Set(),
+    puzzles: [],
+  };
+  a.evaluate(ctx);
+  assert.equal(a.totals().games, 0);
+});
