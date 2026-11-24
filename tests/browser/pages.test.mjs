@@ -50,12 +50,13 @@ after(async () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("배포본 파일: index.html·매니페스트·아이콘·서비스 워커", () => {
+test("배포본 파일: index.html·매니페스트·아이콘·링크 배너·서비스 워커", () => {
   assert.deepEqual(fs.readdirSync(dir).sort(), [
     ".nojekyll",
     "icon.svg",
     "index.html",
     "manifest.webmanifest",
+    "og.png",
     "sw.js",
   ]);
   const manifest = JSON.parse(fs.readFileSync(path.join(dir, "manifest.webmanifest"), "utf8"));
@@ -64,6 +65,13 @@ test("배포본 파일: index.html·매니페스트·아이콘·서비스 워커
   const html = fs.readFileSync(path.join(dir, "index.html"), "utf8");
   assert.match(html, /<link rel="manifest" href="\.\/manifest\.webmanifest">/);
   assert.match(fs.readFileSync(path.join(dir, "sw.js"), "utf8"), /const VERSION = "[0-9a-f]{12}"/);
+  // 링크 배너: 메신저가 읽는 태그(이미지는 절대 주소, 1200×630 PNG)
+  assert.match(html, /<meta property="og:image" content="https:\/\/[^"]+\/og\.png">/);
+  assert.match(html, /<meta property="og:title" content="Tetri#">/);
+  assert.match(html, /<meta name="twitter:card" content="summary_large_image">/);
+  const png = fs.readFileSync(path.join(dir, "og.png"));
+  assert.equal(png.subarray(1, 4).toString(), "PNG");
+  assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1200, 630]);
 });
 
 test("설치 캐시로 서버 장애와 오프라인 상태에서도 기록·리플레이·Sprint에 접근한다", async () => {

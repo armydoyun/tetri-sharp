@@ -1,0 +1,118 @@
+<!doctype html>
+<!--
+  메신저 링크 배너(Open Graph 이미지) 원본. tools/og-image.mjs가 1200×630 PNG(assets/og/og.png)로 찍는다.
+  디자인 원칙은 게임과 같다(docs/DESIGN_SYSTEM.md "보드 테마"): 그라데이션·빛 번짐·그림자·입체 없음, 납작한 면과 가는 선.
+  색은 스튜디오 테마와 앱 다크 토큰 그대로. 보드는 테마 그리기와 같은 비율(칸 여백 4.5%, 모서리 15%)로 그린다.
+-->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --bg: #171a17;
+    --text: #eef1ea;
+    --dim: #aab3a6;
+    --faint: #6f786c;
+    --line: #2b312c;
+    --accent: #d6ed84;
+    --font: "Inter", "Noto Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif;
+    --mono: "DejaVu Sans Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    width: 1200px;
+    height: 630px;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    border-top: 6px solid var(--accent);
+    display: grid;
+    grid-template-columns: 1fr 392px;
+    column-gap: 72px;
+    padding: 64px 88px 56px 88px;
+  }
+  .copy { display: flex; flex-direction: column; min-width: 0; }
+  .eyebrow {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0; color: var(--dim); font-size: 24px; font-weight: 700; letter-spacing: 0.02em;
+  }
+  .eyebrow::before { content: ""; width: 14px; height: 14px; background: var(--accent); }
+  .word {
+    display: flex; align-items: center; gap: 30px;
+    margin: 54px 0 0; font-size: 124px; font-weight: 900; letter-spacing: -0.035em; line-height: 1;
+  }
+  .mark { position: relative; width: 120px; height: 80px; flex: none; }
+  .mark i { position: absolute; width: 38px; height: 38px; background: var(--accent); border-radius: 4px; }
+  .tag { margin: 40px 0 0; font-size: 40px; font-weight: 800; line-height: 1.32; letter-spacing: -0.01em; }
+  .tag span { color: var(--dim); }
+  .foot {
+    margin-top: auto; padding-top: 22px; border-top: 2px solid var(--line);
+    display: flex; justify-content: space-between; align-items: baseline; gap: 24px;
+    font-family: var(--mono); font-size: 21px; color: var(--dim); letter-spacing: 0.01em;
+  }
+  .foot b { color: var(--text); font-weight: 700; }
+  .foot span { white-space: nowrap; }
+  .board { align-self: center; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+  <section class="copy">
+    <p class="eyebrow">설치 없이 브라우저에서 바로</p>
+    <h1 class="word">
+      <span class="mark"><i style="left:0;top:0"></i><i style="left:41px;top:0"></i><i style="left:82px;top:0"></i><i style="left:41px;top:41px"></i></span>
+      Tetri#
+    </h1>
+    <p class="tag">규칙을 직접 조합하는<br><span>낙하 블록 퍼즐</span></p>
+    <div class="foot"><span><b>Sprint</b> · 퍼즐 70 · CPU 대전</span><span>오프라인 OK</span></div>
+  </section>
+  <div class="board"><canvas id="b" width="392" height="510"></canvas></div>
+<script>
+  // 스튜디오 테마 색(js/render/themes.js modern)
+  const PAL = ["", "#8ed6cd", "#9baff4", "#f5ab87", "#d6ed84", "#8bc994", "#c4a6ec", "#ee9095", "#727b74"];
+  const BOARD = { bg: "#202421", grid: "#2b312c", edge: "#414941" };
+  const COLS = 10, ROWS = 13, CELL = 39;
+  // 아래 다섯 줄 + 떨어지는 T(위) + 고스트(T-spin Double 자리). 숫자 = 팔레트 번호
+  // 떨어지는 T가 고스트 자리에 들어가면 아래 두 줄이 지워진다
+  const STACK = [
+    "..........",
+    "..........",
+    "..........",
+    "..........",
+    "..........",
+    "..........",
+    "..........",
+    "..........",
+    "1.......2.",
+    "1.55....2.",
+    "155..7.22.",
+    "177...3355",
+    "4477.33366",
+  ];
+  const T = [[3, 1], [4, 1], [5, 1], [4, 2]];
+  const GHOST = [[3, 11], [4, 11], [5, 11], [4, 12]];
+  const c = document.getElementById("b");
+  const ctx = c.getContext("2d");
+  const ox = (c.width - COLS * CELL) / 2;
+  const oy = 0;
+  ctx.fillStyle = BOARD.bg;
+  ctx.fillRect(ox, oy, COLS * CELL, ROWS * CELL);
+  ctx.strokeStyle = BOARD.grid; ctx.lineWidth = 1; ctx.beginPath();
+  for (let x = 1; x < COLS; x++) { ctx.moveTo(ox + x * CELL + 0.5, oy); ctx.lineTo(ox + x * CELL + 0.5, oy + ROWS * CELL); }
+  for (let y = 1; y < ROWS; y++) { ctx.moveTo(ox, oy + y * CELL + 0.5); ctx.lineTo(ox + COLS * CELL, oy + y * CELL + 0.5); }
+  ctx.stroke();
+  ctx.strokeStyle = BOARD.edge; ctx.strokeRect(ox + 0.5, oy + 0.5, COLS * CELL - 1, ROWS * CELL - 1);
+  const cell = (x, y, color, outline) => {
+    const inset = CELL * 0.045, e = CELL - inset * 2;
+    ctx.beginPath(); ctx.roundRect(ox + x * CELL + inset, oy + y * CELL + inset, e, e, CELL * 0.15);
+    if (outline) { ctx.globalAlpha = 0.58; ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke(); ctx.globalAlpha = 1; }
+    else { ctx.fillStyle = color; ctx.fill(); }
+  };
+  STACK.forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== ".") cell(x, y, PAL[Number(ch)]); }));
+  for (const [x, y] of GHOST) cell(x, y, PAL[6], true);
+  for (const [x, y] of T) cell(x, y, PAL[6]);
+</script>
+</body>
+</html>
