@@ -631,6 +631,7 @@ const setScreen = next => {
   document.body.classList.toggle("is-finesse-lesson", Boolean(mode.lesson) && next !== "menu");
   const modeTitle = mode.versus ? versusTitle(mode.versus) : mode.name;
   $("session-title").textContent = next === "menu" ? "" : scenePractice ? scenePracticeTitle() : modeTitle;
+  $("session-title").classList.remove("is-secret");
   $("mode-objective").textContent =
     next === "menu" || next === "replay"
       ? ""
@@ -854,6 +855,7 @@ for (const btn of panels.confirm.querySelectorAll("[data-confirm]")) {
  * 이미 열렸으면 테마만 다시 바꿔 준다. 여섯 번까지는 아무 반응이 없다.
  */
 let logoTapTimes = /** @type {number[]} */ ([]);
+let secretTimer = 0;
 const logoTaps = () => {
   const now = performance.now();
   logoTapTimes = [...logoTapTimes.filter(time => now - time < 3000), now];
@@ -863,7 +865,24 @@ const logoTaps = () => {
   settings = sanitizeSettings({ ...settings, visual: { ...settings.visual, theme: "sharp" } });
   saveSettings(store, settings);
   renderAchievementProgress();
-  showMenuNotice(fresh ? t("무언가 열렸어요") : t("샤프"));
+  const message = fresh ? t("무언가 열렸어요") : t("샤프");
+  // 화면 읽기용 알림 줄(첫 화면 아래)과 함께, 휴대폰에서도 바로 보이게 머리글에서 반응한다:
+  // 로고 T가 한 바퀴 돌고 '#'이 강조색으로, 머리글 가운데에 한 줄, 진동(켜 둔 경우)
+  showMenuNotice(message);
+  const logo = $("go-home");
+  const title = $("session-title");
+  logo.classList.remove("is-found");
+  void logo.offsetWidth; // 다시 찾았을 때도 애니메이션이 처음부터
+  logo.classList.add("is-found");
+  title.textContent = message;
+  title.classList.add("is-secret");
+  clearTimeout(secretTimer);
+  secretTimer = setTimeout(() => {
+    logo.classList.remove("is-found");
+    title.classList.remove("is-secret");
+    if (screen === "menu") title.textContent = "";
+  }, 3000);
+  if (settings.access.vibrate === "on") navigator.vibrate?.([20, 40, 20, 40, 60]);
   sfx.play("clear2");
 };
 

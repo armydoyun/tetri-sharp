@@ -3791,6 +3791,10 @@ test("첫 화면 로고: 여섯 번은 아무 일 없고, 3초 안에 일곱 번
     assert.equal(await text(page, "menu-notice"), "");
     await tap(1);
     assert.equal(await text(page, "menu-notice"), "무언가 열렸어요");
+    // 휴대폰에서도 바로 보이게 머리글에서 반응한다(로고 애니메이션 + 가운데 한 줄)
+    assert.equal(await text(page, "session-title"), "무언가 열렸어요");
+    assert.match((await page.locator("#go-home").getAttribute("class")) ?? "", /is-found/);
+    assert.equal(await page.locator("#go-home").textContent(), "Tetri#", "로고 글자는 그대로");
     assert.equal(
       await page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:settings") || "{}").visual?.theme),
       "sharp"

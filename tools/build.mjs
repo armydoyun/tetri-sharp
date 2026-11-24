@@ -89,8 +89,31 @@ export const MANIFEST = Object.freeze({
 export const PWA_HEAD =
   '    <link rel="manifest" href="./manifest.webmanifest">\n    <link rel="icon" href="./icon.svg" type="image/svg+xml">\n';
 
+/** 배포 주소(링크 배너는 이미지 주소가 절대 경로여야 메신저가 읽는다) */
+export const SITE_URL = "https://armydoyun.github.io/tetri-sharp/";
+
 /**
- * GitHub Pages용: 한 파일 배포본 + manifest.webmanifest + icon.svg + sw.js
+ * 메신저·SNS 링크 배너(Open Graph). 이미지는 assets/og/og.png(tools/og-image.mjs로 만든다).
+ * 페이지가 바깥에서 무언가를 불러오는 것은 아니다 — 링크를 받은 메신저 서버가 이 태그와 이미지를 읽는다.
+ */
+export const OG_HEAD = [
+  ["og:type", "website"],
+  ["og:site_name", "Tetri#"],
+  ["og:title", "Tetri#"],
+  ["og:description", "블록 쌓기. 규칙은 마음대로."],
+  ["og:url", SITE_URL],
+  ["og:image", `${SITE_URL}og.png`],
+  ["og:image:width", "1200"],
+  ["og:image:height", "630"],
+  ["og:image:alt", "Tetri# 로고와 블록이 쌓인 게임 보드"],
+  ["og:locale", "ko_KR"],
+]
+  .map(([k, v]) => `    <meta property="${k}" content="${v}">\n`)
+  .concat(['    <meta name="twitter:card" content="summary_large_image">\n'])
+  .join("");
+
+/**
+ * GitHub Pages용: 한 파일 배포본 + manifest.webmanifest + icon.svg + og.png + sw.js
  * 서비스 워커 버전은 index.html 내용의 해시 → 내용이 바뀌면 새 저장본을 받는다.
  */
 export const buildPages = async ({ outDir = path.join(ROOT, "deploy-pages") } = {}) => {
@@ -98,11 +121,12 @@ export const buildPages = async ({ outDir = path.join(ROOT, "deploy-pages") } = 
   const result = await build({ outFile: path.join(outDir, "index.html") });
   let html = fs.readFileSync(result.outFile, "utf8");
   if (!html.includes("</head>")) throw new Error("index.html에 </head>가 없습니다");
-  html = html.replace("</head>", `${PWA_HEAD}  </head>`);
+  html = html.replace("</head>", `${PWA_HEAD}${OG_HEAD}  </head>`);
   fs.writeFileSync(result.outFile, html, "utf8");
   const version = crypto.createHash("sha256").update(html).digest("hex").slice(0, 12);
   fs.writeFileSync(path.join(outDir, "manifest.webmanifest"), JSON.stringify(MANIFEST, null, 2), "utf8");
   fs.copyFileSync(path.join(ROOT, "assets", "pwa", "icon.svg"), path.join(outDir, "icon.svg"));
+  fs.copyFileSync(path.join(ROOT, "assets", "og", "og.png"), path.join(outDir, "og.png"));
   const sw = fs.readFileSync(path.join(ROOT, "tools", "sw-template.js"), "utf8").replace("__VERSION__", version);
   fs.writeFileSync(path.join(outDir, "sw.js"), sw, "utf8");
   // Pages가 _로 시작하는 파일을 숨기지 않게
