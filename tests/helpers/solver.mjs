@@ -18,9 +18,10 @@ import { ROTATIONS } from "../../js/rules/rotation/index.js";
 const copy = board => ({ ...board, cells: board.cells.slice() });
 
 /**
+ * @param {{ topSpinOnly?: boolean, half?: boolean }} [options]  half: false면 180° 회전 없이(휴대폰 버튼에 없는 키)
  * @returns {{ x: number, y: number, rot: number, tspin: string, lines: number, perfect: boolean }[]}
  */
-export const placements = (board, type, rotationId = "srs") => {
+export const placements = (board, type, rotationId = "srs", { topSpinOnly = false, half = true } = {}) => {
   const rotation = ROTATIONS[rotationId];
   const size = PIECES[type].size;
   const fits = (x, y, rot) => !collides(board, rotation.cells(type, rot), x, y);
@@ -44,7 +45,9 @@ export const placements = (board, type, rotationId = "srs") => {
     }
     for (const dx of [-1, 1]) if (fits(a.x + dx, a.y, a.rot)) queue.push({ ...a, x: a.x + dx, lastAction: "move" });
     if (fits(a.x, a.y + 1, a.rot)) queue.push({ ...a, y: a.y + 1, lastAction: "drop" });
-    for (const d of [1, 3, 2]) {
+    // topSpinOnly: 생성 높이에서만 돌린다(돌린 뒤 내리고 밀기만) → "돌려서 끼워 넣기"가 필요한 자리인지 가린다
+    if (topSpinOnly && a.y !== start.y) continue;
+    for (const d of half ? [1, 3, 2] : [1, 3]) {
       const to = (a.rot + d) % 4;
       const blocked = (cx, cy) => !inBounds(board, a.x + cx, a.y + cy) || get(board, a.x + cx, a.y + cy) !== 0;
       const kicks = rotation.kicks(type, a.rot, to, blocked);

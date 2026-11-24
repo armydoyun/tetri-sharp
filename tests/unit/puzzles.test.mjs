@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { placements } from "../helpers/solver.mjs";
-import { HEIGHT, clearLines, createBoard, place } from "../../js/core/board.js";
+import { HEIGHT, clearLines, collides, createBoard, place } from "../../js/core/board.js";
 import { ROTATIONS } from "../../js/rules/rotation/index.js";
 import { BTN, createGame } from "../../js/core/engine.js";
 import { MODERN } from "../../js/rules/presets.js";
@@ -34,13 +34,63 @@ const solvesQuad = (board, pieces) => {
   });
 };
 
-test("퍼즐 38단계는 모두 주어진 피스로 풀 수 있다", () => {
-  assert.equal(PUZZLES.length, 38);
+/** 피스마다 한 줄 이상 지우며 끝까지 갈 수 있는가(콤보가 끊기지 않게) */
+const solvesCombo = (board, pieces) => {
+  const [type, ...rest] = pieces;
+  if (!type) return true;
+  return placements(board, type).some(p => {
+    if (!p.lines) return false;
+    const next = { ...board, cells: board.cells.slice() };
+    place(next, ROTATIONS.srs.cells(type, p.rot), p.x, p.y, 1);
+    clearLines(next);
+    return solvesCombo(next, rest);
+  });
+};
+
+/** 곧장 떨어뜨리기만으로(회전·좌우만 하고 하드 드롭) 2줄을 지울 수 있는가 */
+const hardDropClears = (board, type, lines) => {
+  for (let rot = 0; rot < 4; rot++) {
+    const cells = ROTATIONS.srs.cells(type, rot);
+    for (let x = -3; x < 12; x++) {
+      let y = HEIGHT - 22;
+      if (collides(board, cells, x, y)) continue;
+      while (!collides(board, cells, x, y + 1)) y += 1;
+      const next = { ...board, cells: board.cells.slice() };
+      place(next, cells, x, y, 1);
+      if (clearLines(next).length === lines) return true;
+    }
+  }
+  return false;
+};
+
+test("퍼즐 62단계는 모두 주어진 피스로 풀 수 있다", () => {
+  assert.equal(PUZZLES.length, 62);
   for (const p of PUZZLES) {
     const board = createBoard();
     p.build(board);
     if (p.kind === "pc") assert.ok(solvesPc(board, p.pieces), `단계 ${p.number}: ${p.pieces.join("")}`);
-    else if (p.kind === "quad") {
+    else if (p.kind === "tuck") {
+      // 밀어 넣으면(내리고 옆으로) 2줄을 지울 수 있고, 곧장 떨어뜨려서는 못 지운다
+      assert.ok(
+        placements(board, p.pieces[0]).some(q => q.lines === 2),
+        `단계 ${p.number}: 밀어 넣어 2줄`
+      );
+      assert.equal(hardDropClears(board, p.pieces[0], 2), false, `단계 ${p.number}: 곧장 떨어뜨려서는 안 풀린다`);
+    } else if (p.kind === "spin") {
+      // 돌려 넣으면 2줄을 지울 수 있고, 위에서만 돌리고 내리기·밀기로는 2줄을 못 지운다
+      assert.ok(
+        placements(board, p.pieces[0], "srs", { half: false }).some(q => q.lines === 2),
+        `단계 ${p.number}: 돌려 넣어 2줄(180° 회전 없이)`
+      );
+      assert.equal(
+        placements(board, p.pieces[0], "srs", { topSpinOnly: true }).some(q => q.lines >= 2),
+        false,
+        `단계 ${p.number}: 돌리지 않고는 안 풀린다`
+      );
+      assert.equal(hardDropClears(board, p.pieces[0], 2), false);
+    } else if (p.kind === "combo") {
+      assert.ok(solvesCombo(board, p.pieces), `단계 ${p.number}: ${p.pieces.join("")}`);
+    } else if (p.kind === "quad") {
       assert.equal(p.pieces.at(-1), "I", "마지막은 I");
       assert.ok(solvesQuad(board, p.pieces), `단계 ${p.number}: ${p.pieces.join("")}`);
     } else {
@@ -88,7 +138,7 @@ test("깬 단계 기록과 다음 단계", () => {
   assert.deepEqual([...progress.cleared()], [1, 3], "이상한 값은 버린다");
 });
 
-test("퍼즐 순서: 판 비우기 → 4줄 만들기 → T-spin Double → T-spin Triple 장, 장 안에서는 피스가 적은 것부터", async () => {
+test("퍼즐 순서: 판 비우기 → 4줄 만들기 → 콤보 → 밀어 넣기 → 돌려 넣기 → T-spin Double → T-spin Triple 장, 장 안에서는 피스가 적은 것부터", async () => {
   const { CHAPTERS } = await import("../../js/modes/puzzles.js");
   assert.deepEqual(
     PUZZLES.map(p => p.number),
@@ -108,7 +158,7 @@ test("퍼즐 순서: 판 비우기 → 4줄 만들기 → T-spin Double → T-sp
   assert.deepEqual(
     PUZZLES.map(p => p.id).sort((a, b) => a - b),
     PUZZLES.map((_, i) => i + 1),
-    "id는 만들 때의 번호 1~38(4줄 만들기는 31~)"
+    "id는 만들 때의 번호 1~62(4줄 만들기 31~, 밀어 넣기 39~, 콤보 47~, 돌려 넣기 55~)"
   );
 });
 

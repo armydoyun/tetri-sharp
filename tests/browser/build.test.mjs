@@ -47,8 +47,12 @@ test("결과는 파일 하나이고 바깥 파일을 참조하지 않는다", ()
   assert.ok(result.bytes < 1024 * 1024, `배포본 크기 ${result.bytes} bytes`);
 });
 
-const openPage = async (initScript = null, initArg = undefined, { locale = "ko-KR", frameClock = false } = {}) => {
-  const context = await browser.newContext({ locale, viewport: { width: 1280, height: 900 }, acceptDownloads: true });
+const openPage = async (
+  initScript = null,
+  initArg = undefined,
+  { locale = "ko-KR", frameClock = false, viewport = { width: 1280, height: 900 }, hasTouch = false } = {}
+) => {
+  const context = await browser.newContext({ locale, viewport, hasTouch, acceptDownloads: true });
   if (frameClock) {
     await context.addInitScript(() => {
       let now = 0;
@@ -3552,6 +3556,170 @@ test("퍼즐 4줄 만들기: 우물을 남기고 앞 피스를 채운 뒤 I로 4
     await page.waitForTimeout(20);
   }
   await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
+  assert.equal(await text(page, "results-title"), "성공!");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+/** 키를 누르고 떼며 프레임을 진행한다(실제 시간에 기대지 않게). steps: [키 코드, 누르고 있는 프레임 수] */
+const runKeys = (page, steps) =>
+  page.evaluate(steps => {
+    const key = (code, type) => window.dispatchEvent(new KeyboardEvent(type, { code, cancelable: true }));
+    for (const [code, frames] of steps) {
+      key(code, "keydown");
+      for (let i = 0; i < frames; i++) window.advanceFrame();
+      key(code, "keyup");
+      window.advanceFrame();
+    }
+  }, steps);
+
+/** 퍼즐 목록에서 단계를 열고 한 프레임 진행한다 */
+const openPuzzle = async (page, number) => {
+  await page.click("#open-puzzles");
+  await page.click(`[data-puzzle="${number}"]`);
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  await page.evaluate(() => window.advanceFrame());
+};
+
+test("퍼즐 콤보 이어 가기: 줄을 못 지운 피스가 나오면 남은 피스와 상관없이 바로 실패", async () => {
+  const { context, page, errors } = await openPage(
+    () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } })),
+    undefined,
+    { frameClock: true }
+  );
+  const first = PUZZLES.find(p => p.kind === "combo");
+  assert.ok(first.pieces.length >= 3);
+  await openPuzzle(page, first.number);
+  assert.match(await text(page, "mode-objective"), /콤보/);
+  // 가운데에 곧장 떨어뜨리면 우물 밖 벽 위에 얹혀 줄을 못 지운다 → 첫 피스에서 실패
+  await runKeys(page, [["Space", 1]]);
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  assert.equal(await text(page, "results-title"), "실패");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("퍼즐 돌려 넣기: 곧장 떨어뜨리면 틈에 안 들어가고, 바닥까지 내린 뒤 돌려 끼우면 성공", async () => {
+  const { context, page, errors } = await openPage(
+    () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } })),
+    undefined,
+    { frameClock: true }
+  );
+  // 첫 돌려 넣기 단계: 눕힌 Z, 틈 오른쪽 아래 칸이 위 칸에 가려 곧장은 못 들어간다
+  const first = PUZZLES.find(p => p.kind === "spin");
+  assert.equal(first.pieces[0], "Z");
+  await openPuzzle(page, first.number);
+  assert.match(await text(page, "mode-objective"), /돌려 끼워/);
+  await runKeys(page, [["Space", 1]]);
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  assert.equal(await text(page, "results-title"), "실패", "곧장 떨어뜨리면 실패");
+  await page.click('#results [data-action="menu"]');
+  await openPuzzle(page, first.number);
+  // 바닥까지 소프트 드롭 → 반시계 → 오른쪽 → 반시계(벽 차기로 틈에 끼워진다) → 하드 드롭
+  await runKeys(page, [
+    ["ArrowDown", 70],
+    ["KeyZ", 1],
+    ["ArrowRight", 1],
+    ["KeyZ", 1],
+    ["Space", 1],
+  ]);
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  assert.equal(await text(page, "results-title"), "성공!");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("휴대폰 제스처로 밀어 넣기: 옆으로 한 칸 → 끌어내려 소프트 드롭 → 멈춘 채 한 칸 반 옆으로 밀면 정확히 한 칸 들어가고, 튕겨 내리면 성공", async () => {
+  const { context, page, errors } = await openPage(
+    () =>
+      localStorage.setItem(
+        "tetrisharp:settings",
+        JSON.stringify({ touch: "on", touchMode: "gestures", access: { countdown: "off" } })
+      ),
+    undefined,
+    { frameClock: true, viewport: { width: 390, height: 844 }, hasTouch: true }
+  );
+  const first = PUZZLES.find(p => p.kind === "tuck");
+  await openPuzzle(page, first.number);
+  await page.evaluate(() => {
+    const wrap = /** @type {HTMLElement} */ (document.querySelector(".board-wrap"));
+    const board = /** @type {HTMLElement} */ (document.getElementById("board"));
+    const r = board.getBoundingClientRect();
+    const cell = r.width / 10;
+    let id = 30;
+    const fire = (type, x, y) =>
+      wrap.dispatchEvent(
+        new PointerEvent(type, {
+          pointerId: id,
+          pointerType: "touch",
+          clientX: x,
+          clientY: y,
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+    const frames = n => {
+      for (let i = 0; i < n; i++) window.advanceFrame();
+    };
+    const x0 = r.left + r.width / 2;
+    const y0 = r.top + r.height / 3;
+    // 1) 옆으로 한 칸 남짓 밀고 떼기 → 오른쪽 한 칸
+    fire("pointerdown", x0, y0);
+    fire("pointermove", x0 + cell * 0.6, y0);
+    fire("pointermove", x0 + cell * 1.2, y0);
+    fire("pointerup", x0 + cell * 1.2, y0);
+    frames(2);
+    // 2) 새 손가락으로 천천히 끌어내려 소프트 드롭(바닥까지), 멈춘 채 왼쪽으로 한 칸 반 → 한 칸만 밀어 넣는다
+    id += 1;
+    fire("pointerdown", x0, y0);
+    for (let i = 1; i <= 4; i++) {
+      fire("pointermove", x0 + i, y0 + cell * 0.6 * i);
+      frames(3);
+    }
+    frames(70);
+    const y1 = y0 + cell * 2.4;
+    fire("pointermove", x0 + 4 - cell * 0.8, y1);
+    fire("pointermove", x0 + 4 - cell * 1.6, y1);
+    frames(2);
+    // 3) 떼면 가로로 바뀌었으니 하드 드롭은 없다(처마 아래로 옮겨졌을 뿐, 중력이 없으니 그대로 떠 있다)
+    fire("pointerup", x0 + 4 - cell * 1.6, y1);
+    frames(2);
+    // 4) 새 손가락으로 아래로 튕겨 하드 드롭 → 처마 아래 빈칸에 들어가 2줄
+    id += 1;
+    fire("pointerdown", x0, y0);
+    for (let i = 1; i <= 4; i++) fire("pointermove", x0, y0 + cell * i);
+    fire("pointerup", x0, y0 + cell * 5);
+    frames(2);
+  });
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  assert.equal(await text(page, "results-title"), "성공!");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("퍼즐 밀어 넣기: 곧장 떨어뜨리면 처마에 걸리고, 소프트 드롭으로 내린 뒤 옆으로 밀어 넣으면 성공", async () => {
+  const { context, page, errors } = await openPage(
+    () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } })),
+    undefined,
+    { frameClock: true }
+  );
+  // 첫 밀어 넣기 단계: I 하나, 처마가 빈칸 왼쪽 위를 덮는다
+  const first = PUZZLES.find(p => p.kind === "tuck");
+  await openPuzzle(page, first.number);
+  assert.match(await text(page, "mode-objective"), /밀어 넣어/);
+  await runKeys(page, [["Space", 1]]);
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  assert.equal(await text(page, "results-title"), "실패", "곧장 떨어뜨리면 처마에 걸린다");
+  await page.click('#results [data-action="menu"]');
+  await openPuzzle(page, first.number);
+  // 오른쪽 한 칸 → 소프트 드롭으로 바닥까지(중력 없음: 3프레임에 한 칸) → 왼쪽으로 밀어 처마 아래 → 하드 드롭
+  await runKeys(page, [
+    ["ArrowRight", 1],
+    ["ArrowDown", 70],
+    ["ArrowLeft", 1],
+    ["Space", 1],
+  ]);
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
   assert.equal(await text(page, "results-title"), "성공!");
   assert.deepEqual(errors, []);
   await context.close();

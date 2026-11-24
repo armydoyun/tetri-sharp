@@ -118,6 +118,27 @@ export const ACHIEVEMENTS = Object.freeze([
     test: c => c.puzzles.filter(p => p.kind === "pc").every(p => c.puzzlesCleared.has(p.id)),
   },
   {
+    id: "puzzle-combo",
+    group: "puzzle",
+    name: t("콤보 장"),
+    description: t("콤보 이어 가기 퍼즐을 모두 풀기"),
+    test: c => c.puzzles.filter(p => p.kind === "combo").every(p => c.puzzlesCleared.has(p.id)),
+  },
+  {
+    id: "puzzle-spin",
+    group: "puzzle",
+    name: t("돌려 넣기 장"),
+    description: t("돌려 넣기 퍼즐을 모두 풀기"),
+    test: c => c.puzzles.filter(p => p.kind === "spin").every(p => c.puzzlesCleared.has(p.id)),
+  },
+  {
+    id: "puzzle-tuck",
+    group: "puzzle",
+    name: t("밀어 넣기 장"),
+    description: t("밀어 넣기 퍼즐을 모두 풀기"),
+    test: c => c.puzzles.filter(p => p.kind === "tuck").every(p => c.puzzlesCleared.has(p.id)),
+  },
+  {
     id: "puzzle-quad",
     group: "puzzle",
     name: t("4줄 만들기 장"),

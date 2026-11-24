@@ -639,7 +639,13 @@ const setScreen = next => {
           ? t("목표 · 주어진 피스로 판 비우기")
           : mode.puzzle.kind === "quad"
             ? t("목표 · 우물을 남기고 채운 뒤 마지막 I로 4줄 지우기")
-            : t("목표 · T 하나로 {kind} 만들기", { kind: mode.description })
+            : mode.puzzle.kind === "tuck"
+              ? t("목표 · 소프트 드롭으로 내린 뒤 처마 아래로 밀어 넣어 2줄 지우기")
+              : mode.puzzle.kind === "combo"
+                ? t("목표 · 피스마다 한 줄 이상 지워 콤보 끊지 않기")
+                : mode.puzzle.kind === "spin"
+                  ? t("목표 · 틈 근처까지 내린 뒤 돌려 끼워 넣어 2줄 지우기")
+                  : t("목표 · T 하나로 {kind} 만들기", { kind: mode.description })
         : mode.practice
           ? mode.description
           : "";

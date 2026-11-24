@@ -3,8 +3,8 @@
 //  한 번 댄 손가락은 처음 움직인 방향으로 잠근다: 아래·위로 쓸기 시작하면 떼기 전까지 가로 흔들림을 무시하고,
 //  가로로 확실히(세로의 2배 넘게) 밀 때만 칸 이동을 한다. 엄지로 내려 쓸 때 호를 그리며 옆으로 흘러도
 //  하드 드롭이 옆 칸으로 새지 않는다.
-//  다만 세로로 내린 뒤 손가락이 더 내려가지 않으면서 가로로 두 칸 넘게 움직이면 가로를 다시 허락한다
-//  → 소프트 드롭으로 내리다가 처마 아래로 밀어 넣기를 한 손가락으로 할 수 있다.
+//  다만 세로로 내린 뒤 손가락이 더 내려가지 않으면서 가로로 한 칸 반 넘게 움직이면 그 자리에서 한 칸 움직이고
+//  가로를 다시 허락한다 → 소프트 드롭으로 내리다가 처마 아래로 한 칸 밀어 넣기를 한 손가락으로 할 수 있다.
 //  - 아래로 밀고 있기: 소프트 드롭(손가락을 떼면 멈춤)
 //  - 아래로 빠르게 튕기기: 하드 드롭
 //  - 위로 밀기: 홀드
@@ -16,6 +16,7 @@ const TAP_MOVE = 12; // px: 이보다 덜 움직이고 떼면 두드리기
 const TAP_MS = 260;
 const FLICK_SPEED = 0.9; // px/ms: 아래로 이보다 빠르면 하드 드롭
 const AXIS_RATIO = 2; // 가로 이동량이 세로의 이 배수를 넘어야 가로로 잠근다
+const TUCK_UNLOCK = 1.5; // 칸: 세로로 잠근 뒤 이만큼 옆으로 밀면 밀어 넣기(한 칸 이동)
 
 /**
  * @param {{ root: HTMLElement, cellSize: () => number }} options  cellSize: 화면에서 보드 한 칸의 폭(px)
@@ -71,12 +72,16 @@ export const createGestures = ({ root, cellSize }) => {
       else if (Math.hypot(tdx, dy) > cell * 1.5) touch.axis = Math.abs(tdx) > Math.abs(dy) ? "x" : "y";
     }
     // 세로로 잠근 뒤: 아래로 반 칸 넘게 나아가면 기준점을 따라 내린다(내려 쓰는 동안의 옆 흔들림은 쌓이지 않는다).
-    // 기준점에서 더 내려가지 않고 가로로 두 칸 넘게 가면 밀어 넣기 → 가로로 바꾸고 기준점부터 한 칸씩 움직인다.
+    // 기준점에서 더 내려가지 않고 가로로 한 칸 반 넘게 가면 밀어 넣기 → 그 자리에서 한 칸 움직이고 가로로 바꾼다.
+    // (기준점부터 칸을 세면 한 칸 밀어 넣으려다 두 칸 가 버린다 — 휴대폰 점검에서 찾음)
+    // 그 뒤로는 지금 자리부터 한 칸 폭마다 한 칸씩.
     if (touch.axis === "y") {
+      const sx = e.clientX - touch.anchor.x;
       if (e.clientY - touch.anchor.y > cell / 2) touch.anchor = { x: e.clientX, y: e.clientY };
-      else if (Math.abs(e.clientX - touch.anchor.x) > cell * 2 && Math.abs(e.clientY - touch.anchor.y) < cell) {
+      else if (Math.abs(sx) > cell * TUCK_UNLOCK && Math.abs(e.clientY - touch.anchor.y) < cell) {
         touch.axis = "x";
-        touch.ax = touch.anchor.x;
+        press(sx < 0 ? BTN.LEFT : BTN.RIGHT);
+        touch.ax = e.clientX;
       }
     }
     // 가로: 가로로 잠갔을 때만, 댄 자리(또는 밀어 넣기를 시작한 자리)부터 한 칸씩
