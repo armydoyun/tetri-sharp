@@ -127,6 +127,18 @@ const playReplayFrames = (page, inputs, from, to, delay = 0, topOut = false) =>
     { from, to, delay, topOut, inputs }
   );
 /** 메뉴에서 모드를 골라 카운트다운이 끝날 때까지 기다린다. */
+/**
+ * 첫 화면에서 퍼즐·연습 목록을 연다. 퍼즐·연습을 마치고 나오면 그 목록이 이미 열려 있으므로(목록으로 돌아가기)
+ * 열려 있으면 닫고 첫 화면의 단추로 처음부터 연다.
+ */
+const openList = async (page, button) => {
+  const dialog = button === "#open-practice" ? "#practice" : "#puzzles";
+  if (await page.locator(`${dialog}[open]`).count()) {
+    await page.locator(`${dialog}[open]`).evaluate(d => /** @type {HTMLDialogElement} */ (d).close());
+  }
+  await page.click(button);
+};
+
 const startMode = async (page, id) => {
   await page.click(`[data-mode="${id}"]`);
   await page.waitForFunction(() => document.body.dataset.screen === "play", null, {
@@ -226,7 +238,7 @@ test("이어서 하기: 튜토리얼 힌트와 자유 연습 되돌리기를 복
       for (let i = 0; i < n; i++) window.advanceFrame();
     }, n);
   try {
-    await page.click("#open-practice");
+    await openList(page, "#open-practice");
     await page.click('[data-drill="downstack"]');
     await page.click('[data-downstack="downstack-1"]');
     await advance(1);
@@ -240,7 +252,7 @@ test("이어서 하기: 튜토리얼 힌트와 자유 연습 되돌리기를 복
     await page.click("#go-home");
     await page.click('[data-confirm="ok"]');
 
-    await page.click("#open-practice");
+    await openList(page, "#open-practice");
     await page.click('[data-drill="free"]');
     await advance(2);
     await page.keyboard.press("Space");
@@ -1269,7 +1281,7 @@ test("내 규칙: 첫 화면에서 고르고 공유 탭을 열며, 편집기에�
 
 test("연습: 메뉴에서 고르면 시작하고, 놓을 때마다 성공/시도를 센다", async () => {
   const { context, page, errors } = await openPage();
-  await page.click("#open-practice");
+  await openList(page, "#open-practice");
   assert.equal(await page.locator("#practice .menu-row").count(), 12);
   assert.equal(await page.locator('[data-drill="double"]').isVisible(), true);
   await page.click('[data-drill="tsd"]');
@@ -1296,7 +1308,7 @@ test("파내기 훈련: 단계 선택, 두 가지 힌트, 같은 판 재시작 �
     }, code);
   await page.setViewportSize({ width: 390, height: 844 });
   try {
-    await page.click("#open-practice");
+    await openList(page, "#open-practice");
     await page.click('[data-drill="downstack"]');
     const stages = page.locator("[data-downstack]");
     assert.equal(await stages.count(), 6);
@@ -1369,7 +1381,7 @@ test("입문 코스 완료 표시와 수동 Sprint 시도 기록을 볼 수 있�
       if (index < 3) await page.click('#results [data-action="next-puzzle"]');
     }
     await page.click('#results [data-action="menu"]');
-    await page.click("#open-practice");
+    await openList(page, "#open-practice");
     await page.click('[data-drill="intro"]');
     assert.equal(
       await page
@@ -1416,7 +1428,7 @@ test("CPU 대전 입문: 즉시 재시도하고 공격·상쇄·전송 수를 �
     }, codes);
   try {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.click("#open-practice");
+    await openList(page, "#open-practice");
     await page.click('[data-drill="battle-training"]');
     assert.equal(await page.locator("[data-practice-stage]").count(), 3);
     await page.click('[data-practice-stage="battle-lesson-1"]');
@@ -1457,7 +1469,7 @@ test("빌드 연습: 빈칸·배치 힌트, 초기화와 힌트 없는 4줄 완�
     }, codes);
   try {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.click("#open-practice");
+    await openList(page, "#open-practice");
     await page.click('[data-drill="build-training"]');
     assert.equal(await page.locator("[data-practice-stage]").count(), 2);
     await page.click('[data-practice-stage="build-lesson-1"]');
@@ -1611,7 +1623,7 @@ test("글자 잘림 없음: 첫 화면·설정 모든 탭·규칙 편집 모든 
     await page.click("#open-records");
     await check("기록");
     await page.click("#records-close");
-    await page.click("#open-practice");
+    await openList(page, "#open-practice");
     await check("연습");
     assert.deepEqual(found, []);
     await context.close();
@@ -1679,7 +1691,7 @@ test("글자 잘림 없음(영어): 첫 화면·설정·기록·연습", async (
     await page.click("#open-records");
     await check("records");
     await page.click("#records-close");
-    await page.click("#open-practice");
+    await openList(page, "#open-practice");
     await check("practice");
     assert.deepEqual(found, []);
     await context.close();
@@ -2411,7 +2423,7 @@ test("피네스 훈련: 같은 문제를 더 적은 입력으로 다시 풀고 �
     );
   });
   try {
-    await page.click("#open-practice");
+    await openList(page, "#open-practice");
     await page.click('[data-drill="finesse-lesson"]');
     await page.click('[data-practice-stage="finesse-lesson-1"]');
     const play = () => page.waitForFunction(() => document.body.dataset.screen === "play");
@@ -2954,7 +2966,7 @@ test("편의: 카운트다운 '없음'이면 바로 시작하고, 연습에서�
   const { context, page, errors } = await openPage(() =>
     localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
   );
-  await page.click("#open-practice");
+  await openList(page, "#open-practice");
   await page.click('[data-drill="free"]');
   assert.equal(await page.evaluate(() => document.body.dataset.screen), "play", "바로 시작");
   assert.equal(await visible(page, "undo-piece"), true, "연습에서는 되돌리기 버튼");
@@ -2968,6 +2980,9 @@ test("편의: 카운트다운 '없음'이면 바로 시작하고, 연습에서�
   await page.keyboard.press("Escape");
   await page.click('#pause [data-action="menu"]');
   await page.click('[data-confirm="ok"]');
+  // 연습을 그만두면 연습 목록이 열린다 → 닫으면 첫 화면
+  await page.waitForFunction(() => document.getElementById("practice")?.open);
+  await page.keyboard.press("Escape");
   await page.click('[data-mode="endless"]');
   await page.waitForFunction(() => document.body.dataset.screen === "play");
   assert.equal(await visible(page, "undo-piece"), false, "연습이 아니면 되돌리기 없음");
@@ -3016,7 +3031,7 @@ test("퍼즐: 단계를 풀면 성공·다음 단계로 이어지고, 첫 화면
     localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
   );
   assert.equal(await text(page, "puzzle-progress"), `0 / ${PUZZLES.length}`);
-  await page.click("#open-puzzles");
+  await openList(page, "#open-puzzles");
   assert.equal(await page.locator(".puzzle-tile").count(), PUZZLES.length);
   await page.click('[data-puzzle="1"]');
   await page.waitForFunction(() => document.body.dataset.screen === "play");
@@ -3056,7 +3071,7 @@ test("만든 퍼즐: 시험 플레이 성공 후에만 공유하고, 휴대폰�
     isMobile: true,
   });
   try {
-    await page.click("#open-puzzles");
+    await openList(page, "#open-puzzles");
     await page.click("#puzzle-create");
     const trial = page.locator("#puzzle-trial");
     const share = page.locator("#puzzle-copy");
@@ -3328,7 +3343,7 @@ test("업적: 이룬 판의 결과 화면에 알리고, 첫 화면 개수와 업
     localStorage.setItem("tetrisharp:puzzle:cleared", JSON.stringify(rest));
   }, others);
   assert.match(await text(page, "achievement-progress"), /^0 \/ \d+$/);
-  await page.click("#open-puzzles");
+  await openList(page, "#open-puzzles");
   await page.click('[data-puzzle="1"]');
   await page.waitForFunction(() => document.body.dataset.screen === "play");
   for (const key of keysFor(solvePuzzle(PUZZLES[0]))) {
@@ -3560,7 +3575,7 @@ test("퍼즐 4줄 만들기: 우물을 남기고 앞 피스를 채운 뒤 I로 4
     { frameClock: true }
   );
   const first = PUZZLES.find(p => p.kind === "quad");
-  await page.click("#open-puzzles");
+  await openList(page, "#open-puzzles");
   assert.match(await page.locator("#puzzles").textContent(), /4줄 만들기/);
   await page.click(`[data-puzzle="${first.number}"]`);
   await page.waitForFunction(() => document.body.dataset.screen === "play");
@@ -3589,7 +3604,7 @@ const runKeys = (page, steps) =>
 
 /** 퍼즐 목록에서 단계를 열고 한 프레임 진행한다 */
 const openPuzzle = async (page, number) => {
-  await page.click("#open-puzzles");
+  await openList(page, "#open-puzzles");
   await page.click(`[data-puzzle="${number}"]`);
   await page.waitForFunction(() => document.body.dataset.screen === "play");
   await page.evaluate(() => window.advanceFrame());
@@ -3834,6 +3849,52 @@ test("업적: Custom 규칙 판은 결과에 '플레이 업적만 쌓여요'를 
   await page.click('#results [data-action="menu"]');
   await page.click("#open-achievements");
   assert.match(await page.locator("#achievements .notice-slot").textContent(), /플레이 업적은 모든 규칙/);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("퍼즐 첫 수 보기와 목록으로: 힌트는 자리와 누를 순서를 보이고, 결과의 '퍼즐 목록'은 방금 한 단계에 포커스를 둔 목록을 연다", async () => {
+  const { context, page, errors } = await openPage(
+    () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } })),
+    undefined,
+    { frameClock: true }
+  );
+  const spin = PUZZLES.find(p => p.kind === "spin");
+  await openPuzzle(page, spin.number);
+  assert.equal(await page.locator("#downstack-hint").isVisible(), true, "퍼즐에도 힌트 단추");
+  assert.equal(await text(page, "downstack-hint"), "첫 수 보기");
+  await page.click("#downstack-hint");
+  assert.match(await text(page, "downstack-status"), /^첫 수 · .*반시계 회전/);
+  assert.equal(await text(page, "downstack-hint"), "힌트 숨기기");
+  await page.click("#downstack-hint");
+  assert.equal(await text(page, "downstack-status"), "", "한 번 더 누르면 숨긴다");
+  // 결과에서 "퍼즐 목록" → 목록이 열리고 방금 한 단계에 포커스
+  await runKeys(page, [["Space", 1]]);
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  assert.equal(await page.locator('#results [data-action="menu"] .btn-label').textContent(), "퍼즐 목록");
+  await page.click('#results [data-action="menu"]');
+  await page.waitForFunction(() => document.getElementById("puzzles")?.open);
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("data-puzzle")), String(spin.number));
+  assert.equal(await page.evaluate(() => document.body.dataset.screen), "menu", "목록을 닫으면 첫 화면");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("연습 목록으로: 연습 중 일시정지의 '연습 목록으로'는 그 연습 줄에 포커스를 둔 목록을 연다", async () => {
+  const { context, page, errors } = await openPage(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  await openList(page, "#open-practice");
+  await page.click('[data-drill="pc"]');
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  await page.keyboard.press("Escape");
+  assert.equal(await page.locator('#pause [data-action="menu"] .btn-label').textContent(), "연습 목록으로");
+  await page.click('#pause [data-action="menu"]');
+  // 진행 중인 판이면 묻는다
+  await page.waitForFunction(() => document.getElementById("confirm-title")?.textContent === "연습 목록으로 갈까요?");
+  await page.click('[data-confirm="ok"]');
+  await page.waitForFunction(() => document.getElementById("practice")?.open);
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("data-drill")), "pc");
   assert.deepEqual(errors, []);
   await context.close();
 });

@@ -97,6 +97,43 @@ export const buildPcFinish = (board, queue, rng) => {
   return 0;
 };
 
+/** 배열의 모든 순서 */
+const permutations = items =>
+  items.length <= 1
+    ? [items]
+    : items.flatMap((x, i) => permutations([...items.slice(0, i), ...items.slice(i + 1)]).map(p => [x, ...p]));
+
+/**
+ * 퍼펙트 클리어 마무리 연습의 한 판. 다음 피스들로 비울 자리를 만들고, 못 만들면 다음 피스의 순서를 바꾼다.
+ * S·Z가 먼저 오면 두 줄 안에서 곧장 내려 들어갈 자리가 없어 판을 못 만들 때가 있다(약 4%).
+ * 예전에는 그때 빈 판을 두고 "1피스로 비우기"로 넘어가, 첫 피스를 놓자마자 실패했다.
+ * 연습이라 다음 피스 순서를 바꿔도 된다: 앞 네 개의 순서를 바꿔 보고, 그래도 안 되면 첫 피스를 바꾼다.
+ * @param {string[]} queue  다음 피스(필요하면 이 자리에서 고친다)
+ * @returns {number} 필요한 피스 수(1~4)
+ */
+export const buildPcRound = (board, queue, rng) => {
+  const n = buildPcFinish(board, queue, rng);
+  if (n) return n;
+  const front = queue.slice(0, 4);
+  for (const order of permutations(front)) {
+    const m = buildPcFinish(board, [...order, ...queue.slice(4)], rng);
+    if (m) {
+      queue.splice(0, front.length, ...order);
+      return m;
+    }
+  }
+  for (const type of ["T", "L", "J", "I", "O"]) {
+    const m = buildPcFinish(board, [type, ...queue.slice(1)], rng);
+    if (m) {
+      queue[0] = type;
+      return m;
+    }
+  }
+  // 여기까지 오면 I 하나로도 못 만든 것 — 일어나지 않지만, 빈 판으로 두지는 않는다
+  queue[0] = "I";
+  return buildPcFinish(board, queue, rng) || 1;
+};
+
 /**
  * 주어진 피스를 모두 써야 하는 판 비우기 자리(퍼즐용). 만들 수 없으면 false(판은 비운다).
  * @param {string[]} pieces  놓는 순서
@@ -221,7 +258,7 @@ export const DRILLS = Object.freeze([
     description: t("아래 두 줄의 구멍을 다음 피스들로 채워 판을 비우기 · 보통 두 개"),
     sequence: null,
     build: (board, rng, state) => {
-      state.practice.need = buildPcFinish(board, state.queue, rng) || 1;
+      state.practice.need = buildPcRound(board, state.queue, rng);
       state.practice.placed = 0;
     },
     // 여러 피스로 한 번의 시도: 판을 비우면 성공, 필요한 수만큼 놓고도 못 비우면 실패
