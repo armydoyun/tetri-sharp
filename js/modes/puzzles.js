@@ -58,6 +58,45 @@ const PLAN = Object.freeze([
   ["quad", 4],
 ]);
 
+/** 아래 네 줄에서 우물 열을 뺀 빈칸이 몇 덩어리(상하좌우로 이어진)인가 */
+const holeGroups = (board, well) => {
+  const top = board.height - 4;
+  const empty = (x, y) =>
+    x !== well && y >= top && y < board.height && x >= 0 && x < WIDTH && !board.cells[y * WIDTH + x];
+  const seen = new Set();
+  let groups = 0;
+  for (let y = top; y < board.height; y++)
+    for (let x = 0; x < WIDTH; x++) {
+      if (!empty(x, y) || seen.has(y * WIDTH + x)) continue;
+      groups += 1;
+      const stack = [[x, y]];
+      while (stack.length) {
+        const [cx, cy] = /** @type {[number, number]} */ (stack.pop());
+        const key = cy * WIDTH + cx;
+        if (seen.has(key) || !empty(cx, cy)) continue;
+        seen.add(key);
+        stack.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
+      }
+    }
+  return groups;
+};
+
+/**
+ * 울퉁불퉁함: 우물 열을 뺀 열마다 위에서 빈칸이 이어진 깊이를 재고, 이웃 열과의 차를 더한다.
+ * 한 칸 폭의 좁은 틈이 여기저기 있으면 커진다(깔끔한 판 4~8, 흩어진 판 9~13).
+ */
+const bumpiness = (board, well) => {
+  const top = board.height - 4;
+  const depths = [];
+  for (let x = 0; x < WIDTH; x++) {
+    if (x === well) continue;
+    let d = 0;
+    while (d < 4 && !board.cells[(top + d) * WIDTH + x]) d += 1;
+    depths.push(d);
+  }
+  return depths.slice(1).reduce((sum, d, i) => sum + Math.abs(d - depths[i]), 0);
+};
+
 /**
  * 단계 하나 만들기: 판을 그리는 함수, 피스 순서, 목표.
  * 판 비우기는 시드로 피스를 뽑아 구멍을 만들고, 못 만들면 다음 시드로 다시 한다(늘 같은 결과).
@@ -84,6 +123,8 @@ const makeStage = index => {
       const well = rng.int(2) === 0 ? rng.int(3) : WIDTH - 1 - rng.int(3);
       const board = { width: WIDTH, height: 40, cells: new Uint8Array(WIDTH * 40) };
       if (!buildQuadExact(board, front, createRng(53 + index * 131 + attempt), well)) continue;
+      // 빈칸(우물 빼고)이 판 전체에 흩어지면 처음 보는 사람에게 너무 어렵다 → 한두 덩어리로 모인 판만 쓴다(3차 평가 F36)
+      if (holeGroups(board, well) > 2 || bumpiness(board, well) > 8) continue;
       const cells = board.cells.slice();
       return {
         kind,

@@ -3,6 +3,8 @@
 //  한 번 댄 손가락은 처음 움직인 방향으로 잠근다: 아래·위로 쓸기 시작하면 떼기 전까지 가로 흔들림을 무시하고,
 //  가로로 확실히(세로의 2배 넘게) 밀 때만 칸 이동을 한다. 엄지로 내려 쓸 때 호를 그리며 옆으로 흘러도
 //  하드 드롭이 옆 칸으로 새지 않는다.
+//  다만 세로로 내린 뒤 손가락이 더 내려가지 않으면서 가로로 두 칸 넘게 움직이면 가로를 다시 허락한다
+//  → 소프트 드롭으로 내리다가 처마 아래로 밀어 넣기를 한 손가락으로 할 수 있다.
 //  - 아래로 밀고 있기: 소프트 드롭(손가락을 떼면 멈춤)
 //  - 아래로 빠르게 튕기기: 하드 드롭
 //  - 위로 밀기: 홀드
@@ -22,7 +24,7 @@ export const createGestures = ({ root, cellSize }) => {
   let enabled = false;
   let held = 0;
   let pending = [0];
-  /** @type {null | { id: number, x0: number, y0: number, ax: number, t0: number, moved: boolean, soft: boolean, axis: null | "x" | "y", trail: {y: number, t: number}[] }} */
+  /** @type {null | { id: number, x0: number, y0: number, ax: number, t0: number, moved: boolean, soft: boolean, axis: null | "x" | "y", anchor: {x: number, y: number}, trail: {y: number, t: number}[] }} */
   let touch = null;
 
   const press = bit => {
@@ -48,6 +50,8 @@ export const createGestures = ({ root, cellSize }) => {
       moved: false,
       soft: false,
       axis: null,
+      // 세로로 잠근 뒤 마지막으로 아래로 나아간 자리(옆으로 밀기를 다시 허락할지 재는 기준)
+      anchor: { x: e.clientX, y: e.clientY },
       trail: [],
     };
   };
@@ -66,7 +70,16 @@ export const createGestures = ({ root, cellSize }) => {
       else if (Math.abs(dy) >= Math.abs(tdx)) touch.axis = "y";
       else if (Math.hypot(tdx, dy) > cell * 1.5) touch.axis = Math.abs(tdx) > Math.abs(dy) ? "x" : "y";
     }
-    // 가로: 가로로 잠갔을 때만, 댄 자리부터 한 칸씩
+    // 세로로 잠근 뒤: 아래로 반 칸 넘게 나아가면 기준점을 따라 내린다(내려 쓰는 동안의 옆 흔들림은 쌓이지 않는다).
+    // 기준점에서 더 내려가지 않고 가로로 두 칸 넘게 가면 밀어 넣기 → 가로로 바꾸고 기준점부터 한 칸씩 움직인다.
+    if (touch.axis === "y") {
+      if (e.clientY - touch.anchor.y > cell / 2) touch.anchor = { x: e.clientX, y: e.clientY };
+      else if (Math.abs(e.clientX - touch.anchor.x) > cell * 2 && Math.abs(e.clientY - touch.anchor.y) < cell) {
+        touch.axis = "x";
+        touch.ax = touch.anchor.x;
+      }
+    }
+    // 가로: 가로로 잠갔을 때만, 댄 자리(또는 밀어 넣기를 시작한 자리)부터 한 칸씩
     if (touch.axis === "x") {
       while (Math.abs(e.clientX - touch.ax) >= cell) {
         const dir = Math.sign(e.clientX - touch.ax);

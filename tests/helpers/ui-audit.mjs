@@ -91,6 +91,13 @@ export const auditInPage = () => {
         const pr = p.getBoundingClientRect();
         const bl = parseFloat(ps.borderLeftWidth) || 0;
         const br = parseFloat(ps.borderRightWidth) || 0;
+        // 세로: 넘침을 숨기는(hidden·clip) 조상 밖으로 위아래가 잘림(스크롤 영역은 정상). 글자가 있는 요소만
+        if (
+          (ps.overflowY === "hidden" || ps.overflowY === "clip") &&
+          (r.bottom > pr.bottom - (parseFloat(ps.borderBottomWidth) || 0) + 1 || r.top < pr.top - 1) &&
+          [...el.childNodes].some(n => n.nodeType === 3 && n.nodeValue.trim())
+        )
+          problems.push(`세로로 잘림 · ${describe(el)} ⊄ ${describe(p)}`);
         if (r.left < pr.left + bl - 1 || r.right > pr.right - br + 1) {
           // 스크롤 영역 안에서 가로로 나간 것만(세로 스크롤은 정상)
           if (!(ps.overflowX === "auto" || ps.overflowX === "scroll") || p.scrollWidth > p.clientWidth + 1)

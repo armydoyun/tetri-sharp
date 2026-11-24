@@ -151,9 +151,13 @@
   visibility: hidden;
 }
 
-.btn-confirm[data-armed] {
-  border-color: var(--accent);
-  background: var(--accent-soft);
+/* 한 번 누른 상태는 주 버튼처럼 강조색 면: 되돌릴 수 없는 일의 확인이라 눈에 띄어야 한다(3차 평가 U48) */
+.btn-confirm[data-armed],
+.btn-confirm[data-armed]:hover {
+  border-color: var(--accent-ledge);
+  background: var(--accent);
+  box-shadow: inset 0 calc(-1 * var(--ledge)) 0 var(--accent-ledge);
+  color: var(--on-accent);
 }
 
 /* 아이콘만 있는 버튼: 정사각형. 이름은 aria-label로 */
