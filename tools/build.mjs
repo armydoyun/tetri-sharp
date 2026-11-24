@@ -100,7 +100,7 @@ export const OG_HEAD = [
   ["og:type", "website"],
   ["og:site_name", "Tetri#"],
   ["og:title", "Tetri#"],
-  ["og:description", "블록 쌓는 게임이에요. 근데 규칙을 거의 다 바꿀 수 있어요."],
+  ["og:description", "블록 쌓기. 규칙은 마음대로."],
   ["og:url", SITE_URL],
   ["og:image", `${SITE_URL}og.png`],
   ["og:image:width", "1200"],
