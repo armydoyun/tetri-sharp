@@ -779,7 +779,10 @@ export const EN = {
   "늘 보드 아래에 조작 버튼을 보여요": "Always shows control buttons under the board",
   "조작 버튼을 숨겨요": "Hides the control buttons",
   "게임 테마": "Game theme",
-  "격자 색과 블록의 색·모서리를 바꿔요": "Changes the grid color and the color and corners of blocks",
+  "보드·블록의 색과 모양, 효과가 바뀌어요. 미리보기는 지금 화면 설정을 따라요":
+    "Changes board and block colors, shapes and effects. The preview follows your current display settings.",
+  "사용 중": "In use",
+  미리보기: "Preview",
   "화면 효과": "Effects",
   "블록 색": "Block colors",
   "색을 구분하기 쉬운 색 조합을 써요": "Uses colors that are easier to tell apart",

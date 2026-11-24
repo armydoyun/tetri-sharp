@@ -231,17 +231,23 @@ export const setSegmented = (group, value) => {
 
 /**
  * 카드형 선택(이름 + 설명이 긴 선택지). 설명은 잘리지 않고 줄바꿈한다.
- * @param {{ id: string, label: string, options: ReadonlyArray<{ value: string, title: string, desc: string, preview?: HTMLElement }>, value: string, onChange: (v: string) => void }} o
+ * compact: 견본 + 이름만 있는 작은 칩(설명은 다른 곳에 보일 때, 예: 테마 미리보기 아래 칩)
+ * @param {{ id: string, label: string, options: ReadonlyArray<{ value: string, title: string, desc?: string, preview?: HTMLElement }>, value: string, onChange: (v: string) => void, compact?: boolean }} o
  */
-export const choiceCards = ({ id, label, options, value, onChange }) => {
-  const group = el("div", { class: "choice-cards", role: "group", id, "aria-label": label });
+export const choiceCards = ({ id, label, options, value, onChange, compact = false }) => {
+  const group = el("div", {
+    class: `choice-cards${compact ? " is-compact" : ""}`,
+    role: "group",
+    id,
+    "aria-label": label,
+  });
   for (const o of options) {
     const b = el(
       "button",
       { type: "button", class: "choice-card", "data-value": o.value, "aria-pressed": String(o.value === value) },
       ...(o.preview ? [o.preview] : []),
       el("strong", { text: o.title }),
-      el("small", { text: o.desc })
+      ...(o.desc ? [el("small", { text: o.desc })] : [])
     );
     b.addEventListener("click", () => onChange(o.value));
     group.append(b);

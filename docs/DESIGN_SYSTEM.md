@@ -50,7 +50,7 @@
 | 세그먼트 | `segmented({ label, options, value, onChange, wrap?, arrows? })` | `.segmented` / `.choice` | 움푹 들어간 홈 안의 칸. 고른 칸만 강조색 블록으로 솟는다 |
 | 탭 줄 | `tabBar({ tabs, active, onSelect })` | `.segmented` | 세그먼트 + ←→ Home End로 이동 |
 | 세그먼트 칸만 | `segmentButtons(options, value, onChange)` | — | HTML에 이미 있는 `.segmented` 틀을 채울 때(`#rule-tabs`) |
-| 카드 선택 | `choiceCards({ options: [{ value, title, desc, preview? }] })` | `.choice-cards` `.choice-card` | 이름 + 긴 설명. 설명은 잘리지 않고 줄바꿈 |
+| 카드 선택 | `choiceCards({ options: [{ value, title, desc?, preview? }], compact? })` | `.choice-cards` `.choice-card` | 이름 + 긴 설명. 설명은 잘리지 않고 줄바꿈. `compact`는 견본 + 이름만 있는 3열 칩(설명은 다른 곳에, 예: 테마 미리보기) |
 | 드롭다운 | `dropdown({ id, label, options, value, onChange })` | `.select` | 턱 있는 버튼 + 목록. ↑↓ Home End Enter Space Esc Tab, 바깥 클릭으로 닫힘 |
 | 스위치 | `toggle({ id, checked, disabled, onChange? })` | `.switch` | 홈 안에서 블록 하나가 좌우로 옮겨 간다(켜면 강조색) |
 | 슬라이더 | `rangeRow(slider({ id, min, max, step, value }), output, format)` | `.range` | 10칸 막대, 채운 칸은 강조색, 손잡이는 턱 있는 블록. 값 칸 폭은 가장 긴 값에 고정 |
@@ -267,6 +267,11 @@ fieldRow({ id, label: t("고스트"), control: segmented({ id, label: t("고스�
 | 화이트 | `white` | 흰색 `#fafafa` | 선명하고 묵직한 단색 |
 
 저장 키를 유지해 기존 설정에서 새 테마를 이어서 선택할 수 있다. 모든 테마는 약한 격자와 윤곽선 고스트를 공유하고, 블록 마감(`finish`: flat · edge · frame)으로 질감을 나눈다. 마감은 그림자 흐림 없이 칠하기 한두 번으로 그려 공용 PC에서도 가볍다. 색각 친화 옵션을 켜면 블록과 고스트에 공통 팔레트를 사용한다. "직접 고르기"는 피스마다 견본 색으로 바꾸고, 고르지 않은 피스는 테마 색을 쓴다(`paletteFor()`). 테마 정의는 `js/render/themes.js`에서 관리한다.
+
+설정의 테마 고르기는 **큰 미리보기 하나 + 견본 칩 3×3**이다(`js/render/preview.js`). 미리보기는 작은 게임 화면(보드 아래 9줄, 홀드, 다음 피스 3개)으로,
+피스 하나가 중력처럼 내려와 하드 드롭으로 착지하고 다음 T가 두 줄을 지우는 장면을 되풀이한다 — 일곱 피스 색·쓰레기 줄·고스트·착지 반동·줄 삭제 효과가 한 장면에 다 나온다.
+지금 화면 설정(블록 색 구성·무늬·고스트 진하기·격자·효과 수준)을 그대로 따르고, 기기의 "동작 줄이기"면 멈춘 한 장면만 그린다.
+칩에 마우스를 올리거나 키보드로 옮기면 미리보기만 바뀌고("미리보기" 표시), 눌러야 적용된다("사용 중"). 넓은 화면은 미리보기 왼쪽·칩 오른쪽, 좁은 화면은 위아래.
 
 ## 모션
 

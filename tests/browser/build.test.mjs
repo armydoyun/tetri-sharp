@@ -973,41 +973,51 @@ test("게임 테마: 아홉 테마가 서로 다르게 그려지고, 설정에�
   await context.close();
 });
 
-test("게임 테마: 호버한 카드만 재생하고 벗어나거나 모션을 줄이면 정지한다", async () => {
+test("게임 테마: 미리보기는 움직이고, 칩에 올리면 미리보기만 그 테마로 바뀐다(적용은 누를 때). 모션을 줄이면 멈춘다", async () => {
   const { context, page, errors } = await openPage();
   try {
     await page.click("#open-settings");
     await page.click('.dialog-tabs [data-value="visual"]');
-    const card = page.locator('#set-theme [data-value="retro"]');
-    const canvas = card.locator("canvas");
-    const other = page.locator('#set-theme [data-value="modern"] canvas');
-    const snapshot = locator => locator.evaluate(c => c.toDataURL());
-    const still = await snapshot(canvas);
-    const stillOther = await snapshot(other);
-    const changed = () =>
-      page.waitForFunction(
-        initial => document.querySelector('#set-theme [data-value="retro"] canvas').toDataURL() !== initial,
-        still
-      );
-    await card.hover();
-    await changed();
-    assert.equal(await card.getAttribute("aria-pressed"), "false", "호버로 테마가 선택되지 않는다");
-    assert.equal(await snapshot(other), stillOther);
-    assert.equal(await page.locator("dialog[open]").count(), 1);
-    await page.locator("#settings-close").hover();
-    assert.equal(await snapshot(canvas), still);
+    const stage = page.locator(".theme-stage-canvas");
+    const name = page.locator(".theme-stage-name");
+    const state = page.locator(".theme-stage-state");
+    const snapshot = () => stage.evaluate(c => /** @type {HTMLCanvasElement} */ (c).toDataURL());
+    // 1.2초 동안 150ms마다 찍어 한 번이라도 바뀌면 움직이는 것(장면에 잠깐 멈추는 때가 있다)
+    const moves = async () => {
+      const a = await snapshot();
+      for (let i = 0; i < 8; i++) {
+        await page.waitForTimeout(150);
+        if ((await snapshot()) !== a) return true;
+      }
+      return false;
+    };
+    assert.equal(await name.textContent(), "스튜디오");
+    assert.equal(await state.textContent(), "사용 중");
+    assert.ok(await moves(), "미리보기가 장면을 되풀이한다");
+    assert.equal(await page.locator("#set-theme canvas.theme-swatch").count(), 9, "칩마다 견본");
 
+    // 올리면 미리보기만 바뀌고 선택은 그대로
+    const card = page.locator('#set-theme [data-value="retro"]');
     await card.hover();
-    await changed();
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.waitForFunction(
-      initial => document.querySelector('#set-theme [data-value="retro"] canvas').toDataURL() === initial,
-      still
-    );
+    assert.equal(await name.textContent(), "페이퍼");
+    assert.equal(await state.textContent(), "미리보기");
+    assert.equal(await card.getAttribute("aria-pressed"), "false", "올리기만으로는 적용되지 않는다");
     await page.locator("#settings-close").hover();
-    await card.hover();
-    await page.waitForTimeout(450);
-    assert.equal(await snapshot(canvas), still);
+    assert.equal(await name.textContent(), "스튜디오", "벗어나면 사용 중 테마로");
+
+    // 누르면 적용되고 미리보기도 그 테마(사용 중)
+    await card.click();
+    assert.equal(await page.locator('#set-theme [data-value="retro"]').getAttribute("aria-pressed"), "true");
+    assert.equal(await name.textContent(), "페이퍼");
+    assert.equal(await state.textContent(), "사용 중");
+
+    // 모션 줄이기: 바로 멈추고, 다시 그려도 움직이지 않는다
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.waitForTimeout(100);
+    assert.equal(await moves(), false, "모션을 줄이면 멈춘다");
+    await page.click('.dialog-tabs [data-value="control"]');
+    await page.click('.dialog-tabs [data-value="visual"]');
+    assert.equal(await moves(), false, "다시 열어도 멈춰 있다");
     assert.deepEqual(errors, []);
   } finally {
     await context.close();
