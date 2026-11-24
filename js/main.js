@@ -86,6 +86,7 @@ import { createKeyHelp } from "./app/key-help.js";
 import { setupBackup } from "./app/backup.js";
 import { downloadJson } from "./app/download.js";
 import { takeLinkHash } from "./app/links.js";
+import { findTheme } from "./render/themes.js";
 
 const FRAME_MS = 1000 / 60;
 const MAX_CATCH_UP_MS = 250; // 시간이 크게 튀면(탭 복귀 등) 한꺼번에 따라잡지 않는다.
@@ -140,7 +141,10 @@ const applyScheme = () => {
 };
 
 const renderer = createRenderer(canvas, { getVisual: () => settings.visual });
-const sfx = createSfx({ getVolume: () => settings.volume });
+/** 지금 쓸 효과음 묶음: 고정했으면 그것, 아니면 게임 테마의 묶음 */
+const soundSetFor = (themeId = settings.visual.theme) =>
+  settings.sound === "theme" ? findTheme(themeId).sound : settings.sound;
+const sfx = createSfx({ getVolume: () => settings.volume, getSet: () => soundSetFor() });
 const racePanel = $("race-panel");
 const raceProgress = /** @type {HTMLProgressElement} */ ($("race-progress"));
 const raceLabel = $("race-progress-label");
@@ -1299,6 +1303,8 @@ const settingsUI = createSettingsUI({
     renderKeyHelp();
   },
   onPreviewSound: () => sfx.play("clear2"),
+  // 테마 미리보기의 "소리 들어 보기": 이 테마로 게임하면 들릴 묶음. 소리를 꺼 뒀어도 눌렀을 때는 들려준다
+  onPreviewTheme: themeId => sfx.preview(soundSetFor(themeId), settings.volume || 50),
   openedThemes: () => (achievements.unlocked()["secret-sharp"] ? ["sharp"] : []),
   // 모드 이름처럼 시작할 때 만든 글자까지 바꾸려면 다시 불러오는 게 가장 확실하다.
   onLanguage: () => location.reload(),

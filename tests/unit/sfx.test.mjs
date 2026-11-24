@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SOUND_NAMES, createSfx, soundsFor } from "../../js/audio/sfx.js";
+import { SOUND_NAMES, SOUND_SETS, SOUND_SET_IDS, createSfx, soundsFor } from "../../js/audio/sfx.js";
+import { THEMES } from "../../js/render/themes.js";
 import { createGame } from "../../js/core/engine.js";
 import { MODERN } from "../../js/rules/presets.js";
 import { DEFAULT_SETTINGS, sanitizeSettings } from "../../js/storage/settings.js";
@@ -85,6 +86,9 @@ test("같은 프레임의 클리어는 조작과 하드 드롭보다 앞에 들�
     createBufferSource() {
       return { ...source };
     }
+    createBiquadFilter() {
+      return { connect() {}, frequency: parameter, Q: { value: 0 }, type: "" };
+    }
   };
   try {
     const sfx = createSfx({ getVolume: () => 100 });
@@ -97,4 +101,30 @@ test("같은 프레임의 클리어는 조작과 하드 드롭보다 앞에 들�
     if (previous === undefined) delete globalThis.AudioContext;
     else globalThis.AudioContext = previous;
   }
+});
+
+test("효과음 묶음: 모든 묶음이 모든 소리를 갖고, 테마마다 묶음이 정해져 있다", () => {
+  for (const [id, set] of Object.entries(SOUND_SETS))
+    for (const name of SOUND_NAMES) assert.ok(set[name]?.length, `${id}.${name}`);
+  for (const theme of Object.values(THEMES)) assert.ok(SOUND_SETS[theme.sound], theme.name);
+  assert.deepEqual([...SOUND_SET_IDS], ["clean", "wood", "glass", "quiet"]);
+  // 고전 게임기 느낌(네모파·톱니파)은 쓰지 않는다
+  for (const [id, set] of Object.entries(SOUND_SETS))
+    for (const [name, parts] of Object.entries(set))
+      for (const p of parts) assert.ok(!["square", "sawtooth"].includes(p.wave), `${id}.${name} ${p.wave}`);
+});
+
+test("효과음 묶음: 크기가 고르다(조각 하나 0.4 이하), 쓰레기 경고·게임 오버는 어느 묶음에서나 또렷하다", () => {
+  const loud = parts => Math.max(...parts.map(p => p.gain * (1 + (p.partials ?? []).reduce((s, [, g]) => s + g, 0))));
+  for (const [id, set] of Object.entries(SOUND_SETS)) {
+    for (const [name, parts] of Object.entries(set)) assert.ok(loud(parts) <= 0.4, `${id}.${name} ${loud(parts)}`);
+    for (const name of ["garbage", "gameOver"]) assert.ok(loud(set[name]) >= 0.15, `${id}.${name}`);
+    // 조작 소리(이동)는 줄 삭제보다 작다
+    assert.ok(loud(set.move) < loud(set.clear1), `${id}: 이동 < 1줄`);
+  }
+});
+
+test("샤프 묶음은 기본 묶음을 반음 올린 것이다", () => {
+  const ratio = SOUND_SETS.sharp.clear1[0].f / SOUND_SETS.clean.clear1[0].f;
+  assert.ok(Math.abs(ratio - Math.pow(2, 1 / 12)) < 1e-9);
 });
