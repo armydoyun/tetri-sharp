@@ -100,12 +100,12 @@ export const OG_HEAD = [
   ["og:type", "website"],
   ["og:site_name", "Tetri#"],
   ["og:title", "Tetri#"],
-  ["og:description", "규칙을 직접 조합하는 낙하 블록 퍼즐 · 설치 없이 브라우저에서 바로"],
+  ["og:description", "블록 쌓는 게임이에요. 근데 규칙을 거의 다 바꿀 수 있어요."],
   ["og:url", SITE_URL],
   ["og:image", `${SITE_URL}og.png`],
   ["og:image:width", "1200"],
   ["og:image:height", "630"],
-  ["og:image:alt", "Tetri# — 규칙을 직접 조합하는 낙하 블록 퍼즐"],
+  ["og:image:alt", "Tetri# 로고와 블록이 쌓인 게임 보드"],
   ["og:locale", "ko_KR"],
 ]
   .map(([k, v]) => `    <meta property="${k}" content="${v}">\n`)

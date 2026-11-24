@@ -41,12 +41,12 @@
   .eyebrow::before { content: ""; width: 14px; height: 14px; background: var(--accent); }
   .word {
     display: flex; align-items: center; gap: 30px;
-    margin: 54px 0 0; font-size: 124px; font-weight: 900; letter-spacing: -0.035em; line-height: 1;
+    margin: auto 0 0; font-size: 124px; font-weight: 900; letter-spacing: -0.035em; line-height: 1;
   }
   .mark { position: relative; width: 120px; height: 80px; flex: none; }
   .mark i { position: absolute; width: 38px; height: 38px; background: var(--accent); border-radius: 4px; }
-  .tag { margin: 40px 0 0; font-size: 40px; font-weight: 800; line-height: 1.32; letter-spacing: -0.01em; }
-  .tag span { color: var(--dim); }
+  .tag { margin: 44px 0 auto; font-size: 38px; font-weight: 700; line-height: 1.4; letter-spacing: -0.01em; }
+  .tag span { color: var(--dim); font-weight: 500; }
   .foot {
     margin-top: auto; padding-top: 22px; border-top: 2px solid var(--line);
     display: flex; justify-content: space-between; align-items: baseline; gap: 24px;
@@ -60,13 +60,11 @@
 </head>
 <body>
   <section class="copy">
-    <p class="eyebrow">설치 없이 브라우저에서 바로</p>
     <h1 class="word">
       <span class="mark"><i style="left:0;top:0"></i><i style="left:41px;top:0"></i><i style="left:82px;top:0"></i><i style="left:41px;top:41px"></i></span>
       Tetri#
     </h1>
-    <p class="tag">규칙을 직접 조합하는<br><span>낙하 블록 퍼즐</span></p>
-    <div class="foot"><span><b>Sprint</b> · 퍼즐 70 · CPU 대전</span><span>오프라인 OK</span></div>
+    <p class="tag">블록 쌓는 게임이에요.<br><span>근데 규칙을 거의 다 바꿀 수 있어요.</span></p>
   </section>
   <div class="board"><canvas id="b" width="392" height="510"></canvas></div>
 <script>
