@@ -88,12 +88,19 @@ const SCHEME_HINTS = {
   light: "첫 화면과 메뉴를 밝게 써요",
   dark: "첫 화면과 메뉴를 어둡게 써요",
 };
+/** 효과음 설명(테마 키별) */
 const SOUND_HINTS = {
   theme: "게임 테마마다 다른 소리. 뜻과 박자는 같고 음색만 달라요",
-  clean: "깔끔한 클릭과 짧은 음(스튜디오·프레임·화이트)",
-  wood: "연필 톡, 나무 블록, 마림바(페이퍼·샌드·포레스트)",
-  glass: "맑은 종소리와 짧은 잔향(미드나잇·블루프린트)",
-  quiet: "조작은 아주 작게, 쓰레기 경고와 게임 오버만 또렷하게(그라파이트)",
+  modern: "깔끔한 클릭과 짧은 음",
+  retro: "종이에 톡, 종이 스치는 소리, 칼림바",
+  minimal: "샤프펜슬 딸깍, 자 눈금, 맑은 신호음",
+  graphite: "조작은 아주 작게, 쓰레기 경고와 게임 오버만 또렷하게",
+  frame: "쇠 클릭, 경첩, 비브라폰",
+  stone: "모래 쓸림, 토기 두드림, 오카리나",
+  midnight: "맑은 종소리와 짧은 잔향",
+  forest: "연필 톡, 나무 블록, 마림바",
+  white: "볼펜 딸깍, 책상 톡, 펠트 피아노",
+  sharp: "스튜디오 소리를 반음 올려서",
 };
 const GAME_SURFACE_HINTS = {
   dark: "게임 중 보드 둘레는 화면 색과 상관없이 어두워요. 보드 색은 게임 테마가 정하고, 아래 미리보기에 그대로 보여요",
@@ -664,13 +671,15 @@ export const createSettingsUI = ({
       control: dropdown({
         id: "set-sound",
         label: t("효과음 종류"),
-        options: /** @type {const} */ ([
-          ["theme", t("테마 따라")],
-          ["clean", t("기본")],
-          ["wood", t("종이·나무")],
-          ["glass", t("유리·종")],
-          ["quiet", t("거의 무음")],
-        ]).map(([v, label]) => ({ value: v, label, hint: t(SOUND_HINTS[v]) })),
+        // 테마 따라, 또는 한 테마의 소리로 고정(숨은 테마는 열렸을 때만)
+        options: [
+          { value: "theme", label: t("테마 따라"), hint: t(SOUND_HINTS.theme) },
+          ...[...THEME_IDS, ...openedThemes()].map(id => ({
+            value: id,
+            label: THEMES[id].name,
+            hint: t(SOUND_HINTS[id] ?? ""),
+          })),
+        ],
         value,
         onChange: v => {
           update({ sound: v });

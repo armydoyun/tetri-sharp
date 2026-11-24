@@ -3818,7 +3818,7 @@ test("첫 화면 로고: 여섯 번은 아무 일 없고, 3초 안에 일곱 번
   }
 });
 
-test("업적: Custom 규칙 판은 결과에 '업적에 들어가지 않아요'를 알려 주고, 업적 목록은 기본 규칙에서 쌓인다고 적는다", async () => {
+test("업적: Custom 규칙 판은 결과에 '플레이 업적만 쌓여요'를 알려 주고, 업적 목록에도 적는다", async () => {
   const { context, page, errors } = await openPage(() =>
     localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
   );
@@ -3830,10 +3830,10 @@ test("업적: Custom 규칙 판은 결과에 '업적에 들어가지 않아요'�
     await page.waitForTimeout(30);
   }
   await page.waitForFunction(() => !document.getElementById("results")?.hidden);
-  assert.equal(await text(page, "results-achievements"), "Custom 규칙 판은 업적에 들어가지 않아요");
+  assert.equal(await text(page, "results-achievements"), "Custom 규칙 판은 플레이 업적만 쌓여요");
   await page.click('#results [data-action="menu"]');
   await page.click("#open-achievements");
-  assert.match(await page.locator("#achievements .notice-slot").textContent(), /기본 규칙/);
+  assert.match(await page.locator("#achievements .notice-slot").textContent(), /플레이 업적은 모든 규칙/);
   assert.deepEqual(errors, []);
   await context.close();
 });

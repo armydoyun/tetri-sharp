@@ -86,7 +86,6 @@ import { createKeyHelp } from "./app/key-help.js";
 import { setupBackup } from "./app/backup.js";
 import { downloadJson } from "./app/download.js";
 import { takeLinkHash } from "./app/links.js";
-import { findTheme } from "./render/themes.js";
 
 const FRAME_MS = 1000 / 60;
 const MAX_CATCH_UP_MS = 250; // 시간이 크게 튀면(탭 복귀 등) 한꺼번에 따라잡지 않는다.
@@ -141,9 +140,8 @@ const applyScheme = () => {
 };
 
 const renderer = createRenderer(canvas, { getVisual: () => settings.visual });
-/** 지금 쓸 효과음 묶음: 고정했으면 그것, 아니면 게임 테마의 묶음 */
-const soundSetFor = (themeId = settings.visual.theme) =>
-  settings.sound === "theme" ? findTheme(themeId).sound : settings.sound;
+/** 지금 쓸 효과음 묶음(테마 키): 고정했으면 그 테마의 소리, 아니면 게임 테마의 소리 */
+const soundSetFor = (themeId = settings.visual.theme) => (settings.sound === "theme" ? themeId : settings.sound);
 const sfx = createSfx({ getVolume: () => settings.volume, getSet: () => soundSetFor() });
 const racePanel = $("race-panel");
 const raceProgress = /** @type {HTMLProgressElement} */ ($("race-progress"));
@@ -842,8 +840,9 @@ const playCounts = () => !scenePractice && (MODES.includes(mode) || Boolean(mode
 const achievementContext = (state, abandoned = false) => ({
   mode,
   state,
-  // Custom 규칙 판은 업적을 주지 않는다(퍼즐 업적은 규칙과 무관) — 2차 평가 F22
+  // Custom 규칙 판은 플레이 업적(첫 줄·4줄 등)만 센다. 모드 업적·누적은 기본 규칙 판만(기록 비교) — 2차 평가 F22
   real: playCounts() && isRankedRules(rules),
+  played: playCounts(),
   won: Boolean(mode.versus) && state.over === WIN,
   short: isShortGame(state),
   abandoned,
@@ -856,7 +855,7 @@ const achievementContext = (state, abandoned = false) => ({
  * 예전에는 끝까지 가야만 판정해서, 줄을 지우고 나가면 업적이 안 쌓였다. 누적 합계에는 더하지 않는다.
  */
 const keepAbandonedAchievements = () => {
-  if (!game || game.state.over || !playCounts() || !isRankedRules(rules)) return [];
+  if (!game || game.state.over || !playCounts()) return [];
   return achievements.evaluate(achievementContext(game.state, true));
 };
 
@@ -1143,7 +1142,7 @@ const finish = () => {
   $("results-achievements").textContent = freshAchievements.length
     ? t("업적 달성 · {names}", { names: freshAchievements.map(a => a.name).join(", ") })
     : playCounts() && !isRankedRules(rules)
-      ? t("Custom 규칙 판은 업적에 들어가지 않아요")
+      ? t("Custom 규칙 판은 플레이 업적만 쌓여요")
       : "";
   const nextPuzzle = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="next-puzzle"]'));
   const nextLesson = nextPracticeLesson();

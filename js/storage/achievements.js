@@ -12,7 +12,8 @@ export const TOTAL_KEYS = Object.freeze(["games", "lines", "quads", "tspins", "w
 const MIN = 3600; // 1분 = 3600프레임
 
 /**
- * @typedef {{ mode: any, state: any, real: boolean, won: boolean, puzzlesCleared: Set<number>, puzzles: readonly any[], totals?: Record<string, number>, short?: boolean, abandoned?: boolean }} Context
+ * @typedef {{ mode: any, state: any, real: boolean, won: boolean, puzzlesCleared: Set<number>, puzzles: readonly any[], totals?: Record<string, number>, short?: boolean, abandoned?: boolean, played?: boolean }} Context
+ *   played: 업적을 셀 수 있는 판(메뉴 모드·오늘의 도전·CPU 대전, 규칙 무관) — 플레이 업적만 이것을 본다
  *   abandoned: 중간에 그만둔 판(그때까지 이룬 플레이 업적만, 누적 합계에는 더하지 않는다)
  *   real: 실제 플레이(메뉴의 모드·오늘의 도전·CPU 대전, 기본 규칙). won: CPU 대전에서 이겼는가
  *   totals: 이번 판까지 더한 누적 합계(evaluate가 채운다)
@@ -20,12 +21,13 @@ const MIN = 3600; // 1분 = 3600프레임
  *   secret: 판 결과로는 열리지 않고(unlock으로만), 열리기 전에는 목록에 이름이 가려진다
  */
 
+// 플레이 업적(첫 줄·4줄·T-spin 등)은 Custom 규칙 판에서도 센다(played). 기록 비교가 걸린 모드 업적·누적은 기본 규칙(real)만
 const play = (id, name, description, test) => ({
   id,
   group: "play",
   name,
   description,
-  test: c => c.real && test(c.state),
+  test: c => (c.played ?? c.real) && test(c.state),
 });
 const inMode = (id, modeId, name, description, test) => ({
   id,
