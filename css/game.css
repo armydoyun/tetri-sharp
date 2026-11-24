@@ -84,6 +84,57 @@ body:not([data-screen="play"], [data-screen="countdown"]) #pause-game {
   transform: translateY(1px);
 }
 
+/* 로고에서 무언가를 찾았을 때: T가 한 바퀴, '#'이 강조색(3초) */
+.logo-sharp {
+  transition: color var(--dur) var(--ease);
+}
+
+.logo-btn.is-found .logo-sharp {
+  color: var(--accent);
+}
+
+.logo-btn.is-found .logo-mark {
+  animation: logo-found 700ms var(--ease);
+}
+
+.session-title.is-secret {
+  color: var(--accent);
+  animation: secret-in 260ms var(--ease);
+}
+
+@keyframes logo-found {
+  60% {
+    transform: rotate(360deg) scale(1.25);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes secret-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* 좁은 휴대폰: 두 줄이 되어도 머리글 높이가 커지지 않게(아래 내용이 밀리지 않게) */
+@media (max-width: 390px) {
+  .session-title.is-secret {
+    font-size: var(--text-s);
+    line-height: 1.15;
+    letter-spacing: normal;
+    word-break: keep-all;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo-btn.is-found .logo-mark,
+  .session-title.is-secret {
+    animation: none;
+  }
+}
+
 .confirm-desc {
   margin: 0 0 var(--space-2);
   color: var(--text-dim);
