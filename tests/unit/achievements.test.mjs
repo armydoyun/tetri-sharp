@@ -173,7 +173,16 @@ test("중간에 그만둔 판: 그때까지 이룬 플레이 업적은 남기고
   assert.ok(!ids.includes("sprint-clear"), "모드 업적은 끝까지 가야");
   assert.equal(achievements.totals().games, 0, "그만둔 판은 판 수에 안 들어간다");
   assert.equal(achievements.totals().lines, 0);
-  // Custom 규칙 판(real=false)은 그만둬도 없다
+  // Custom 규칙 판(real=false, played=true): 플레이 업적은 쌓이고 모드 업적·누적은 없다
   const other = createAchievements(createStore(memoryBackend()));
-  assert.deepEqual(other.evaluate(context(sprint, partial, { abandoned: true, real: false })), []);
+  const custom = other
+    .evaluate(
+      context(sprint, finished("clear", { frame: 50 * 60, stats: { lines: 40, pieces: 100 } }), {
+        real: false,
+        played: true,
+      })
+    )
+    .map(a => a.id);
+  assert.deepEqual(custom, ["first-line"], "Custom: 플레이 업적만");
+  assert.equal(other.totals().games, 0);
 });

@@ -842,8 +842,9 @@ const playCounts = () => !scenePractice && (MODES.includes(mode) || Boolean(mode
 const achievementContext = (state, abandoned = false) => ({
   mode,
   state,
-  // Custom 규칙 판은 업적을 주지 않는다(퍼즐 업적은 규칙과 무관) — 2차 평가 F22
+  // Custom 규칙 판은 플레이 업적(첫 줄·4줄 등)만 센다. 모드 업적·누적은 기본 규칙 판만(기록 비교) — 2차 평가 F22
   real: playCounts() && isRankedRules(rules),
+  played: playCounts(),
   won: Boolean(mode.versus) && state.over === WIN,
   short: isShortGame(state),
   abandoned,
@@ -856,7 +857,7 @@ const achievementContext = (state, abandoned = false) => ({
  * 예전에는 끝까지 가야만 판정해서, 줄을 지우고 나가면 업적이 안 쌓였다. 누적 합계에는 더하지 않는다.
  */
 const keepAbandonedAchievements = () => {
-  if (!game || game.state.over || !playCounts() || !isRankedRules(rules)) return [];
+  if (!game || game.state.over || !playCounts()) return [];
   return achievements.evaluate(achievementContext(game.state, true));
 };
 
@@ -1143,7 +1144,7 @@ const finish = () => {
   $("results-achievements").textContent = freshAchievements.length
     ? t("업적 달성 · {names}", { names: freshAchievements.map(a => a.name).join(", ") })
     : playCounts() && !isRankedRules(rules)
-      ? t("Custom 규칙 판은 업적에 들어가지 않아요")
+      ? t("Custom 규칙 판은 플레이 업적만 쌓여요")
       : "";
   const nextPuzzle = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="next-puzzle"]'));
   const nextLesson = nextPracticeLesson();

@@ -66,7 +66,7 @@ export const createAchievementsUI = ({ dialog, achievements }) => {
           );
         })
       );
-      notice.textContent = t("{done} / {total} 달성 · 기본 규칙(Modern·Retro·Arcade) 판에서 쌓여요", {
+      notice.textContent = t("{done} / {total} 달성 · 플레이 업적은 모든 규칙, 나머지는 기본 규칙 판에서 쌓여요", {
         done: count,
         total: ACHIEVEMENTS.length,
       });
