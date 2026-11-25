@@ -701,7 +701,7 @@ export const EN = {
   "게임과 리플레이에서 누르는 키를 정보 칸 아래에 보여 줘요":
     "Shows the keys being pressed under the HUD, in games and replays",
 
-  "직접 고르기": "Custom",
+  "내 색": "Custom",
   "아래에서 피스를 고르고 색을 눌러요. 고르지 않은 피스는 테마 색이에요":
     "Pick a piece below, then a color. Untouched pieces keep the theme color",
   "색을 바꿀 피스": "Piece to recolor",
@@ -848,7 +848,7 @@ export const EN = {
   설정: "Settings",
   구역: "Section",
   조작: "Controls",
-  "화면·소리": "Display & sound",
+  "화면·소리": "Display", // "Display & sound"는 휴대폰 탭(79px)에서 두 줄로 꺾였다
   "DAS (자동 이동 시작)": "DAS (auto-shift delay)",
   "방향키를 누른 채로 있을 때 자동 이동이 시작되기까지의 시간":
     "How long you hold a direction before auto-shift starts",
@@ -897,7 +897,7 @@ export const EN = {
     "Around the board stays dark while playing, whatever the appearance. The board itself follows the game theme, as the preview below shows",
   "게임 중 보드 둘레도 위의 화면 색을 따라요. 보드 색은 게임 테마가 정하고, 아래 미리보기에 그대로 보여요":
     "Around the board follows the appearance above while playing. The board itself follows the game theme, as the preview below shows",
-  "색각 친화": "Color-blind friendly",
+  "색각 친화": "Color-safe",
   효과음: "Sound effects",
   "블록 이동·회전·줄 삭제 소리의 크기. 맨 왼쪽은 끄기": "Volume of move, rotate and line clear sounds. Far left is off",
   언어: "Language",

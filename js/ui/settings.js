@@ -464,7 +464,7 @@ export const createSettingsUI = ({
         options: [
           ["theme", t("테마 색")],
           ["contrast", t("색각 친화")],
-          ["custom", t("직접 고르기")],
+          ["custom", t("내 색")], // "직접 고르기"는 휴대폰 가로에서 혼자 두 줄로 꺾였다
         ],
         value: visual.palette,
         onChange: v => setVisual("palette", v),

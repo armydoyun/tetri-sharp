@@ -972,6 +972,13 @@ body.is-finesse-lesson .results-stats :is(dt, dd) {
   width: 30px;
 }
 
+/* 터치 화면은 누를 곳 44px(5차 검수 U55 후속: UI 검수의 터치 목표 검사가 찾음) */
+@media (pointer: coarse) {
+  .replay-mark-controls .btn {
+    width: 44px;
+  }
+}
+
 .replay-utilities {
   flex-wrap: wrap;
   justify-content: space-between;

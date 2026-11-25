@@ -2910,10 +2910,25 @@ for (const [locale, width, height] of [
   });
 }
 
-test("대화상자: 끝까지 내려도 마지막 줄·버튼이 아래 구분선에 붙지 않는다", async () => {
+test("대화상자: 열면 맨 위부터 보이고, 끝까지 내려도 마지막 줄·버튼이 아래 구분선에 붙지 않는다", async () => {
   const { context, page, errors } = await openPage();
+  const openBody = () =>
+    page.evaluate(
+      () => [...document.querySelectorAll("dialog")].find(d => d.open).querySelector(".dialog-body").scrollTop
+    );
+  // 열자마자 아래로 스크롤된 채 뜨면 위쪽 설정이 안 보인다(5차 검수 F39: 퍼즐 만들기)
+  for (const opener of ["#open-achievements", "#open-puzzles #puzzle-create"]) {
+    const [first, second] = opener.split(" ");
+    await page.click(first);
+    if (second) await page.click(second);
+    await page.waitForTimeout(100);
+    assert.equal(await openBody(), 0, `${opener} 열면 맨 위`);
+    await page.keyboard.press("Escape");
+  }
   for (const opener of ["#open-help", "#open-practice", "#open-puzzles", "#open-records", "#open-settings"]) {
     await page.click(opener);
+    await page.waitForTimeout(100);
+    assert.equal(await openBody(), 0, `${opener} 열면 맨 위`);
     const gap = await page.evaluate(() => {
       const body = [...document.querySelectorAll("dialog")].find(d => d.open).querySelector(".dialog-body");
       body.scrollTop = body.scrollHeight;

@@ -254,6 +254,34 @@ export const auditInPage = () => {
     if (Math.round(r.width) !== 48 || Math.round(r.height) !== 26)
       problems.push(`컨트롤 크기 · ${describe(c)} ${Math.round(r.width)}×${Math.round(r.height)} (48×26)`);
   }
+  // 8) 터치 화면: 누를 곳은 32px 이상(권장 44px, 5차 검수 U55). 스위치·체크는 줄 이름(label)이 누를 곳이라 뺀다.
+  //    퍼즐 편집기 판 칸은 끌어서 칠하는 격자라 20줄 높이에서는 폭이 모자라 작아질 수밖에 없다
+  if (matchMedia("(pointer: coarse)").matches) {
+    for (const c of all.filter(el => el.matches("button, a[href], summary, [role='option'], select"))) {
+      if (c.matches(".puzzle-editor-cell") || c.closest(".sr-only")) continue;
+      const r = c.getBoundingClientRect();
+      if (r.width < 32 || r.height < 32)
+        problems.push(`터치 목표 작음 · ${describe(c)} ${Math.round(r.width)}×${Math.round(r.height)} (32px 미만)`);
+    }
+  }
+  // 9) 세그먼트·선택지: 한 묶음에서 한 칸만 이름이 두 줄로 꺾이면 들쭉날쭉하다(1차 U19가 5차 U59로 되살아남).
+  //    .choice는 좁으면 꺾이도록 두었으니 모두 같이 꺾이는 것은 괜찮다
+  const lines = button => {
+    const tops = new Set();
+    for (const node of button.childNodes) {
+      if (node.nodeType !== Node.TEXT_NODE) continue;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      for (const r of range.getClientRects()) if (r.width > 0) tops.add(Math.round(r.top));
+    }
+    return tops.size;
+  };
+  for (const group of all.filter(el => el.matches(".segmented, .choice"))) {
+    const counts = [...group.querySelectorAll(":scope > button")].filter(visible).map(b => [b, lines(b)]);
+    const most = Math.min(...counts.map(([, n]) => n));
+    for (const [b, n] of counts)
+      if (n > most) problems.push(`이름 꺾임 · ${describe(b)} (한 칸만 ${n}줄, 나머지 ${most}줄)`);
+  }
   // 7) 접근성: 누를 수 있는 것과 입력은 이름이 있다(글자·aria-label·연결된 label), 양수 tabindex 없음,
   //    열린 대화상자는 이름이 있고 포커스가 그 안에 있다
   const nameOf = el => {
