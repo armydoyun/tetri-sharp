@@ -500,7 +500,7 @@ export const EN = {
     "You received a result. Press Race to run against it with the same pieces",
 
   // ---- 편의·접근성 ----
-  "되돌리기 (연습)": "Undo (practice)",
+  "되돌리기 (연습·퍼즐 시험)": "Undo (practice, puzzle test)",
   되돌리기: "Undo",
   "{mode} 시작": "{mode} started",
   "더 되돌릴 수 없어요": "Nothing more to undo",

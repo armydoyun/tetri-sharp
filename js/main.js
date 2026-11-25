@@ -627,6 +627,11 @@ const setScreen = next => {
   touch.setEnabled(next === "play" || next === "countdown");
   gestures.setEnabled((next === "play" || next === "countdown") && gesturesOn());
   document.body.classList.toggle("is-practice", Boolean(mode.practice && !isGuidedPractice()) && next !== "menu");
+  document.body.classList.toggle("is-trial", Boolean(mode.trialCode) && next !== "menu");
+  document.body.classList.toggle(
+    "is-trial-failed",
+    next === "results" && Boolean(mode.trialCode) && Boolean(game?.state.over) && game?.state.over !== "clear"
+  );
   document.body.classList.toggle("has-lesson-hints", hasHintControls(mode) && next !== "menu");
   document.body.classList.toggle("is-finesse-lesson", Boolean(mode.lesson) && next !== "menu");
   // 기록이 남는 판(기본 모드·오늘의 도전·CPU 대전): 일시정지 중에는 보드와 다음 피스를 가린다(css/game.css, 5차 검수 G4)
@@ -1774,16 +1779,29 @@ const gestures = createGestures({
 const gesturesOn = () => settings.touchMode === "gestures" && touchVisible(settings.touch, isTouchScreen());
 
 const undo = createUndo();
+/**
+ * 한 피스 되돌리기를 쓰는 판: 자유 연습, 그리고 내 퍼즐 시험 플레이(퍼즐 다시 보기 P10 — 만든 사람이 "이 수 대신 저 수"를 비교).
+ * 받은 퍼즐·기본 퍼즐 풀이에는 쓰지 않는다. 만든 퍼즐은 리플레이를 남기지 않아(noReplay) 기록이 어긋날 일이 없다
+ */
+const canUndoPieces = () => Boolean((mode.practice && !isGuidedPractice()) || mode.trialCode);
+/** 내 퍼즐 시험이 실패로 끝나 결과 화면에 있다(퍼즐은 틀린 수에서 바로 끝나므로, 되돌리기는 여기서 가장 쓸모 있다) */
+const trialFailed = () =>
+  screen === "results" && Boolean(mode.trialCode) && Boolean(game?.state.over) && game?.state.over !== "clear";
 
 // ---- 키 입력 표시 ----
 const inputDisplay = createInputDisplay({ root: $("input-display"), isOn: () => settings.visual.inputs === "on" });
 
-/** 연습 모드에서 바로 앞 피스로 되돌린다 */
+/** 바로 앞 피스로 되돌린다(연습·내 퍼즐 시험). 시험이 실패로 끝났으면 그 수를 되돌려 판으로 돌아간다 */
 const undoPiece = () => {
-  if (!game || !mode.practice || isGuidedPractice() || (screen !== "play" && screen !== "paused")) return;
+  const fromFailure = trialFailed();
+  if (!game || !canUndoPieces() || (screen !== "play" && screen !== "paused" && !fromFailure)) return;
   if (!undo.undo(game.state)) {
     say(t("더 되돌릴 수 없어요"));
     return;
+  }
+  if (fromFailure) {
+    showPanel(null);
+    setScreen("play");
   }
   runs.journal?.action("undo");
   renderer.clearEffects();
@@ -2138,7 +2156,7 @@ const applyRunHandling = handling => {
 
 const advanceRun = (held, pressed, reconstructing = false) => {
   if (sceneView.current) return sceneView.step(held, pressed, reconstructing);
-  if (mode.practice && !isGuidedPractice()) undo.track(game.state);
+  if (canUndoPieces()) undo.track(game.state);
   recorder?.input(held, pressed);
   const hadActive = Boolean(game.state.active);
   const events = game.step({ held, pressed });

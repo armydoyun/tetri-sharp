@@ -3303,6 +3303,58 @@ test("리플레이의 '퍼즐로': 그 장면의 판·지금 피스와 다음 �
   await context.close();
 });
 
+test("퍼즐 만들기: 닫았다 다시 열어도 저장 전 새 퍼즐은 이어서, 내 퍼즐은 되돌리기 기록이 남는다(퍼즐 다시 보기 P8·P11)", async () => {
+  const { context, page, errors } = await openPage();
+  const pressed = () => page.locator('[data-cell][aria-pressed="true"]').count();
+  // 이름만 적은 새 퍼즐(아직 저장되지 않는다)은 닫았다 다시 "퍼즐 만들기"를 누르면 이어서 보인다
+  await openList(page, "#open-puzzles");
+  await page.click("#puzzle-create");
+  await page.fill("#puzzle-title", "초안");
+  await page.click("#puzzle-editor-close");
+  await openList(page, "#open-puzzles");
+  await page.click("#puzzle-create");
+  assert.equal(await page.inputValue("#puzzle-title"), "초안");
+
+  // 판·피스를 넣어 저장된 퍼즐: 칸을 고치고 닫았다 목록에서 다시 열면 되돌릴 수 있다
+  await pickTemplate(page, `stage-${PUZZLES[0].number}`);
+  const before = await pressed();
+  await page.click('[data-cell="120"]');
+  assert.equal(await pressed(), before + 1);
+  await page.click("#puzzle-editor-close");
+  await openList(page, "#open-puzzles");
+  await page.click('#puzzles .dialog-tabs [data-value="mine"]');
+  await page.click("[data-made-edit]");
+  assert.ok(await page.locator("#puzzle-undo").isEnabled(), "다시 열어도 되돌리기 기록");
+  await page.click("#puzzle-undo");
+  assert.equal(await pressed(), before);
+
+  // 내 퍼즐 시험 플레이에서는 한 피스 되돌리기(U·버튼)를 쓸 수 있다(퍼즐 다시 보기 P10).
+  // 퍼즐은 틀린 수에서 바로 끝나므로, 실패 결과에서 되돌리면 그 수 앞으로 판에 돌아간다
+  await page.click("#puzzle-trial");
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  assert.equal(await visible(page, "undo-piece"), true);
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => document.body.dataset.screen === "results");
+  assert.equal(await text(page, "results-title"), "실패");
+  assert.equal(await visible(page, "undo-piece"), true, "실패 결과에서도 되돌리기");
+  await page.keyboard.press("KeyU");
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "0");
+  await page.keyboard.press("Escape");
+  await page.click('#pause [data-action="menu"]');
+  await page.click('[data-confirm="ok"]');
+  // 시험을 그만두면 내 퍼즐 목록이 열린다
+  await page.waitForFunction(() => document.querySelector("#puzzles[open] [data-made-edit]"));
+  await page.keyboard.press("Escape");
+  // 저장된 퍼즐을 닫은 뒤 새로 만들면 빈 편집기
+  await openList(page, "#open-puzzles");
+  await page.click("#puzzle-create");
+  assert.equal(await page.inputValue("#puzzle-title"), "");
+  assert.equal(await pressed(), 0);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
 test("퍼즐 만들기 자동 확인: 고치기를 멈추면 저절로 확인하고, 풀 수 있으면 시험 없이 공유, 풀이를 한 수씩 보고, 미리 알려 주고, 긴 확인은 멈출 수 있다", async () => {
   const { context, page, errors } = await openPage();
   const status = () => text(page, "puzzle-status");

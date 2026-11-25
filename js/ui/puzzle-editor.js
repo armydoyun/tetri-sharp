@@ -127,7 +127,17 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
   let height = EDIT_HEIGHTS[0];
   /** 피스 순서에서 고른 자리(없으면 null: 새 피스는 맨 뒤에) */
   let selected = /** @type {number | null} */ (null);
-  const history = createHistory();
+  let history = createHistory();
+  /**
+   * 퍼즐마다 되돌리기 기록(퍼즐 다시 보기 P8): 편집기를 닫았다 다시 열어도 그 퍼즐의 기록이 남는다(새로고침 전까지).
+   * @type {Map<string, ReturnType<typeof createHistory>>}
+   */
+  const histories = new Map();
+  /**
+   * 아직 저장되지 않은 새 퍼즐(이름만 적었거나 판·피스가 모자란 것)을 닫으면 여기 두고, 다시 "퍼즐 만들기"를 누르면 이어서 연다(P11)
+   * @type {{ state: Snapshot, history: ReturnType<typeof createHistory> } | null}
+   */
+  let draft = null;
   /** @returns {Snapshot} */
   const snapshot = () => ({ cells: cells.slice(), pieces, settings: structuredClone(settings) });
   /** @type {Verified | null} */
@@ -156,6 +166,11 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
   // 목록에서 편집기로 바꿀 때는 같은 대화상자를 닫았다 바로 다시 연다. close 이벤트는 그 뒤에 오므로 열려 있으면 그대로 둔다
   dialog.addEventListener("close", () => {
     if (dialog.open) return;
+    // 편집기를 닫을 때만(목록을 닫을 때는 그대로): 저장되지 않은 새 퍼즐에 뭔가 적었으면 초안으로 남긴다
+    if (undoKeys) {
+      const touched = cells.some(Boolean) || pieces || settings.title || settings.desc;
+      draft = entryId === null && touched ? { state: snapshot(), history } : null;
+    }
     undoKeys = null;
     stopChecking();
   });
@@ -176,7 +191,10 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       entryId,
       encodePuzzle({ ...current(), checked: checkedFor(keyNow()) }, { checked: true }) ?? ""
     );
-    if (id) entryId = id;
+    if (id) {
+      entryId = id;
+      histories.set(id, history);
+    }
     saveState = id ? "saved" : "full";
   };
   /** 편집기 상태를 이 퍼즐로(없으면 빈 판) */
@@ -190,7 +208,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
     cleared = null;
     selected = null;
     height = puzzle ? fitHeight(cells) : EDIT_HEIGHTS[0];
-    history.clear();
+    history = (id && histories.get(id)) || createHistory();
     stopChecking();
     verified = null;
     saveState = puzzle ? "saved" : "none";
@@ -211,6 +229,14 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
     /** 새 퍼즐 */
     openNew() {
       reset(null);
+      if (draft) {
+        cells = draft.state.cells;
+        pieces = draft.state.pieces;
+        settings = draft.state.settings;
+        history = draft.history;
+        height = fitHeight(cells);
+        draft = null;
+      }
       editor.open();
     },
     /** 내 퍼즐 하나를 편집 @param {string} id */
