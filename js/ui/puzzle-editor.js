@@ -34,6 +34,7 @@ import {
   fitHeight,
   insertPiece,
   mirrorCells,
+  mirrorPieces,
   movePiece,
   puzzleWarnings,
   removePiece,
@@ -308,10 +309,21 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       ]).map(([icon, label, dx, dy]) =>
         iconButton({ icon, label, "data-shift": `${dx},${dy}`, onClick: () => edit(() => shiftCells(cells, dx, dy)) })
       );
+      // 판과 함께 피스 순서·처음 홀드 피스도 뒤집는다(S와 Z, J와 L을 서로 바꿈) — 되돌리기 한 번으로 함께 돌아간다
       const mirror = iconButton({
         icon: "mirror",
-        label: t("좌우 뒤집기"),
-        onClick: () => edit(() => mirrorCells(cells)),
+        label: t("좌우 뒤집기 (피스도 S와 Z, J와 L을 바꿔요)"),
+        onClick: () => {
+          const next = mirrorCells(cells);
+          const nextPieces = mirrorPieces(pieces);
+          const nextHold = mirrorPieces(settings.holdStart);
+          if (next.every((v, i) => v === cells[i]) && nextPieces === pieces && nextHold === settings.holdStart) return;
+          history.record(snapshot());
+          cells = next;
+          pieces = nextPieces;
+          settings = { ...settings, holdStart: nextHold };
+          changed();
+        },
       });
       const clear = confirmButton({
         label: t("판 지우기"),
@@ -1001,62 +1013,75 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
             templates
           ),
           goalRow,
+          // 판과 피스를 한 화면에(퍼즐 다시 보기 P2): 넓은 창은 [판 | 피스·확인] 두 칸, 좁은 창은 판 바로 아래에 피스
           el(
             "div",
-            { class: "puzzle-editor-row" },
-            el("span", { class: "puzzle-editor-label", text: t("칠하기") }),
-            tools
-          ),
-          el(
-            "div",
-            { class: "puzzle-editor-row" },
-            el("span", { class: "puzzle-editor-label", text: t("보이는 높이") }),
-            heights
-          ),
-          hint,
-          board,
-          el(
-            "div",
-            { class: "puzzle-editor-tools", role: "toolbar", "aria-label": t("판 도구") },
-            undo,
-            redo,
-            ...shifts,
-            mirror,
-            clear
-          ),
-          el(
-            "div",
-            { class: "puzzle-editor-check" },
-            el("div", { class: "puzzle-editor-check-actions" }, check, stop),
-            status,
+            { class: "puzzle-editor-work" },
             el(
-              "div",
-              { class: "puzzle-editor-solution" },
-              el("label", { class: "puzzle-editor-switch" }, view, el("span", { text: t("풀이 보기") })),
-              el("span", { class: "puzzle-editor-step-nav" }, prevStep, stepOut, nextStep)
+              "section",
+              { class: "puzzle-editor-canvas", "aria-label": t("판") },
+              el(
+                "div",
+                { class: "puzzle-editor-row" },
+                el("span", { class: "puzzle-editor-label", text: t("칠하기") }),
+                tools
+              ),
+              el(
+                "div",
+                { class: "puzzle-editor-row" },
+                el("span", { class: "puzzle-editor-label", text: t("보이는 높이") }),
+                heights
+              ),
+              hint,
+              board,
+              el(
+                "div",
+                { class: "puzzle-editor-tools", role: "toolbar", "aria-label": t("판 도구") },
+                undo,
+                redo,
+                ...shifts,
+                mirror,
+                clear
+              )
+            ),
+            el(
+              "section",
+              { class: "puzzle-editor-side", "aria-label": t("피스와 확인") },
+              el(
+                "div",
+                { class: "puzzle-editor-seq-head" },
+                el("span", { class: "puzzle-editor-label", text: t("피스 순서") }),
+                count,
+                el("span", { class: "puzzle-editor-seq-actions" }, moveBack, moveForward, remove)
+              ),
+              sequence,
+              el(
+                "div",
+                {
+                  class: "puzzle-editor-pieces",
+                  role: "group",
+                  "aria-label": t("피스 추가 (최대 {n}개)", { n: MAX_PUZZLE_PIECES }),
+                },
+                ...add
+              ),
+              el(
+                "p",
+                { class: "field-help" },
+                t("피스를 눌러 고르면 그 뒤에 넣고, 앞뒤로 옮기거나 뺄 수 있어요(Alt+화살표·Delete).")
+              ),
+              el(
+                "div",
+                { class: "puzzle-editor-check" },
+                el("div", { class: "puzzle-editor-check-actions" }, check, stop),
+                status,
+                el(
+                  "div",
+                  { class: "puzzle-editor-solution" },
+                  el("label", { class: "puzzle-editor-switch" }, view, el("span", { text: t("풀이 보기") })),
+                  el("span", { class: "puzzle-editor-step-nav" }, prevStep, stepOut, nextStep)
+                )
+              )
             )
-          ),
-          el(
-            "div",
-            { class: "puzzle-editor-seq-head" },
-            el("span", { class: "puzzle-editor-label", text: t("피스 순서") }),
-            count,
-            el("span", { class: "puzzle-editor-seq-actions" }, moveBack, moveForward, remove)
-          ),
-          sequence,
-          el(
-            "p",
-            { class: "field-help" },
-            t("피스를 눌러 고르면 그 뒤에 넣고, 앞뒤로 옮기거나 뺄 수 있어요(Alt+화살표·Delete).")
-          ),
-          el(
-            "div",
-            {
-              class: "puzzle-editor-pieces",
-              role: "group",
-              "aria-label": t("피스 추가 (최대 {n}개)", { n: MAX_PUZZLE_PIECES }),
-            },
-            ...add
           ),
           advanced,
           link

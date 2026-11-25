@@ -73,6 +73,12 @@ export const mirrorCells = cells => {
   return out;
 };
 
+/**
+ * 좌우로 뒤집은 판에 맞는 피스: S와 Z, J와 L을 서로 바꾼다(I·O·T는 그대로). 판만 뒤집으면 원래 피스로는 대개 풀 수 없다(퍼즐 다시 보기 P1)
+ * @param {string} pieces  피스 글자들(처음 홀드 피스 한 글자에도 쓴다)
+ */
+export const mirrorPieces = pieces => pieces.replace(/[SZJL]/g, p => ({ S: "Z", Z: "S", J: "L", L: "J" })[p] ?? p);
+
 /** 블록이 다 보이는 가장 낮은 편집 높이 @param {Uint8Array} cells */
 export const fitHeight = cells => EDIT_HEIGHTS.find(h => h >= usedHeight(cells)) ?? VISIBLE_ROWS;
 

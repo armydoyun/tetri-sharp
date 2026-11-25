@@ -3221,6 +3221,13 @@ test("퍼즐 만들기: 끌어서 칠하기·구멍 줄·되돌리기·높이·�
   await page.focus('.puzzle-seq-chip[data-at="1"]');
   await page.keyboard.press("Alt+ArrowRight");
   assert.equal(await sequence(), "TISO");
+  // 좌우 뒤집기는 피스도 S와 Z, J와 L을 바꾸고, 되돌리기 한 번으로 판·피스가 함께 돌아간다(퍼즐 다시 보기 P1)
+  const mirrorButton = page.locator('#puzzles button[aria-label^="좌우 뒤집기"]');
+  await mirrorButton.click();
+  assert.equal(await sequence(), "TIZO");
+  await page.click("#puzzle-undo");
+  assert.equal(await sequence(), "TISO");
+  await page.focus('.puzzle-seq-chip[data-at="2"]');
   await page.keyboard.press("Delete");
   assert.equal(await sequence(), "TIO");
   assert.equal(await text(page, "puzzles .puzzle-editor-count"), `3 / 50`);

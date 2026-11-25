@@ -235,7 +235,6 @@ export const EN = {
   "판을 아래로 밀기": "Shift board down",
   "판을 왼쪽으로 밀기": "Shift board left",
   "판을 오른쪽으로 밀기": "Shift board right",
-  "좌우 뒤집기": "Mirror",
   "판 지우기": "Clear board",
   "{piece} 넣기": "Add {piece}",
   "{n}번째 {piece}": "Piece {n}: {piece}",
@@ -1129,4 +1128,7 @@ export const EN = {
   "전체 화면": "Full screen",
   "Esc나 브라우저의 뒤로 가기로도 끝낼 수 있어요": "You can also leave with Esc or the browser's Back",
   "주소창과 탭을 숨겨 보드를 크게 봐요": "Hide the address bar and tabs for a bigger board",
+  "좌우 뒤집기 (피스도 S와 Z, J와 L을 바꿔요)": "Mirror (also swaps S with Z and J with L)",
+  "피스와 확인": "Pieces and check",
+  판: "Board",
 };

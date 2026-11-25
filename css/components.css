@@ -1102,6 +1102,27 @@
   margin: 0;
 }
 
+/* 판과 피스를 한 화면에(퍼즐 다시 보기 P2): 좁으면 [판] 아래 [피스·확인], 넓으면 두 칸 */
+.puzzle-editor-work,
+.puzzle-editor-canvas,
+.puzzle-editor-side {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+@media (min-width: 700px) {
+  .puzzle-editor-work {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-4);
+  }
+
+  .puzzle-editor-side .puzzle-editor-seq-head {
+    margin-block-start: 0;
+  }
+}
+
 .puzzle-editor-row {
   display: grid;
   grid-template-columns: 6.5em minmax(0, 1fr);

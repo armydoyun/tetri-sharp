@@ -13,6 +13,7 @@ import {
   fitHeight,
   insertPiece,
   mirrorCells,
+  mirrorPieces,
   movePiece,
   puzzleWarnings,
   removePiece,
@@ -76,6 +77,35 @@ test("밀기: 밖으로 나간 칸은 사라지고 들어온 자리는 빈다. �
   const mirrored = mirrorCells(cells);
   assert.equal(row(mirrored, 19), "1000000011");
   assert.deepEqual(mirrorCells(mirrored), cells);
+});
+
+test("좌우 뒤집기: 피스도 S와 Z, J와 L을 바꿔야 뒤집은 판 비우기 퍼즐이 그대로 풀린다(퍼즐 다시 보기 P1)", () => {
+  assert.equal(mirrorPieces("ISZJLOT"), "IZSLJOT");
+  assert.equal(mirrorPieces(mirrorPieces("SJTZL")), "SJTZL");
+  assert.equal(mirrorPieces(""), "");
+  const solvable = (cells, pieces) =>
+    "moves" in
+    (runSolverTask({
+      type: "solution",
+      kind: "pc",
+      count: pieces.length,
+      rotation: "srs",
+      board: solverBoard(cells),
+      pieces: [...pieces],
+    }) ?? {});
+  // S·Z·J·L이 든 판 비우기 단계: 뒤집은 판 + 바꾼 피스는 풀리고, 피스를 안 바꾸면 못 푸는 단계가 있다
+  const stages = PUZZLES.filter(p => p.kind === "pc")
+    .map(p => template(`stage-${p.number}`))
+    .filter(st => st && /[SZJL]/.test(st.pieces))
+    .slice(0, 6);
+  assert.ok(stages.length >= 3);
+  let brokenWithoutSwap = 0;
+  for (const st of stages) {
+    assert.equal(solvable(st.cells, st.pieces), true);
+    assert.equal(solvable(mirrorCells(st.cells), mirrorPieces(st.pieces)), true, st.pieces);
+    if (!solvable(mirrorCells(st.cells), st.pieces)) brokenWithoutSwap += 1;
+  }
+  assert.ok(brokenWithoutSwap > 0, "판만 뒤집으면 못 푸는 단계가 있다");
 });
 
 test("높이: 블록이 있는 가장 높은 줄까지, 그것이 다 보이는 가장 낮은 편집 높이", () => {
