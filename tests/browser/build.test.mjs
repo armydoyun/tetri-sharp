@@ -2996,7 +2996,8 @@ test("다시 시작 키 '한 번에': 게임 중 R 한 번에 새 판(터치 버
   const { context, page, errors } = await openPage(() =>
     localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off", restart: "instant" } }))
   );
-  const boardHidden = () => page.evaluate(() => getComputedStyle(document.getElementById("board")).visibility === "hidden");
+  const boardHidden = () =>
+    page.evaluate(() => getComputedStyle(document.getElementById("board")).visibility === "hidden");
   await page.click('[data-mode="sprint40"]');
   await page.waitForFunction(() => document.body.dataset.screen === "play");
   await page.keyboard.press("Space");

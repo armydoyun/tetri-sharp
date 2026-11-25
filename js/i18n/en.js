@@ -624,7 +624,7 @@ export const EN = {
   "안내 닫기": "Close guide",
   느긋하게: "Relaxed",
   빠르게: "Fast",
-  "초고속": "Fastest",
+  초고속: "Fastest",
   "처음 해 보는 분께: 천천히 움직이고 실수가 적어요": "For beginners: slower movement, fewer mistakes",
   "대부분에게 맞는 기본값이에요": "The default that suits most players",
   "익숙해지면: 누르고 있으면 바로 벽까지 가요": "Once you're used to it: holding a direction goes straight to the wall",
