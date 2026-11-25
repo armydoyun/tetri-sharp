@@ -19,15 +19,15 @@ test("저장된 값이 없거나 깨져 있으면 기본값", () => {
 });
 
 test("범위 밖·숫자가 아닌 값은 보정한다", () => {
-  const s = sanitizeSettings({ handling: { das: -50, arr: 9999, sdf: "fast" } });
-  assert.deepEqual(s.handling, { das: 0, arr: 83, sdf: 20 });
+  const s = sanitizeSettings({ handling: { das: -50, arr: 9999, sdf: "fast", dcd: 999 } });
+  assert.deepEqual(s.handling, { das: 0, arr: 83, sdf: 20, dcd: 167 });
 });
 
 test("저장 → 다시 읽기", () => {
   const store = createStore(memoryBackend());
-  saveSettings(store, { handling: { das: 100, arr: 0, sdf: SDF_INFINITE } });
+  saveSettings(store, { handling: { das: 100, arr: 0, sdf: SDF_INFINITE, dcd: 50 } });
   const s = loadSettings(store);
-  assert.deepEqual(s.handling, { das: 100, arr: 0, sdf: SDF_INFINITE });
+  assert.deepEqual(s.handling, { das: 100, arr: 0, sdf: SDF_INFINITE, dcd: 50 });
   assert.equal(s.v, 1);
 });
 

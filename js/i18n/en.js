@@ -1123,4 +1123,10 @@ export const EN = {
   묻기: "Ask",
   "한 번에": "Instant",
   "링크의 결과 코드를 읽을 수 없었어요.": "Couldn't read the result code in the link.",
+  "DCD (자동 이동 끊김)": "DCD (DAS cut delay)",
+  "자동 이동 중 새 피스가 나오거나 돌리면 다시 기다리는 시간. 0이면 끄기":
+    "After a new piece or a rotation during auto-shift, wait this long again. 0 turns it off",
+  "전체 화면": "Full screen",
+  "Esc나 브라우저의 뒤로 가기로도 끝낼 수 있어요": "You can also leave with Esc or the browser's Back",
+  "주소창과 탭을 숨겨 보드를 크게 봐요": "Hide the address bar and tabs for a bigger board",
 };

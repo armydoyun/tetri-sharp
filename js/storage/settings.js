@@ -13,6 +13,8 @@ export const HANDLING_LIMITS = Object.freeze({
   das: Object.freeze({ min: 0, max: 333, step: 1, default: 133 }),
   arr: Object.freeze({ min: 0, max: 83, step: 1, default: 10 }),
   sdf: Object.freeze({ min: 5, max: SDF_INFINITE, step: 1, default: 20 }),
+  // DAS 끊김: 자동 이동 중 새 피스·회전 뒤 다시 기다리는 시간. 0 = 끄기(기본)
+  dcd: Object.freeze({ min: 0, max: 167, step: 1, default: 0 }),
 });
 
 export const TOUCH_OPTIONS = Object.freeze(["auto", "on", "off"]);
@@ -93,7 +95,7 @@ export const defaultVisual = () => ({
 
 export const DEFAULT_SETTINGS = Object.freeze({
   v: SETTINGS_VERSION,
-  handling: Object.freeze({ das: 133, arr: 10, sdf: 20 }),
+  handling: Object.freeze({ das: 133, arr: 10, sdf: 20, dcd: 0 }),
   keymap: DEFAULT_KEYMAP,
   padmap: DEFAULT_PADMAP,
   /** 터치 버튼: auto(터치 화면이면) · on · off */
@@ -149,6 +151,7 @@ const sanitizeHandling = raw => {
     das: clampNum(h.das, HANDLING_LIMITS.das),
     arr: clampNum(h.arr, HANDLING_LIMITS.arr),
     sdf: clampNum(h.sdf, HANDLING_LIMITS.sdf),
+    dcd: clampNum(h.dcd, HANDLING_LIMITS.dcd),
   };
 };
 
@@ -180,4 +183,5 @@ export const toEngineHandling = h => ({
   das: msToFrames(h.das),
   arr: msToFrames(h.arr),
   sdf: h.sdf >= SDF_INFINITE ? Infinity : h.sdf,
+  dcd: msToFrames(h.dcd ?? 0),
 });

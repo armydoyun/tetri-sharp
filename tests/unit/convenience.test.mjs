@@ -81,7 +81,11 @@ test("조작감 프리셋: 기본 설정은 '보통'이고, 값이 하나라도 
   assert.equal(handlingPresetOf(sanitizeSettings({}).handling), "standard");
   for (const [id, p] of Object.entries(HANDLING_PRESETS)) {
     assert.equal(handlingPresetOf(p), id);
-    assert.deepEqual(sanitizeSettings({ handling: p }).handling, p, `${id}는 허용 범위 안`);
+    assert.deepEqual(
+      sanitizeSettings({ handling: p }).handling,
+      { ...p, dcd: 0 },
+      `${id}는 허용 범위 안(DCD는 기본 끄기)`
+    );
   }
   assert.equal(handlingPresetOf({ das: 134, arr: 10, sdf: 20 }), null);
 });

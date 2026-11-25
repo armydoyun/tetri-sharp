@@ -22,7 +22,7 @@ import {
   handlingPresetOf,
 } from "../storage/settings.js";
 import { el, fieldRow, fillDialog, focusKey, restoreFocus } from "./dom.js";
-import { button, choiceCards, confirmButton, rangeRow, segmented, slider, tabBar } from "./components.js";
+import { button, choiceCards, confirmButton, rangeRow, segmented, slider, tabBar, toggle } from "./components.js";
 import { dropdown } from "./select.js";
 import { COLOR_SWATCHES, PIECE_ORDER, THEMES, THEME_IDS, findTheme, paletteFor } from "../render/themes.js";
 import { keycap } from "./keycap.js";
@@ -40,6 +40,11 @@ const HANDLING_ROWS = [
     key: "sdf",
     label: t("SDF (소프트 드롭 속도)"),
     hint: t("아래 키를 누를 때 떨어지는 속도 배율. 맨 끝은 즉시 바닥까지"),
+  },
+  {
+    key: "dcd",
+    label: t("DCD (자동 이동 끊김)"),
+    hint: t("자동 이동 중 새 피스가 나오거나 돌리면 다시 기다리는 시간. 0이면 끄기"),
   },
 ];
 
@@ -159,6 +164,34 @@ export const createSettingsUI = ({
 
   const update = patch => onChange({ ...getSettings(), ...patch });
 
+  /**
+   * 전체 화면(5차 검수 G5): 휴대폰 브라우저 주소창이 높이를 먹지 않게. 브라우저가 지원할 때만 줄을 둔다
+   * (iPhone Safari는 지원하지 않는다 — 홈 화면에 설치하면 처음부터 전체 화면). 설정에 저장하지 않는 그때그때의 상태다.
+   */
+  const fullscreenRow = () => {
+    if (!document.fullscreenEnabled) return [];
+    const on = Boolean(document.fullscreenElement);
+    return [
+      fieldRow({
+        id: "set-fullscreen",
+        label: t("전체 화면"),
+        hint: on ? t("Esc나 브라우저의 뒤로 가기로도 끝낼 수 있어요") : t("주소창과 탭을 숨겨 보드를 크게 봐요"),
+        control: toggle({
+          id: "set-fullscreen",
+          checked: on,
+          onChange: next => {
+            const done = next ? document.documentElement.requestFullscreen() : document.exitFullscreen();
+            // 거절되면(사용자 동작이 아니라고 보는 브라우저 등) 스위치를 실제 상태로 되돌린다
+            done.catch(() => render());
+          },
+        }),
+      }),
+    ];
+  };
+  document.addEventListener("fullscreenchange", () => {
+    if (dialog.open) render();
+  });
+
   const handlingSection = () =>
     el(
       "section",
@@ -177,7 +210,8 @@ export const createSettingsUI = ({
           options: PRESET_OPTIONS,
           value: handlingPresetOf(getSettings().handling) ?? "",
           onChange: v => {
-            update({ handling: { ...HANDLING_PRESETS[v] } });
+            // 프리셋은 DAS·ARR·SDF만 정한다 — DCD는 그대로 둔다
+            update({ handling: { ...getSettings().handling, ...HANDLING_PRESETS[v] } });
             render();
           },
         }),
@@ -527,6 +561,7 @@ export const createSettingsUI = ({
       { class: "field-section" },
       volumeRow(),
       soundRow(),
+      ...fullscreenRow(),
       fieldRow({
         id: "set-scheme",
         label: t("화면 색"),

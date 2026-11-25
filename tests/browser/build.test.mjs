@@ -2960,6 +2960,22 @@ test("편의: 조작감 프리셋을 누르면 DAS·ARR·SDF가 한 번에 바�
   await page.locator("#set-das").fill("150");
   assert.equal(await page.locator('#set-handling-preset [aria-pressed="true"]').count(), 0);
   assert.match(await page.locator('label[for="set-handling-preset"] small').textContent(), /직접 조절/);
+
+  // DCD(5차 검수 G6): 기본 0(끄기), 바꾼 값은 저장되고 프리셋을 눌러도 그대로 남는다
+  assert.equal(await page.locator("#set-dcd").inputValue(), "0");
+  await page.locator("#set-dcd").fill("50");
+  await page.click('#set-handling-preset [data-value="fast"]');
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:settings")).handling);
+  assert.deepEqual(saved, { das: 100, arr: 0, sdf: 30, dcd: 50 });
+
+  // 전체 화면(5차 검수 G5): 지원하는 브라우저면 화면 탭의 스위치로 켜고 끈다(설정에 남기지 않는 그때 상태)
+  await page.click('#settings .dialog-tabs [data-value="visual"]');
+  await page.click("#set-fullscreen");
+  await page.waitForFunction(() => Boolean(document.fullscreenElement));
+  assert.equal(await page.locator("#set-fullscreen").isChecked(), true);
+  await page.click("#set-fullscreen");
+  await page.waitForFunction(() => !document.fullscreenElement);
+  assert.equal(await page.locator("#set-fullscreen").isChecked(), false);
   assert.deepEqual(errors, []);
   await context.close();
 });
