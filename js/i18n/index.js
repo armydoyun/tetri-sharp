@@ -40,10 +40,19 @@ const fill = (text, params) =>
   params ? text.replace(/\{(\w+)\}/g, (m, k) => (params[k] === undefined ? m : String(params[k]))) : text;
 
 /**
+ * 영어 단수: 값이 1인 매개변수 바로 뒤의 복수 낱말은 s를 뗀다("{n} lines" → "1 line", 5차 검수에서 "1 lines" 발견).
+ * 사전의 "{n} lines" "{n} pieces" "{n} times" 같은 꼴이 모두 이 규칙을 따른다.
+ */
+const singular = (text, params) =>
+  params
+    ? text.replace(/\{(\w+)\} ([A-Za-z]+?)s\b/g, (m, k, word) => (String(params[k]) === "1" ? `{${k}} ${word}` : m))
+    : text;
+
+/**
  * @param {string} ko  한국어 원문(열쇠)
  * @param {Record<string, string | number>} [params]
  */
-export const t = (ko, params) => fill(lang === "en" ? (EN[ko] ?? ko) : ko, params);
+export const t = (ko, params) => fill(lang === "en" ? singular(EN[ko] ?? ko, params) : ko, params);
 
 /**
  * 정적 HTML의 글자와 aria-label·title·placeholder를 번역한다. 사전에 있는 것만 바꾼다.

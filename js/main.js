@@ -624,6 +624,8 @@ const setScreen = next => {
   document.body.classList.toggle("is-practice", Boolean(mode.practice && !isGuidedPractice()) && next !== "menu");
   document.body.classList.toggle("has-lesson-hints", hasHintControls(mode) && next !== "menu");
   document.body.classList.toggle("is-finesse-lesson", Boolean(mode.lesson) && next !== "menu");
+  // 기록이 남는 판(기본 모드·오늘의 도전·CPU 대전): 일시정지 중에는 보드와 다음 피스를 가린다(css/game.css, 5차 검수 G4)
+  document.body.classList.toggle("is-ranked", next !== "menu" && playCounts());
   const modeTitle = mode.versus ? versusTitle(mode.versus) : mode.name;
   $("session-title").textContent = next === "menu" ? "" : sceneView.current ? sceneView.title() : modeTitle;
   $("session-title").classList.remove("is-secret");
@@ -1283,7 +1285,7 @@ const finish = () => {
       [t("시간"), formatTime(state.frame)],
       [t("줄"), String(state.stats.lines)],
       [t("피스"), String(state.stats.pieces)],
-      ["PPS", tooShort ? "—" : seconds ? (state.stats.pieces / seconds).toFixed(2) : "0.00"],
+      [t("초당 피스"), tooShort ? "—" : seconds ? (state.stats.pieces / seconds).toFixed(2) : "0.00"],
       [t("보낸 줄"), String(g.sent)],
       [t("막은 쓰레기"), String(g.blocked)],
       [t("받은 쓰레기"), String(g.received)],
@@ -1302,7 +1304,7 @@ const finish = () => {
     [t("레벨"), String(state.level)],
     [t("줄"), String(state.stats.lines)],
     [t("피스"), String(state.stats.pieces)],
-    ["PPS", tooShort ? "—" : seconds ? (state.stats.pieces / seconds).toFixed(2) : "0.00"],
+    [t("초당 피스"), tooShort ? "—" : seconds ? (state.stats.pieces / seconds).toFixed(2) : "0.00"],
     [t("최고 기록"), best ? mode.formatRecord(best) : "—"],
   ];
   // 순위 줄은 늘 둔다(없으면 —) → 결과 화면 높이가 판마다 같다.
@@ -1692,7 +1694,8 @@ $("records").addEventListener("close", () => {
   if (screen === "menu") returnFocus($("open-records"));
 });
 
-const handleSystem = (action, code = "") => {
+/** @param {string} action @param {string} [code] 누른 키 @param {"key" | "touch"} [source] */
+const handleSystem = (action, code = "", source = "key") => {
   if (runs.restoring) return;
   if (anyDialogOpen()) return;
   if (sceneView.current) {
@@ -1715,8 +1718,13 @@ const handleSystem = (action, code = "") => {
     else if (action === "restart" && confirming === "restart") acceptConfirm();
     return;
   }
-  // 진행 중인 판은 묻고, 끝난 판(결과 화면)은 바로 다시 시작
-  if (action === "restart" && inProgress()) return askConfirm("restart");
+  // 진행 중인 판은 묻고, 끝난 판(결과 화면)은 바로 다시 시작.
+  // 설정 "다시 시작 키: 한 번에"면 키보드·게임패드의 R은 묻지 않는다(5차 검수 G1) — 터치 버튼은 잘못 누르기 쉬워 늘 묻는다
+  if (action === "restart" && inProgress()) {
+    if (settings.access.restart !== "instant" || source === "touch") return askConfirm("restart");
+    keepAbandonedAchievements();
+    return start(mode, rules, race?.target);
+  }
   if (action === "restart" && screen === "results") return start(mode, rules, race?.target);
   if (action === "undo") return undoPiece();
   // 힌트(퍼즐 첫 수 보기·파내기·빌드 연습)와 결과 화면의 다음 단계
@@ -1738,7 +1746,7 @@ const handleSystem = (action, code = "") => {
 const keyboard = createKeyboard({ getBindings: () => bindings, onSystem: handleSystem });
 const touch = createTouch({
   root: $("touchpad"),
-  onSystem: handleSystem,
+  onSystem: action => handleSystem(action, "", "touch"),
   vibrate: () => settings.access.vibrate === "on",
 });
 
@@ -2209,7 +2217,6 @@ const loop = now => {
   requestAnimationFrame(loop);
 };
 
-/** 결과 링크(#daily=…)로 열었으면 오늘의 도전 창을 그 코드로 연다. 주소의 해시는 지운다. */
 // ---- 리플레이 공유 · 그 기록과 달리기 ----
 const shareUI = createShareUI({
   dialog: /** @type {HTMLDialogElement} */ ($("share")),
@@ -2254,9 +2261,18 @@ const importReplayFromLink = async () => {
   );
 };
 
-const importDailyFromLink = () => {
+/**
+ * 결과 링크(#daily=…)로 열었으면 오늘의 도전 창을 그 코드로 연다. 주소의 해시는 지운다.
+ * 읽을 수 없는 코드면 다른 링크처럼 바로 알린다 — 예전에는 "받은 결과가 있어요"라고 한 뒤 겨루기를 눌러야 실패를 알았다(5차 검수 F40)
+ */
+const importDailyFromLink = async () => {
   const pasted = takeLinkHash("daily");
   if (!pasted) return;
+  const raw = await decodeReplayCode(pasted);
+  if (!(raw && sanitizeReplay(raw, findMode))) {
+    showMenuNotice(t("링크의 결과 코드를 읽을 수 없었어요."));
+    return;
+  }
   dailyUI.open({
     pasted,
     message: t("받은 결과가 있어요. 겨루기를 누르면 같은 블록 순서로 함께 달려요"),

@@ -2992,6 +2992,51 @@ test("편의: 카운트다운 '없음'이면 바로 시작하고, 연습에서�
   await context.close();
 });
 
+test("다시 시작 키 '한 번에': 게임 중 R 한 번에 새 판(터치 버튼은 묻는다), 기록 판은 일시정지 중 보드를 가린다", async () => {
+  const { context, page, errors } = await openPage(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off", restart: "instant" } }))
+  );
+  const boardHidden = () => page.evaluate(() => getComputedStyle(document.getElementById("board")).visibility === "hidden");
+  await page.click('[data-mode="sprint40"]');
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "2");
+  await page.keyboard.press("KeyR");
+  await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "0");
+  assert.equal(await page.evaluate(() => document.body.dataset.screen), "play", "묻지 않고 바로 새 판");
+  assert.equal(await visible(page, "confirm"), false);
+
+  // 기록 판(Sprint): 일시정지 중에는 보드·다음 피스를 가리고, 계속하면 다시 보인다(5차 검수 G4)
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => document.body.dataset.screen === "paused");
+  assert.equal(await boardHidden(), true, "일시정지 중 보드 가림");
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  assert.equal(await boardHidden(), false);
+
+  // 터치 버튼의 다시 시작은 설정과 상관없이 묻는다
+  await page.evaluate(() => document.body.classList.add("touch-on"));
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "1");
+  await page.dispatchEvent('[data-touch="RESTART"]', "pointerdown", { pointerId: 1, isPrimary: true });
+  await page.waitForFunction(() => !document.getElementById("confirm").hidden);
+  await page.keyboard.press("Escape");
+
+  // 연습은 기록 판이 아니라 일시정지 중에도 보드가 보인다
+  await page.keyboard.press("Escape");
+  await page.click('#pause [data-action="menu"]');
+  await page.click('[data-confirm="ok"]');
+  await openList(page, "#open-practice");
+  await page.click('[data-drill="free"]');
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => document.body.dataset.screen === "paused");
+  assert.equal(await boardHidden(), false, "연습은 보드를 가리지 않는다");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
 test("편의: 제스처 방식이면 보드 아래 버튼 대신 보드를 튕겨 하드 드롭한다", async () => {
   const context = await browser.newContext({ locale: "ko-KR", viewport: { width: 390, height: 844 }, hasTouch: true });
   await context.addInitScript(() =>
@@ -3811,7 +3856,7 @@ test("피스 몇 개 만에 막힌 판: PPS는 —, 공유는 끄고 이유를 �
   await page.waitForFunction(() => !document.getElementById("results")?.hidden);
   // 블록 순서는 무작위라 막히기까지 피스 수는 판마다 조금 다르다. 짧은 판 기준(20초 안, 줄 0개)에 드는지만 본다
   assert.equal(await text(page, "hud-lines"), "0", "세워서 떨어뜨리기만 하면 줄을 못 지우고 금방 막힌다");
-  assert.match(await text(page, "results-stats"), /PPS—/);
+  assert.match(await text(page, "results-stats"), /초당 피스—/);
   assert.equal(await page.locator('#results [data-action="export"]').isDisabled(), true);
   assert.match(await text(page, "race-result"), /너무 일찍 끝난 판/);
   assert.equal(await page.locator('#results [data-action="retry"]').isDisabled(), false, "다시 하기는 그대로");
@@ -3910,7 +3955,7 @@ test("하드 드롭 연타로 1~2초 만에 막힌 Sprint: 피스가 10개를 �
   for (let i = 0; i < 40 && !(await visible(page, "results")); i++) await page.keyboard.press("Space");
   await page.waitForFunction(() => !document.getElementById("results")?.hidden);
   assert.ok(Number(await text(page, "hud-pieces")) >= 10, "피스는 10개 넘게 놓였다");
-  assert.match(await text(page, "results-stats"), /PPS—/);
+  assert.match(await text(page, "results-stats"), /초당 피스—/);
   assert.equal(await page.locator('#results [data-action="export"]').isDisabled(), true);
   assert.equal(await page.locator("#results-practice-scene").isVisible(), false, "추천 연습 없음");
   assert.deepEqual(errors, []);

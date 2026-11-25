@@ -1522,3 +1522,27 @@
     justify-content: flex-end;
   }
 }
+
+/* ---- 터치 화면: 컨트롤이 아닌 누를 곳도 44px(5차 검수 U55) ----
+   펼치기 줄(기록 "최근 20판", 통계, 결과 "같은 순서로 다시 하기"), 머리글 로고, 설정 색 견본.
+   첫 화면 "규칙 · Modern" 링크는 글자 줄 안에 있으니 보이는 배치는 그대로 두고 누르는 범위만 위아래로 넓힌다. */
+@media (pointer: coarse) {
+  details > summary {
+    min-height: 44px;
+  }
+
+  .logo-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .color-swatch {
+    height: 44px;
+  }
+
+  .active-rules {
+    display: inline-block;
+    padding-block: 14px;
+    margin-block: -14px;
+  }
+}

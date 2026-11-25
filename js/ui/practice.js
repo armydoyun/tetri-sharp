@@ -55,7 +55,7 @@ export const createPracticeUI = ({ dialog, onPick, progress, onStage }) => {
     open(from = "", stageId = "") {
       const lesson = {
         id: "finesse-lesson",
-        name: t("피네스 훈련"),
+        name: t("피네스 문제"), // 정해진 목표 배치(아래 "피네스 자유 연습"과 이름으로 구별 — 5차 검수 U61)
         description: t("목표 배치 10개 · 내 입력과 최소 입력 비교"),
         lessons: FINESSE_LESSONS,
       };

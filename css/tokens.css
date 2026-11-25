@@ -90,7 +90,7 @@ body:not([data-screen="menu"], [data-game-surface="scheme"]) {
     --border-strong: #9aa592;
     --text: #1d221b;
     --text-dim: #4d584a;
-    --text-faint: #6c7768;
+    --text-faint: #646f60;
     --accent: #3f5b29;
     --accent-hover: #34501f;
     --accent-ledge: #253a16;
@@ -114,7 +114,7 @@ body:not([data-screen="menu"], [data-game-surface="scheme"]) {
   --border-strong: #9aa592;
   --text: #1d221b;
   --text-dim: #4d584a;
-  --text-faint: #6c7768;
+  --text-faint: #646f60;
   --accent: #3f5b29;
   --accent-hover: #34501f;
   --accent-ledge: #253a16;

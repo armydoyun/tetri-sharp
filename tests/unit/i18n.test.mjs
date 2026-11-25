@@ -66,6 +66,11 @@ test("t(): 매개변수를 채우고, 영어면 사전을 쓰며 없으면 원�
   setLang("en");
   try {
     assert.equal(t("{n}줄", { n: 3 }), "3 lines");
+    // 값이 1이면 단수(5차 검수: 퍼즐 목표 "1 lines")
+    assert.equal(t("{n}줄", { n: 1 }), "1 line");
+    assert.equal(t("{goal} · {n}피스", { goal: "Clear", n: 1 }), "Clear · 1 piece");
+    assert.equal(t("시계 회전 {n}번", { n: 1 }), "rotate right 1 time");
+    assert.equal(t("{n}줄", { n: 11 }), "11 lines");
     assert.equal(t("사전에 없는 문장"), "사전에 없는 문장");
   } finally {
     setLang("ko");

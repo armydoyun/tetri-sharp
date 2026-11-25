@@ -48,7 +48,7 @@ const PRESET_OPTIONS = [
   ["relaxed", t("느긋하게")],
   ["standard", t("보통")],
   ["fast", t("빠르게")],
-  ["instant", t("아주 빠르게")],
+  ["instant", t("초고속")], // "아주 빠르게"는 칸에서 두 줄로 꺾였다(5차 검수 U59)
 ];
 const PRESET_HINTS = {
   relaxed: "처음 해 보는 분께: 천천히 움직이고 실수가 적어요",
@@ -235,6 +235,25 @@ export const createSettingsUI = ({
             update({ touchMode: v });
             render();
           },
+        }),
+      }),
+      fieldRow({
+        id: "set-restart",
+        label: t("게임 중 다시 시작 키"),
+        hint:
+          getSettings().access.restart === "instant"
+            ? t("한 번 누르면 바로 다시 시작해요(터치 버튼은 물어요)")
+            : t("한 번 더 눌러 확인해요"),
+        control: segmented({
+          wrap: true,
+          id: "set-restart",
+          label: t("게임 중 다시 시작 키"),
+          options: [
+            ["ask", t("묻기")],
+            ["instant", t("한 번에")],
+          ],
+          value: getSettings().access.restart,
+          onChange: v => setAccess("restart", v),
         }),
       })
     );

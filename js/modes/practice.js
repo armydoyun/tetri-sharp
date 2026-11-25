@@ -294,7 +294,7 @@ export const DRILLS = Object.freeze([
   }),
   Object.freeze({
     id: "finesse",
-    name: t("피네스"),
+    name: t("피네스 자유 연습"),
     description: t("가장 적은 키 입력으로 놓기 · 더 누르면 실수로 세요"),
     sequence: null,
     build: board => clear(board),

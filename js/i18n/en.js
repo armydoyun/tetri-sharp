@@ -104,7 +104,7 @@ export const EN = {
   "이전 최고보다 {n}초 더 버팀": "Survived {n}s longer than previous best",
   "이전 최고보다 {n}초 덜 버팀": "Survived {n}s less than previous best",
   "같은 조건으로 재도전": "Retry same setup",
-  "피네스 훈련": "Finesse lessons",
+  "피네스 문제": "Finesse drills",
   "목표 배치 10개 · 내 입력과 최소 입력 비교": "10 target placements with input feedback",
   "피네스 {n} / {total}": "Finesse {n} / {total}",
   "점선 칸에 맞춘 뒤 하드 드롭하세요.": "Match the dashed outline, then hard drop.",
@@ -624,7 +624,7 @@ export const EN = {
   "안내 닫기": "Close guide",
   느긋하게: "Relaxed",
   빠르게: "Fast",
-  "아주 빠르게": "Very fast",
+  "초고속": "Fastest",
   "처음 해 보는 분께: 천천히 움직이고 실수가 적어요": "For beginners: slower movement, fewer mistakes",
   "대부분에게 맞는 기본값이에요": "The default that suits most players",
   "익숙해지면: 누르고 있으면 바로 벽까지 가요": "Once you're used to it: holding a direction goes straight to the wall",
@@ -818,7 +818,7 @@ export const EN = {
   "위치가 바뀌는 두 칸짜리 구멍에 O를 넣어 2줄 지우기": "Drop an O into a moving two-wide hole to clear 2 lines",
   "자유 쌓기": "Free stacking",
   "중력 없이 천천히 — 판이 높아지면 비워요": "Take your time without gravity — the board clears when it gets high",
-  피네스: "Finesse",
+  "피네스 자유 연습": "Finesse free practice",
   "가장 적은 키 입력으로 놓기 · 더 누르면 실수로 세요":
     "Place pieces with the fewest key presses · extra presses count as faults",
   "연습 · {name}": "Practice · {name}",
@@ -1117,4 +1117,10 @@ export const EN = {
   "프리셋으로 채우기 전으로 되돌렸어요": "Restored the rules from before the preset",
   "랭크와 업적은 기본 규칙(Modern·Retro·Arcade)에서만 받아요":
     "Ranks and achievements are only earned with the standard rules (Modern, Retro, Arcade)",
+  "게임 중 다시 시작 키": "Restart key in game",
+  "한 번 누르면 바로 다시 시작해요(터치 버튼은 물어요)": "One press restarts right away (the touch button still asks)",
+  "한 번 더 눌러 확인해요": "Press again to confirm",
+  묻기: "Ask",
+  "한 번에": "Instant",
+  "링크의 결과 코드를 읽을 수 없었어요.": "Couldn't read the result code in the link.",
 };

@@ -537,9 +537,16 @@ body[data-screen="replay"]:has(.replay-note:not(:empty)) {
   :root {
     /* 휴대폰은 보드 위 정보 줄(약 54) + 간격까지 */
     --chrome-h: 176px;
-    --board-ratio: calc(16 / 22);
+    /* 홀드·다음 칸을 2칸씩(10 + 2 × 2 = 14칸) — 폭이 모자란 휴대폰 세로에서 판 칸이 약 10% 커진다(5차 검수 G2) */
+    --board-ratio: calc(14 / 22);
     --board-inline-reserve: 2px;
   }
+}
+
+/* 기록이 남는 판은 일시정지 중 보드·다음 피스를 가린다 — 시간을 멈춰 놓고 다음 배치를 생각할 수 없게(5차 검수 G4).
+   자리는 그대로(visibility) 두어 배치가 움직이지 않는다. 연습·퍼즐은 그대로 보인다 */
+body.is-ranked[data-screen="paused"] :is(#board, #cpu-board, #race-board) {
+  visibility: hidden;
 }
 
 /* 보드 위 일시정지·결과: 어두운 막 + 불투명 카드(블록과 글자가 겹치지 않게) */
@@ -1365,6 +1372,14 @@ body[data-screen="replay"] .touchpad {
   text-overflow: ellipsis;
 }
 
+/* 두 쌍씩 놓는 표에서 줄 수가 홀수면 마지막 줄(랭크·전적)이 왼쪽 반에만 남는다 → 표 폭 전체에 걸친다(5차 검수 U58).
+   휴대폰 세로(420px 이하)는 한 쌍씩이라 해당 없음 */
+@media (min-width: 421px) {
+  body:not(.is-finesse-lesson) .results-stats dt:last-of-type:nth-of-type(odd) {
+    grid-column: 1 / span 3;
+  }
+}
+
 .results-splits summary {
   padding-block: 6px;
 }
@@ -1415,16 +1430,25 @@ body[data-game-surface="scheme"] .countdown[data-phase="go"] > span {
    좁은 화면: CPU 칸은 계기판 아래 한 줄(보드 없이 숫자만), 보드 높이 계산에 그 줄을 넣는다. */
 body.is-versus {
   --versus-feedback-h: 76px;
-  --board-inline-reserve: calc(2 * var(--hud-width) + var(--space-3) + var(--space-5) + 2px);
+  /* CPU 칸 폭: 보통은 계기판과 같고, 넓고 높은 화면에서는 CPU 보드를 알아보기 쉽게 키운다(5차 검수 G3).
+     1280×800에서도 내 보드는 높이에 맞춰져 있어 이만큼 넓혀도 줄지 않는다 */
+  --cpu-col: var(--hud-width);
+  --board-inline-reserve: calc(var(--hud-width) + var(--cpu-col) + var(--space-3) + var(--space-5) + 2px);
+}
+
+@media (min-width: 1200px) and (min-height: 720px) {
+  body.is-versus {
+    --cpu-col: 220px;
+  }
 }
 
 @media (min-width: 721px) {
   body.is-versus .stage {
-    grid-template-columns: auto calc(2 * var(--hud-width) + var(--space-3));
+    grid-template-columns: auto calc(var(--hud-width) + var(--cpu-col) + var(--space-3));
   }
 
   body.is-versus .stage-side {
-    grid-template-columns: var(--hud-width) var(--hud-width);
+    grid-template-columns: var(--hud-width) var(--cpu-col);
     align-items: start;
     gap: var(--space-3);
   }
@@ -1447,7 +1471,7 @@ body.is-versus {
   }
 
   body.is-versus .cpu-board {
-    width: min(var(--hud-width), max(70px, calc((100dvh - 230px) * 10 / 22)));
+    width: min(var(--cpu-col), max(70px, calc((100dvh - 230px) * 10 / 22)));
   }
 }
 

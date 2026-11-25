@@ -40,13 +40,14 @@ const VISUAL_OPTIONS = Object.freeze({
   inputs: Object.freeze(["off", "on"]),
 });
 
-/** 접근성·편의: 화면 읽기 알림, 진동, 카운트다운 길이 */
+/** 접근성·편의: 화면 읽기 알림, 진동, 카운트다운 길이, 게임 중 다시 시작 키(ask: 묻기 · instant: 한 번에) */
 const ACCESS_OPTIONS = Object.freeze({
   announce: Object.freeze(["on", "off"]),
   vibrate: Object.freeze(["on", "off"]),
   countdown: Object.freeze(["normal", "short", "off"]),
+  restart: Object.freeze(["ask", "instant"]),
 });
-export const defaultAccess = () => ({ announce: "on", vibrate: "on", countdown: "normal" });
+export const defaultAccess = () => ({ announce: "on", vibrate: "on", countdown: "normal", restart: "ask" });
 export const sanitizeAccess = raw => {
   const r = raw && typeof raw === "object" ? raw : {};
   const d = defaultAccess();
