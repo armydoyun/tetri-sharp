@@ -113,6 +113,22 @@
   --btn-font: var(--text-m);
 }
 
+.puzzle-piece-add,
+.puzzle-seq-chip {
+  --btn-px: var(--space-1);
+}
+
+.puzzle-seq-chip {
+  min-inline-size: max(var(--control-h), var(--touch-min, 0px));
+  border-color: var(--border-strong);
+}
+
+.puzzle-seq-chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 /* 이름이 길면 줄을 바꾸고 버튼이 그만큼 높아진다(높이는 크기의 기본값이 바닥) */
 .btn-wrap {
   --btn-size: auto;

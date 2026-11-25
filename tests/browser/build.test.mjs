@@ -3149,6 +3149,58 @@ const pickTemplate = async (page, value) => {
   await page.click(`#puzzle-template-list [data-value="${value}"]`);
 };
 
+test("퍼즐 만들기: 피스 50개를 넣어도 추가 버튼은 같은 자리에 있고 본문만 스크롤한다", async () => {
+  for (const viewport of [
+    { width: 1280, height: 900 },
+    { width: 390, height: 844 },
+    { width: 740, height: 360 },
+  ]) {
+    const { context, page } = await openPage(null, undefined, { viewport, hasTouch: viewport.width < 800 });
+    try {
+      await openList(page, "#open-puzzles");
+      await page.click("#puzzle-create");
+      const body = page.locator("#puzzles > .puzzle-editor");
+      const add = body.getByRole("button", { name: "T 넣기", exact: true });
+      await add.scrollIntoViewIfNeeded();
+      const top = await add.evaluate(button => button.getBoundingClientRect().top);
+      await add.click();
+      await add.evaluate(button => {
+        for (let i = 0; i < 48; i++) button.click();
+      });
+      assert.equal(await add.evaluate(button => button.getBoundingClientRect().top), top);
+      await add.click();
+      assert.ok(await add.isDisabled());
+      const last = body.getByRole("button", { name: "50번째 T", exact: true });
+      assert.equal(await last.textContent(), "50 T");
+      await last.click();
+      assert.equal(await last.getAttribute("aria-pressed"), "false");
+      await last.click();
+      assert.equal(await last.getAttribute("aria-pressed"), "true");
+
+      const scroll = await body.evaluate(element => {
+        const paletteBottom = element.querySelector(".puzzle-editor-palette").getBoundingClientRect().bottom;
+        const selectedTop = element.querySelector(".puzzle-seq-chip[aria-pressed=true]").getBoundingClientRect().top;
+        element.scrollTop = element.scrollHeight;
+        return {
+          body: element.scrollTop,
+          dialog: element.parentElement.scrollTop,
+          pageOverflow: getComputedStyle(document.documentElement).overflowY,
+          paletteBottom,
+          selectedTop,
+        };
+      });
+      assert.ok(scroll.body > 0);
+      assert.equal(scroll.dialog, 0);
+      assert.equal(scroll.pageOverflow, "hidden");
+      assert.ok(scroll.paletteBottom <= scroll.selectedTop);
+      await page.click("#puzzle-editor-close");
+      assert.notEqual(await page.locator("html").evaluate(element => getComputedStyle(element).overflowY), "hidden");
+    } finally {
+      await context.close();
+    }
+  }
+});
+
 test("퍼즐 만들기: 끌어서 칠하기·구멍 줄·되돌리기·높이·피스 순서 편집, 시작 틀로 만든 퍼즐을 풀면 공유할 수 있다", async () => {
   const { context, page, errors } = await openPage(() =>
     localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
@@ -3246,7 +3298,7 @@ test("퍼즐 만들기: 끌어서 칠하기·구멍 줄·되돌리기·높이·�
   assert.equal(await page.locator("[data-cell]").count(), 80);
 
   // 피스 순서: 고른 피스 뒤에 넣고, Delete로 빼고, Alt+화살표로 옮긴다
-  const sequence = () => page.$$eval(".puzzle-seq-chip", els => els.map(e => e.textContent).join(""));
+  const sequence = () => page.$$eval(".puzzle-seq-chip", els => els.map(e => e.textContent.split(" ").at(-1)).join(""));
   for (const piece of ["T", "I", "O"]) await page.click(`#puzzles [data-piece="${piece}"]`);
   await page.click('.puzzle-seq-chip[data-at="0"]');
   await page.click('#puzzles [data-piece="S"]');

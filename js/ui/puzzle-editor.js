@@ -372,7 +372,9 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
           label: piece,
           icon: /** @type {any} */ (`piece-${piece}`),
           size: "s",
+          class: "puzzle-piece-add",
           "data-piece": piece,
+          "aria-label": t("{piece} 넣기", { piece }),
           title: t("{piece} 넣기", { piece }),
         })
       );
@@ -780,10 +782,10 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
           : null;
         const chips = [...pieces].map((piece, i) => {
           const chip = button({
-            label: piece,
-            icon: /** @type {any} */ (`piece-${piece}`),
+            label: `${String(i + 1).padStart(2, "0")} ${piece}`,
             size: "s",
-            class: "puzzle-seq-chip",
+            variant: "ghost",
+            class: "puzzle-seq-chip num",
             "data-at": String(i),
             "aria-pressed": String(selected === i),
             "aria-label": t("{n}번째 {piece}", { n: i + 1, piece }),
@@ -1268,20 +1270,29 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
               { class: "puzzle-editor-side", "aria-label": t("피스와 확인") },
               el(
                 "div",
-                { class: "puzzle-editor-seq-head" },
-                el("span", { class: "puzzle-editor-label", text: t("피스 순서") }),
-                count,
-                el("span", { class: "puzzle-editor-seq-actions" }, moveBack, moveForward, remove)
-              ),
-              sequence,
-              el(
-                "div",
-                {
-                  class: "puzzle-editor-pieces",
-                  role: "group",
-                  "aria-label": t("피스 추가 (최대 {n}개)", { n: MAX_PUZZLE_PIECES }),
-                },
-                ...add
+                { class: "puzzle-editor-queue" },
+                el(
+                  "div",
+                  { class: "puzzle-editor-palette" },
+                  el("span", { class: "puzzle-editor-label", text: t("피스 추가") }),
+                  el(
+                    "div",
+                    {
+                      class: "puzzle-editor-pieces",
+                      role: "group",
+                      "aria-label": t("피스 추가 (최대 {n}개)", { n: MAX_PUZZLE_PIECES }),
+                    },
+                    ...add
+                  )
+                ),
+                el(
+                  "div",
+                  { class: "puzzle-editor-seq-head" },
+                  el("span", { class: "puzzle-editor-label", text: t("피스 순서") }),
+                  count,
+                  el("span", { class: "puzzle-editor-seq-actions" }, moveBack, moveForward, remove)
+                ),
+                sequence
               ),
               el(
                 "p",
