@@ -1460,8 +1460,12 @@ const nextPracticeLesson = () =>
             ? FINESSE_LESSONS[mode.lesson.index + 1]
             : null;
 const downstackHint = $("downstack-hint");
+/** 버튼 구조(<span class="btn-label">)를 지키고 글자만 바꾼다 */
+const setHintLabel = text => {
+  /** @type {HTMLElement} */ (downstackHint.querySelector(".btn-label")).textContent = text;
+};
 const resetLessonHint = () => {
-  downstackHint.textContent = mode.puzzle ? t("첫 수 보기") : t("힌트");
+  setHintLabel(mode.puzzle ? t("첫 수 보기") : t("힌트"));
   $("downstack-status").textContent = "";
   if (game?.state.puzzle) game.state.puzzle.hintCells = [];
 };
@@ -1491,7 +1495,7 @@ const togglePuzzleHint = () => {
   p.hintCells = move.cells;
   const spinLast = ["mini", "tsd", "tst"].includes(mode.puzzle.kind);
   $("downstack-status").textContent = t("첫 수 · {steps}", { steps: describeSteps(move.steps, spinLast) });
-  downstackHint.textContent = t("힌트 숨기기");
+  setHintLabel(t("힌트 숨기기"));
 };
 const downstackRetry = $("downstack-retry");
 for (const control of [downstackHint, downstackRetry]) {
@@ -1502,7 +1506,7 @@ for (const control of [downstackHint, downstackRetry]) {
 }
 const applyLessonHint = () => {
   $("downstack-status").textContent = mode.hint(game.state);
-  downstackHint.textContent = t(["힌트", "자리 힌트", "힌트 숨기기"][lessonHintState(game.state).hintLevel]);
+  setHintLabel(t(["힌트", "자리 힌트", "힌트 숨기기"][lessonHintState(game.state).hintLevel]));
 };
 downstackHint.addEventListener("click", event => {
   if (!hasHintControls(mode) || screen !== "play" || !game?.state.active) return;

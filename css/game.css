@@ -1590,13 +1590,26 @@ body.is-versus {
 body.has-lesson-hints[data-screen="play"] .downstack-controls {
   display: grid;
   gap: var(--space-1);
+  container: downstack / inline-size;
+}
+
+/* 정보 칸은 좁아서 두 버튼을 나란히 두면 "첫 수 보기"가 꺾인다. 한 줄에 하나씩, 글자가 바뀌어도 자리는 그대로 */
+.downstack-controls .actions-row {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-1);
+}
+
+/* 정보 칸이 넓으면(휴대폰 세로) 나란히 둔다. 칸 너비로 정하므로 글자가 바뀌어도 그대로 */
+@container downstack (min-width: 300px) {
+  .downstack-controls .actions-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .downstack-controls .btn {
   --btn-size: auto;
   --btn-min: var(--btn-base);
   min-width: 0;
-  white-space: normal;
 }
 
 #downstack-status {
