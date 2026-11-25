@@ -134,6 +134,9 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
   dialog.addEventListener("keydown", event => {
     if (!undoKeys || !dialog.querySelector(".puzzle-editor") || !(event.ctrlKey || event.metaKey) || event.altKey)
       return;
+    // 이름·설명 칸 안에서는 글자 되돌리기(브라우저 기본)
+    const target = /** @type {HTMLElement} */ (event.target);
+    if (target instanceof HTMLInputElement && target.type !== "checkbox") return;
     const key = event.key.toLowerCase();
     if (key !== "z" && key !== "y") return;
     event.preventDefault();

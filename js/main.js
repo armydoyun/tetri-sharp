@@ -2771,7 +2771,8 @@ const restoreRun = async () => {
       applyAction(kind, value) {
         if (kind === "handling") applyRunHandling(sanitizeSettings({ handling: value }).handling);
         if (kind === "undo" && !undo.undo(game.state)) throw new Error("undo");
-        if (kind === "hint") applyLessonHint();
+        // 퍼즐의 첫 수 보기는 판을 바꾸지 않는 표시라 다시 할 것이 없다(연습의 힌트만 단계가 남는다)
+        if (kind === "hint" && !mode.puzzle) applyLessonHint();
       },
       applyInput(held, pressed) {
         advanceRun(held, pressed, true);
@@ -2848,6 +2849,7 @@ const loop = now => {
   if (restoringRun) {
     last = now;
     requestAnimationFrame(loop);
+
     return;
   }
   pad.poll();
@@ -2974,6 +2976,13 @@ if (
     /* 등록이 안 돼도 게임은 그대로 된다 */
   });
 }
+
+// 이미 열려 있는 앱에서 공유 링크(#puzzle= · #replay= · #daily= · #rules=)를 열면 주소의 해시만 바뀌고 페이지는 그대로다.
+// 처음 열 때와 같은 흐름(진행 중인 판 저장·묻기, 받은 퍼즐 남기기 등)을 타도록 다시 불러온다.
+// 진행 중인 판은 이어서 하기로 저장돼 있고, 만들던 퍼즐은 내 퍼즐에 저장돼 있다.
+window.addEventListener("hashchange", () => {
+  if (/[#&](puzzle|replay|daily|rules)=/.test(location.hash)) location.reload();
+});
 
 // 브라우저 테스트가 "앱이 끝까지 떴는지" 확인하는 표시.
 document.documentElement.dataset.ready = "1";

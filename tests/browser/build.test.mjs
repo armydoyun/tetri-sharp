@@ -3411,6 +3411,43 @@ test("내 퍼즐·받은 퍼즐: 고치면 저절로 저장되고, 목록에서 
   await context.close();
 });
 
+test("퍼즐 고친 것: 열린 앱에서 링크를 열면 그 퍼즐로, 첫 수 보기를 쓴 판도 이어서 하기, 이름 칸의 Ctrl+Z는 글자만", async () => {
+  const { context, page, errors } = await openPage(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  // 이미 열린 앱(첫 화면)에서 퍼즐 링크를 열면 주소의 해시만 바뀐다 → 그 퍼즐이 시작돼야 한다
+  await page.evaluate(code => {
+    location.hash = `puzzle=${code}`;
+  }, "2.-.1fc0.I.66eB7YGsIO2NvOymkAo");
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  assert.equal(await text(page, "session-title"), "링크 퍼즐");
+
+  // 첫 수 보기를 쓴 뒤 새로 고침 → 이어서 하기가 된다(전에는 '이어서 할 수 없어요')
+  await page.click("#downstack-hint");
+  await page.waitForFunction(() => document.getElementById("downstack-status")?.textContent?.startsWith("첫 수 ·"));
+  assert.equal(await text(page, "downstack-status"), "첫 수 · 오른쪽 3칸, 하드 드롭", "누를 것이 적은 길");
+  await page.waitForTimeout(300);
+  await page.reload();
+  await page.click("#continue-run");
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  assert.equal(await text(page, "session-title"), "링크 퍼즐");
+  assert.equal(await text(page, "menu-notice"), "");
+
+  // 편집기: 판을 칠한 뒤 이름 칸에서 Ctrl+Z → 판은 그대로(글자 되돌리기만)
+  await page.keyboard.press("Escape");
+  await page.click('#pause [data-action="menu"]');
+  await page.click('[data-confirm="ok"]').catch(() => {});
+  await openList(page, "#open-puzzles");
+  await page.click("#puzzle-create");
+  await page.click('[data-cell="190"]');
+  await page.fill("#puzzle-title", "abc");
+  await page.focus("#puzzle-title");
+  await page.keyboard.press("Control+z");
+  assert.equal(await page.locator('[data-cell="190"]').getAttribute("aria-pressed"), "true");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
 test("만든 퍼즐: 시험 플레이 성공 후에만 공유하고, 휴대폰에서 링크를 열어 풀 수 있다", async () => {
   const { context, page, errors } = await openPage(() => {
     localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
