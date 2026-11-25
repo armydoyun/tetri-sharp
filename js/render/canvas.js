@@ -139,7 +139,13 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     const hintCells =
       state?.downstack?.hintCells ?? state?.buildLesson?.hintCells ?? state?.puzzle?.hintCells ?? state?.finesseTarget;
     const lockTimer = active ? state.lock.timer : 0;
-    const shown = state?.puzzle ? Math.max(0, state.puzzle.need - state.puzzle.placed - 1) : game?.rules.previewCount;
+    // 퍼즐은 남은 피스만(움직이는 피스·홀드 칸 제외), 규칙의 미리보기 개수까지
+    const shown = state?.puzzle
+      ? Math.min(
+          game?.rules.previewCount ?? 5,
+          Math.max(0, state.puzzle.need - state.puzzle.placed - 1 - (state.hold ? 1 : 0))
+        )
+      : game?.rules.previewCount;
 
     // 같은 엔진 프레임이라도 힌트나 화면 설정이 바뀔 수 있고, 반대로 프레임이 흘러도 보드는 그대로일 수 있다.
     const view = [

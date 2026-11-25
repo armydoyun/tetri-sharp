@@ -52,9 +52,27 @@ export const readCss = (root = ROOT) =>
     root
   );
 
-export const build = async ({ outFile = path.join(DEPLOY, "index.html") } = {}) => {
+/** 퍼즐 풀이 Worker 소스를 담는 전역 이름(js/app/solver.js의 SOLVER_GLOBAL과 같다) */
+export const SOLVER_GLOBAL = "__TETRISHARP_SOLVER__";
+
+/** 퍼즐 풀이 Worker(js/workers/solver.js)를 따로 묶은 소스 */
+export const buildSolverWorker = async () => {
   const bundle = await esbuild({
     ...JS_OPTIONS,
+    banner: { js: '"use strict";' },
+    entryPoints: [path.join(ROOT, "js", "workers", "solver.js")],
+    write: false,
+    logLevel: "silent",
+  });
+  return bundle.outputFiles[0].text;
+};
+
+export const build = async ({ outFile = path.join(DEPLOY, "index.html") } = {}) => {
+  const worker = await buildSolverWorker();
+  // 한 파일 배포본: Worker 소스는 본 스크립트 맨 앞 전역 문자열로 넣는다(Blob Worker로 띄운다)
+  const bundle = await esbuild({
+    ...JS_OPTIONS,
+    banner: { js: `${JS_OPTIONS.banner.js}\nvar ${SOLVER_GLOBAL} = ${JSON.stringify(worker)};` },
     entryPoints: [path.join(ROOT, "js", "main.js")],
     write: false,
     logLevel: "silent",

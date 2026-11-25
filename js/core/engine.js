@@ -69,6 +69,7 @@ export const msToFrames = ms => (ms * 60) / 1000;
  * @property {number} [levelStep]                     레벨업 알림 간격 (기본 1, Master는 100)
  * @property {(state: any) => number} [scoreLevel]    점수에 곱할 레벨 (기본 state.level)
  * @property {(state: any, rng: import("./rng.js").Rng) => void} [setup]  시작 전에 보드를 꾸민다(Dig의 쓰레기 줄 등)
+ * @property {(state: any) => boolean} [canHold]  홀드할 수 있는지(없으면 늘 된다)
  * @property {readonly string[]} [sequence]  정해진 피스 순서를 반복(연습 모드). 있으면 규칙의 생성기 대신 쓴다
  * @property {(state: any, lockEvent: any, events: any[]) => boolean | void} [onLock]  고정·줄 삭제 직후, 다음 피스 전에 불린다. 보드를 되돌렸으면 true
  * @property {(state: any, events: any[]) => void} [onFrame]  매 프레임 끝에 불린다(Survival의 쓰레기 줄 타이머 등)
@@ -163,6 +164,9 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
   const fits = (a, dx, dy, rot = a.rot) => !collides(board, rotation.cells(a.type, rot), a.x + dx, a.y + dy);
   const grounded = a => !fits(a, 0, 1);
 
+  /** 모드가 홀드를 막을 수 있다(퍼즐: 목록이 끝났는데 홀드 칸이 비어 있으면) */
+  const canHold = () => mode?.canHold?.(state) ?? true;
+
   const takeNext = () => {
     const type = /** @type {import("./pieces.js").PieceType} */ (state.queue.shift());
     state.queue.push(randomizer.next());
@@ -218,7 +222,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
   /** 다음 피스를 꺼내 생성한다. IHS: 생성 순간 홀드를 누르고 있으면 바로 홀드한 피스와 바꾼다. */
   const spawnNext = () => {
     let type = takeNext();
-    if (rules.ihs && rules.hold.enabled && currentHeld & BTN.HOLD && !state.holdUsed) {
+    if (rules.ihs && rules.hold.enabled && currentHeld & BTN.HOLD && !state.holdUsed && canHold()) {
       const held = state.hold;
       state.hold = type;
       state.holdUsed = true;
@@ -466,7 +470,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
       return events;
     }
 
-    if (pressed & BTN.HOLD && rules.hold.enabled && !state.holdUsed) {
+    if (pressed & BTN.HOLD && rules.hold.enabled && !state.holdUsed && canHold()) {
       const current = state.active.type;
       const next = state.hold ?? takeNext();
       state.hold = current;

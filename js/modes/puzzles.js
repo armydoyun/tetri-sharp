@@ -13,6 +13,7 @@ import { WIDTH } from "../core/board.js";
 import { GARBAGE } from "../core/pieces.js";
 import { buildPcExact, buildQuadExact, buildTsd, buildTst } from "./practice.js";
 import { t } from "../i18n/index.js";
+import { goalOf } from "./puzzle-goals.js";
 
 const TYPES = ["I", "J", "L", "O", "S", "T", "Z"];
 
@@ -236,12 +237,12 @@ const makeStage = index => {
       kind,
       pieces: ["T"],
       build: board => (kind === "tsd" ? buildTsd(board, where, right) : buildTst(board, where, right)),
-      goal: ev => ev.tspin === "full" && ev.lines === (kind === "tsd" ? 2 : 3),
+      ...goalOf(kind, 1),
     };
   }
   if (kind === "tuck" || kind === "spin") {
     const [piece, rows] = (kind === "tuck" ? TUCK_BOARDS : SPIN_BOARDS)[nthOfKind(index)];
-    return { kind, pieces: [piece], build: board => drawRows(board, rows), goal: ev => ev.lines === 2 };
+    return { kind, pieces: [piece], build: board => drawRows(board, rows), ...goalOf(kind, 1) };
   }
   if (kind === "mini") {
     const [piece, rows] = MINI_BOARDS[nthOfKind(index)];
@@ -249,7 +250,7 @@ const makeStage = index => {
       kind,
       pieces: [piece],
       build: board => drawRows(board, rows),
-      goal: ev => ev.tspin === "mini" && ev.lines >= 1,
+      ...goalOf(kind, 1),
     };
   }
   if (kind === "combo") {
@@ -267,9 +268,7 @@ const makeStage = index => {
             if (!inWell || (y === board.height - 1 && x !== left + gap)) board.cells[y * WIDTH + x] = GARBAGE;
           }
       },
-      // 피스마다 줄을 지워 콤보가 피스 수 - 1까지 이어지면 성공, 한 번이라도 못 지우면 바로 실패
-      goal: ev => ev.lines > 0 && ev.combo === count - 1,
-      broken: ev => ev.lines === 0,
+      ...goalOf(kind, count),
     };
   }
   if (kind === "quad") {
@@ -287,7 +286,7 @@ const makeStage = index => {
         kind,
         pieces: [...front, "I"],
         build: target => target.cells.set(cells),
-        goal: ev => ev.lines === 4,
+        ...goalOf(kind, count),
       };
     }
     throw new Error(`퍼즐 단계를 만들 수 없습니다: ${index + 1}`);
@@ -303,7 +302,7 @@ const makeStage = index => {
       kind,
       pieces,
       build: target => target.cells.set(cells),
-      goal: ev => ev.perfect,
+      ...goalOf(kind, count),
     };
   }
   throw new Error(`퍼즐 단계를 만들 수 없습니다: ${index + 1}`);
@@ -340,25 +339,41 @@ export const PUZZLES = Object.freeze(
 const cache = new Map();
 
 export const makePuzzleMode = (puzzle, rules = MODERN) => {
-  const need = puzzle.pieces.length;
+  // 피스 수: 목록 + 처음 홀드 피스(만든 퍼즐)
+  const need = puzzle.pieces.length + (puzzle.holdStart ? 1 : 0);
+  /** 아직 나오지 않은 목록 피스 수(움직이는 피스·홀드 칸 제외) */
+  const left = state => need - state.puzzle.placed - (state.active ? 1 : 0) - (state.hold ? 1 : 0);
   return Object.freeze({
     id: puzzle.number ? `puzzle-${puzzle.id}` : "custom-puzzle",
-    name: puzzle.number ? t("퍼즐 {n} · {kind}", { n: puzzle.number, kind: KIND_NAMES[puzzle.kind] }) : t("만든 퍼즐"),
-    description: KIND_NAMES[puzzle.kind],
+    name: puzzle.number
+      ? t("퍼즐 {n} · {kind}", { n: puzzle.number, kind: KIND_NAMES[puzzle.kind] })
+      : puzzle.custom?.title || t("만든 퍼즐"),
+    description: KIND_NAMES[puzzle.kind] ?? "",
     rules,
     puzzle,
     hud: Object.freeze(["time", "lines", "pieces"]),
     sequence: Object.freeze([...puzzle.pieces]),
     setup: state => {
-      state.puzzle = { placed: 0, result: null, need };
+      state.puzzle = { placed: 0, result: null, need, lines: 0 };
+      if (puzzle.holdStart) state.hold = puzzle.holdStart;
       puzzle.build(state.board);
     },
-    gravityFor: () => 0,
+    // 퍼즐은 중력 없음. 만든 퍼즐은 20G나 규칙의 중력을 고를 수 있다
+    gravityFor: () => (puzzle.gravity === "20g" ? 20 : puzzle.gravity === "rules" ? rules.gravity : 0),
+    // 목록이 끝났는데 홀드 칸이 비어 있으면 홀드할 수 없다(목록 밖 피스가 나오지 않게)
+    canHold: state => Boolean(state.hold) || left(state) > 0,
     onLock: (state, ev) => {
       const p = state.puzzle;
       p.placed += 1;
-      if (puzzle.goal(ev)) p.result = "clear";
-      else if (p.placed >= need || puzzle.broken?.(ev)) p.result = "fail";
+      p.lines += ev.lines;
+      const event = { ...ev, total: p.lines };
+      if (puzzle.goal(event)) p.result = "clear";
+      else if (p.placed >= need || puzzle.broken?.(event)) p.result = "fail";
+      // 목록이 끝나면 홀드한 피스가 다음으로 나온다
+      else if (state.hold && left(state) <= 0) {
+        state.queue.unshift(state.hold);
+        state.hold = null;
+      }
       return false;
     },
     check: state => (state.puzzle.result ? { result: state.puzzle.result } : null),
