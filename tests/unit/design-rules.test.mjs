@@ -233,7 +233,7 @@ test("컴포넌트: 화면 코드는 버튼·입력을 직접 만들지 않는�
     "js/ui/puzzles.js:puzzle-tile",
     "js/ui/settings.js:key-slot",
     "js/ui/puzzle-editor.js:puzzle-editor-cell",
-    "js/main.js:replay-mark",
+    "js/app/replay-player.js:replay-mark",
   ]);
   const bad = [];
   // 컴포넌트를 만드는 파일: components.js와 드롭다운(select.js)

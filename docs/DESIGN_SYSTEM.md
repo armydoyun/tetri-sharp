@@ -177,7 +177,7 @@ fieldRow({ id, label: t("고스트"), control: segmented({ id, label: t("고스�
 | 퍼즐 단계 칸 | `.puzzle-tile` | `js/ui/puzzles.js` |
 | 키 칸 | `.key-slot` | `js/ui/settings.js` |
 | 퍼즐 편집 칸 | `.puzzle-editor-cell` | `js/ui/puzzle-editor.js` |
-| 리플레이 표시 | `.replay-mark` | `js/main.js` |
+| 리플레이 표시 | `.replay-mark` | `js/app/replay-player.js` |
 | 로고 | `.logo-btn` | `index.html` 머리글 |
 
 ### 그 밖의 표면
