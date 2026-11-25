@@ -133,6 +133,8 @@ const playReplayFrames = (page, inputs, from, to, delay = 0, topOut = false) =>
  */
 const openList = async (page, button) => {
   const dialog = button === "#open-practice" ? "#practice" : "#puzzles";
+  // 목록은 키·클릭 처리가 끝난 뒤에 열린다(같은 Esc가 닫지 않게) → 한 박자 기다린 뒤 본다
+  await page.waitForTimeout(30);
   if (await page.locator(`${dialog}[open]`).count()) {
     await page.locator(`${dialog}[open]`).evaluate(d => /** @type {HTMLDialogElement} */ (d).close());
   }
@@ -3353,6 +3355,9 @@ test("업적: 이룬 판의 결과 화면에 알리고, 첫 화면 개수와 업
   await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
   assert.equal(await text(page, "results-achievements"), "업적 달성 · 판 비우기 장");
   await page.keyboard.press("Escape");
+  // 퍼즐을 마치고 나오면 퍼즐 목록이 열린다 → 닫으면 첫 화면
+  await page.waitForFunction(() => document.getElementById("puzzles")?.open);
+  await page.keyboard.press("Escape");
   assert.match(await text(page, "achievement-progress"), /^1 \/ \d+$/);
   await page.click("#open-achievements");
   assert.equal(await page.locator('#achievements [data-achievement="puzzle-pc"].is-done').count(), 1);
@@ -3862,10 +3867,10 @@ test("퍼즐 첫 수 보기와 목록으로: 힌트는 자리와 누를 순서�
   const spin = PUZZLES.find(p => p.kind === "spin");
   await openPuzzle(page, spin.number);
   assert.equal(await page.locator("#downstack-hint").isVisible(), true, "퍼즐에도 힌트 단추");
-  assert.equal(await text(page, "downstack-hint"), "첫 수 보기");
+  assert.equal(await page.locator("#downstack-hint .btn-label").textContent(), "첫 수 보기");
   await page.click("#downstack-hint");
   assert.match(await text(page, "downstack-status"), /^첫 수 · .*반시계 회전/);
-  assert.equal(await text(page, "downstack-hint"), "힌트 숨기기");
+  assert.equal(await page.locator("#downstack-hint .btn-label").textContent(), "힌트 숨기기");
   await page.click("#downstack-hint");
   assert.equal(await text(page, "downstack-status"), "", "한 번 더 누르면 숨긴다");
   // 결과에서 "퍼즐 목록" → 목록이 열리고 방금 한 단계에 포커스
@@ -3873,7 +3878,8 @@ test("퍼즐 첫 수 보기와 목록으로: 힌트는 자리와 누를 순서�
   await page.waitForFunction(() => !document.getElementById("results")?.hidden);
   assert.equal(await page.locator('#results [data-action="menu"] .btn-label').textContent(), "퍼즐 목록");
   await page.click('#results [data-action="menu"]');
-  await page.waitForFunction(() => document.getElementById("puzzles")?.open);
+  // 목록은 클릭 처리가 끝난 뒤에 열린다. 이 판은 그리기 프레임을 멈춰 두었으니 시간 간격으로 기다린다
+  await page.waitForFunction(() => document.getElementById("puzzles")?.open, null, { polling: 50 });
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("data-puzzle")), String(spin.number));
   assert.equal(await page.evaluate(() => document.body.dataset.screen), "menu", "목록을 닫으면 첫 화면");
   assert.deepEqual(errors, []);
@@ -3895,6 +3901,57 @@ test("연습 목록으로: 연습 중 일시정지의 '연습 목록으로'는 �
   await page.click('[data-confirm="ok"]');
   await page.waitForFunction(() => document.getElementById("practice")?.open);
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("data-drill")), "pc");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("단축키: H는 첫 수 보기, 결과에서 N은 다음 단계", async () => {
+  const { context, page, errors } = await openPage(
+    () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } })),
+    undefined,
+    { frameClock: true }
+  );
+  const first = PUZZLES.find(p => p.kind === "tuck");
+  await openPuzzle(page, first.number);
+  assert.equal(await page.locator("#downstack-hint kbd[data-key]").textContent(), "H", "단추에 단축키 표시");
+  await page.keyboard.press("KeyH");
+  assert.match(await text(page, "downstack-status"), /^첫 수 · /);
+  await page.keyboard.press("KeyH");
+  assert.equal(await text(page, "downstack-status"), "");
+  // 밀어 넣어 성공 → 결과에서 N = 다음 단계
+  await runKeys(page, [
+    ["ArrowRight", 1],
+    ["ArrowDown", 70],
+    ["ArrowLeft", 1],
+    ["Space", 1],
+  ]);
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  assert.equal(await text(page, "results-title"), "성공!");
+  assert.equal(await page.locator('#results [data-action="next-puzzle"] kbd[data-key]').textContent(), "N");
+  await page.keyboard.press("KeyN");
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  assert.match(await text(page, "session-title"), new RegExp(`퍼즐 ${first.number + 1} `));
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("결과에서 Esc는 퍼즐 목록: 같은 Esc 입력이 방금 연 목록을 닫지 않는다", async () => {
+  const { context, page, errors } = await openPage(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  const first = PUZZLES.find(p => p.kind === "tuck");
+  await openList(page, "#open-puzzles");
+  await page.click(`[data-puzzle="${first.number}"]`);
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  await page.waitForTimeout(200);
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => !document.getElementById("results")?.hidden);
+  await page.waitForTimeout(200);
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => document.getElementById("puzzles")?.open);
+  await page.waitForTimeout(200);
+  assert.equal(await page.evaluate(() => document.getElementById("puzzles")?.open), true, "열린 채로 남는다");
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("data-puzzle")), String(first.number));
   assert.deepEqual(errors, []);
   await context.close();
 });

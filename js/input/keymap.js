@@ -5,7 +5,7 @@ import { t } from "../i18n/index.js";
 
 export const SLOTS = 2;
 
-/** @type {ReadonlyArray<{ id: string, label: string, bit?: number, system?: "restart" | "pause" | "undo" }>} */
+/** @type {ReadonlyArray<{ id: string, label: string, bit?: number, system?: "restart" | "pause" | "undo" | "hint" | "next" }>} */
 export const ACTIONS = Object.freeze([
   { id: "LEFT", label: t("왼쪽 이동"), bit: BTN.LEFT },
   { id: "RIGHT", label: t("오른쪽 이동"), bit: BTN.RIGHT },
@@ -18,6 +18,8 @@ export const ACTIONS = Object.freeze([
   { id: "RESTART", label: t("다시 시작"), system: "restart" },
   { id: "PAUSE", label: t("일시정지"), system: "pause" },
   { id: "UNDO", label: t("되돌리기 (연습)"), system: "undo" },
+  { id: "HINT", label: t("힌트·첫 수 보기 (퍼즐·연습)"), system: "hint" },
+  { id: "NEXT", label: t("다음 단계 (결과 화면)"), system: "next" },
 ]);
 
 export const DEFAULT_KEYMAP = Object.freeze({
@@ -32,6 +34,8 @@ export const DEFAULT_KEYMAP = Object.freeze({
   RESTART: ["KeyR"],
   PAUSE: ["KeyP"],
   UNDO: ["KeyU"],
+  HINT: ["KeyH"],
+  NEXT: ["KeyN"],
 });
 
 /** 바꿀 수 없는 키: Esc는 언제나 일시정지/뒤로. */
@@ -95,12 +99,12 @@ export const clearKey = (keymap, actionId, slot) => ({
 
 /**
  * 키 이벤트 처리용으로 바꾼다.
- * @returns {{ buttons: Record<string, number>, system: Record<string, "restart" | "pause" | "undo"> }}
+ * @returns {{ buttons: Record<string, number>, system: Record<string, "restart" | "pause" | "undo" | "hint" | "next"> }}
  */
 export const compileKeymap = keymap => {
   /** @type {Record<string, number>} */
   const buttons = {};
-  /** @type {Record<string, "restart" | "pause" | "undo">} */
+  /** @type {Record<string, "restart" | "pause" | "undo" | "hint" | "next">} */
   const system = { Escape: "pause" };
   for (const action of ACTIONS) {
     for (const code of keymap[action.id] ?? []) {

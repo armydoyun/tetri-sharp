@@ -844,7 +844,8 @@ const updateBackLabels = () => {
 const leaveToMenu = () => {
   const back = backList();
   toMenu(false, Boolean(back));
-  back?.open();
+  // Esc로 왔으면 같은 키 입력이 방금 연 목록을 바로 닫는다(대화상자의 Esc 닫기) → 키 처리가 끝난 뒤에 연다
+  if (back) setTimeout(back.open, 0);
 };
 
 const askConfirm = kind => {
@@ -1460,8 +1461,10 @@ const nextPracticeLesson = () =>
             ? FINESSE_LESSONS[mode.lesson.index + 1]
             : null;
 const downstackHint = $("downstack-hint");
+// 이름만 바꾼다(단추 안의 단축키 표시는 그대로)
+const hintLabel = /** @type {HTMLElement} */ (downstackHint.querySelector(".btn-label"));
 const resetLessonHint = () => {
-  downstackHint.textContent = mode.puzzle ? t("첫 수 보기") : t("힌트");
+  hintLabel.textContent = mode.puzzle ? t("첫 수 보기") : t("힌트");
   $("downstack-status").textContent = "";
   if (game?.state.puzzle) game.state.puzzle.hintCells = [];
 };
@@ -1491,7 +1494,7 @@ const togglePuzzleHint = () => {
   p.hintCells = move.cells;
   const spinLast = ["mini", "tsd", "tst"].includes(mode.puzzle.kind);
   $("downstack-status").textContent = t("첫 수 · {steps}", { steps: describeSteps(move.steps, spinLast) });
-  downstackHint.textContent = t("힌트 숨기기");
+  hintLabel.textContent = t("힌트 숨기기");
 };
 const downstackRetry = $("downstack-retry");
 for (const control of [downstackHint, downstackRetry]) {
@@ -1502,7 +1505,7 @@ for (const control of [downstackHint, downstackRetry]) {
 }
 const applyLessonHint = () => {
   $("downstack-status").textContent = mode.hint(game.state);
-  downstackHint.textContent = t(["힌트", "자리 힌트", "힌트 숨기기"][lessonHintState(game.state).hintLevel]);
+  hintLabel.textContent = t(["힌트", "자리 힌트", "힌트 숨기기"][lessonHintState(game.state).hintLevel]);
 };
 downstackHint.addEventListener("click", event => {
   if (!hasHintControls(mode) || screen !== "play" || !game?.state.active) return;
@@ -1660,6 +1663,16 @@ const handleSystem = (action, code = "") => {
   if (action === "restart" && inProgress()) return askConfirm("restart");
   if (action === "restart" && screen === "results") return start(mode, rules, race?.target);
   if (action === "undo") return undoPiece();
+  // 힌트(퍼즐 첫 수 보기·파내기·빌드 연습)와 결과 화면의 다음 단계
+  if (action === "hint") {
+    if (screen === "play" && hasHintControls(mode)) downstackHint.click();
+    return;
+  }
+  if (action === "next") {
+    const next = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="next-puzzle"]'));
+    if (screen === "results" && !next.hidden) next.click();
+    return;
+  }
   if (action !== "pause") return;
   if (screen === "play" || screen === "countdown") pause();
   else if (screen === "paused") resume();
