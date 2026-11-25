@@ -40,6 +40,7 @@ export const VISIBLE_TOP = HEIGHT - VISIBLE_ROWS;
  * @property {number} das  자동 이동이 시작되기까지의 프레임
  * @property {number} arr  자동 이동 한 칸당 프레임(0 = 즉시 벽까지)
  * @property {number} sdf  소프트 드롭 배율(Infinity = 즉시 바닥까지)
+ * @property {number} [dcd]  DAS 끊김(프레임): 자동 이동 중 새 피스가 나오거나 돌리면 이만큼 다시 기다린다(없거나 0 = 끄기)
  */
 
 /** @type {Handling} */
@@ -215,6 +216,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
     state.pieceId += 1;
     state.gravityAcc = 0;
     resetLock(a.y);
+    cutDas();
     events.push({ type: "spawn", piece: type });
     onSpawn?.(state);
   };
@@ -346,6 +348,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
         a.rot = to;
         a.lastAction = "rotate";
         a.kick = i;
+        cutDas();
         onShifted();
         onDescended(a);
         events.push({ type: "rotate", kick: i });
@@ -355,6 +358,18 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
       }
     }
     return false;
+  };
+
+  /**
+   * DCD(DAS 끊김): 자동 이동이 이미 걸린 채로 새 피스가 나오거나 돌리면, dcd 프레임을 다시 기다린 뒤 자동 이동한다.
+   * 꾹 누른 채 다음 피스가 벽까지 미끄러지는 실수를 막는다(5차 검수 G6). 0이면 아무 일도 하지 않아 예전과 같다.
+   */
+  const cutDas = () => {
+    const dcd = handling.dcd ?? 0;
+    const d = state.das;
+    if (dcd <= 0 || !d.dir || d.charge < handling.das) return;
+    d.charge = Math.max(0, handling.das - dcd);
+    d.arrAcc = 0;
   };
 
   const dropOne = a => {

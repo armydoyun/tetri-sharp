@@ -44,7 +44,7 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
    */
   const fit = () => {
     const dpr = window.devicePixelRatio || 1;
-    const nextSide = compact ? 0 : narrow.matches ? 3 : 5;
+    const nextSide = compact ? 0 : narrow.matches ? 2 : 5;
     const shown = compact ? 0 : canvas.clientWidth / (COLS + nextSide * 2);
     const next = Math.max(8, Math.round((compact ? 14 : Math.max(CSS_CELL, shown)) * dpr));
     if (next === cell && nextSide === side) return false;
@@ -277,7 +277,8 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     if (!game || compact) return;
 
     // 홀드
-    const small = Math.round(cell * (narrow.matches ? 0.57 : 0.8));
+    // 미리보기 피스(가로 4칸)가 옆 칸 폭 안에 들어가게: 좁은 화면 2칸 → 0.42(양옆 여백 조금), 넓은 화면 5칸 → 0.8
+    const small = Math.round(cell * (narrow.matches ? 0.42 : 0.8));
     const sidePad = Math.round((side * cell - 4 * small) / 2);
     const nx = bx + COLS * cell + sidePad;
     if (redrawLabels) {

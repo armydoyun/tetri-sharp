@@ -1068,7 +1068,8 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       layoutBoard();
       refresh();
       dialog.showModal();
-      tiles[focusIndex].focus();
+      // 포커스는 판의 칸에 두되 스크롤은 하지 않는다 — 열자마자 이름·시작 틀·목표가 위로 밀려 안 보였다(5차 검수 F39)
+      tiles[focusIndex].focus({ preventScroll: true });
     },
   };
   return editor;

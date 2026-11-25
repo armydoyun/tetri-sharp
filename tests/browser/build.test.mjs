@@ -2910,10 +2910,25 @@ for (const [locale, width, height] of [
   });
 }
 
-test("대화상자: 끝까지 내려도 마지막 줄·버튼이 아래 구분선에 붙지 않는다", async () => {
+test("대화상자: 열면 맨 위부터 보이고, 끝까지 내려도 마지막 줄·버튼이 아래 구분선에 붙지 않는다", async () => {
   const { context, page, errors } = await openPage();
+  const openBody = () =>
+    page.evaluate(
+      () => [...document.querySelectorAll("dialog")].find(d => d.open).querySelector(".dialog-body").scrollTop
+    );
+  // 열자마자 아래로 스크롤된 채 뜨면 위쪽 설정이 안 보인다(5차 검수 F39: 퍼즐 만들기)
+  for (const opener of ["#open-achievements", "#open-puzzles #puzzle-create"]) {
+    const [first, second] = opener.split(" ");
+    await page.click(first);
+    if (second) await page.click(second);
+    await page.waitForTimeout(100);
+    assert.equal(await openBody(), 0, `${opener} 열면 맨 위`);
+    await page.keyboard.press("Escape");
+  }
   for (const opener of ["#open-help", "#open-practice", "#open-puzzles", "#open-records", "#open-settings"]) {
     await page.click(opener);
+    await page.waitForTimeout(100);
+    assert.equal(await openBody(), 0, `${opener} 열면 맨 위`);
     const gap = await page.evaluate(() => {
       const body = [...document.querySelectorAll("dialog")].find(d => d.open).querySelector(".dialog-body");
       body.scrollTop = body.scrollHeight;
@@ -2960,6 +2975,22 @@ test("편의: 조작감 프리셋을 누르면 DAS·ARR·SDF가 한 번에 바�
   await page.locator("#set-das").fill("150");
   assert.equal(await page.locator('#set-handling-preset [aria-pressed="true"]').count(), 0);
   assert.match(await page.locator('label[for="set-handling-preset"] small').textContent(), /직접 조절/);
+
+  // DCD(5차 검수 G6): 기본 0(끄기), 바꾼 값은 저장되고 프리셋을 눌러도 그대로 남는다
+  assert.equal(await page.locator("#set-dcd").inputValue(), "0");
+  await page.locator("#set-dcd").fill("50");
+  await page.click('#set-handling-preset [data-value="fast"]');
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:settings")).handling);
+  assert.deepEqual(saved, { das: 100, arr: 0, sdf: 30, dcd: 50 });
+
+  // 전체 화면(5차 검수 G5): 지원하는 브라우저면 화면 탭의 스위치로 켜고 끈다(설정에 남기지 않는 그때 상태)
+  await page.click('#settings .dialog-tabs [data-value="visual"]');
+  await page.click("#set-fullscreen");
+  await page.waitForFunction(() => Boolean(document.fullscreenElement));
+  assert.equal(await page.locator("#set-fullscreen").isChecked(), true);
+  await page.click("#set-fullscreen");
+  await page.waitForFunction(() => !document.fullscreenElement);
+  assert.equal(await page.locator("#set-fullscreen").isChecked(), false);
   assert.deepEqual(errors, []);
   await context.close();
 });
@@ -2988,6 +3019,52 @@ test("편의: 카운트다운 '없음'이면 바로 시작하고, 연습에서�
   await page.click('[data-mode="endless"]');
   await page.waitForFunction(() => document.body.dataset.screen === "play");
   assert.equal(await visible(page, "undo-piece"), false, "연습이 아니면 되돌리기 없음");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("다시 시작 키 '한 번에': 게임 중 R 한 번에 새 판(터치 버튼은 묻는다), 기록 판은 일시정지 중 보드를 가린다", async () => {
+  const { context, page, errors } = await openPage(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off", restart: "instant" } }))
+  );
+  const boardHidden = () =>
+    page.evaluate(() => getComputedStyle(document.getElementById("board")).visibility === "hidden");
+  await page.click('[data-mode="sprint40"]');
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "2");
+  await page.keyboard.press("KeyR");
+  await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "0");
+  assert.equal(await page.evaluate(() => document.body.dataset.screen), "play", "묻지 않고 바로 새 판");
+  assert.equal(await visible(page, "confirm"), false);
+
+  // 기록 판(Sprint): 일시정지 중에는 보드·다음 피스를 가리고, 계속하면 다시 보인다(5차 검수 G4)
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => document.body.dataset.screen === "paused");
+  assert.equal(await boardHidden(), true, "일시정지 중 보드 가림");
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  assert.equal(await boardHidden(), false);
+
+  // 터치 버튼의 다시 시작은 설정과 상관없이 묻는다
+  await page.evaluate(() => document.body.classList.add("touch-on"));
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "1");
+  await page.dispatchEvent('[data-touch="RESTART"]', "pointerdown", { pointerId: 1, isPrimary: true });
+  await page.waitForFunction(() => !document.getElementById("confirm").hidden);
+  await page.keyboard.press("Escape");
+
+  // 연습은 기록 판이 아니라 일시정지 중에도 보드가 보인다
+  await page.keyboard.press("Escape");
+  await page.click('#pause [data-action="menu"]');
+  await page.click('[data-confirm="ok"]');
+  await openList(page, "#open-practice");
+  await page.click('[data-drill="free"]');
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => document.body.dataset.screen === "paused");
+  assert.equal(await boardHidden(), false, "연습은 보드를 가리지 않는다");
   assert.deepEqual(errors, []);
   await context.close();
 });
@@ -3092,6 +3169,18 @@ test("퍼즐 만들기: 끌어서 칠하기·구멍 줄·되돌리기·높이·�
   await openList(page, "#open-puzzles");
   await page.click("#puzzle-create");
   assert.equal(await page.locator("[data-cell]").count(), 80, "처음에는 아래 8줄만 크게");
+  // 열면 맨 위(이름·시작 틀·목표)부터 보이고, 닫기는 다른 버튼과 같은 줄 오른쪽 끝(5차 검수 F39·U54)
+  const opened = await page.evaluate(() => {
+    const body = document.querySelector("dialog[open] .dialog-body");
+    const close = document.getElementById("puzzle-editor-close").getBoundingClientRect();
+    const trial = document.getElementById("puzzle-trial").getBoundingClientRect();
+    return {
+      scrollTop: body.scrollTop,
+      sameRow: Math.abs(close.top - trial.top) < 2,
+      closeRight: close.right > trial.right,
+    };
+  });
+  assert.deepEqual(opened, { scrollTop: 0, sameRow: true, closeRight: true });
 
   // 끌어서 칠하기 한 번 = 되돌리기 한 번
   await drag(190, 194);
@@ -3627,7 +3716,11 @@ test("휴대폰: 일시정지·결과 카드가 잘리지 않고, 리플레이 �
     await page.waitForFunction(() => document.body.dataset.screen === "replay");
     await page.waitForTimeout(100);
     const board = await page.locator("#board").boundingBox();
-    assert.ok(board.width >= 110 && board.height >= 150, `리플레이 보드 ${board.width}×${board.height} · ${where}`);
+    // 알아볼 수 있는지는 판(10칸) 폭으로 본다 — 옆 홀드·다음 칸 폭은 화면마다 다르다(휴대폰 세로 2칸, 5차 검수 G2).
+    // 68px = 예전 기준(캔버스 110px, 16칸 중 10칸)과 같은 판 폭
+    const cols = Math.round((board.width / board.height) * 22);
+    const field = (board.width * 10) / cols;
+    assert.ok(field >= 68 && board.height >= 150, `리플레이 판 ${field}×${board.height}(${cols}칸) · ${where}`);
     await page.locator('[data-replay="share"]').scrollIntoViewIfNeeded();
     assert.deepEqual(await reachable(".replay-bar .btn"), [], `리플레이 조작이 스크롤로 다 닿는다 · ${where}`);
     assert.deepEqual(errors, []);
@@ -3799,7 +3892,7 @@ test("피스 몇 개 만에 막힌 판: PPS는 —, 공유는 끄고 이유를 �
   await page.waitForFunction(() => !document.getElementById("results")?.hidden);
   // 블록 순서는 무작위라 막히기까지 피스 수는 판마다 조금 다르다. 짧은 판 기준(20초 안, 줄 0개)에 드는지만 본다
   assert.equal(await text(page, "hud-lines"), "0", "세워서 떨어뜨리기만 하면 줄을 못 지우고 금방 막힌다");
-  assert.match(await text(page, "results-stats"), /PPS—/);
+  assert.match(await text(page, "results-stats"), /초당 피스—/);
   assert.equal(await page.locator('#results [data-action="export"]').isDisabled(), true);
   assert.match(await text(page, "race-result"), /너무 일찍 끝난 판/);
   assert.equal(await page.locator('#results [data-action="retry"]').isDisabled(), false, "다시 하기는 그대로");
@@ -3898,7 +3991,7 @@ test("하드 드롭 연타로 1~2초 만에 막힌 Sprint: 피스가 10개를 �
   for (let i = 0; i < 40 && !(await visible(page, "results")); i++) await page.keyboard.press("Space");
   await page.waitForFunction(() => !document.getElementById("results")?.hidden);
   assert.ok(Number(await text(page, "hud-pieces")) >= 10, "피스는 10개 넘게 놓였다");
-  assert.match(await text(page, "results-stats"), /PPS—/);
+  assert.match(await text(page, "results-stats"), /초당 피스—/);
   assert.equal(await page.locator('#results [data-action="export"]').isDisabled(), true);
   assert.equal(await page.locator("#results-practice-scene").isVisible(), false, "추천 연습 없음");
   assert.deepEqual(errors, []);

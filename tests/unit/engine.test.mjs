@@ -72,6 +72,36 @@ test("ARR 0이면 DAS가 차는 순간 벽까지", () => {
   assert.equal(minX(g), 0);
 });
 
+test("DCD: 자동 이동 중 돌리거나 새 피스가 나오면 DCD만큼 다시 기다린다, 0이면 예전과 같다(5차 검수 G6)", () => {
+  /** 오른쪽을 꾹 눌러 자동 이동을 건 뒤 돌린다 → 돌린 뒤 n프레임 동안 움직인 칸 수 */
+  const afterRotate = (dcd, frames) => {
+    const g = make({ gravity: 0 }, { ...HANDLING, dcd });
+    tick(g);
+    tick(g, BTN.RIGHT);
+    run(g, 8, BTN.RIGHT); // DAS 도달
+    tick(g, BTN.RIGHT | BTN.CW, BTN.CW);
+    const x = minX(g);
+    run(g, frames, BTN.RIGHT);
+    return minX(g) - x;
+  };
+  assert.ok(afterRotate(0, 2) >= 1, "끄면 돌린 뒤에도 ARR대로 계속 간다");
+  assert.equal(afterRotate(4, 2), 0, "DCD 4프레임: 돌린 바로 뒤에는 멈춘다");
+  assert.ok(afterRotate(4, 5) >= 1, "DCD가 지나면 다시 자동 이동");
+
+  // 새 피스: 하드 드롭 뒤 나온 피스도 바로 미끄러지지 않는다
+  const afterSpawn = dcd => {
+    const g = make({ gravity: 0 }, { ...HANDLING, arr: 0, dcd });
+    tick(g);
+    tick(g, BTN.RIGHT);
+    run(g, 8, BTN.RIGHT); // ARR 0: 벽까지
+    tick(g, BTN.RIGHT, BTN.HARD);
+    run(g, 1, BTN.RIGHT);
+    return maxX(g);
+  };
+  assert.equal(afterSpawn(0), WIDTH - 1, "끄면 새 피스가 곧장 벽으로");
+  assert.ok(afterSpawn(6) < WIDTH - 1, "DCD가 있으면 새 피스는 잠깐 제자리");
+});
+
 test("좌우를 바꿔 누르면 나중 방향이 이기고, 놓으면 남은 방향으로 돌아간다", () => {
   const g = make({ gravity: 0 });
   tick(g);

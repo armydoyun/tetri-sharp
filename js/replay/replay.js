@@ -14,14 +14,22 @@ const APP = "tetri-sharp";
 const MAX_INPUTS = 500000;
 
 /** JSON에는 Infinity가 없으므로 SDF ∞는 -1로 적는다. */
-const encodeHandling = h => ({ das: h.das, arr: h.arr, sdf: h.sdf === Infinity ? -1 : h.sdf });
+// dcd는 켰을 때만 적는다 → 끈 판의 리플레이는 예전 모양 그대로다
+const encodeHandling = h => ({
+  das: h.das,
+  arr: h.arr,
+  sdf: h.sdf === Infinity ? -1 : h.sdf,
+  ...(h.dcd > 0 ? { dcd: h.dcd } : {}),
+});
 const decodeHandling = h => {
   const num = (v, min, max, fallback) => (Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback);
   const sdf = Number(h?.sdf);
+  const dcd = num(Number(h?.dcd), 0, 60, 0);
   return {
     das: num(Number(h?.das), 0, 120, 8),
     arr: num(Number(h?.arr), 0, 60, 0.6),
     sdf: sdf === -1 || sdf === Infinity ? Infinity : num(sdf, 1, 1000, 20),
+    ...(dcd > 0 ? { dcd } : {}),
   };
 };
 

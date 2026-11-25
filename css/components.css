@@ -196,6 +196,30 @@
   background: var(--surface);
 }
 
+/* 퍼즐 편집기는 버튼이 셋(시험 플레이 · 링크 복사 · 닫기).
+   넓은 창: 한 줄에 [알림 | 시험 | 링크 | 닫기] — 닫기가 둘째 줄 왼쪽으로 떨어지지 않게(5차 검수 U54).
+   그보다 좁으면 알림을 맨 위 한 줄에 두고 [시험 | 링크] 아래 닫기 한 줄 — 알림이 좁은 칸에서 잘리지 않게. */
+@media (min-width: 761px) {
+  .dialog-foot:has(#puzzle-trial) {
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .dialog-foot:has(#puzzle-trial) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dialog-foot:has(#puzzle-trial) > .notice-slot,
+  .dialog-foot:has(#puzzle-trial) > #puzzle-editor-close {
+    grid-column: 1 / -1;
+  }
+
+  .dialog-foot:has(#puzzle-trial) > :not(.notice-slot):first-of-type {
+    grid-column: auto;
+  }
+}
+
 /* 좁은 화면: 알림은 버튼 위 한 줄 전체(좁은 칸에서 두 줄을 넘겨 잘리지 않게), 버튼은 그 아래 오른쪽 */
 @media (max-width: 560px) {
   .dialog-foot {
@@ -1111,19 +1135,6 @@
     grid-template-columns: minmax(0, 1fr) 8.5em;
   }
 
-  /* 편집기 발 줄: 버튼이 셋이라 한 줄에 두면 닫기가 좁아진다 → [시험 플레이 | 링크 복사] 아래 닫기 한 줄 */
-  .dialog-foot:has(#puzzle-trial) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .dialog-foot:has(#puzzle-trial) > :not(.notice-slot):first-of-type {
-    grid-column: auto;
-  }
-
-  .dialog-foot:has(#puzzle-trial) > #puzzle-editor-close {
-    grid-column: 1 / -1;
-  }
-
   .puzzle-editor-goal > .puzzle-editor-label {
     grid-column: 1 / -1;
   }
@@ -1509,5 +1520,29 @@
 
   .custom-puzzle-actions {
     justify-content: flex-end;
+  }
+}
+
+/* ---- 터치 화면: 컨트롤이 아닌 누를 곳도 44px(5차 검수 U55) ----
+   펼치기 줄(기록 "최근 20판", 통계, 결과 "같은 순서로 다시 하기"), 머리글 로고, 설정 색 견본.
+   첫 화면 "규칙 · Modern" 링크는 글자 줄 안에 있으니 보이는 배치는 그대로 두고 누르는 범위만 위아래로 넓힌다. */
+@media (pointer: coarse) {
+  details > summary {
+    min-height: 44px;
+  }
+
+  .logo-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .color-swatch {
+    height: 44px;
+  }
+
+  .active-rules {
+    display: inline-block;
+    padding-block: 14px;
+    margin-block: -14px;
   }
 }
