@@ -161,6 +161,13 @@ const scenarios = async (page, quick) => {
     await check(`퍼즐 만들기 높이=${h}`);
   }
   await esc();
+  // 퍼즐 목록의 내 퍼즐(방금 편집기가 저장한 퍼즐 한 줄)·받은 퍼즐(빈 목록) 탭
+  await page.click("#open-puzzles");
+  for (const tab of ["mine", "received", "stages"]) {
+    await page.click(`#puzzles .dialog-tabs [data-value="${tab}"]`);
+    await check(`퍼즐 목록 ${tab}`);
+  }
+  await esc();
   if (await page.$('[data-mode="versus"]')) {
     await page.click('[data-mode="versus"]');
     await check("CPU 대전 난이도");

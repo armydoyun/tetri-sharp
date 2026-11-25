@@ -1,4 +1,4 @@
-// 저장 데이터 백업: 이 브라우저에 쌓인 설정·기록·이름·Custom 규칙·리플레이를 JSON 파일 하나로 내보내고 다시 들인다.
+// 저장 데이터 백업: 이 브라우저에 쌓인 설정·기록·이름·Custom 규칙·리플레이·내 퍼즐을 JSON 파일 하나로 내보내고 다시 들인다.
 // 들일 때는 항목마다 원래 저장할 때와 같은 검사를 거친다. 알 수 없는 항목은 버린다.
 import { sanitizeSettings } from "./settings.js";
 import { PUZZLES } from "../modes/puzzles.js";
@@ -7,6 +7,7 @@ import { PRACTICE_PROGRESS_KEY, sanitizePracticeProgress } from "./practice-prog
 import { SPRINT_HISTORY_KEY, sanitizeSprintHistory } from "./sprint-history.js";
 import { ACHIEVEMENTS_KEY, ACHIEVEMENT_TOTALS_KEY, sanitizeAchievements, sanitizeTotals } from "./achievements.js";
 import { RULE_SLOTS_KEY, sanitizeRuleSlots } from "./rule-slots.js";
+import { CUSTOM_PUZZLES_KEY, mergeCustomPuzzles, sanitizeCustomPuzzles } from "./custom-puzzles.js";
 import { isEntry } from "./records.js";
 import { sanitizeRuleBody } from "../rules/sanitize.js";
 import { sanitizeReplay } from "../replay/replay.js";
@@ -33,6 +34,7 @@ export const BACKUP_KEYS = Object.freeze([
   ACHIEVEMENTS_KEY,
   ACHIEVEMENT_TOTALS_KEY,
   RULE_SLOTS_KEY,
+  CUSTOM_PUZZLES_KEY,
 ]);
 
 const MAX_TABLES = 500;
@@ -79,6 +81,7 @@ export const parseBackup = (raw, findMode) => {
     data[ACHIEVEMENT_TOTALS_KEY] = sanitizeTotals(src[ACHIEVEMENT_TOTALS_KEY]);
   const slots = src[RULE_SLOTS_KEY] !== undefined ? sanitizeRuleSlots(src[RULE_SLOTS_KEY]) : null;
   if (slots) data[RULE_SLOTS_KEY] = slots;
+  if (src[CUSTOM_PUZZLES_KEY] !== undefined) data[CUSTOM_PUZZLES_KEY] = sanitizeCustomPuzzles(src[CUSTOM_PUZZLES_KEY]);
   if (src.settings !== undefined) data.settings = sanitizeSettings(src.settings);
   if (isPlainObject(src.records)) {
     const records = {};
@@ -146,6 +149,12 @@ export const parseBackup = (raw, findMode) => {
 export const restoreBackup = (store, parsed) => {
   const values = {};
   for (const key of BACKUP_KEYS) {
+    // 내 퍼즐·받은 퍼즐은 바꾸지 않고 합친다(이 기기에서 만든 퍼즐을 잃지 않게)
+    if (key === CUSTOM_PUZZLES_KEY) {
+      if (key in parsed.data)
+        values[key] = mergeCustomPuzzles(sanitizeCustomPuzzles(store.get(key, null)), parsed.data[key]);
+      continue;
+    }
     // 이전 버전의 백업에는 이 진행도 항목이 없으므로 기존 값을 보존한다.
     if (
       (key === "puzzle:cleared" ||

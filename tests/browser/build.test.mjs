@@ -3308,6 +3308,109 @@ test("퍼즐 만들기 목표·고급 설정: 목표와 규칙이 링크로 가�
   await context.close();
 });
 
+test("내 퍼즐·받은 퍼즐: 고치면 저절로 저장되고, 목록에서 편집·플레이·링크·지우기, 받은 퍼즐은 풀었는지 남고 복사해서 고친다", async () => {
+  const { context, page, errors } = await openPage(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  const stage = PUZZLES[0];
+  const rows = (p = page) =>
+    p.$$eval(".custom-puzzle-row", els => els.map(e => e.innerText.replace(/\s+/g, " ").trim()));
+  const openTab = async (tab, p = page) => {
+    if (!(await p.locator("#puzzles[open]").count())) await p.click("#open-puzzles");
+    await p.click(`#puzzles .dialog-tabs [data-value="${tab}"]`);
+  };
+  const solve = async p => {
+    await p.waitForFunction(() => document.body.dataset.screen === "play");
+    for (const key of keysFor(solvePuzzle(stage))) {
+      await p.keyboard.press(key);
+      await p.waitForTimeout(20);
+    }
+    await p.waitForFunction(() => document.body.dataset.screen === "results");
+  };
+
+  // 만들기: 판과 피스가 생기면 저장되고, 이름·설명도 담긴다
+  await openList(page, "#open-puzzles");
+  await page.click("#puzzle-create");
+  assert.equal(await text(page, "puzzle-saved"), "판과 피스를 넣으면 내 퍼즐에 저절로 저장돼요.");
+  await pickTemplate(page, `stage-${stage.number}`);
+  await page.fill("#puzzle-title", "첫 퍼즐");
+  await page.fill("#puzzle-desc", "오른쪽을 보세요");
+  assert.equal(await text(page, "puzzle-saved"), "내 퍼즐에 저장했어요. 고치면 저절로 저장돼요.");
+  await page.click("#puzzle-editor-close");
+  await openTab("mine");
+  assert.deepEqual(await rows(), [
+    `첫 퍼즐 판 비우기 · 확인 안 됨 ${await page.locator(".custom-puzzle-row .mode-best").textContent()} 지우기`,
+  ]);
+  assert.ok(await page.locator("[data-made-link]").isDisabled(), "확인 전에는 링크를 보낼 수 없다");
+
+  // 목록에서 플레이 → 풀면 '직접 풀어 봄'이 저장되고, 결과의 '퍼즐 목록'은 내 퍼즐 탭
+  await page.click("[data-made-play]");
+  await solve(page);
+  assert.equal(await text(page, "session-title"), "첫 퍼즐");
+  await page.click('#results [data-action="menu"]');
+  await page.waitForFunction(() => document.getElementById("puzzles")?.open);
+  assert.equal(await page.getAttribute('#puzzles .dialog-tabs [aria-pressed="true"]', "data-value"), "mine");
+  assert.match((await rows())[0], /직접 풀어 봄/);
+  assert.ok(await page.locator("[data-made-link]").isEnabled());
+  await page.click("[data-made-link]");
+  const link = await page.evaluate(() => navigator.clipboard.readText());
+  assert.match(link, /#puzzle=2\.e2\./);
+
+  // 목록에서 편집 → 같은 퍼즐을 고친다(새로 생기지 않는다)
+  await page.click("[data-made-edit]");
+  assert.equal(await page.inputValue("#puzzle-title"), "첫 퍼즐");
+  await page.fill("#puzzle-title", "고친 퍼즐");
+  await page.click("#puzzle-editor-close");
+  await openTab("mine");
+  assert.equal((await rows()).length, 1);
+  assert.match((await rows())[0], /^고친 퍼즐 /);
+
+  // 받는 쪽: 링크로 열면 받은 퍼즐에 남고, 못 풀면 '아직', 풀면 시간
+  const other = await browser.newContext({ locale: "ko-KR" });
+  await other.addInitScript(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  const friend = await other.newPage();
+  await friend.goto(link);
+  await friend.waitForFunction(() => document.body.dataset.screen === "play");
+  assert.equal(await text(friend, "session-title"), "첫 퍼즐");
+  assert.equal(
+    await text(friend, "mode-objective"),
+    "목표 · 판 비우기 · 만든 사람이 직접 풀어 봤어요 · 오른쪽을 보세요"
+  );
+  await friend.keyboard.press("Space");
+  await friend.waitForFunction(() => document.body.dataset.screen === "results");
+  await friend.click('#results [data-action="menu"]');
+  await friend.waitForFunction(() => document.getElementById("puzzles")?.open);
+  assert.match((await rows(friend))[0], /^첫 퍼즐 판 비우기 · 오른쪽을 보세요 아직/);
+  await friend.click("[data-received-play]");
+  await solve(friend);
+  await friend.click('#results [data-action="menu"]');
+  await friend.waitForFunction(() => document.getElementById("puzzles")?.open);
+  assert.match((await rows(friend))[0], /풀었어요 \d/);
+  // 복사해서 편집 → 내 퍼즐에 새로(확인 표시는 빼고)
+  await friend.click("[data-received-copy]");
+  assert.equal(await friend.inputValue("#puzzle-title"), "첫 퍼즐");
+  await friend.click("#puzzle-editor-close");
+  await openTab("mine", friend);
+  assert.match((await rows(friend))[0], /^첫 퍼즐 판 비우기 · 확인 안 됨/);
+  await other.close();
+
+  // 지우기는 두 번 눌러 확정
+  await openTab("mine");
+  await page.click("[data-made-delete]");
+  assert.equal((await rows()).length, 1);
+  await page.click("[data-made-delete]");
+  assert.equal((await rows()).length, 0);
+  assert.equal(
+    await text(page, "puzzles .custom-puzzle-empty"),
+    "아직 만든 퍼즐이 없어요. 아래 '퍼즐 만들기'로 시작해요."
+  );
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
 test("만든 퍼즐: 시험 플레이 성공 후에만 공유하고, 휴대폰에서 링크를 열어 풀 수 있다", async () => {
   const { context, page, errors } = await openPage(() => {
     localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
