@@ -5,7 +5,7 @@ import { DEFAULT_PADMAP, sanitizePadmap } from "../input/gamepad.js";
 import { ALL_THEME_IDS, DEFAULT_THEME } from "../render/themes.js";
 import { LANG_OPTIONS } from "../i18n/index.js";
 
-export const SETTINGS_VERSION = 1;
+const SETTINGS_VERSION = 1;
 export const SDF_INFINITE = 41; // 슬라이더 맨 끝 = 즉시 바닥까지
 
 /** [최소, 최대, 기본] */
@@ -16,15 +16,15 @@ export const HANDLING_LIMITS = Object.freeze({
 });
 
 export const TOUCH_OPTIONS = Object.freeze(["auto", "on", "off"]);
-export const SCHEME_OPTIONS = Object.freeze(["system", "light", "dark"]);
+const SCHEME_OPTIONS = Object.freeze(["system", "light", "dark"]);
 /** 게임 화면: dark(늘 어둡게) · scheme(화면 색 따르기) */
-export const GAME_SURFACE_OPTIONS = Object.freeze(["dark", "scheme"]);
+const GAME_SURFACE_OPTIONS = Object.freeze(["dark", "scheme"]);
 /** 효과음: theme(테마 따라가기) 또는 한 테마의 소리로 고정(테마 키 — js/audio/sound-sets.js) */
-export const SOUND_OPTIONS = Object.freeze(["theme", ...ALL_THEME_IDS]);
+const SOUND_OPTIONS = Object.freeze(["theme", ...ALL_THEME_IDS]);
 /** 예전 묶음 이름 → 그 소리를 쓰던 테마 */
 const OLD_SOUND = Object.freeze({ clean: "modern", wood: "forest", glass: "midnight", quiet: "graphite" });
 
-export const VISUAL_OPTIONS = Object.freeze({
+const VISUAL_OPTIONS = Object.freeze({
   // 게임 테마(블록·격자·움직임·연출의 모습) — js/render/themes.js
   theme: ALL_THEME_IDS,
   // 접근성: 테마와 상관없이 적용
@@ -41,7 +41,7 @@ export const VISUAL_OPTIONS = Object.freeze({
 });
 
 /** 접근성·편의: 화면 읽기 알림, 진동, 카운트다운 길이 */
-export const ACCESS_OPTIONS = Object.freeze({
+const ACCESS_OPTIONS = Object.freeze({
   announce: Object.freeze(["on", "off"]),
   vibrate: Object.freeze(["on", "off"]),
   countdown: Object.freeze(["normal", "short", "off"]),
@@ -57,7 +57,7 @@ export const sanitizeAccess = raw => {
 };
 
 /** 터치 조작 방식: buttons(보드 아래 버튼) · gestures(보드를 밀고 두드리기) */
-export const TOUCH_MODE_OPTIONS = Object.freeze(["buttons", "gestures"]);
+const TOUCH_MODE_OPTIONS = Object.freeze(["buttons", "gestures"]);
 
 /** 조작감 프리셋(ms·배율). 처음 하는 사람이 숫자를 몰라도 고를 수 있게 */
 export const HANDLING_PRESETS = Object.freeze({
@@ -115,7 +115,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
 export const VOLUME_LIMITS = Object.freeze({ min: 0, max: 100, step: 5, default: 0 });
 
 /** 직접 고른 블록 색: 피스(I~Z) → "#rrggbb". 잘못된 값은 버린다(그 피스는 테마 색) */
-export const sanitizeColors = raw => {
+const sanitizeColors = raw => {
   /** @type {Record<string, string>} */
   const out = {};
   if (!raw || typeof raw !== "object") return out;
@@ -142,7 +142,7 @@ const clampNum = (value, { min, max, default: fallback }) => {
   return Math.min(max, Math.max(min, Math.round(n)));
 };
 
-export const sanitizeHandling = raw => {
+const sanitizeHandling = raw => {
   const h = raw && typeof raw === "object" ? raw : {};
   return {
     das: clampNum(h.das, HANDLING_LIMITS.das),

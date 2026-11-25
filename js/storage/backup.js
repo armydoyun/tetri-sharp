@@ -13,11 +13,11 @@ import { sanitizeRuleBody } from "../rules/sanitize.js";
 import { sanitizeReplay } from "../replay/replay.js";
 
 const APP = "tetri-sharp";
-export const BACKUP_KIND = "backup";
-export const BACKUP_VERSION = 1;
+const BACKUP_KIND = "backup";
+const BACKUP_VERSION = 1;
 
 /** 백업에 담는 저장소 키 */
-export const BACKUP_KEYS = Object.freeze([
+const BACKUP_KEYS = Object.freeze([
   "settings",
   "records",
   "playerName",

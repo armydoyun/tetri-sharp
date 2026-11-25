@@ -3,9 +3,9 @@
 import { HEIGHT, VISIBLE_ROWS, WIDTH, collides, createBoard } from "../core/board.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
 import { spawnOf } from "./puzzle-solver.js";
-import { PUZZLE_CELLS, MAX_PUZZLE_PIECES, normalizePuzzle, solverBoard } from "./custom-puzzle.js";
+import { PUZZLE_CELLS, MAX_PUZZLE_PIECES, normalizePuzzle, solverBoard, usedHeight } from "./custom-puzzle.js";
 
-export { solverBoard };
+export { solverBoard, usedHeight };
 import { PUZZLES } from "./puzzles.js";
 
 /** 편집 화면에 보이는 높이(아래에서부터 줄 수) */
@@ -71,12 +71,6 @@ export const mirrorCells = cells => {
   const out = new Uint8Array(cells.length);
   for (let i = 0; i < cells.length; i++) out[i] = cells[i - (i % WIDTH) + (WIDTH - 1 - (i % WIDTH))];
   return out;
-};
-
-/** 블록이 있는 가장 높은 줄까지의 높이(아래에서부터, 빈 판은 0) @param {Uint8Array} cells */
-export const usedHeight = cells => {
-  const first = cells.findIndex(Boolean);
-  return first < 0 ? 0 : VISIBLE_ROWS - Math.floor(first / WIDTH);
 };
 
 /** 블록이 다 보이는 가장 낮은 편집 높이 @param {Uint8Array} cells */

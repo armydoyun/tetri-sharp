@@ -29,7 +29,7 @@ export const RANK_STEPS = Object.freeze({
  * @returns {string | null}
  */
 /** 랭크·업적을 주는 규칙: 기본 규칙(Modern·Retro·Arcade)만. Custom은 지연을 0으로 두는 등 쉽게 만들 수 있다(2차 평가 F22) */
-export const RANKED_RULES = Object.freeze(new Set(["modern", "retro", "arcade"]));
+const RANKED_RULES = Object.freeze(new Set(["modern", "retro", "arcade"]));
 export const isRankedRules = rules => RANKED_RULES.has(rules?.id);
 
 /**

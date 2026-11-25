@@ -43,7 +43,7 @@ export const VISIBLE_TOP = HEIGHT - VISIBLE_ROWS;
  */
 
 /** @type {Handling} */
-export const DEFAULT_HANDLING = Object.freeze({ das: 8, arr: 0.6, sdf: 20 });
+const DEFAULT_HANDLING = Object.freeze({ das: 8, arr: 0.6, sdf: 20 });
 
 /** ms → 프레임 */
 export const msToFrames = ms => (ms * 60) / 1000;

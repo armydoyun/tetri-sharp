@@ -8,14 +8,14 @@ import { formatTime } from "./format.js";
 import { t } from "../i18n/index.js";
 
 /** 줄 삭제 종류별 공격 줄 수: [T-spin 종류][지운 줄 수] */
-export const ATTACK = Object.freeze({
+const ATTACK = Object.freeze({
   none: Object.freeze([0, 0, 1, 2, 4]),
   mini: Object.freeze([0, 0, 1, 2]),
   full: Object.freeze([0, 2, 4, 6]),
 });
 /** 콤보(연속으로 줄을 지운 고정 수 − 1)에 따른 추가 공격 */
-export const COMBO_ATTACK = Object.freeze([0, 0, 1, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5]);
-export const PERFECT_ATTACK = 10;
+const COMBO_ATTACK = Object.freeze([0, 0, 1, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5]);
+const PERFECT_ATTACK = 10;
 
 /** 고정 이벤트 하나가 보내는 줄 수 */
 const attackParts = ev => {

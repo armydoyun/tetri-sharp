@@ -6,7 +6,7 @@ import { BTN } from "../core/engine.js";
 import { ACTIONS, SLOTS } from "./keymap.js";
 import { t } from "../i18n/index.js";
 
-export const PAD_BUTTON_COUNT = 17;
+const PAD_BUTTON_COUNT = 17;
 
 export const DEFAULT_PADMAP = Object.freeze({
   LEFT: [14],
@@ -25,7 +25,7 @@ export const DEFAULT_PADMAP = Object.freeze({
 });
 
 /** 버튼 이름(패드에 적힌 글자). 십자키는 화면에서 화살표 아이콘으로 보여 준다(PAD_ICONS). */
-export const PAD_BUTTON_NAMES = Object.freeze([
+const PAD_BUTTON_NAMES = Object.freeze([
   "A",
   "B",
   "X",
@@ -49,7 +49,7 @@ export const PAD_ICONS = Object.freeze({ 12: "arrow-up", 13: "arrow-down", 14: "
 export const padButtonName = i => PAD_BUTTON_NAMES[i] ?? t("버튼 {n}", { n: i });
 
 /** 메뉴에서 쓰는 버튼(고정): A 선택, 십자키 위·아래 이동 */
-export const PAD_MENU = Object.freeze({ 0: "select", 12: "up", 13: "down" });
+const PAD_MENU = Object.freeze({ 0: "select", 12: "up", 13: "down" });
 
 const isButton = i => Number.isInteger(i) && i >= 0 && i < PAD_BUTTON_COUNT;
 

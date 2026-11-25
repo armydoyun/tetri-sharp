@@ -64,8 +64,6 @@ export const EN = {
   "쓰레기 줄이 남았어요": "Garbage rows remain",
   "쓰레기 줄을 모두 지웠어요!": "All garbage cleared!",
   "남은 쓰레기 줄": "Garbage rows left",
-  "배치가 달라졌어요. 처음부터 다시 하면 자리 힌트를 볼 수 있어요.":
-    "The board changed. Restart to see the placement hint.",
   "현재 피스를 놓을 수 있는 자리예요.": "This is a placement for the current piece.",
   "맨 위 쓰레기 줄의 열린 칸을 표시했어요.": "The empty cells in the top garbage row are marked.",
   "주어진 피스로 회색 쓰레기 줄을 모두 지우세요.": "Clear every gray garbage row with the given pieces.",
@@ -76,7 +74,6 @@ export const EN = {
   "좌우로 바뀌는 구멍": "Holes on opposite sides",
   "벽 옆 세로 우물": "Vertical well by the wall",
   "가운데 두 줄": "Two lines in the middle",
-  "같은 판에서 힌트를 보고 여러 번 연습할 수 있어요.": "Use hints and retry the same board.",
   "고정된 판 6개 · 구멍과 다음 배치 힌트": "6 fixed boards with hole and placement hints",
   "쓰레기 줄 파내기": "Downstack training",
   "연습 목록": "Practice list",
@@ -287,8 +284,6 @@ export const EN = {
   "기본 키": "Primary",
   동작: "Action",
   "시작 전에 준비 신호를 보여 줘요": "Show a ready cue before play begins",
-  "일시정지에서 이어서 하거나, 판을 다시 시작하거나, 첫 화면으로 갈 수 있어요.":
-    "Pause to resume, restart the run, or return home.",
   "Sprint 40L은 40줄을 지우는 데 걸린 시간을 재요.": "Sprint 40L times how long it takes to clear 40 lines.",
   "Sprint 40L 시작": "Start Sprint 40L",
   "현재 피스 맡기기": "Hold the current piece",
@@ -307,7 +302,6 @@ export const EN = {
   "최고 기록과 달리기": "Race my best",
   "같은 블록 순서로 재시작": "Retry same blocks",
   "규칙 · {name}": "Rules · {name}",
-  "완주하면 같은 규칙의 내 기록과 달릴 수 있어요.": "Finish a run to race your best under the same rules.",
   "받은 사람이 링크를 열면 바로 재생할 수 있어요.": "Anyone who opens the link can watch this replay.",
   "자동 복사가 막혔어요. 선택된 링크를 직접 복사해 주세요.":
     "Automatic copying is unavailable. Copy the selected link manually.",
@@ -324,9 +318,6 @@ export const EN = {
   "Custom 규칙 편집": "Edit Custom rules",
   "플레이 모드": "Modes",
   "내 기록과 달리기": "Race my best",
-  "같은 규칙의 최고 기록 리플레이와 같은 블록 순서로 겨뤄요":
-    "Race the replay of your best run with the same rules and the same piece order",
-  "끝까지 간 리플레이 필요": "Needs a finished replay",
   "플레이 도구": "Play tools",
   "연습과 기록": "Practice & records",
   연습: "Practice",
@@ -357,7 +348,6 @@ export const EN = {
   "이 최고 기록은 현재 버전에서 재현할 수 없어요. 새 최고 기록이 필요해요.":
     "This best run can't be reproduced in this version. Set a new best first.",
   "링크의 규칙 코드를 읽을 수 없었어요.": "Couldn't read the rule code in the link.",
-  "링크로 받은 규칙을 Custom에 불러왔어요 · 기록표 {id}": "Loaded the linked rules into Custom · table {id}",
 
   // ---- 모드 ----
   "40줄을 가장 빨리 지우기": "Clear 40 lines as fast as you can",
@@ -490,12 +480,8 @@ export const EN = {
   "{mode} · 모두 같은 블록 순서": "{mode}, same pieces for everyone",
   도전하기: "Play today's challenge",
   "{mode} · Modern · 모두 같은 블록 순서": "{mode} · Modern · same pieces for everyone",
-  "오늘 최고 기록 {record}": "Today's best {record}",
-  "아직 오늘 기록이 없어요": "No result today yet",
   "내 결과 공유": "Share my result",
   "결과 코드": "Result code",
-  "오늘 최고 기록의 리플레이": "The replay of today's best",
-  "오늘 기록을 세우면 생겨요": "Appears after you finish today's challenge",
   "결과 코드를 복사했어요. 친구에게 보내 보세요": "Copied the result code. Send it to a friend",
   "링크를 복사했어요. 받은 사람이 열면 내 기록과 겨룰 수 있어요":
     "Copied the link. Whoever opens it can race your result",
@@ -531,15 +517,9 @@ export const EN = {
   "아래로 빠르게 튕기기": "Flick down",
   "위로 밀기": "Swipe up",
   "보드 아래 버튼": "Buttons under the board",
-  "이동 · 회전 · 드롭 · 홀드": "Move · rotate · drop · hold",
-  "오른쪽 끝 버튼": "Rightmost buttons",
-  "일시정지 · 다시 시작": "Pause · restart",
   "조작감 바꾸기": "Change handling",
   "접근성 설정": "Accessibility settings",
   "이렇게 시작해요": "Getting started",
-  "위의 규칙에서 Modern을 고른 채로 두세요. 요즘 표준 규칙이에요.":
-    "Keep Modern selected under Rules. It's today's standard.",
-  "플레이 모드에서 Marathon이나 Sprint 40L을 눌러 시작해요.": "Pick Marathon or Sprint 40L under Modes to start.",
   "줄을 가득 채우면 지워져요. 블록이 위까지 차면 끝나요.":
     "Filled lines disappear. The game ends when blocks reach the top.",
   "익숙해지면 연습에서 T-spin을, CPU 대전에서 공격과 방어를 익혀 보세요.":
@@ -669,10 +649,7 @@ export const EN = {
     "Short vibrations on lock, line clear and game over on phones (where supported)",
   "시작 카운트다운": "Start countdown",
   "누르자마자 바로 시작해요": "Starts right away",
-  "시작 전에 READY를 보여 줘요": "Shows READY before the start",
   짧게: "Short",
-  "화면 효과 줄이기와 색각 친화 색은 화면·소리 탭에 있어요.":
-    "Reduced effects and color-blind friendly colors are on the Display & sound tab.",
   "피스가 떨어질 자리 표시의 진하기": "How strongly the landing spot is shown",
   흐리게: "Faint",
   진하게: "Strong",
@@ -743,23 +720,16 @@ export const EN = {
   "다시 하기": "Play again",
   통계: "Stats",
   "다시 보기": "Replay",
-  "리플레이 파일로 저장": "Save replay file",
   "파일 저장": "Save file",
   "구간 기록": "Splits",
-  "구간 기록 · {from}–{to}줄 확인": "Splits · check lines {from}–{to}",
-  "누적 줄": "Lines",
-  "경과 시간": "Elapsed",
   구간: "Segment",
   "구간 시간": "Segment time",
   "{from}–{to}줄": "Lines {from}–{to}",
   "{segment} 구간 다시 보기": "Watch segment: {segment}",
   "구간 기록 · {from}–{to}줄 {delta}초": "Splits · Lines {from}–{to} {delta}s",
-  "같은 블록 재시작": "Retry same sequence",
-  "PB와 달리기": "Race my best",
   "가장 많이 밀린 구간 {from}–{to}줄 ({delta}초)": "Slowest segment: lines {from}–{to} ({delta}s)",
   "같은 순서로 다시 하기": "Retry same pieces",
   "10줄부터 구간 기록이 남아요.": "Splits start at 10 lines.",
-  "같은 규칙의 최고 기록이 쌓이면 비교할 수 있어요.": "You can compare once you have a best with these rules.",
   "완료한 비교 구간에서 잃은 시간이 없어요.": "No time lost in the finished segments.",
   "끝까지 가지 못했어요 · 상대 기록 {record}": "Didn't finish · opponent {record}",
   "내 최고 기록과 같은 점수예요.": "Same score as your best.",
@@ -770,7 +740,6 @@ export const EN = {
   "이전 최고 기록보다 {n}초 느려요.": "{n}s slower than your previous best.",
 
   // ---- 리플레이 ----
-  "리플레이 진행률": "Replay progress",
   재생: "Play",
   "다시 재생": "Play again",
   끝: "End",
@@ -1035,13 +1004,10 @@ export const EN = {
   "규칙 코드를 복사했어요": "Copied the rule code",
   "복사하지 못했어요. 코드를 선택해 직접 복사해 주세요": "Couldn't copy. Select the code and copy it yourself",
   "링크 복사": "Copy link",
-  "링크를 복사했어요. 받은 사람이 열면 이 규칙이 Custom으로 들어가요":
-    "Copied the link. Opening it loads these rules into Custom",
   "복사하지 못했어요": "Couldn't copy",
   "TS1-로 시작하는 코드나 링크": "A code starting with TS1- or a link",
   불러오기: "Load",
   "읽을 수 없는 코드예요": "Can't read this code",
-  "불러왔어요 · 기록표 {id}": "Loaded · table {id}",
   "규칙 코드": "Rule code",
   "지금 조합을 코드로": "The current mix as a code",
   "공유 링크": "Share link",
@@ -1151,5 +1117,4 @@ export const EN = {
   "프리셋으로 채우기 전으로 되돌렸어요": "Restored the rules from before the preset",
   "랭크와 업적은 기본 규칙(Modern·Retro·Arcade)에서만 받아요":
     "Ranks and achievements are only earned with the standard rules (Modern, Retro, Arcade)",
-  "기록표 {id} · 조합마다 기록이 따로 쌓여요": "Table {id} · each mix keeps its own records",
 };

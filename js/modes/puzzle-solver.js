@@ -58,6 +58,12 @@ const reachable = (
     prev.set(k, start.first ? ["", start.first] : null);
     queue.push(s);
   }
+  /** 시작에서 그 상태까지 누를 순서 */
+  const pathTo = target => {
+    const steps = [];
+    for (let k = target.key; prev.get(k) && prev.get(k) !== true; k = prev.get(k)[0]) steps.unshift(prev.get(k)[1]);
+    return steps;
+  };
   /** @type {Map<string, any>} */
   const out = new Map();
   for (let i = 0; i < queue.length && budget.left > 0; i++, budget.left--) {
@@ -68,7 +74,9 @@ const reachable = (
         /** @type {any} */ ({ type, x: s.x, y: s.y, rot: s.rot, lastAction: s.last, kick: s.kick })
       );
       const k = `${s.x},${s.y},${s.rot},${tspin}`;
-      if (!out.has(k)) out.set(k, { ...s, tspin, key: key(s) });
+      const found = { ...s, tspin, key: key(s) };
+      // 같은 자리에 가는 길이 여럿이면(이동 뒤 내리기 · 내린 뒤 회전 등) 누를 것이 적은 길을 남긴다(첫 수 보기 안내가 짧게)
+      if (!out.has(k) || (withPath && pressCost(pathTo(found)) < pressCost(pathTo(out.get(k))))) out.set(k, found);
       // 20G에 고정 지연이 없으면 바닥에 닿는 순간 고정된다: 더 움직일 수 없다
       if (sonic && lockNone) continue;
     }
@@ -98,13 +106,52 @@ const reachable = (
       }
     }
   }
-  /** 시작에서 그 자리까지 누를 순서 */
-  const pathTo = target => {
-    const steps = [];
-    for (let k = target.key; prev.get(k) && prev.get(k) !== true; k = prev.get(k)[0]) steps.unshift(prev.get(k)[1]);
-    return steps;
-  };
   return { placements: [...out.values()], pathTo };
+};
+
+/**
+ * 누를 순서의 수고: 끝에 곧장 내려가는 칸은 하드 드롭 한 번이므로 그 앞까지 누르는 수가 먼저, 같으면 전체 길이
+ * @param {string[]} steps
+ */
+const pressCost = steps => {
+  let end = steps.length;
+  while (end > 0 && steps[end - 1] === "D") end--;
+  return end * 1000 + steps.length;
+};
+
+/**
+ * 위에서 돌리고(엔진과 같은 킥), 옆으로 옮기고, 곧장 내려 target에 닿는 길. 막히면 null
+ * @param {{ cells: Uint8Array, width: number, height: number }} board
+ * @param {{ x: number, y: number, rot: number }} start @param {{ x: number, y: number, rot: number }} target
+ */
+const straightPath = (board, rotation, type, start, target, half) => {
+  const fits = (x, y, rot) => !collides(board, rotation.cells(type, rot), x, y);
+  let { x, y, rot } = start;
+  const steps = [];
+  const turn = (target.rot - rot + 4) % 4;
+  const turns = turn === 0 ? [] : turn === 1 ? [1] : turn === 3 ? [3] : half ? [2] : [1, 1];
+  for (const d of turns) {
+    // 엔진과 같은 킥 순서로 돈다(처음 들어가는 킥)
+    const to = (rot + d) % 4;
+    const blocked = (cx, cy) => !inBounds(board, x + cx, y + cy) || get(board, x + cx, y + cy) !== 0;
+    const kick = rotation.kicks(type, rot, to, blocked).find(([dx, dy]) => fits(x + dx, y + dy, to));
+    if (!kick) return null;
+    x += kick[0];
+    y += kick[1];
+    rot = to;
+    steps.push(d === 1 ? "CW" : d === 3 ? "CCW" : "180");
+  }
+  while (x !== target.x) {
+    const dx = Math.sign(target.x - x);
+    if (!fits(x + dx, y, rot)) return null;
+    x += dx;
+    steps.push(dx < 0 ? "L" : "R");
+  }
+  while (y < target.y && fits(x, y + 1, rot)) {
+    y++;
+    steps.push("D");
+  }
+  return y === target.y && !fits(x, y + 1, rot) ? steps : null;
 };
 
 /** 처음 나올 때의 자리(엔진과 같다) */
@@ -217,16 +264,22 @@ export const findFirstMove = (puzzle, state, rest, rotation, opts = {}) => {
       const after = advance(queue, hold);
       return Boolean(after) && solves(next, after.cur, after.queue, after.hold, ev.combo, ev.total, true);
     };
-    /** 지금 피스(또는 홀드로 바꾼 피스)의 자리 중 풀리는 첫 자리 */
+    /** 지금 피스(또는 홀드로 바꾼 피스)의 자리 중 풀리는 첫 자리. 누를 것이 적은 자리부터 본다(첫 수 보기 안내가 짧게) */
     const firstOf = (type, starts, queue, hold, swapped) => {
       const first = reachable(state.board, rotation, type, starts, { ...search, withPath: true });
-      for (const p of first.placements) {
+      /** 사람이 보통 하는 길: 위에서 돌리고, 옆으로 옮기고, 곧장 떨어뜨린다. 막히면(처마 밑·스핀) 탐색이 찾은 길 */
+      const pathOf = p =>
+        (!opts.sonic && p.tspin === "none" && straightPath(state.board, rotation, type, starts[0], p, half)) ||
+        first.pathTo(p);
+      const paths = new Map(first.placements.map(p => [p, pathOf(p)]));
+      const cost = new Map(first.placements.map(p => [p, pressCost(paths.get(p))]));
+      for (const p of [...first.placements].sort((a, b) => cost.get(a) - cost.get(b))) {
         if (!tryPlace(state.board, type, p, queue, hold, state.combo, total0)) continue;
         const { next, ev, cells } = placeOn(state.board, rotation, type, p, state.combo, total0, opts);
         const after = advance(queue, hold);
         return {
           cells: cells.map(([cx, cy]) => /** @type {[number, number]} */ ([p.x + cx, p.y + cy])),
-          steps: first.pathTo(p),
+          steps: paths.get(p),
           hold: swapped,
           type,
           done: puzzle.goal(ev),
@@ -262,7 +315,7 @@ export const findFirstMove = (puzzle, state, rest, rotation, opts = {}) => {
  * @param {SearchOptions & { holdStart?: string | null }} [opts]
  * @returns {null | { exhausted: true } | { moves: Array<{ type: string, hold: boolean, board: Uint8Array, cells: Array<[number, number]> }> }}
  */
-export const findSolution = (puzzle, board, pieces, rotation, opts = {}) => {
+const findSolution = (puzzle, board, pieces, rotation, opts = {}) => {
   const moves = [];
   let combo = -1;
   let total = 0;

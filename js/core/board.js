@@ -47,7 +47,7 @@ export const place = (b, cells, ox, oy, value) => {
 };
 
 /** @param {Board} b */
-export const isRowFull = (b, y) => {
+const isRowFull = (b, y) => {
   for (let x = 0; x < b.width; x++) if (get(b, x, y) === 0) return false;
   return true;
 };

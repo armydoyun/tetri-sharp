@@ -16,7 +16,7 @@ export { dropdown } from "./select.js";
  * 버튼 class 이름. 정적 HTML과 같은 이름을 쓰도록 한 곳에서 만든다.
  * @param {{ variant?: ButtonVariant, size?: ButtonSize, wrap?: boolean, iconOnly?: boolean, extra?: string }} o
  */
-export const buttonClass = ({ variant = "default", size = "m", wrap = false, iconOnly = false, extra = "" } = {}) =>
+const buttonClass = ({ variant = "default", size = "m", wrap = false, iconOnly = false, extra = "" } = {}) =>
   [
     "btn",
     variant === "primary" ? "btn-primary" : variant === "ghost" ? "btn-ghost" : "",

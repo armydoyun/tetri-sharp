@@ -1,7 +1,7 @@
 // 기록 화면(대화상자): 모드 × 규칙별 상위 10개, 1위 기록의 리플레이 보기.
 // 표는 늘 10줄이라 고르는 조건이 바뀌어도 대화상자 크기가 그대로다(원칙 2).
 import { recentSprintMedian } from "../storage/sprint-history.js";
-import { formatTime } from "../modes/format.js";
+import { formatDate, formatTime } from "../modes/format.js";
 import { PRESET_LIST } from "../rules/presets.js";
 import { recordKey } from "../storage/records.js";
 import { MAX_RANKED } from "../replay/replay.js";
@@ -12,13 +12,6 @@ import { RANK_STEPS, isRankedRules, nextRankStep, rankLabel, rankOf } from "../m
 import { t } from "../i18n/index.js";
 
 const ROWS = 10;
-
-const formatDate = iso => {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  const p = n => String(n).padStart(2, "0");
-  return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())}`;
-};
 
 const renderSprintHistory = (runs, personalBest) => {
   const median = recentSprintMedian(runs);

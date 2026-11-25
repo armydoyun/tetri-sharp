@@ -36,7 +36,7 @@ import { t } from "../i18n/index.js";
 // ---- 레벨·중력 ----
 
 export const MAX_LEVEL = 15;
-export const LINES_PER_LEVEL = 10;
+const LINES_PER_LEVEL = 10;
 
 /** 가이드라인 중력 곡선: 한 줄 내려오는 데 (0.8 − (L−1)·0.007)^(L−1) 초 → 프레임당 칸 수 */
 export const guidelineGravity = level => {
@@ -143,7 +143,7 @@ export const ULTRA = Object.freeze({
 // 레벨에 따라 중력이 오르다 200에서 한 번 늦춰지고, 500부터 20G. ----
 
 /** [시작 레벨, 중력(1/256 G 단위)] — 아케이드 게임의 고전적인 곡선을 따른다. */
-export const MASTER_GRAVITY = Object.freeze([
+const MASTER_GRAVITY = Object.freeze([
   [0, 4],
   [30, 6],
   [35, 8],
@@ -288,7 +288,7 @@ export const DIG = Object.freeze({
 // ---- Survival: 시간이 갈수록 쓰레기 줄이 쌓여 대기한다. 줄을 지우면 대기 중인 줄을 막고(T-spin은 두 배),
 // 줄을 못 지우고 고정하면 대기 중인 줄이 한꺼번에 아래에서 올라온다. 막힐 때까지 버틴 시간이 기록. ----
 
-export const SURVIVAL_LEVEL_FRAMES = 30 * 60;
+const SURVIVAL_LEVEL_FRAMES = 30 * 60;
 export const SURVIVAL_MILESTONES = Object.freeze([30, 60, 120, 180].map(seconds => seconds * 60));
 /** 쓰레기 한 줄이 쌓이기까지의 프레임(레벨이 오를수록 짧다) */
 export const survivalInterval = level => Math.max(60, 300 - (level - 1) * 20);
@@ -381,7 +381,7 @@ export const ENDLESS = Object.freeze({
 
 export const MODES = Object.freeze([SPRINT_40, MARATHON, ULTRA, MASTER, DIG, SURVIVAL, ENDLESS]);
 /** 메뉴에는 없지만 저장된 기록·리플레이를 위해 찾을 수 있는 이전 규칙 모드 */
-export const LEGACY_MODES = Object.freeze([ZEN]);
+const LEGACY_MODES = Object.freeze([ZEN]);
 /** 기록 화면에서 고를 수 있는 모드: 지금 모드 + 이전 규칙 모드 */
 export const RECORD_MODES = Object.freeze([...MODES, ...LEGACY_MODES]);
 /** "내 기록과 달리기"를 할 수 있는 모드 */

@@ -8,5 +8,13 @@ export const formatTime = frames => {
   return `${m}:${s.toFixed(2).padStart(5, "0")}`;
 };
 
+/** 날짜(ISO) → "2026.11.25"(이 기기 시간대). 읽을 수 없으면 "—" */
+export const formatDate = iso => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())}`;
+};
+
 /** 점수 → "12,345" */
 export const formatScore = n => Math.floor(n).toLocaleString("en-US");

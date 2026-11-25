@@ -11,10 +11,3 @@ export const keycap = code => {
   else kbd.textContent = keyLabel(code);
   return kbd;
 };
-
-/** 키 여러 개를 나란히(사이에 가는 구분 없이) */
-export const keycaps = codes => {
-  const frag = document.createDocumentFragment();
-  for (const code of codes) frag.append(keycap(code));
-  return frag;
-};

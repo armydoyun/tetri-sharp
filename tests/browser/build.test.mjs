@@ -3249,11 +3249,17 @@ test("퍼즐 만들기 목표·고급 설정: 목표와 규칙이 링크로 가�
   await pickTemplate(page, "tsd");
   assert.equal(await page.getAttribute("#puzzle-goal", "data-value"), "tsd");
   assert.ok(await page.locator("#puzzle-goal-lines").isDisabled(), "줄 수는 'N줄 지우기'에서만");
+  // 쓸 수 없는 드롭다운·스위치는 흐리게(누를 수 있어 보이지 않게)
+  const opacity = sel => page.$eval(sel, e => getComputedStyle(e).opacity);
+  assert.equal(await opacity("#puzzle-goal-lines"), "0.4");
+  assert.equal(await opacity("#puzzle-goal"), "1");
+  assert.equal(await opacity("#puzzle-solution-view"), "0.4");
 
   // 고급 설정: 홀드 켜기·처음 홀드 피스, 20G. 요약 한 줄과 되돌리기
   assert.equal(await text(page, "puzzles .puzzle-editor-advanced-summary"), "Modern · 홀드 없음 · 중력 없음");
   await page.click("#puzzle-advanced summary");
   assert.ok(await page.locator("#puzzle-hold-start").isDisabled(), "홀드가 꺼져 있으면 처음 홀드 피스는 못 고른다");
+  assert.equal(await opacity("#puzzle-hold-start"), "1", "줄이 통째로 흐리므로 한 번 더 흐리지 않는다");
   await page.click("#puzzle-hold");
   await pick("puzzle-hold-start", "I");
   await page.click('#puzzle-gravity [data-value="20g"]');
@@ -3407,6 +3413,43 @@ test("내 퍼즐·받은 퍼즐: 고치면 저절로 저장되고, 목록에서 
     await text(page, "puzzles .custom-puzzle-empty"),
     "아직 만든 퍼즐이 없어요. 아래 '퍼즐 만들기'로 시작해요."
   );
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("퍼즐 고친 것: 열린 앱에서 링크를 열면 그 퍼즐로, 첫 수 보기를 쓴 판도 이어서 하기, 이름 칸의 Ctrl+Z는 글자만", async () => {
+  const { context, page, errors } = await openPage(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  // 이미 열린 앱(첫 화면)에서 퍼즐 링크를 열면 주소의 해시만 바뀐다 → 그 퍼즐이 시작돼야 한다
+  await page.evaluate(code => {
+    location.hash = `puzzle=${code}`;
+  }, "2.-.1fc0.I.66eB7YGsIO2NvOymkAo");
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  assert.equal(await text(page, "session-title"), "링크 퍼즐");
+
+  // 첫 수 보기를 쓴 뒤 새로 고침 → 이어서 하기가 된다(전에는 '이어서 할 수 없어요')
+  await page.click("#downstack-hint");
+  await page.waitForFunction(() => document.getElementById("downstack-status")?.textContent?.startsWith("첫 수 ·"));
+  assert.equal(await text(page, "downstack-status"), "첫 수 · 오른쪽 3칸, 하드 드롭", "누를 것이 적은 길");
+  await page.waitForTimeout(300);
+  await page.reload();
+  await page.click("#continue-run");
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  assert.equal(await text(page, "session-title"), "링크 퍼즐");
+  assert.equal(await text(page, "menu-notice"), "");
+
+  // 편집기: 판을 칠한 뒤 이름 칸에서 Ctrl+Z → 판은 그대로(글자 되돌리기만)
+  await page.keyboard.press("Escape");
+  await page.click('#pause [data-action="menu"]');
+  await page.click('[data-confirm="ok"]').catch(() => {});
+  await openList(page, "#open-puzzles");
+  await page.click("#puzzle-create");
+  await page.click('[data-cell="190"]');
+  await page.fill("#puzzle-title", "abc");
+  await page.focus("#puzzle-title");
+  await page.keyboard.press("Control+z");
+  assert.equal(await page.locator('[data-cell="190"]').getAttribute("aria-pressed"), "true");
   assert.deepEqual(errors, []);
   await context.close();
 });

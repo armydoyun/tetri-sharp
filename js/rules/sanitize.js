@@ -6,7 +6,7 @@ import { RANDOMIZERS } from "./randomizer/index.js";
 import { SCORINGS } from "./scoring/index.js";
 
 export const LOCK_TYPES = Object.freeze(["moveReset", "stepReset", "infinite", "none"]);
-export const TSPIN_TYPES = Object.freeze(["threeCorner", "none"]);
+const TSPIN_TYPES = Object.freeze(["threeCorner", "none"]);
 /** 고를 수 있는 기본 중력(프레임당 칸) */
 export const GRAVITY_OPTIONS = Object.freeze([1 / 60, 1 / 48, 2 / 60, 6 / 60, 1, 20]);
 

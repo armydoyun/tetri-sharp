@@ -11,6 +11,7 @@
 //  - 두드리기: 오른쪽 절반은 시계 방향, 왼쪽 절반은 반시계 방향 회전
 // 키보드·터치 버튼과 같은 { held, takePressed() } 모양이라 게임 루프가 그대로 합친다.
 import { BTN } from "../core/engine.js";
+import { createPressQueue } from "./press-queue.js";
 
 const TAP_MOVE = 12; // px: 이보다 덜 움직이고 떼면 두드리기
 const TAP_MS = 260;
@@ -24,15 +25,11 @@ const TUCK_UNLOCK = 1.5; // 칸: 세로로 잠근 뒤 이만큼 옆으로 밀면
 export const createGestures = ({ root, cellSize }) => {
   let enabled = false;
   let held = 0;
-  let pending = [0];
+  const pending = createPressQueue();
   /** @type {null | { id: number, x0: number, y0: number, ax: number, t0: number, moved: boolean, soft: boolean, axis: null | "x" | "y", anchor: {x: number, y: number}, trail: {y: number, t: number}[] }} */
   let touch = null;
 
-  const press = bit => {
-    const last = pending.length - 1;
-    if (pending[last] & bit) pending.push(bit);
-    else pending[last] |= bit;
-  };
+  const press = pending.press;
 
   const down = e => {
     if (!enabled || e.pointerType === "mouse" || touch) return;
@@ -130,7 +127,7 @@ export const createGestures = ({ root, cellSize }) => {
   const releaseAll = () => {
     touch = null;
     held = 0;
-    pending = [0];
+    pending.clear();
   };
 
   return {
@@ -143,11 +140,7 @@ export const createGestures = ({ root, cellSize }) => {
       enabled = value;
       root.classList.toggle("gestures-on", value);
     },
-    takePressed() {
-      const p = pending.shift() || 0;
-      if (!pending.length) pending.push(0);
-      return p;
-    },
+    takePressed: pending.take,
     releaseAll,
   };
 };

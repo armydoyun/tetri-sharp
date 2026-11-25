@@ -36,7 +36,7 @@ export const dailySeed = key => {
 /** 이 날부터 날마다 모드가 바뀐다(이전 날짜는 Sprint 40L 그대로) */
 export const ROTATION_START = "2026-12-01";
 /** 몇 분 안에 끝나고 같은 블록 순서로 겨루기 좋은 모드들 */
-export const DAILY_ROTATION = Object.freeze([SPRINT_40, ULTRA, DIG]);
+const DAILY_ROTATION = Object.freeze([SPRINT_40, ULTRA, DIG]);
 
 /** "YYYY-MM-DD" 두 날짜 사이 날 수(달력 기준, 시간대와 무관) */
 const daysBetween = (from, to) => {
