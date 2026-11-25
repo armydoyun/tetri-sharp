@@ -226,7 +226,7 @@ export const EN = {
   "칠하기 도구": "Paint tool",
   칸: "Cell",
   "한 줄": "Row",
-  "구멍 줄": "Garbage",
+  "구멍 줄": "Hole",
   "보이는 높이": "Visible height",
   "누르거나 끌어서 칸을 채우고 지워요.": "Tap or drag to fill and clear cells.",
   "누르거나 끌어서 줄 전체를 채우고 지워요.": "Tap or drag to fill and clear whole rows.",

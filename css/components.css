@@ -1105,10 +1105,23 @@
   gap: var(--space-2);
 }
 
-/* 좁은 화면: 이름은 위 한 줄, 아래에 [목표 | 줄 수] */
+/* 좁은 화면: 이름은 위 한 줄, 아래에 [목표 | 줄 수]. 줄 수 칸은 "20 lines"가 넓은 글꼴에서도 들어가게 */
 @media (max-width: 560px) {
   .puzzle-editor-goal {
-    grid-template-columns: minmax(0, 1fr) 6em;
+    grid-template-columns: minmax(0, 1fr) 8.5em;
+  }
+
+  /* 편집기 발 줄: 버튼이 셋이라 한 줄에 두면 닫기가 좁아진다 → [시험 플레이 | 링크 복사] 아래 닫기 한 줄 */
+  .dialog-foot:has(#puzzle-trial) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dialog-foot:has(#puzzle-trial) > :not(.notice-slot):first-of-type {
+    grid-column: auto;
+  }
+
+  .dialog-foot:has(#puzzle-trial) > #puzzle-editor-close {
+    grid-column: 1 / -1;
   }
 
   .puzzle-editor-goal > .puzzle-editor-label {
