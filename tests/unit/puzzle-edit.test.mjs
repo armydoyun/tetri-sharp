@@ -205,24 +205,24 @@ test("자동 확인: 시작 틀의 풀이를 처음부터 끝까지 찾고, 수�
 test("미리 막아 주기: 블록 수, 다 찬 줄, 막힌 나올 자리", () => {
   const cells = new Uint8Array(PUZZLE_CELLS);
   for (let i = 0; i < 6; i++) cells[BOTTOM + i] = 1;
-  assert.deepEqual(puzzleWarnings(cells, "I"), [], "6칸 + I = 10");
-  assert.deepEqual(puzzleWarnings(cells, "IIO"), [], "판을 비우는 순간 끝나므로 남는 피스는 괜찮다");
+  assert.deepEqual(puzzleWarnings({ cells, pieces: "I" }), [], "6칸 + I = 10");
+  assert.deepEqual(puzzleWarnings({ cells, pieces: "IIO" }), [], "판을 비우는 순간 끝나므로 남는 피스는 괜찮다");
   cells[BOTTOM + 6] = 1;
-  assert.deepEqual(puzzleWarnings(cells, "IIIII".slice(0, 4)), [{ key: "count", cells: 7 }], "홀수 칸은 늘 안 된다");
-  assert.deepEqual(puzzleWarnings(cells, ""), [], "피스가 없으면 아직 알리지 않는다");
+  assert.deepEqual(puzzleWarnings({ cells, pieces: "IIII" }), [{ key: "count", cells: 7 }], "홀수 칸은 늘 안 된다");
+  assert.deepEqual(puzzleWarnings({ cells, pieces: "" }), [], "피스가 없으면 아직 알리지 않는다");
   const full = new Uint8Array(PUZZLE_CELLS);
   full.fill(1, BOTTOM);
   assert.deepEqual(
-    puzzleWarnings(full, "").map(w => w.key),
+    puzzleWarnings({ cells: full, pieces: "" }).map(w => w.key),
     ["full"]
   );
   const top = new Uint8Array(PUZZLE_CELLS);
   top.fill(1, 3, 7);
   assert.ok(
-    puzzleWarnings(top, "T").some(w => w.key === "spawn"),
+    puzzleWarnings({ cells: top, pieces: "T" }).some(w => w.key === "spawn"),
     "맨 윗줄 가운데가 막히면 내려오지 못한다"
   );
-  assert.ok(!puzzleWarnings(template("well").cells, "I").some(w => w.key === "spawn"));
+  assert.ok(!puzzleWarnings(template("well")).some(w => w.key === "spawn"));
 });
 
 test("풀이 탐색 창구: Worker가 없으면(Node·개발 실행) 잠깐 뒤 화면 쪽에서 돌리고, 취소하면 undefined", async () => {

@@ -3226,6 +3226,88 @@ test("퍼즐 만들기 자동 확인: 풀 수 있으면 시험 없이 공유, �
   await context.close();
 });
 
+test("퍼즐 만들기 목표·고급 설정: 목표와 규칙이 링크로 가고, 받는 쪽은 목표·규칙·확인 표시를 보고, '규칙대로'는 확인·첫 수 보기를 끈다", async () => {
+  const { context, page, errors } = await openPage(() => {
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
+    Object.defineProperty(navigator, "clipboard", { value: undefined });
+  });
+  const status = () => text(page, "puzzle-status");
+  const settled = () =>
+    page.waitForFunction(() => !document.getElementById("puzzle-status")?.textContent?.includes("찾는 중"), null, {
+      timeout: 20000,
+    });
+  const pick = async (id, value) => {
+    await page.locator(`#${id}`).scrollIntoViewIfNeeded();
+    await page.waitForTimeout(50);
+    await page.click(`#${id}`);
+    await page.click(`#${id}-list [data-value="${value}"]`);
+  };
+  await openList(page, "#open-puzzles");
+  await page.click("#puzzle-create");
+
+  // 시작 틀 T-spin Double 자리: 목표도 함께 바뀐다
+  await pickTemplate(page, "tsd");
+  assert.equal(await page.getAttribute("#puzzle-goal", "data-value"), "tsd");
+  assert.ok(await page.locator("#puzzle-goal-lines").isDisabled(), "줄 수는 'N줄 지우기'에서만");
+
+  // 고급 설정: 홀드 켜기·처음 홀드 피스, 20G. 요약 한 줄과 되돌리기
+  assert.equal(await text(page, "puzzles .puzzle-editor-advanced-summary"), "Modern · 홀드 없음 · 중력 없음");
+  await page.click("#puzzle-advanced summary");
+  assert.ok(await page.locator("#puzzle-hold-start").isDisabled(), "홀드가 꺼져 있으면 처음 홀드 피스는 못 고른다");
+  await page.click("#puzzle-hold");
+  await pick("puzzle-hold-start", "I");
+  await page.click('#puzzle-gravity [data-value="20g"]');
+  assert.equal(await text(page, "puzzles .puzzle-editor-advanced-summary"), "20G · 홀드(처음 I)");
+  await page.click("#puzzle-undo");
+  assert.equal(await text(page, "puzzles .puzzle-editor-advanced-summary"), "홀드(처음 I)");
+  await page.click("#puzzle-redo");
+
+  // 자동 확인 → 링크 복사(자동 복사가 막혀 링크 칸에 나온다)
+  await page.locator("#puzzle-check").scrollIntoViewIfNeeded();
+  await page.click("#puzzle-check");
+  await settled();
+  assert.match(await status(), /^풀 수 있어요/);
+  await page.click("#puzzle-copy");
+  const link = await page.locator("#custom-puzzle-link").inputValue();
+  assert.match(link, /#puzzle=2\.od_g2_h1_pI_e1\./, link);
+
+  // 받는 쪽: 같은 목표·규칙으로 열리고, 목표 줄에 규칙 요약과 확인 표시
+  // (다른 사람의 브라우저: 저장소를 나누지 않는다)
+  const other = await browser.newContext({ locale: "ko-KR" });
+  await other.addInitScript(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  const recipient = await other.newPage();
+  await recipient.goto(link);
+  await recipient.waitForFunction(() => document.body.dataset.screen === "play");
+  assert.equal(
+    await text(recipient, "mode-objective"),
+    "목표 · T-spin Double · 20G · 홀드(처음 I) · 자동 확인으로 풀 수 있는 퍼즐"
+  );
+  await other.close();
+
+  // 규칙대로 떨어지는 퍼즐: 자동 확인을 쓸 수 없고, 게임 중 첫 수 보기도 꺼진다
+  await page.click('#puzzle-gravity [data-value="rules"]');
+  assert.ok(await page.locator("#puzzle-check").isDisabled());
+  assert.match(await status(), /^규칙대로 떨어지는 퍼즐은/);
+  assert.ok(await page.locator("#puzzle-copy").isDisabled(), "직접 풀어야 공유한다");
+  await page.click("#puzzle-trial");
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  assert.ok(await page.locator("#downstack-hint").isDisabled());
+
+  // N줄 지우기: 줄 수를 고르면 목표 이름에 담긴다
+  await page.keyboard.press("Escape");
+  await page.click('#pause [data-action="menu"]');
+  await page.click('[data-confirm="ok"]').catch(() => {});
+  await openList(page, "#open-puzzles");
+  await page.click("#puzzle-create");
+  await pick("puzzle-goal", "lines");
+  await pick("puzzle-goal-lines", "3");
+  assert.equal(await text(page, "puzzle-goal .select-value"), "3줄 지우기");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
 test("만든 퍼즐: 시험 플레이 성공 후에만 공유하고, 휴대폰에서 링크를 열어 풀 수 있다", async () => {
   const { context, page, errors } = await openPage(() => {
     localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
@@ -3267,7 +3349,8 @@ test("만든 퍼즐: 시험 플레이 성공 후에만 공유하고, 휴대폰�
     await page.click('#results [data-action="export"]');
     await share.click();
     const link = await page.locator("#custom-puzzle-link").inputValue();
-    assert.match(link, /#puzzle=1\./);
+    assert.match(link, /#puzzle=2\./);
+    assert.match(link, /_e2|\.e2|-e2|e2\./, "직접 풀어 본 표시");
     await page.click('[data-cell="190"]');
     await page.click('[data-cell="190"]');
     assert.ok(await share.isDisabled(), "편집 뒤 원상복구해도 다시 시험해야 한다");

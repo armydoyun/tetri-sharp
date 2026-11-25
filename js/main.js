@@ -76,7 +76,15 @@ import { createHelpUI } from "./ui/help.js";
 import { PUZZLES, createPuzzleProgress, findPuzzle, puzzleMode } from "./modes/puzzles.js";
 import { describeSteps } from "./modes/puzzle-hint.js";
 import { createSolver } from "./app/solver.js";
-import { customPuzzleMode, decodePuzzle } from "./modes/custom-puzzle.js";
+import {
+  CHECKED_AUTO,
+  CHECKED_TRIED,
+  customPuzzleMode,
+  decodePuzzle,
+  goalLabel,
+  ruleSummary,
+  searchOptions,
+} from "./modes/custom-puzzle.js";
 import { createPuzzleEditor } from "./ui/puzzle-editor.js";
 import { createPuzzleUI } from "./ui/puzzles.js";
 import { createShareUI } from "./ui/share.js";
@@ -639,24 +647,41 @@ const setScreen = next => {
   $("mode-objective").textContent =
     next === "menu" || next === "replay"
       ? ""
-      : mode.puzzle
-        ? mode.puzzle.kind === "pc"
-          ? t("목표 · 주어진 피스로 판 비우기")
-          : mode.puzzle.kind === "quad"
-            ? t("목표 · 우물을 남기고 채운 뒤 마지막 I로 4줄 지우기")
-            : mode.puzzle.kind === "tuck"
-              ? t("목표 · 소프트 드롭으로 내린 뒤 처마 아래로 밀어 넣어 2줄 지우기")
-              : mode.puzzle.kind === "combo"
-                ? t("목표 · 피스마다 한 줄 이상 지워 콤보 끊지 않기")
-                : mode.puzzle.kind === "spin"
-                  ? t("목표 · 틈 근처까지 내린 뒤 돌려 끼워 넣어 2줄 지우기")
-                  : mode.puzzle.kind === "mini"
-                    ? t("목표 · T를 마지막에 돌려 넣어 T-spin Mini로 줄 지우기")
-                    : t("목표 · T 하나로 {kind} 만들기", { kind: mode.description })
-        : mode.practice
-          ? mode.description
-          : "";
+      : mode.puzzle?.custom
+        ? customObjective(mode.puzzle.custom)
+        : mode.puzzle
+          ? mode.puzzle.kind === "pc"
+            ? t("목표 · 주어진 피스로 판 비우기")
+            : mode.puzzle.kind === "quad"
+              ? t("목표 · 우물을 남기고 채운 뒤 마지막 I로 4줄 지우기")
+              : mode.puzzle.kind === "tuck"
+                ? t("목표 · 소프트 드롭으로 내린 뒤 처마 아래로 밀어 넣어 2줄 지우기")
+                : mode.puzzle.kind === "combo"
+                  ? t("목표 · 피스마다 한 줄 이상 지워 콤보 끊지 않기")
+                  : mode.puzzle.kind === "spin"
+                    ? t("목표 · 틈 근처까지 내린 뒤 돌려 끼워 넣어 2줄 지우기")
+                    : mode.puzzle.kind === "mini"
+                      ? t("목표 · T를 마지막에 돌려 넣어 T-spin Mini로 줄 지우기")
+                      : t("목표 · T 하나로 {kind} 만들기", { kind: mode.description })
+          : mode.practice
+            ? mode.description
+            : "";
 };
+
+/**
+ * 만든 퍼즐의 목표 줄: 목표 · 바뀐 규칙 · 만든 사람이 확인한 것
+ * @param {import("./modes/custom-puzzle.js").FullPuzzle} p
+ */
+function customObjective(p) {
+  const summary = ruleSummary(p);
+  const checked =
+    p.checked & CHECKED_TRIED
+      ? t("만든 사람이 직접 풀어 봤어요")
+      : p.checked & CHECKED_AUTO
+        ? t("자동 확인으로 풀 수 있는 퍼즐")
+        : "";
+  return [t("목표 · {goal}", { goal: goalLabel(p.goal) }), summary, checked, p.desc].filter(Boolean).join(" · ");
+}
 
 /** @param {boolean} [initial] 처음 열 때 @param {boolean} [keepFocus] 포커스는 옮기지 않는다(대화상자를 닫고 다시 그릴 때) */
 const toMenu = (initial = false, keepFocus = false) => {
@@ -1466,6 +1491,8 @@ const downstackHint = $("downstack-hint");
 const hintLabel = /** @type {HTMLElement} */ (downstackHint.querySelector(".btn-label"));
 const resetLessonHint = () => {
   cancelPuzzleHint();
+  // "규칙대로" 떨어지는 만든 퍼즐은 손 빠르기에 따라 달라 첫 수를 찾을 수 없다(자리는 남기고 끈다)
+  /** @type {HTMLButtonElement} */ (downstackHint).disabled = mode.puzzle?.gravity === "rules";
   hintLabel.textContent = mode.puzzle ? t("첫 수 보기") : t("힌트");
   $("downstack-status").textContent = "";
   if (game?.state.puzzle) game.state.puzzle.hintCells = [];
@@ -1486,21 +1513,25 @@ const cancelPuzzleHint = () => {
 const togglePuzzleHint = () => {
   const p = game.state.puzzle;
   if (p.hintCells?.length || puzzleHintSearch) return resetLessonHint();
-  const active = game.state.active;
-  // 남은 피스: 지금 피스(홀드로 바꿨을 수도 있다)를 한 개 뺀 나머지
-  const remaining = mode.puzzle.pieces.slice(p.placed);
-  const at = remaining.indexOf(active.type);
-  const rest = at >= 0 ? [...remaining.slice(0, at), ...remaining.slice(at + 1)] : remaining.slice(1);
-  const asked = { game, placed: p.placed, x: active.x, y: active.y, rot: active.rot, type: active.type };
+  const { active, hold, holdUsed } = game.state;
+  // 아직 나오지 않은 목록 피스: 지금까지 목록에서 나온 피스 = 놓은 것 + 움직이는 것 + 홀드 칸 - 처음 홀드 피스
+  const drawn = p.placed + 1 + (hold ? 1 : 0) - (mode.puzzle.holdStart ? 1 : 0);
+  const rest = mode.puzzle.pieces.slice(drawn);
+  const asked = { game, placed: p.placed, x: active.x, y: active.y, rot: active.rot, type: active.type, hold };
   const search = solver.run({
     type: "first",
     kind: mode.puzzle.kind,
-    count: mode.puzzle.pieces.length,
+    count: p.need,
+    lines: mode.puzzle.lines ?? 0,
     rotation: rules.rotation,
     board: game.state.board.cells.slice(),
     active: { type: active.type, x: active.x, y: active.y, rot: active.rot },
     combo: game.state.combo ?? -1,
+    total: p.lines ?? 0,
+    hold,
+    holdUsed,
     rest,
+    opts: mode.puzzle.custom ? searchOptions(mode.puzzle.custom) : {},
   });
   puzzleHintSearch = search;
   $("downstack-status").textContent = t("첫 수를 찾는 중…");
@@ -1516,7 +1547,8 @@ const togglePuzzleHint = () => {
       now?.x === asked.x &&
       now?.y === asked.y &&
       now?.rot === asked.rot &&
-      now?.type === asked.type;
+      now?.type === asked.type &&
+      game.state.hold === asked.hold;
     if (move === undefined || !same) return resetLessonHint();
     hintLabel.textContent = t("첫 수 보기");
     if (!move) {
@@ -1530,7 +1562,10 @@ const togglePuzzleHint = () => {
     if (!("cells" in move)) return;
     game.state.puzzle.hintCells = move.cells;
     const spinLast = ["mini", "tsd", "tst"].includes(mode.puzzle.kind);
-    $("downstack-status").textContent = t("첫 수 · {steps}", { steps: describeSteps(move.steps, spinLast) });
+    const steps = describeSteps(move.steps, spinLast);
+    $("downstack-status").textContent = move.hold
+      ? t("첫 수 · 홀드한 뒤 {steps}", { steps })
+      : t("첫 수 · {steps}", { steps });
     hintLabel.textContent = t("힌트 숨기기");
   });
 };

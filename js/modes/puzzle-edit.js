@@ -1,10 +1,11 @@
 // 퍼즐 만들기의 편집 동작(DOM 없이 돈다 — 단위 테스트가 직접 부른다).
 // 판은 위에서 아래로 VISIBLE_ROWS줄 × WIDTH칸, 칸 값은 0(빔)·1(참)이다. index = row * WIDTH + col.
 import { HEIGHT, VISIBLE_ROWS, WIDTH, collides, createBoard } from "../core/board.js";
-import { GARBAGE } from "../core/pieces.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
 import { spawnOf } from "./puzzle-solver.js";
-import { PUZZLE_CELLS, MAX_PUZZLE_PIECES } from "./custom-puzzle.js";
+import { PUZZLE_CELLS, MAX_PUZZLE_PIECES, normalizePuzzle, solverBoard } from "./custom-puzzle.js";
+
+export { solverBoard };
 import { PUZZLES } from "./puzzles.js";
 
 /** 편집 화면에 보이는 높이(아래에서부터 줄 수) */
@@ -172,59 +173,60 @@ const stageCells = stage => {
   return Uint8Array.from(board.cells.subarray(offset), v => Number(v > 0));
 };
 
-/** 판 비우기 목표로 바로 쓸 수 있는 기본 퍼즐(지금 만든 퍼즐의 목표는 판 비우기 하나) */
-export const COPYABLE_STAGES = Object.freeze(PUZZLES.filter(p => p.kind === "pc"));
+/** 복사할 수 있는 기본 퍼즐(모든 단계) */
+export const COPYABLE_STAGES = PUZZLES;
+
+/** 기본 퍼즐 종류 → 만든 퍼즐 목표(밀어 넣기·돌려 넣기는 "2줄 지우기") */
+const stageGoal = kind => (kind === "tuck" || kind === "spin" ? { kind: "lines", lines: 2 } : { kind, lines: 0 });
 
 /**
- * 시작 틀: 빈 판, T 자리, 4줄 우물, 기본 퍼즐 N단계 복사("stage-<번호>").
+ * 시작 틀: 빈 판, T 자리, 4줄 우물, T-spin Double·Triple 자리, 기본 퍼즐 N단계 복사("stage-<번호>").
  * @param {string} id
- * @returns {{ cells: Uint8Array, pieces: string } | null}
+ * @returns {{ cells: Uint8Array, pieces: string, goal: { kind: string, lines: number } } | null}
  */
 export const template = id => {
-  if (id === "empty") return { cells: new Uint8Array(PUZZLE_CELLS), pieces: "" };
-  if (id === "t-slot") return { cells: fromRows(["###...####", "####.#####"]), pieces: "T" };
-  if (id === "well") return { cells: fromRows(["#########.", "#########.", "#########.", "#########."]), pieces: "I" };
-  const number = Number(/^stage-(\d+)$/.exec(id)?.[1]);
-  const stage = COPYABLE_STAGES.find(p => p.number === number);
-  return stage ? { cells: stageCells(stage), pieces: stage.pieces.join("") } : null;
+  const pc = { kind: "pc", lines: 0 };
+  if (id === "empty") return { cells: new Uint8Array(PUZZLE_CELLS), pieces: "", goal: pc };
+  if (id === "t-slot") return { cells: fromRows(["###...####", "####.#####"]), pieces: "T", goal: pc };
+  if (id === "well")
+    return {
+      cells: fromRows(["#########.", "#########.", "#########.", "#########."]),
+      pieces: "I",
+      goal: { kind: "quad", lines: 0 },
+    };
+  const spin = { tsd: "tsd", tst: "tst" }[id];
+  const number = spin ? PUZZLES.find(p => p.kind === spin)?.number : Number(/^stage-(\d+)$/.exec(id)?.[1]);
+  const stage = PUZZLES.find(p => p.number === number);
+  return stage ? { cells: stageCells(stage), pieces: stage.pieces.join(""), goal: stageGoal(stage.kind) } : null;
 };
 
 // ---- 자동 확인·미리 막아 주기 ----
 
-/** 편집 칸(보이는 20줄)을 엔진 판(40줄) 칸으로 */
-export const solverBoard = cells => {
-  const board = new Uint8Array(WIDTH * HEIGHT);
-  board.set(
-    cells.map(v => v * GARBAGE),
-    board.length - PUZZLE_CELLS
-  );
-  return board;
-};
-
 /**
- * 만들기 전에 알려 줄 것(판 비우기 기준).
- * - count: 칸 수와 피스로는 블록 수가 10의 배수가 되지 않아 판을 다 비울 수 없다
+ * 만들기 전에 알려 줄 것.
+ * - count: (판 비우기) 칸 수와 피스로는 블록 수가 10의 배수가 되지 않아 판을 다 비울 수 없다
  * - full: 다 찬 줄이 있다(처음부터 지워질 줄)
  * - spawn: 첫 피스가 나온 자리 바로 아래가 막혀 판으로 내려오지 못한다
- * @param {Uint8Array} cells
- * @param {string} pieces
- * @param {string} [rotationId]
+ * @param {import("./custom-puzzle.js").CustomPuzzle} puzzle
  * @returns {Array<{ key: "count", cells: number } | { key: "full" } | { key: "spawn" }>}
  */
-export const puzzleWarnings = (cells, pieces, rotationId = "srs") => {
+export const puzzleWarnings = puzzle => {
+  const p = normalizePuzzle(puzzle);
+  const { cells, pieces } = p;
   /** @type {ReturnType<typeof puzzleWarnings>} */
   const out = [];
   const filled = cells.reduce((n, v) => n + v, 0);
+  const total = pieces.length + (p.holdStart ? 1 : 0);
   // 판을 비우는 순간 끝나므로 피스를 다 쓰지 않아도 된다: 앞에서 k개를 놓은 블록 수가 10의 배수가 되는 k가 있어야 한다
-  const reachable = Array.from({ length: pieces.length }, (_, k) => filled + (k + 1) * 4).some(n => n % WIDTH === 0);
-  if (pieces.length && filled && !reachable) out.push({ key: "count", cells: filled });
+  const reachable = Array.from({ length: total }, (_, k) => filled + (k + 1) * 4).some(n => n % WIDTH === 0);
+  if (p.goal.kind === "pc" && pieces.length && filled && !reachable) out.push({ key: "count", cells: filled });
   for (let row = 0; row < VISIBLE_ROWS; row++)
     if (cells.subarray(row * WIDTH, (row + 1) * WIDTH).every(Boolean)) {
       out.push({ key: "full" });
       break;
     }
   if (pieces.length) {
-    const rotation = ROTATIONS[rotationId] ?? ROTATIONS.srs;
+    const rotation = ROTATIONS[p.rules.rotation] ?? ROTATIONS.srs;
     const board = { width: WIDTH, height: HEIGHT, cells: solverBoard(cells) };
     const type = /** @type {import("../core/pieces.js").PieceType} */ (pieces[0]);
     const s = spawnOf(board, rotation, type);

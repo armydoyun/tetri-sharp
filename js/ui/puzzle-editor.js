@@ -4,7 +4,24 @@
 import { WIDTH, VISIBLE_ROWS } from "../core/board.js";
 import { PIECE_TYPES } from "../core/pieces.js";
 import { t } from "../i18n/index.js";
-import { decodePuzzle, encodePuzzle, MAX_PUZZLE_PIECES, PUZZLE_CELLS } from "../modes/custom-puzzle.js";
+import {
+  CHECKED_AUTO,
+  CHECKED_TRIED,
+  DEFAULT_RULES,
+  MAX_GOAL_LINES,
+  MAX_PUZZLE_PIECES,
+  PUZZLE_CELLS,
+  baseRules,
+  canSearch,
+  decodePuzzle,
+  encodePuzzle,
+  goalLabel,
+  normalizePuzzle,
+  ruleSummary,
+  solutionTask,
+} from "../modes/custom-puzzle.js";
+import { GOAL_KINDS } from "../modes/puzzle-goals.js";
+import { LOCK_TYPES } from "../rules/sanitize.js";
 import {
   COPYABLE_STAGES,
   EDIT_HEIGHTS,
@@ -17,12 +34,11 @@ import {
   puzzleWarnings,
   removePiece,
   shiftCells,
-  solverBoard,
   strokeValue,
   template,
   usedHeight,
 } from "../modes/puzzle-edit.js";
-import { el, fillDialog } from "./dom.js";
+import { el, fieldRow, fillDialog, focusKey, restoreFocus } from "./dom.js";
 import {
   button,
   confirmButton,
@@ -35,9 +51,31 @@ import {
 } from "./components.js";
 
 /** @typedef {"cell" | "row" | "garbage"} Tool */
-/** @typedef {{ cells: Uint8Array, pieces: string }} Snapshot */
+/**
+ * 판·피스 말고 퍼즐에 담기는 것: 목표·중력·바탕 규칙·규칙 내용·처음 홀드 피스
+ * @typedef {{ goal: { kind: string, lines: number }, gravity: "none" | "20g" | "rules", base: "modern" | "retro" | "arcade", rules: import("../modes/custom-puzzle.js").RuleBody, holdStart: string }} Settings
+ * @typedef {{ cells: Uint8Array, pieces: string, settings: Settings }} Snapshot
+ */
 
-/** @typedef {{ type: string, board: Uint8Array, cells: Array<[number, number]> }} SolutionMove */
+/** @returns {Settings} */
+const defaultSettings = () => ({
+  goal: { kind: "pc", lines: 0 },
+  gravity: "none",
+  base: "modern",
+  rules: structuredClone(DEFAULT_RULES),
+  holdStart: "",
+});
+
+/** 퍼즐 → 설정 부분 @param {import("../modes/custom-puzzle.js").FullPuzzle} p @returns {Settings} */
+const settingsOf = p => ({
+  goal: { ...p.goal },
+  gravity: p.gravity,
+  base: /** @type {Settings["base"]} */ (p.base),
+  rules: structuredClone(p.rules),
+  holdStart: p.holdStart,
+});
+
+/** @typedef {{ type: string, hold: boolean, board: Uint8Array, cells: Array<[number, number]> }} SolutionMove */
 /**
  * 자동 확인 결과(그 퍼즐 코드에 대해). checking: 찾는 중
  * @typedef {{ code: string, state: "checking" | "solvable" | "unsolvable" | "exhausted", moves?: SolutionMove[] }} Verified
@@ -53,6 +91,9 @@ import {
 export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
   let cells = new Uint8Array(PUZZLE_CELLS);
   let pieces = "";
+  let settings = defaultSettings();
+  /** 지금 편집 중인 퍼즐 */
+  const current = () => ({ cells, pieces, ...settings });
   let cleared = /** @type {string | null} */ (null);
   /** @type {Tool} */
   let tool = "cell";
@@ -60,7 +101,8 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
   /** 피스 순서에서 고른 자리(없으면 null: 새 피스는 맨 뒤에) */
   let selected = /** @type {number | null} */ (null);
   const history = createHistory();
-  const snapshot = () => ({ cells: cells.slice(), pieces });
+  /** @returns {Snapshot} */
+  const snapshot = () => ({ cells: cells.slice(), pieces, settings: structuredClone(settings) });
   /** @type {Verified | null} */
   let verified = null;
   /** 찾는 중인 자동 확인(대화상자를 닫거나 퍼즐이 바뀌면 멈춘다) */
@@ -94,6 +136,7 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
       if (!puzzle) return;
       cells = puzzle.cells;
       pieces = puzzle.pieces;
+      settings = settingsOf(puzzle);
       cleared = null;
       selected = null;
       height = fitHeight(cells);
@@ -102,7 +145,7 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
       verified = null;
     },
     markCleared(code) {
-      if (code === encodePuzzle({ cells, pieces })) cleared = code;
+      if (code === encodePuzzle(current())) cleared = code;
     },
     open() {
       const notice = el("p", { class: "notice-slot", role: "status" });
@@ -246,9 +289,14 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
             { value: "empty", label: t("빈 판") },
             { value: "t-slot", label: t("T 자리") },
             { value: "well", label: t("4줄 우물") },
+            { value: "tsd", label: t("T-spin Double 자리") },
+            { value: "tst", label: t("T-spin Triple 자리") },
             ...COPYABLE_STAGES.map(p => ({
               value: `stage-${p.number}`,
-              label: t("퍼즐 {n}단계 복사", { n: p.number }),
+              label: t("퍼즐 {n}단계 복사 · {kind}", {
+                n: p.number,
+                kind: goalLabel(template(`stage-${p.number}`)?.goal ?? { kind: "pc" }),
+              }),
             })),
           ],
           onChange: id => {
@@ -257,6 +305,7 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
             history.record(snapshot());
             cells = start.cells;
             pieces = start.pieces;
+            settings = { ...settings, goal: start.goal };
             selected = null;
             height = fitHeight(cells);
             layoutBoard();
@@ -268,6 +317,215 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
           },
         });
       let templates = makeTemplates();
+
+      // ---- 목표 · 고급 설정(규칙·중력) ----
+      /** 설정 바꾸기 — 되돌리기에 남기고, 허용된 값으로 정리한다 */
+      const editSettings = (/** @type {(next: Settings) => void} */ mutate) => {
+        const next = structuredClone(settings);
+        mutate(next);
+        const fixed = settingsOf(normalizePuzzle({ cells, pieces, ...next }));
+        if (JSON.stringify(fixed) === JSON.stringify(settings)) return;
+        history.record(snapshot());
+        settings = fixed;
+        changed();
+      };
+      const goalRow = el("div", { class: "puzzle-editor-goal" });
+      const advancedSummary = el("span", { class: "puzzle-editor-advanced-summary" });
+      const advancedBody = el("div", { class: "puzzle-editor-advanced-body" });
+      const advanced = el(
+        "details",
+        { class: "puzzle-editor-advanced", id: "puzzle-advanced" },
+        el("summary", {}, el("strong", { text: t("고급 설정") }), advancedSummary),
+        advancedBody
+      );
+      const yesNo = (id, value, onChange, disabled = false) =>
+        toggle({ id, checked: value, disabled, onChange: on => editSettings(next => onChange(next, on)) });
+      const pick = (id, label, options, value, onChange, disabled = false) =>
+        dropdown({ id, label, options, value, disabled, onChange: v => editSettings(next => onChange(next, v)) });
+      let renderedSettings = "";
+      /** 설정이 바뀌었을 때만 목표 줄과 고급 설정을 다시 그린다(포커스는 같은 조작으로 돌려준다) */
+      const renderSettings = () => {
+        const key = JSON.stringify(settings);
+        advancedSummary.textContent = ruleSummary(current()) || t("Modern · 홀드 없음 · 중력 없음");
+        if (key === renderedSettings) return;
+        renderedSettings = key;
+        const focus = focusKey(document.activeElement);
+        const r = settings.rules;
+        goalRow.replaceChildren(
+          el("span", { class: "puzzle-editor-label", text: t("목표") }),
+          pick(
+            "puzzle-goal",
+            t("목표"),
+            GOAL_KINDS.map(kind => ({ value: kind, label: goalLabel({ kind, lines: settings.goal.lines || 1 }) })),
+            settings.goal.kind,
+            (next, kind) => (next.goal = { kind, lines: kind === "lines" ? next.goal.lines || 1 : 0 })
+          ),
+          pick(
+            "puzzle-goal-lines",
+            t("지울 줄 수"),
+            Array.from({ length: MAX_GOAL_LINES }, (_, i) => ({ value: i + 1, label: t("{n}줄", { n: i + 1 }) })),
+            settings.goal.lines || 1,
+            (next, n) => (next.goal = { kind: "lines", lines: n }),
+            settings.goal.kind !== "lines"
+          )
+        );
+        const gravity = segmented({
+          id: "puzzle-gravity",
+          label: t("중력"),
+          options: [
+            ["none", t("없음")],
+            ["20g", "20G"],
+            ["rules", t("규칙대로")],
+          ],
+          value: settings.gravity,
+          onChange: v => editSettings(next => (next.gravity = /** @type {Settings["gravity"]} */ (v))),
+        });
+        const base = segmented({
+          id: "puzzle-base",
+          label: t("바탕 규칙"),
+          options: [
+            ["modern", "Modern"],
+            ["retro", "Retro"],
+            ["arcade", "Arcade"],
+          ],
+          value: settings.base,
+          onChange: v =>
+            editSettings(next => {
+              next.base = /** @type {Settings["base"]} */ (v);
+              next.rules = baseRules(next.base);
+            }),
+        });
+        const gravityHint = {
+          none: t("피스가 떨어지지 않아요. 생각하는 퍼즐"),
+          "20g": t("피스가 나오자마자 바닥까지. 바닥을 따라 움직여야 해요"),
+          rules: t("규칙의 중력대로 떨어져요. 자동 확인과 첫 수 보기를 쓸 수 없어요"),
+        }[settings.gravity];
+        const holdOff = !r.hold.enabled;
+        advancedBody.replaceChildren(
+          fieldRow({
+            id: "puzzle-base",
+            label: t("바탕 규칙"),
+            hint: t("고르면 그 규칙으로 아래 항목을 다시 채워요"),
+            control: base,
+          }),
+          fieldRow({ id: "puzzle-gravity", label: t("중력"), hint: gravityHint, control: gravity }),
+          fieldRow({
+            id: "puzzle-rotation",
+            label: t("회전 시스템"),
+            hint: "",
+            control: pick(
+              "puzzle-rotation",
+              t("회전 시스템"),
+              [
+                { value: "srs", label: t("SRS — 벽차기 5단계 (현대 표준)") },
+                { value: "ars", label: t("ARS — 좌우 1칸만, 중앙열 규칙 (아케이드)") },
+                { value: "classic", label: t("킥 없음 — 막히면 안 돈다 (옛날 방식)") },
+              ],
+              r.rotation,
+              (next, v) => (next.rules.rotation = v)
+            ),
+          }),
+          fieldRow({
+            id: "puzzle-hold",
+            label: t("홀드"),
+            hint: t("피스 하나를 맡겨 두었다가 바꿔 쓰기"),
+            control: yesNo("puzzle-hold", r.hold.enabled, (next, on) => (next.rules.hold = { enabled: on })),
+          }),
+          fieldRow({
+            id: "puzzle-hold-start",
+            label: t("처음 홀드 피스"),
+            hint: holdOff ? t("홀드가 꺼져 있어 쓰지 않아요") : t("처음부터 홀드 칸에 들어 있는 피스"),
+            disabled: holdOff,
+            control: pick(
+              "puzzle-hold-start",
+              t("처음 홀드 피스"),
+              [{ value: "", label: t("없음") }, ...PIECE_TYPES.map(piece => ({ value: piece, label: piece }))],
+              settings.holdStart,
+              (next, v) => (next.holdStart = v),
+              holdOff
+            ),
+          }),
+          fieldRow({
+            id: "puzzle-preview",
+            label: t("넥스트 미리보기"),
+            hint: t("다음에 나올 피스를 몇 개까지 미리 보여 줄지"),
+            control: pick(
+              "puzzle-preview",
+              t("넥스트 미리보기"),
+              Array.from({ length: 7 }, (_, n) => ({ value: n, label: t("{n}개", { n }) })),
+              r.previewCount,
+              (next, v) => (next.rules.previewCount = v)
+            ),
+          }),
+          fieldRow({
+            id: "puzzle-tspin",
+            label: t("T-spin 판정"),
+            hint: "",
+            control: pick(
+              "puzzle-tspin",
+              t("T-spin 판정"),
+              [
+                { value: "threeCorner", label: t("3-corner (Mini 포함)") },
+                { value: "none", label: t("없음") },
+              ],
+              r.tspin,
+              (next, v) => (next.rules.tspin = v)
+            ),
+          }),
+          fieldRow({
+            id: "puzzle-lock",
+            label: t("고정 방식"),
+            hint: "",
+            control: pick(
+              "puzzle-lock",
+              t("고정 방식"),
+              LOCK_TYPES.map(type => ({
+                value: type,
+                label: {
+                  moveReset: t("움직이면 리셋 (횟수 제한)"),
+                  stepReset: t("더 내려갔을 때만 리셋"),
+                  infinite: t("무제한 리셋 (인피니티)"),
+                  none: t("닿으면 다음 낙하 때 즉시 고정"),
+                }[type],
+              })),
+              r.lock.type,
+              (next, v) => (next.rules.lock = { ...next.rules.lock, type: v })
+            ),
+          }),
+          fieldRow({
+            id: "puzzle-hard-drop",
+            label: t("하드 드롭"),
+            hint: t("한 번에 바닥까지 떨어뜨리고 바로 고정"),
+            control: yesNo("puzzle-hard-drop", r.hardDrop, (next, on) => (next.rules.hardDrop = on)),
+          }),
+          fieldRow({
+            id: "puzzle-ghost",
+            label: t("고스트"),
+            hint: t("피스가 떨어질 자리를 흐리게 보여 줘요"),
+            control: yesNo("puzzle-ghost", r.ghost, (next, on) => (next.rules.ghost = on)),
+          }),
+          fieldRow({
+            id: "puzzle-irs",
+            label: t("미리 회전 (IRS)"),
+            hint: t("생성 순간 회전 키를 누르고 있으면 돌린 채로 나온다"),
+            control: yesNo("puzzle-irs", r.irs, (next, on) => (next.rules.irs = on)),
+          }),
+          fieldRow({
+            id: "puzzle-ihs",
+            label: t("미리 홀드 (IHS)"),
+            hint: holdOff ? t("홀드가 꺼져 있어 쓰지 않아요") : t("생성 순간 홀드 키를 누르고 있으면 바로 홀드"),
+            disabled: holdOff,
+            control: yesNo("puzzle-ihs", r.ihs, (next, on) => (next.rules.ihs = on), holdOff),
+          }),
+          el("p", {
+            class: "field-help",
+            text: t(
+              "생성기·점수표·지연 시간 같은 나머지 규칙은 바탕 규칙을 그대로 따라요(퍼즐에서는 거의 쓰이지 않아요)."
+            ),
+          })
+        );
+        restoreFocus(dialog, focus);
+      };
 
       const toolHint = {
         cell: t("누르거나 끌어서 칸을 채우고 지워요."),
@@ -308,7 +566,8 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
       };
 
       const refresh = () => {
-        const code = encodePuzzle({ cells, pieces });
+        const code = encodePuzzle(current());
+        renderSettings();
         trial.disabled = !code;
         // 퍼즐이 바뀌었으면 찾던 확인은 멈추고, 지난 결과는 쓰지 않는다
         if (verified && verified.code !== code) {
@@ -338,13 +597,18 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
         // 자동 확인
         const moves = solution();
         if (!moves) viewStep = null;
-        check.disabled = !code || Boolean(checking) || Boolean(verified);
+        check.disabled = !code || !canSearch(current()) || Boolean(checking) || Boolean(verified);
         stop.disabled = !checking;
         view.disabled = !moves;
         view.checked = viewStep !== null;
         prevStep.disabled = viewStep === null || viewStep === 0;
         nextStep.disabled = viewStep === null || !moves || viewStep >= moves.length - 1;
-        stepOut.textContent = moves ? `${(viewStep ?? 0) + 1} / ${moves.length}` : "- / -";
+        const step = moves && viewStep !== null ? moves[viewStep] : null;
+        stepOut.textContent = moves
+          ? step?.hold
+            ? t("{n} / {total} · 홀드 먼저", { n: (viewStep ?? 0) + 1, total: moves.length })
+            : `${(viewStep ?? 0) + 1} / ${moves.length}`
+          : "- / -";
         status.textContent = statusText(code);
         status.dataset.tone = verified?.state === "solvable" ? "ok" : verified || warnings().length ? "warn" : "";
         paintTiles();
@@ -354,13 +618,20 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
             ? t("풀 수 있는 퍼즐이에요. 링크를 공유할 수 있어요.")
             : t("풀 수 있는지 확인하거나 시험 플레이에서 풀면 링크를 공유할 수 있어요.");
       };
-      const warnings = () => puzzleWarnings(cells, pieces);
+      const warnings = () => puzzleWarnings(current());
       /** 확인 결과가 있으면 그것, 없으면 미리 알려 줄 것 */
       const statusText = code => {
         if (verified?.state === "checking") return t("풀 수 있는지 찾는 중이에요…");
         if (verified?.state === "solvable")
           return t("풀 수 있어요 · {n}수. 풀이 보기로 한 수씩 볼 수 있어요.", { n: verified.moves?.length ?? 0 });
-        if (verified?.state === "unsolvable") return t("이 피스로는 판을 비울 수 없어요.");
+        if (verified?.state === "unsolvable")
+          return settings.goal.kind === "pc"
+            ? t("이 피스로는 판을 비울 수 없어요.")
+            : t("이 피스로는 목표({goal})를 이룰 수 없어요.", { goal: goalLabel(settings.goal) });
+        if (!canSearch(current()))
+          return t(
+            "규칙대로 떨어지는 퍼즐은 손 빠르기에 따라 달라 자동으로 확인할 수 없어요. 시험 플레이로 직접 풀어 주세요."
+          );
         if (verified?.state === "exhausted")
           return t("너무 길어서 자동으로 확인하지 못했어요. 시험 플레이로 직접 풀어 주세요.");
         const found = warnings();
@@ -406,6 +677,7 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
         if (!state) return;
         cells = state.cells;
         pieces = state.pieces;
+        settings = state.settings;
         if (selected !== null && selected >= pieces.length) selected = null;
         changed();
       };
@@ -526,17 +798,10 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
       });
 
       check.addEventListener("click", () => {
-        const code = encodePuzzle({ cells, pieces });
-        if (!code || checking) return;
+        const code = encodePuzzle(current());
+        if (!code || checking || !canSearch(current())) return;
         verified = { code, state: "checking" };
-        const search = solver.run({
-          type: "solution",
-          kind: "pc",
-          count: pieces.length,
-          rotation: "srs",
-          board: solverBoard(cells),
-          pieces: [...pieces],
-        });
+        const search = solver.run(solutionTask(current()));
         checking = search;
         refresh();
         stop.focus();
@@ -576,22 +841,26 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
       });
 
       trial.addEventListener("click", () => {
-        const code = encodePuzzle({ cells, pieces });
+        const code = encodePuzzle(current());
         if (!code) return;
         dialog.close();
         onTry(code);
       });
       copy.addEventListener("click", async () => {
-        const code = encodePuzzle({ cells, pieces });
+        const code = encodePuzzle(current());
         if (!code || copy.disabled) return;
+        // 받는 쪽에 보일 확인 표시: 자동 확인으로 풀 수 있었는지, 만든 사람이 직접 풀어 봤는지
+        const checked =
+          (verified?.code === code && verified.state === "solvable" ? CHECKED_AUTO : 0) |
+          (cleared === code ? CHECKED_TRIED : 0);
         const url = new URL(location.href);
-        url.hash = `puzzle=${code}`;
+        url.hash = `puzzle=${encodePuzzle({ ...current(), checked }, { checked: true })}`;
         try {
           await navigator.clipboard.writeText(url.href);
-          if (encodePuzzle({ cells, pieces }) === code && dialog.contains(link))
+          if (encodePuzzle(current()) === code && dialog.contains(link))
             notice.textContent = t("퍼즐 링크를 복사했어요.");
         } catch {
-          if (encodePuzzle({ cells, pieces }) !== code || !dialog.open || !dialog.contains(link)) return;
+          if (encodePuzzle(current()) !== code || !dialog.open || !dialog.contains(link)) return;
           link.value = url.href;
           link.hidden = false;
           link.focus();
@@ -607,7 +876,7 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
           { class: "puzzle-editor" },
           el("p", {
             class: "field-help",
-            text: t("지금은 Modern 규칙, 홀드 없이 판 비우기 퍼즐을 만들 수 있어요."),
+            text: t("판을 칠하고 피스와 목표를 고르세요. 규칙과 중력은 아래 고급 설정에서 바꿀 수 있어요."),
           }),
           el(
             "div",
@@ -615,6 +884,7 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
             el("span", { class: "puzzle-editor-label", text: t("시작 틀") }),
             templates
           ),
+          goalRow,
           el(
             "div",
             { class: "puzzle-editor-row" },
@@ -647,9 +917,7 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
               "div",
               { class: "puzzle-editor-solution" },
               el("label", { class: "puzzle-editor-switch" }, view, el("span", { text: t("풀이 보기") })),
-              prevStep,
-              stepOut,
-              nextStep
+              el("span", { class: "puzzle-editor-step-nav" }, prevStep, stepOut, nextStep)
             )
           ),
           el(
@@ -674,6 +942,7 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
             },
             ...add
           ),
+          advanced,
           link
         ),
         notice,
