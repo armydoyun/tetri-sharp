@@ -40,6 +40,8 @@ import {
   puzzleWarnings,
   removePiece,
   shiftCells,
+  stampCells,
+  stampIndices,
   strokeValue,
   template,
   usedHeight,
@@ -60,7 +62,7 @@ import {
 /** 저절로 확인하는 퍼즐의 피스 수 한도(이보다 많으면 확인 버튼으로만) */
 const AUTO_CHECK_PIECES = 12;
 
-/** @typedef {"cell" | "row" | "garbage"} Tool */
+/** @typedef {"cell" | "row" | "garbage" | "piece"} Tool */
 /**
  * 판·피스 말고 퍼즐에 담기는 것: 목표·중력·바탕 규칙·규칙 내용·처음 홀드 피스·제목·설명
  * @typedef {{ goal: { kind: string, lines: number }, gravity: "none" | "20g" | "rules", base: "modern" | "retro" | "arcade", rules: import("../modes/custom-puzzle.js").RuleBody, holdStart: string, title: string, desc: string }} Settings
@@ -335,6 +337,12 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       const solution = () => (verified?.state === "solvable" && verified.moves) || null;
       const paintTiles = () => {
         const move = viewStep !== null ? solution()?.[viewStep] : null;
+        // 피스 도장 미리보기: 올린(또는 포커스한) 칸에 찍힐 네 칸
+        const stamp = new Set(
+          tool === "piece" && stampAt !== null && !move
+            ? (stampIndices(stampType, stampRot, stampAt, firstVisible() / WIDTH) ?? [])
+            : []
+        );
         // 풀이를 볼 때는 그 수를 놓기 전 판(40줄 중 보이는 20줄)과 놓을 칸
         const shown = move ? move.board.subarray(move.board.length - PUZZLE_CELLS) : cells;
         const ghost = new Set(
@@ -344,6 +352,8 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
           tile.setAttribute("aria-pressed", String(Boolean(shown[i])));
           if (ghost.has(i)) tile.dataset.ghost = "1";
           else delete tile.dataset.ghost;
+          if (stamp.has(i)) tile.dataset.stamp = "1";
+          else delete tile.dataset.stamp;
         });
         board.classList.toggle("is-viewing", Boolean(move));
       };
@@ -427,6 +437,38 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       const nextStep = iconButton({ icon: "arrow-right", label: t("다음 수"), id: "puzzle-solution-next" });
       const stepOut = el("output", { class: "puzzle-editor-step num", id: "puzzle-solution-step" });
 
+      // ---- 피스 도장(퍼즐 다시 보기 P9): 칠하기 도구 "피스"일 때 누른 칸에 고른 피스 모양을 찍는다 ----
+      /** @type {import("../core/pieces.js").PieceType} */
+      let stampType = "T";
+      let stampRot = 0;
+      /** 미리보기 자리(올리거나 포커스한 칸) */
+      let stampAt = /** @type {number | null} */ (null);
+      const stampPick = dropdown({
+        id: "puzzle-stamp",
+        label: t("도장 피스"),
+        value: stampType,
+        options: PIECE_TYPES.map(piece => ({ value: piece, label: piece })),
+        onChange: v => {
+          stampType = /** @type {any} */ (v);
+          stampRot = 0;
+          paintTiles();
+        },
+      });
+      const rotateStamp = () => {
+        stampRot = (stampRot + 1) % 4;
+        paintTiles();
+      };
+      const stampRotate = iconButton({ icon: "rotate-cw", label: t("도장 돌리기 (R)"), onClick: rotateStamp });
+      const doStamp = index => {
+        const at = stampIndices(stampType, stampRot, index, firstVisible() / WIDTH);
+        if (!at) {
+          notice.textContent = t("판 밖으로 나가 찍을 수 없어요. 다른 칸이나 방향을 골라 보세요.");
+          return;
+        }
+        history.record(snapshot());
+        cells = stampCells(cells, at);
+        changed();
+      };
       const tools = segmented({
         id: "puzzle-tool",
         label: t("칠하기 도구"),
@@ -434,6 +476,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
           ["cell", t("칸")],
           ["row", t("한 줄")],
           ["garbage", t("구멍 줄")],
+          ["piece", t("도장")],
         ],
         value: tool,
         onChange: v => {
@@ -798,7 +841,14 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
           /** @type {HTMLButtonElement} */ (b).disabled = Number(/** @type {HTMLElement} */ (b).dataset.value) < used;
         }
         setSegmented(heights, String(height));
-        hint.textContent = toolHint[tool];
+        hint.textContent =
+          tool === "piece"
+            ? t("누른 칸에 {piece} 모양을 찍어요. 네 칸이 다 찬 자리를 누르면 지워요. R로 돌려요.", {
+                piece: stampType,
+              })
+            : toolHint[tool];
+        stampPick.disabled = tool !== "piece";
+        stampRotate.disabled = tool !== "piece";
         // 자동 확인
         const moves = solution();
         if (!moves) viewStep = null;
@@ -920,7 +970,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       /** @type {null | { value: 0 | 1, before: Snapshot, changed: boolean, col: number, last: number }} */
       let stroke = null;
       const paintAt = index => {
-        if (!stroke || index === stroke.last) return;
+        if (!stroke || index === stroke.last || tool === "piece") return;
         stroke.last = index;
         // 구멍 줄은 처음 누른 열을 구멍으로 둔다(아래위로 끌면 같은 열에 구멍이 이어진다)
         const at = tool === "garbage" ? index - (index % WIDTH) + stroke.col : index;
@@ -950,6 +1000,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         }
         const index = Number(cell.dataset.cell);
         cell.focus({ preventScroll: true });
+        if (tool === "piece") return doStamp(index);
         stroke = {
           value: strokeValue(cells, tool, index),
           before: snapshot(),
@@ -961,9 +1012,22 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         paintAt(index);
       });
       board.addEventListener("pointermove", event => {
-        if (!stroke) return;
         const cell = cellAt(document.elementFromPoint(event.clientX, event.clientY));
+        if (tool === "piece") {
+          const at = cell && board.contains(cell) ? Number(cell.dataset.cell) : null;
+          if (at !== stampAt) {
+            stampAt = at;
+            paintTiles();
+          }
+          return;
+        }
+        if (!stroke) return;
         if (cell && board.contains(cell)) paintAt(Number(cell.dataset.cell));
+      });
+      board.addEventListener("pointerleave", () => {
+        if (stampAt === null || board.contains(document.activeElement)) return;
+        stampAt = null;
+        paintTiles();
       });
       for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) board.addEventListener(type, endStroke);
       // 키보드(Enter·Space)로 누른 칸: 칸 하나에 도구를 한 번
@@ -971,6 +1035,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         const cell = cellAt(event.target);
         if (!cell || event.detail > 0) return;
         const index = Number(cell.dataset.cell);
+        if (tool === "piece") return doStamp(index);
         stroke = {
           value: strokeValue(cells, tool, index),
           before: snapshot(),
@@ -986,9 +1051,19 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         if (!cell) return;
         focusIndex = Number(cell.dataset.cell);
         for (const tile of tiles) tile.tabIndex = tile === cell ? 0 : -1;
+        if (tool === "piece") {
+          stampAt = focusIndex;
+          paintTiles();
+        }
       });
       board.addEventListener("keydown", event => {
         const cell = cellAt(event.target);
+        // 도장은 R로 돌린다
+        if (tool === "piece" && cell && event.key.toLowerCase() === "r" && !event.ctrlKey && !event.metaKey) {
+          event.preventDefault();
+          rotateStamp();
+          return;
+        }
         const offset = { ArrowUp: -WIDTH, ArrowDown: WIDTH, ArrowLeft: -1, ArrowRight: 1 }[event.key];
         if (!cell || offset === undefined) return;
         event.preventDefault();
@@ -1163,6 +1238,12 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
                 { class: "puzzle-editor-row" },
                 el("span", { class: "puzzle-editor-label", text: t("칠하기") }),
                 tools
+              ),
+              el(
+                "div",
+                { class: "puzzle-editor-row" },
+                el("span", { class: "puzzle-editor-label", text: t("도장 피스") }),
+                el("span", { class: "puzzle-editor-stamp" }, stampPick, stampRotate)
               ),
               el(
                 "div",

@@ -74,7 +74,10 @@ export const dropdown = ({ id, label, options, value, onChange, disabled = false
   const onOutside = e => {
     if (list && !list.contains(e.target) && !trigger.contains(e.target)) close(false);
   };
+  /** 연 시각: 열기 직전의 스크롤(누른 단추를 화면에 보이게 하는 스크롤, 휴대폰의 관성 스크롤)은 조금 늦게 오므로 그건 무시한다 */
+  let openedAt = 0;
   const onViewport = e => {
+    if (performance.now() - openedAt < 150) return;
     if (list && e.target !== list && !list.contains(e.target)) close(false);
   };
 
@@ -177,6 +180,7 @@ export const dropdown = ({ id, label, options, value, onChange, disabled = false
     place();
     setActive(selectedIndex);
     list.focus({ preventScroll: true });
+    openedAt = performance.now();
     document.addEventListener("pointerdown", onOutside, true);
     window.addEventListener("scroll", onViewport, true);
     window.addEventListener("resize", onViewport);

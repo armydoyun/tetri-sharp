@@ -3191,6 +3191,33 @@ test("퍼즐 만들기: 끌어서 칠하기·구멍 줄·되돌리기·높이·�
   assert.match(await page.locator("#puzzles .dialog-foot .notice-slot").textContent(), /칸 5개가 판 밖으로/);
   await page.keyboard.press("Control+z");
   assert.deepEqual(await pressed(), [190, 191, 192, 193, 194]);
+  // 피스 도장(퍼즐 다시 보기 P9): 고른 피스 모양을 누른 칸에 찍고, R로 돌리며, 판 밖이면 찍지 않고 알린다
+  assert.ok(await page.locator("#puzzle-stamp").isDisabled(), "도장 도구가 아니면 도장 피스는 못 고른다");
+  await page.click('#puzzle-tool [data-value="piece"]');
+  await page.click("#puzzle-stamp");
+  await page.click('#puzzle-stamp-list [data-value="O"]');
+  await page.click('[data-cell="186"]');
+  assert.deepEqual(await pressed(), [186, 187, 190, 191, 192, 193, 194, 196, 197], "O는 누른 칸이 왼쪽 위");
+  await page.click('[data-cell="186"]');
+  assert.deepEqual(await pressed(), [190, 191, 192, 193, 194], "같은 자리에 다시 찍으면 지운다");
+  await page.click('[data-cell="189"]');
+  assert.match(await page.locator("#puzzles .dialog-foot .notice-slot").textContent(), /판 밖으로 나가/);
+  await page.click("#puzzle-stamp");
+  await page.click('#puzzle-stamp-list [data-value="I"]');
+  await page.focus('[data-cell="175"]');
+  await page.keyboard.press("r");
+  assert.deepEqual(
+    await page.$$eval("[data-stamp]", els => els.map(e => Number(e.dataset.cell))),
+    [165, 175, 185, 195],
+    "세운 I 미리보기"
+  );
+  await page.keyboard.press("Enter");
+  assert.equal((await pressed()).length, 9, "세운 I 네 칸");
+  await page.keyboard.press("Control+z");
+  await page.keyboard.press("Control+z");
+  await page.keyboard.press("Control+z");
+  assert.deepEqual(await pressed(), [190, 191, 192, 193, 194]);
+  await page.click('#puzzle-tool [data-value="cell"]');
   await page.keyboard.press("Control+z");
   assert.deepEqual(await pressed(), []);
   await page.keyboard.press("Control+Shift+z");

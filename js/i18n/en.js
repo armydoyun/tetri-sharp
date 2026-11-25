@@ -1142,4 +1142,11 @@ export const EN = {
   "피스가 많아 확인을 눌러야 찾아봐요.": "With this many pieces, press Check to search.",
   퍼즐로: "Puzzle",
   "이 장면으로 퍼즐 만들기": "Make a puzzle from this moment",
+  도장: "Stamp",
+  "도장 피스": "Stamp piece",
+  "도장 돌리기 (R)": "Rotate stamp (R)",
+  "판 밖으로 나가 찍을 수 없어요. 다른 칸이나 방향을 골라 보세요.":
+    "It would go off the board. Try another cell or rotation.",
+  "누른 칸에 {piece} 모양을 찍어요. 네 칸이 다 찬 자리를 누르면 지워요. R로 돌려요.":
+    "Stamps a {piece} where you press. Press where all four cells are filled to erase. R rotates.",
 };

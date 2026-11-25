@@ -23,6 +23,8 @@ import {
   sceneToPuzzle,
   shiftCells,
   solverBoard,
+  stampCells,
+  stampIndices,
   strokeValue,
   template,
   usedHeight,
@@ -127,6 +129,22 @@ test("게임 장면 → 퍼즐: 보이는 판은 채움으로, 지금 피스와 
   assert.ok(scene.holdStart);
   // 퍼즐 코드로 오갈 수 있다
   assert.ok(encodePuzzle({ cells: scene.cells, pieces: scene.pieces }));
+});
+
+test("피스 도장: 누른 칸이 모양의 가운데, 판 밖·보이는 높이 위는 거절, 다 찬 자리는 지운다(퍼즐 다시 보기 P9)", () => {
+  assert.deepEqual(stampIndices("T", 0, BOTTOM + 5), [BOTTOM - 5, BOTTOM + 4, BOTTOM + 5, BOTTOM + 6]);
+  assert.deepEqual(stampIndices("I", 0, BOTTOM + 5), [BOTTOM + 4, BOTTOM + 5, BOTTOM + 6, BOTTOM + 7]);
+  assert.equal(stampIndices("I", 1, BOTTOM + 5), null, "세운 I는 바닥 밖으로");
+  assert.equal(stampIndices("O", 0, BOTTOM + 9), null, "오른쪽 밖으로");
+  assert.equal(stampIndices("T", 0, BOTTOM - 10 * 7 + 5, 12), null, "보이는 높이(8줄) 위로");
+  const once = stampCells(new Uint8Array(PUZZLE_CELLS), stampIndices("T", 0, BOTTOM + 5));
+  assert.equal(row(once, 19), "0000111000");
+  assert.equal(row(once, 18), "0000010000");
+  assert.equal(
+    stampCells(once, stampIndices("T", 0, BOTTOM + 5)).some(Boolean),
+    false,
+    "같은 자리에 다시 찍으면 지운다"
+  );
 });
 
 test("높이: 블록이 있는 가장 높은 줄까지, 그것이 다 보이는 가장 낮은 편집 높이", () => {

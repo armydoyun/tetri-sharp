@@ -2,6 +2,7 @@
 // 판은 위에서 아래로 VISIBLE_ROWS줄 × WIDTH칸, 칸 값은 0(빔)·1(참)이다. index = row * WIDTH + col.
 import { HEIGHT, VISIBLE_ROWS, WIDTH, collides, createBoard } from "../core/board.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
+import { PIECES, cellsOf } from "../core/pieces.js";
 import { spawnOf } from "./puzzle-solver.js";
 import { PUZZLE_CELLS, MAX_PUZZLE_PIECES, normalizePuzzle, solverBoard, usedHeight } from "./custom-puzzle.js";
 
@@ -21,6 +22,37 @@ export const sceneToPuzzle = (state, count = 7) => {
       if (state.board.cells[(top + row) * state.board.width + col]) cells[row * WIDTH + col] = 1;
   const pieces = [...(state.active ? [state.active.type] : []), ...state.queue].slice(0, count).join("");
   return { cells, pieces, holdStart: state.hold ?? "" };
+};
+
+/**
+ * 피스 도장(퍼즐 다시 보기 P9): 누른 칸에 피스 모양 네 칸. 누른 칸은 모양의 가운데 칸(상자 가운데에 가장 가까운 칸)이다.
+ * 판 밖이나 보이는 높이 위로 나가면 null
+ * @param {import("../core/pieces.js").PieceType} type @param {number} rot @param {number} index @param {number} [minRow] 보이는 맨 윗줄
+ */
+export const stampIndices = (type, rot, index, minRow = 0) => {
+  const shape = cellsOf(type, rot);
+  const mid = (PIECES[type].size - 1) / 2;
+  const pivot = shape.reduce((best, c) =>
+    Math.hypot(c[0] - mid, c[1] - mid) < Math.hypot(best[0] - mid, best[1] - mid) ? c : best
+  );
+  const row = Math.floor(index / WIDTH);
+  const col = index % WIDTH;
+  const out = [];
+  for (const [x, y] of shape) {
+    const r = row + y - pivot[1];
+    const c = col + x - pivot[0];
+    if (r < minRow || r >= VISIBLE_ROWS || c < 0 || c >= WIDTH) return null;
+    out.push(r * WIDTH + c);
+  }
+  return out;
+};
+
+/** 도장 찍기: 네 칸을 채운다. 이미 네 칸이 다 차 있으면 지운다(다른 칠하기 도구처럼 누른 곳이 그 모양이면 지우기) */
+export const stampCells = (cells, indices) => {
+  const out = cells.slice();
+  const erase = indices.every(i => cells[i]);
+  for (const i of indices) out[i] = erase ? 0 : 1;
+  return out;
 };
 
 /** 편집 화면에 보이는 높이(아래에서부터 줄 수) */
