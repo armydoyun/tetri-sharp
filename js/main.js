@@ -16,13 +16,7 @@ import { decodeReplayCode, encodeReplayCode, replayLink } from "./replay/share.j
 import { createDailyUI } from "./ui/daily.js";
 import { formatScore, formatTime } from "./modes/format.js";
 import { createStore } from "./storage/store.js";
-import {
-  createRunJournal,
-  readSuspendedRun,
-  replayRunJournal,
-  runFingerprint,
-  SUSPENDED_RUN_KEY,
-} from "./storage/suspended-run.js";
+import { runFingerprint } from "./storage/suspended-run.js";
 import { loadSettings, sanitizeSettings, saveSettings, toEngineHandling } from "./storage/settings.js";
 import { createRecords } from "./storage/records.js";
 import { createSettingsUI } from "./ui/settings.js";
@@ -62,6 +56,7 @@ import { FINESSE_LESSONS } from "./modes/finesse-lessons.js";
 import { createFinesseTracker } from "./modes/finesse.js";
 import { createReplayPlayer } from "./app/replay-player.js";
 import { createScenePractice } from "./app/scene-practice.js";
+import { createRunSaver } from "./app/run-saver.js";
 import { ROTATIONS } from "./rules/rotation/index.js";
 import { STYLES, WIN, settleBattleFrame, versusMode, versusStatKey } from "./modes/versus.js";
 import { createBot } from "./ai/bot.js";
@@ -235,101 +230,87 @@ let acc = 0;
 let last = performance.now();
 
 // ---- 이어서 하기 ----
-let runJournal = null;
-let savedRunId = null;
-let lastSavedStep = -1;
-let restoringRun = false;
-const continueRun = /** @type {HTMLButtonElement} */ ($("continue-run"));
-const savedRun = () => readSuspendedRun(store.get(SUSPENDED_RUN_KEY, null));
-const getRunMode = entry => {
-  if (entry.mode === "custom-puzzle") {
-    const puzzle = decodePuzzle(entry.puzzle);
-    return puzzle
-      ? { ...customPuzzleMode(puzzle), puzzleCode: entry.puzzle, trialCode: entry.trial ? entry.puzzle : null }
-      : null;
-  }
-  const found =
-    [INTRO_LESSONS, BATTLE_LESSONS, BUILD_LESSONS, DOWNSTACK_LESSONS, FINESSE_LESSONS]
-      .flat()
-      .find(item => item.id === entry.mode) ?? findMode(entry.mode);
-  return found.id === entry.mode ? found : null;
-};
-const renderContinue = () => {
-  const entry = savedRun();
-  const m = entry && getRunMode(entry);
-  continueRun.hidden = !m;
-  if (m)
-    $("continue-run-info").textContent = t("{mode} · {time} · {lines}줄", {
-      mode: m.name,
-      time: formatTime(entry.frame),
-      lines: entry.lines,
-    });
-};
-const beginJournal = (seed, target, scene = null) => {
-  if (restoringRun) return;
-  savedRunId = savedRun()?.id ?? null;
-  lastSavedStep = -1;
-  runJournal = createRunJournal({
-    id: Array.from(crypto.getRandomValues(new Uint32Array(4))).join("-"),
-    mode: mode.id,
-    seed,
-    rules,
-    handling: settings.handling,
-    name: runPlayerName,
-    target,
-    puzzle: mode.puzzleCode,
-    trial: Boolean(mode.trialCode),
-    scene,
-    resultPbSplits,
-    pbSplits,
-  });
-};
-const saveRun = (force = true) => {
-  if (restoringRun || !runJournal || !game || game.state.over || sceneView.current?.ended) return;
-  const entry = runJournal.entry;
-  if (!force && entry.steps - lastSavedStep < SAVE_INTERVAL) return;
-  const current = savedRun();
-  if ((current?.id ?? null) !== savedRunId) {
-    lastSavedStep = entry.steps;
-    if (screen === "paused") $("resume-save-status").textContent = t("다른 창에서 저장된 판이 바뀌었어요.");
-    return;
-  }
-  const snapshot = {
-    ...entry,
-    frame: game.state.frame,
-    lines: game.state.stats.lines,
-    fingerprint: runFingerprint(game, sceneView.current ? null : (versus?.cpu ?? race?.player.game)),
-  };
-  if (store.set(SUSPENDED_RUN_KEY, snapshot)) {
-    savedRunId = entry.id;
-    lastSavedStep = entry.steps;
-    if (screen === "paused") $("resume-save-status").textContent = t("창을 닫아도 이 판은 이 기기에 남아요.");
-  } else {
-    // 재시도 간격을 유지하고, 일시정지·창 닫기 때는 다시 시도한다.
-    lastSavedStep = entry.steps;
-    if (screen === "paused")
-      $("resume-save-status").textContent = t("저장 공간을 확인해 주세요. 이번 진행을 저장하지 못했어요.");
-  }
-};
-const clearRun = () => {
-  if (runJournal && savedRun()?.id === runJournal.entry.id) store.set(SUSPENDED_RUN_KEY, null);
-  runJournal = null;
-};
-/** 이어서 할 판이 저장돼 있는데 다른 판을 시작하려 하는가(그러면 먼저 묻는다) */
-const replacesSavedRun = () => {
-  const current = savedRun();
-  return Boolean(current) && !(runJournal && current.id === savedRunId);
-};
-/** 저장된 판을 버릴지 앱 안의 확인 대화상자로 묻고, 그러자고 하면 then을 부른다 */
-const confirmReplaceRun = then =>
-  ask({
-    title: t("저장된 판을 지울까요?"),
-    message: t("이어서 할 수 있게 저장해 둔 판이 있어요. 새 판을 시작하면 그 판은 지워져요."),
-    okLabel: t("지우고 새 판 시작"),
-    okIcon: "play",
-  }).then(ok => {
-    if (ok) then();
-  });
+/** 이어서 하기(js/app/run-saver.js): 기록·저장·되살리기. 판을 시작하고 진행하는 일은 아래 hooks가 맡는다 */
+const runs = createRunSaver({
+  store,
+  findMode,
+  lessons: [INTRO_LESSONS, BATTLE_LESSONS, BUILD_LESSONS, DOWNSTACK_LESSONS, FINESSE_LESSONS],
+  // ask는 아래에서 정의된다: 부를 때 찾는다
+  ask: options => ask(options),
+  saveInterval: SAVE_INTERVAL,
+  live: {
+    journalInfo: () => ({
+      mode,
+      rules,
+      handling: settings.handling,
+      name: runPlayerName,
+      resultPbSplits,
+      pbSplits,
+    }),
+    game: () => game,
+    sceneEnded: () => Boolean(sceneView.current?.ended),
+    fingerprint: () => runFingerprint(game, sceneView.current ? null : (versus?.cpu ?? race?.player.game)),
+    paused: () => screen === "paused",
+  },
+  hooks: {
+    canRestore: () => screen === "menu",
+    /** 저장된 판과 같은 시드·규칙으로 판(또는 장면 연습)을 연다 */
+    prepare(entry, m, handling) {
+      if (entry.scene) {
+        const source = sanitizeReplay(entry.scene.source, findMode);
+        if (!source || source.mode !== m.id) throw new Error("scene");
+        replayView.start(source, "menu", "", true);
+        replayView.seek(entry.scene.returnFrame, true);
+        const { split, target, rescue } = entry.scene;
+        sceneView.enter(split, target, rescue, { ...entry, handling });
+        if (!sceneView.current) throw new Error("scene");
+      } else {
+        const savedRules =
+          m.puzzle || isGuidedPractice(m) ? m.rules : (PRESETS[entry.rules.id] ?? makeCustomRules(entry.rules));
+        const replay = entry.target && sanitizeReplay(entry.target.replay, findMode);
+        if (entry.target && (!replay || replay.mode !== m.id)) throw new Error("race");
+        start(m, savedRules, replay ? { ...entry.target, replay } : null, entry.seed, { ...entry, handling });
+      }
+      countdownEl.hidden = false;
+      countdownEl.dataset.phase = "ready";
+      $("countdown-label").textContent = t("저장된 판을 불러오는 중…");
+    },
+    applyAction(kind, value) {
+      if (kind === "handling") applyRunHandling(sanitizeSettings({ handling: value }).handling);
+      if (kind === "undo" && !undo.undo(game.state)) throw new Error("undo");
+      // 퍼즐의 첫 수 보기는 판을 바꾸지 않는 표시라 다시 할 것이 없다(연습의 힌트만 단계가 남는다)
+      if (kind === "hint" && !mode.puzzle) applyLessonHint();
+    },
+    applyInput(held, pressed) {
+      advanceRun(held, pressed, true);
+      if (game.state.over || sceneView.current?.ended) throw new Error("finished");
+    },
+    adopted(m) {
+      if (m.trialCode) puzzleEditor.load(m.trialCode);
+    },
+    failed() {
+      if (sceneView.current) sceneView.exit();
+      replayView.stop();
+      toMenu();
+      countdownEl.hidden = true;
+      showMenuNotice(t("저장된 판을 이어서 할 수 없어요."));
+    },
+    /** 되살린 뒤: 화면 시계를 새로 맞추고 카운트다운부터 */
+    restored() {
+      if (race) updateRaceProgress();
+      if (sceneView.current?.split) sceneView.updateSplitProgress(game.state);
+      renderer.clearEffects();
+      acc = 0;
+      last = performance.now();
+      countdown = COUNTDOWN_FRAMES[settings.access.countdown] ?? READY_FRAMES;
+      countdownEl.hidden = !countdown;
+      $("countdown-label").textContent = t("준비");
+      setScreen(countdown ? "countdown" : "play");
+      $("pause-game").focus({ preventScroll: true });
+      runs.save();
+    },
+  },
+});
 
 // ---- 표시 도우미 ----
 
@@ -697,7 +678,7 @@ const toMenu = (initial = false, keepFocus = false) => {
   setScreen("menu");
   countdownEl.hidden = true;
   renderMenu();
-  renderContinue();
+  runs.renderContinue();
   /** @type {HTMLButtonElement} */ ($("watch-last")).disabled = !replays.last();
   showPanel("menu");
   // 이어 할 판이 있으면 Enter로 복원하고, 없으면 마지막 모드에 포커스를 둔다.
@@ -705,7 +686,7 @@ const toMenu = (initial = false, keepFocus = false) => {
   // 처음 열 때는 포커스만 두고(Enter로 바로 시작) 테두리는 그리지 않는다 — "골라 둔 모드"처럼 보이지 않게.
   // 게임에서 돌아올 때는 키보드로 오가는 중일 수 있으니 브라우저가 정한 대로 보인다.
   if (!keepFocus)
-    (continueRun.hidden ? defaultMode : continueRun)?.focus(
+    (runs.button.hidden ? defaultMode : runs.button)?.focus(
       /** @type {FocusOptions} */ ({ preventScroll: initial, ...(initial ? { focusVisible: false } : {}) })
     );
 };
@@ -726,16 +707,16 @@ const start = (
   restored = null,
   confirmed = false
 ) => {
-  if (restoringRun) {
+  if (runs.restoring) {
     if (!restored) return;
-  } else if (!confirmed && replacesSavedRun()) {
-    confirmReplaceRun(() => start(m, selectedRules, target, retrySeed, restored, true));
+  } else if (!confirmed && runs.replacesSaved()) {
+    runs.confirmReplace(() => start(m, selectedRules, target, retrySeed, restored, true));
     return;
   }
   confirming = null;
   if (screen === "replay") replayView.stop();
   mode = m;
-  if (!restoringRun && !m.practice && m.id !== "custom-puzzle") store.set("lastMode", m.id);
+  if (!runs.restoring && !m.practice && m.id !== "custom-puzzle") store.set("lastMode", m.id);
   rules = selectedRules;
   runPlayerName = restored?.name ?? records.playerName;
   const seed = target?.replay.seed ?? retrySeed ?? m.fixedSeed ?? (Math.random() * 2 ** 32) >>> 0;
@@ -792,9 +773,9 @@ const start = (
   countdownEl.dataset.phase = "ready";
   $("countdown-label").textContent = t("준비");
   // 카운트다운 "없음": 바로 시작
-  if (restoringRun) return;
-  beginJournal(seed, target);
-  saveRun();
+  if (runs.restoring) return;
+  runs.begin(seed, target);
+  runs.save();
   if (countdown <= 0) {
     countdownEl.hidden = true;
     setScreen("play");
@@ -806,13 +787,13 @@ const start = (
 let pausedFrom = /** @type {"play" | "countdown"} */ ("play");
 
 const pause = () => {
-  if (restoringRun) return;
+  if (runs.restoring) return;
   if (screen !== "play" && screen !== "countdown") return;
   pausedFrom = screen;
   setScreen("paused");
   showPanel("pause");
   $("resume-save-status").textContent = "";
-  saveRun();
+  runs.save();
 };
 
 $("pause-game").addEventListener("click", pause);
@@ -953,7 +934,7 @@ const acceptConfirm = () => {
   const kept = keepAbandonedAchievements();
   if (kind === "restart") start(mode, rules, race?.target);
   else {
-    clearRun();
+    runs.clear();
     if (sceneView.current) {
       sceneView.exit();
       replayView.stop();
@@ -1200,7 +1181,7 @@ const renderResultStats = rows =>
 const finish = () => {
   if (!game) return;
   const state = game.state;
-  clearRun();
+  runs.clear();
   setScreen("results");
   countdownEl.hidden = true;
   if (mode.id === "sprint40" && state.stats.pieces > 0)
@@ -1400,8 +1381,8 @@ const settingsUI = createSettingsUI({
     applyScheme();
     if (game && screen !== "replay") {
       applyRunHandling(settings.handling);
-      runJournal?.action("handling", settings.handling);
-      saveRun();
+      runs.journal?.action("handling", settings.handling);
+      runs.save();
     }
     renderKeyHelp();
   },
@@ -1590,7 +1571,7 @@ downstackHint.addEventListener("click", event => {
   if (!hasHintControls(mode) || screen !== "play" || !game?.state.active) return;
   if (mode.puzzle) togglePuzzleHint();
   else applyLessonHint();
-  runJournal?.action("hint");
+  runs.journal?.action("hint");
   if (event.detail > 0) downstackHint.blur();
 });
 downstackRetry.addEventListener("click", () => {
@@ -1712,7 +1693,7 @@ $("records").addEventListener("close", () => {
 });
 
 const handleSystem = (action, code = "") => {
-  if (restoringRun) return;
+  if (runs.restoring) return;
   if (anyDialogOpen()) return;
   if (sceneView.current) {
     if (action === "restart") sceneView.reset();
@@ -1790,7 +1771,7 @@ const undoPiece = () => {
     say(t("더 되돌릴 수 없어요"));
     return;
   }
-  runJournal?.action("undo");
+  runs.journal?.action("undo");
   renderer.clearEffects();
   announceText([t("되돌리기")]);
   say(t("한 피스 되돌렸어요"));
@@ -1930,12 +1911,12 @@ for (const btn of document.querySelectorAll("[data-action]")) {
 window.addEventListener("blur", pause);
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) return;
-  if (screen === "paused") saveRun();
+  if (screen === "paused") runs.save();
   else pause();
 });
-window.addEventListener("pagehide", () => saveRun());
+window.addEventListener("pagehide", () => runs.save());
 window.addEventListener("storage", () => {
-  if (screen === "menu") renderContinue();
+  if (screen === "menu") runs.renderContinue();
 });
 
 // ---- 리플레이: 녹화와 재생 화면(재생 화면은 js/app/replay-player.js) ----
@@ -1981,7 +1962,7 @@ const session = {
   },
   /** 이어서 하기로 판을 되살리는 중 */
   get restoring() {
-    return restoringRun;
+    return runs.restoring;
   },
   /** 쌓인 프레임 시간을 비운다(화면이 바뀐 뒤 밀린 프레임을 한꺼번에 돌리지 않게) */
   resetClock() {
@@ -2028,9 +2009,9 @@ const sceneView = createScenePractice({
   input: { keyboard, touch, gestures },
   getSettings: () => settings,
   getLastReplay: () => lastReplay,
-  journal: { begin: beginJournal, save: () => saveRun(), clear: clearRun },
-  replacesSavedRun,
-  confirmReplaceRun,
+  journal: { begin: runs.begin, save: () => runs.save(), clear: runs.clear },
+  replacesSavedRun: runs.replacesSaved,
+  confirmReplaceRun: runs.confirmReplace,
   showPanel,
   setScreen,
   showModeHud,
@@ -2171,88 +2152,6 @@ const advanceRun = (held, pressed, reconstructing = false) => {
   if (events.some(e => e.type === "gameOver" || e.type === "finish")) finish();
 };
 
-const restoreRun = async () => {
-  if (screen !== "menu" || restoringRun) return;
-  const entry = savedRun();
-  const m = entry && getRunMode(entry);
-  if (!m) return;
-  const initialHandling = sanitizeSettings({ handling: entry.handling }).handling;
-  restoringRun = true;
-  document.body.inert = true;
-  let success = false;
-  try {
-    if (entry.scene) {
-      const source = sanitizeReplay(entry.scene.source, findMode);
-      if (!source || source.mode !== m.id) throw new Error("scene");
-      replayView.start(source, "menu", "", true);
-      replayView.seek(entry.scene.returnFrame, true);
-      const { split, target, rescue } = entry.scene;
-      sceneView.enter(split, target, rescue, { ...entry, handling: initialHandling });
-      if (!sceneView.current) throw new Error("scene");
-    } else {
-      const savedRules =
-        m.puzzle || isGuidedPractice(m) ? m.rules : (PRESETS[entry.rules.id] ?? makeCustomRules(entry.rules));
-      const replay = entry.target && sanitizeReplay(entry.target.replay, findMode);
-      if (entry.target && (!replay || replay.mode !== m.id)) throw new Error("race");
-      start(m, savedRules, replay ? { ...entry.target, replay } : null, entry.seed, {
-        ...entry,
-        handling: initialHandling,
-      });
-    }
-    countdownEl.hidden = false;
-    countdownEl.dataset.phase = "ready";
-    $("countdown-label").textContent = t("저장된 판을 불러오는 중…");
-    await replayRunJournal(entry, {
-      applyAction(kind, value) {
-        if (kind === "handling") applyRunHandling(sanitizeSettings({ handling: value }).handling);
-        if (kind === "undo" && !undo.undo(game.state)) throw new Error("undo");
-        // 퍼즐의 첫 수 보기는 판을 바꾸지 않는 표시라 다시 할 것이 없다(연습의 힌트만 단계가 남는다)
-        if (kind === "hint" && !mode.puzzle) applyLessonHint();
-      },
-      applyInput(held, pressed) {
-        advanceRun(held, pressed, true);
-        if (game.state.over || sceneView.current?.ended) throw new Error("finished");
-      },
-    });
-    if (
-      savedRun()?.id !== entry.id ||
-      runFingerprint(game, sceneView.current ? null : (versus?.cpu ?? race?.player.game)) !== entry.fingerprint
-    )
-      throw new Error("checkpoint");
-    if (m.trialCode) puzzleEditor.load(m.trialCode);
-    savedRunId = entry.id;
-    runJournal = createRunJournal(null, {
-      ...entry,
-      id: Array.from(crypto.getRandomValues(new Uint32Array(4))).join("-"),
-    });
-    lastSavedStep = -1;
-    success = true;
-  } catch {
-    if (sceneView.current) sceneView.exit();
-    replayView.stop();
-    toMenu();
-    countdownEl.hidden = true;
-    showMenuNotice(t("저장된 판을 이어서 할 수 없어요."));
-  } finally {
-    document.body.inert = false;
-    restoringRun = false;
-  }
-  if (!success) return;
-  if (race) updateRaceProgress();
-  if (sceneView.current?.split) sceneView.updateSplitProgress(game.state);
-  renderer.clearEffects();
-  acc = 0;
-  last = performance.now();
-  countdown = COUNTDOWN_FRAMES[settings.access.countdown] ?? READY_FRAMES;
-  countdownEl.hidden = !countdown;
-  $("countdown-label").textContent = t("준비");
-  setScreen(countdown ? "countdown" : "play");
-  $("pause-game").focus({ preventScroll: true });
-  saveRun();
-};
-
-continueRun.addEventListener("click", restoreRun);
-
 const tick = () => {
   if (screen === "countdown") {
     keyboard.takePressed(); // 카운트다운 중 누른 키는 버린다(누르고 있는 키는 시작하자마자 반영).
@@ -2274,14 +2173,14 @@ const tick = () => {
   const allowed = sceneView.current?.target ? ~(BTN.HOLD | BTN.SOFT) : mode.lesson ? ~BTN.SOFT : -1;
   const held = (keyboard.held | pad.held | touch.held | gestures.held) & allowed;
   const pressed = (keyboard.takePressed() | touch.takePressed() | gestures.takePressed()) & allowed;
-  runJournal?.input(held, pressed);
+  runs.journal?.input(held, pressed);
   advanceRun(held, pressed);
-  saveRun(false);
+  runs.save(false);
 };
 
 let padCount = 0;
 const loop = now => {
-  if (restoringRun) {
+  if (runs.restoring) {
     last = now;
     requestAnimationFrame(loop);
 
