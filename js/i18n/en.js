@@ -1137,4 +1137,7 @@ export const EN = {
   "복제해서 편집": "Duplicate and edit",
   "칸 {n}개가 판 밖으로 나가 지워졌어요. 되돌리기로 돌아갈 수 있어요.":
     "{n} cells went off the board and were removed. Undo brings them back.",
+  "고치기를 멈추면 저절로 풀 수 있는지 찾아봐요.":
+    "When you stop editing, it checks by itself whether it can be solved.",
+  "피스가 많아 확인을 눌러야 찾아봐요.": "With this many pieces, press Check to search.",
 };

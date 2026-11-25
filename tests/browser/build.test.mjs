@@ -3274,9 +3274,16 @@ test("퍼즐 만들기: 끌어서 칠하기·구멍 줄·되돌리기·높이·�
   await context.close();
 });
 
-test("퍼즐 만들기 자동 확인: 풀 수 있으면 시험 없이 공유, 풀이를 한 수씩 보고, 미리 알려 주고, 긴 확인은 멈출 수 있다", async () => {
+test("퍼즐 만들기 자동 확인: 고치기를 멈추면 저절로 확인하고, 풀 수 있으면 시험 없이 공유, 풀이를 한 수씩 보고, 미리 알려 주고, 긴 확인은 멈출 수 있다", async () => {
   const { context, page, errors } = await openPage();
   const status = () => text(page, "puzzle-status");
+  /** 저절로 확인(퍼즐 다시 보기 P3)이 끝나 결과가 나올 때까지 */
+  const autoChecked = pattern =>
+    page.waitForFunction(
+      source => new RegExp(source).test(document.getElementById("puzzle-status")?.textContent ?? ""),
+      pattern.source,
+      { timeout: 20000 }
+    );
   const settled = () =>
     page.waitForFunction(() => !document.getElementById("puzzle-status")?.textContent?.includes("찾는 중"), null, {
       timeout: 20000,
@@ -3290,9 +3297,8 @@ test("퍼즐 만들기 자동 확인: 풀 수 있으면 시험 없이 공유, �
   await pickTemplate(page, `stage-${stage.number}`);
   assert.ok(await page.locator("#puzzle-copy").isDisabled());
   assert.ok(await page.locator("#puzzle-solution-view").isDisabled());
-  await page.click("#puzzle-check");
-  await settled();
-  assert.match(await status(), /^풀 수 있어요 · \d수/);
+  assert.equal(await status(), "고치기를 멈추면 저절로 풀 수 있는지 찾아봐요.");
+  await autoChecked(/^풀 수 있어요 · \d수/);
   assert.ok(await page.locator("#puzzle-copy").isEnabled());
   assert.equal(await text(page, "puzzles .notice-slot"), "풀 수 있는 퍼즐이에요. 링크를 공유할 수 있어요.");
   assert.ok(await page.locator("#puzzle-check").isDisabled(), "같은 퍼즐은 다시 확인하지 않는다");
@@ -3311,7 +3317,7 @@ test("퍼즐 만들기 자동 확인: 풀 수 있으면 시험 없이 공유, �
   // 바꾸면 확인은 지워진다
   await page.click('#puzzles [data-piece="O"]');
   assert.ok(await page.locator("#puzzle-copy").isDisabled());
-  assert.equal(await status(), "확인을 누르면 풀 수 있는지 찾아봐요.");
+  assert.equal(await status(), "고치기를 멈추면 저절로 풀 수 있는지 찾아봐요.");
 
   // 미리 알려 주기: 홀수 칸이면 판을 비울 수 없다
   await pickTemplate(page, "empty");
@@ -3322,11 +3328,13 @@ test("퍼즐 만들기 자동 확인: 풀 수 있으면 시험 없이 공유, �
   await settled();
   assert.equal(await status(), "이 피스로는 판을 비울 수 없어요.");
 
-  // 오래 걸리는 확인은 멈출 수 있고, 그동안 화면은 움직인다
+  // 피스가 많으면(12개 넘게) 저절로 확인하지 않는다. 오래 걸리는 확인은 멈출 수 있고, 그동안 화면은 움직인다
   await pickTemplate(page, "empty");
   await page.click('#puzzle-height [data-value="12"]');
   for (let r = 10; r < 20; r++) for (let c = 4; c < 10; c++) await page.click(`[data-cell="${r * 10 + c}"]`);
-  for (const piece of "TSZOJLITSZ") await page.click(`#puzzles [data-piece="${piece}"]`);
+  for (const piece of "TSZOJLITSZOJLIT") await page.click(`#puzzles [data-piece="${piece}"]`);
+  await page.waitForTimeout(900);
+  assert.equal(await status(), "피스가 많아 확인을 눌러야 찾아봐요.");
   await page.click("#puzzle-check");
   assert.equal(await status(), "풀 수 있는지 찾는 중이에요…");
   await page.click('#puzzle-tool [data-value="row"]');
@@ -3348,10 +3356,6 @@ test("퍼즐 만들기 목표·고급 설정: 목표와 규칙이 링크로 가�
     Object.defineProperty(navigator, "clipboard", { value: undefined });
   });
   const status = () => text(page, "puzzle-status");
-  const settled = () =>
-    page.waitForFunction(() => !document.getElementById("puzzle-status")?.textContent?.includes("찾는 중"), null, {
-      timeout: 20000,
-    });
   const pick = async (id, value) => {
     await page.locator(`#${id}`).scrollIntoViewIfNeeded();
     await page.waitForTimeout(50);
@@ -3384,11 +3388,14 @@ test("퍼즐 만들기 목표·고급 설정: 목표와 규칙이 링크로 가�
   assert.equal(await text(page, "puzzles .puzzle-editor-advanced-summary"), "홀드(처음 I)");
   await page.click("#puzzle-redo");
 
-  // 자동 확인 → 링크 복사(자동 복사가 막혀 링크 칸에 나온다)
-  await page.locator("#puzzle-check").scrollIntoViewIfNeeded();
-  await page.click("#puzzle-check");
-  await settled();
-  assert.match(await status(), /^풀 수 있어요/);
+  // 저절로 확인 → 링크 복사(자동 복사가 막혀 링크 칸에 나온다)
+  await page.waitForFunction(
+    () => /^풀 수 있어요/.test(document.getElementById("puzzle-status")?.textContent ?? ""),
+    null,
+    {
+      timeout: 20000,
+    }
+  );
   await page.click("#puzzle-copy");
   const link = await page.locator("#custom-puzzle-link").inputValue();
   assert.match(link, /#puzzle=2\.od_g2_h1_pI_e1\./, link);

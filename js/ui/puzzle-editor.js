@@ -57,6 +57,9 @@ import {
   toggle,
 } from "./components.js";
 
+/** 저절로 확인하는 퍼즐의 피스 수 한도(이보다 많으면 확인 버튼으로만) */
+const AUTO_CHECK_PIECES = 12;
+
 /** @typedef {"cell" | "row" | "garbage"} Tool */
 /**
  * 판·피스 말고 퍼즐에 담기는 것: 목표·중력·바탕 규칙·규칙 내용·처음 홀드 피스·제목·설명
@@ -252,6 +255,9 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
     },
     open() {
       const notice = el("p", { class: "notice-slot", role: "status" });
+      let autoTimer = 0;
+      /** 사용자가 멈춘 퍼즐(열쇠): 다시 고치기 전까지 저절로 확인하지 않는다 */
+      let autoSkip = /** @type {string | null} */ (null);
       const trial = button({ id: "puzzle-trial", label: t("시험 플레이") });
       const copy = button({ id: "puzzle-copy", label: t("링크 복사"), icon: "link" });
       const link = textInput({
@@ -766,6 +772,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
             : `${(viewStep ?? 0) + 1} / ${moves.length}`
           : "- / -";
         status.textContent = statusText(code);
+        scheduleAutoCheck();
         status.dataset.tone = verified?.state === "solvable" ? "ok" : verified || warnings().length ? "warn" : "";
         paintTiles();
         notice.textContent = tried
@@ -775,6 +782,24 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
             : t("풀 수 있는지 확인하거나 시험 플레이에서 풀면 링크를 공유할 수 있어요.");
       };
       const warnings = () => puzzleWarnings(current());
+      /**
+       * 저절로 확인(퍼즐 다시 보기 P3): 고치기를 멈추고 0.6초 뒤 Worker로 찾는다. 다시 고치면 찾던 것은 멈춘다(refresh).
+       * 피스가 많으면(12개 넘게) 오래 걸릴 수 있어 버튼으로만. 미리 알려 줄 것이 있거나 멈춘 퍼즐도 하지 않는다
+       */
+      const autoCheckable = () =>
+        pieces.length <= AUTO_CHECK_PIECES &&
+        canSearch(current()) &&
+        !warnings().length &&
+        !checking &&
+        keyNow() !== autoSkip &&
+        !(verified && verified.code === keyNow());
+      const scheduleAutoCheck = () => {
+        clearTimeout(autoTimer);
+        if (!keyNow() || !autoCheckable()) return;
+        autoTimer = setTimeout(() => {
+          if (dialog.open && dialog.contains(status) && autoCheckable()) runCheck(true);
+        }, 600);
+      };
       /** 확인 결과가 있으면 그것, 없으면 미리 알려 줄 것 */
       const statusText = code => {
         if (verified?.state === "checking") return t("풀 수 있는지 찾는 중이에요…");
@@ -801,7 +826,11 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
                   : t("첫 피스가 나오는 자리 바로 아래가 막혀 있어 판으로 내려오지 못해요.")
             )
             .join(" ");
-        return code ? t("확인을 누르면 풀 수 있는지 찾아봐요.") : "";
+        if (!code) return "";
+        if (keyNow() === autoSkip) return t("확인을 누르면 풀 수 있는지 찾아봐요.");
+        return pieces.length <= AUTO_CHECK_PIECES
+          ? t("고치기를 멈추면 저절로 풀 수 있는지 찾아봐요.")
+          : t("피스가 많아 확인을 눌러야 찾아봐요.");
       };
       const changed = () => {
         // 이름·설명만 고쳤으면 직접 풀어 본 표시는 그대로
@@ -979,14 +1008,15 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         }
       });
 
-      check.addEventListener("click", () => {
+      /** 풀 수 있는지 찾는다. auto: 고치기를 멈추면 저절로(포커스는 옮기지 않는다) */
+      const runCheck = (auto = false) => {
         const code = keyNow();
         if (!code || checking || !canSearch(current())) return;
         verified = { code, state: "checking" };
         const search = solver.run(solutionTask(current()));
         checking = search;
         refresh();
-        stop.focus();
+        if (!auto) stop.focus();
         search.promise.then(result => {
           if (checking !== search) return;
           checking = null;
@@ -996,12 +1026,17 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
               ? { code, state: "solvable", moves: result.moves }
               : { code, state: result ? "exhausted" : "unsolvable" };
           if (dialog.contains(status)) {
+            // 저절로 확인한 것이면 포커스는 사용자가 두던 곳에 그대로
+            const keepFocus = auto && document.activeElement !== stop;
             refresh();
-            (view.disabled ? check : view).focus();
+            if (!keepFocus) (view.disabled ? check : view).focus();
           }
         });
-      });
+      };
+      check.addEventListener("click", () => runCheck());
       stop.addEventListener("click", () => {
+        // 멈춘 퍼즐은 다시 고치기 전까지 저절로 확인하지 않는다
+        autoSkip = keyNow();
         stopChecking();
         refresh();
         check.focus();
