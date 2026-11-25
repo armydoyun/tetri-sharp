@@ -9,9 +9,11 @@ import {
   canSearch,
   decodePuzzle,
   goalLabel,
+  puzzleLink,
   ruleSummary,
 } from "../modes/custom-puzzle.js";
-import { formatTime } from "../modes/format.js";
+import { formatDate, formatTime } from "../modes/format.js";
+import { copyText, revealForCopy } from "./clipboard.js";
 import { MAX_MADE, MAX_RECEIVED } from "../storage/custom-puzzles.js";
 import { el, fillDialog } from "./dom.js";
 import { button, confirmButton, iconButton, menuRow, tabBar, textInput } from "./components.js";
@@ -27,12 +29,6 @@ const customPuzzleName = p =>
 /** 확인 표시 글 @param {number} checked */
 const checkedLabel = checked =>
   checked & CHECKED_TRIED ? t("직접 풀어 봄") : checked & CHECKED_AUTO ? t("자동 확인") : t("확인 안 됨");
-
-/** 날짜 짧게(이 기기 시간대) @param {string} iso */
-const shortDate = iso => {
-  const d = new Date(iso);
-  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
-};
 
 /**
  * @param {{
@@ -93,7 +89,7 @@ export const createPuzzleUI = ({
       menuRow({
         title: customPuzzleName(p),
         desc: [goalLabel(p.goal), ruleSummary(p), checkedLabel(p.checked)].filter(Boolean).join(" · "),
-        meta: shortDate(item.updated),
+        meta: formatDate(item.updated),
         onClick: () => {
           dialog.close();
           onEdit(item.id);
@@ -184,17 +180,10 @@ export const createPuzzleUI = ({
   };
 
   const copyLink = async code => {
-    const url = new URL(location.href);
-    url.hash = `puzzle=${code}`;
-    try {
-      await navigator.clipboard.writeText(url.href);
-      notice.textContent = t("퍼즐 링크를 복사했어요.");
-    } catch {
-      if (!dialog.open) return;
-      link.value = url.href;
-      link.hidden = false;
-      link.focus();
-      link.select();
+    const url = puzzleLink(code, location.href);
+    if (await copyText(url)) notice.textContent = t("퍼즐 링크를 복사했어요.");
+    else if (dialog.open) {
+      revealForCopy(link, url);
       notice.textContent = t("자동 복사가 막혔어요. 선택된 링크를 직접 복사해 주세요.");
     }
   };

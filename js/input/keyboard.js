@@ -2,6 +2,7 @@
 // pressed는 다음 프레임에 읽어 갈 때까지 모아 둔다(프레임 사이에 눌렀다 뗀 짧은 입력도 놓치지 않게).
 // 같은 키가 한 프레임 안에 두 번 눌리면 두 번째는 다음 프레임으로 넘긴다(빠른 연타가 하나로 합쳐지지 않게).
 // OS 키 반복(e.repeat)은 무시한다 — DAS/ARR은 엔진이 직접 센다.
+import { createPressQueue } from "./press-queue.js";
 
 /**
  * @param {{
@@ -11,8 +12,7 @@
  */
 export const createKeyboard = ({ getBindings, onSystem }) => {
   let held = 0;
-  /** 프레임별로 넘겨줄 pressed 비트마스크 대기열. 맨 앞이 다음 프레임 몫. */
-  let pending = [0];
+  const pending = createPressQueue();
   /** 같은 버튼에 키가 여러 개일 때(↑·X) 하나를 떼도 다른 키가 눌려 있으면 유지한다. */
   const down = new Set();
   let enabled = false;
@@ -31,9 +31,7 @@ export const createKeyboard = ({ getBindings, onSystem }) => {
       if (e.repeat) return;
       down.add(e.code);
       recompute();
-      const last = pending.length - 1;
-      if (pending[last] & bit) pending.push(bit);
-      else pending[last] |= bit;
+      pending.press(bit);
       return;
     }
     const action = system[e.code];
@@ -56,7 +54,7 @@ export const createKeyboard = ({ getBindings, onSystem }) => {
   const releaseAll = () => {
     down.clear();
     held = 0;
-    pending = [0];
+    pending.clear();
   };
 
   return {
@@ -69,11 +67,7 @@ export const createKeyboard = ({ getBindings, onSystem }) => {
       enabled = value;
     },
     /** 모아 둔 pressed를 꺼내고 비운다. */
-    takePressed() {
-      const p = pending.shift() || 0;
-      if (!pending.length) pending.push(0);
-      return p;
-    },
+    takePressed: pending.take,
     /** 창이 포커스를 잃으면 keyup이 오지 않으므로 전부 뗀 것으로 친다. */
     releaseAll,
   };

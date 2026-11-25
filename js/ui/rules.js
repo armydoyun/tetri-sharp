@@ -7,6 +7,7 @@ import { dropdown } from "./select.js";
 import { decodeRules, encodeRules, rulesLink } from "../rules/share.js";
 import { MAX_RULE_NAME, MAX_RULE_SLOTS } from "../storage/rule-slots.js";
 import { t } from "../i18n/index.js";
+import { copyText } from "./clipboard.js";
 
 const ms = frames => `${Math.round((frames * 1000) / 60)}ms`;
 
@@ -257,21 +258,6 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
    */
   let undo = null;
 
-  /** 클립보드에 복사. 막혀 있으면 입력칸을 선택해 둔다. */
-  const copy = async (text, input) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      input?.select();
-      try {
-        return document.execCommand("copy");
-      } catch {
-        return false;
-      }
-    }
-  };
-
   const shareSection = rules => {
     const code = encodeRules(rules);
     const codeInput = textInput({
@@ -282,7 +268,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
     });
     const copyCode = button({ label: t("복사"), icon: "copy", size: "s", id: "rule-share-copy" });
     copyCode.addEventListener("click", async () => {
-      message = (await copy(code, codeInput))
+      message = (await copyText(code, codeInput))
         ? t("규칙 코드를 복사했어요")
         : t("복사하지 못했어요. 코드를 선택해 직접 복사해 주세요");
       notice.textContent = message;
@@ -295,7 +281,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
       id: "rule-share-link",
     });
     copyLink.addEventListener("click", async () => {
-      message = (await copy(link, null))
+      message = (await copyText(link))
         ? t("링크를 복사했어요. 받은 사람이 열면 이 규칙이 내 규칙에 새로 들어가요")
         : t("복사하지 못했어요");
       notice.textContent = message;

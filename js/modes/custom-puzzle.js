@@ -4,6 +4,7 @@
 //   1.<보드 hex 50자>.<피스>                          처음 형식. Modern·홀드 없음·중력 없음·판 비우기로 연다
 //   2.<설정>.<높이 + 보드 hex>.<피스>[.<제목·설명>]   설정은 "_"로 이은 짧은 기호, 규칙은 바탕 규칙과 다른 것만
 // 계획: docs/PUZZLE_MAKER.md "링크 형식 2."
+import { fromBase64Url, toBase64Url } from "../core/base64url.js";
 import { HEIGHT, VISIBLE_ROWS, WIDTH } from "../core/board.js";
 import { GARBAGE, PIECE_TYPES } from "../core/pieces.js";
 import { t } from "../i18n/index.js";
@@ -12,7 +13,7 @@ import { RANDOMIZERS } from "../rules/randomizer/index.js";
 import { GRAVITY_OPTIONS, sanitizeRuleBody } from "../rules/sanitize.js";
 import { SCORINGS } from "../rules/scoring/index.js";
 import { GOAL_KINDS, goalOf } from "./puzzle-goals.js";
-import { makePuzzleMode } from "./puzzles.js";
+import { KIND_NAMES, makePuzzleMode } from "./puzzles.js";
 
 export const PUZZLE_CELLS = WIDTH * VISIBLE_ROWS;
 /** 피스 수 안전선(판 비우기 기준 판 높이에 맞춘 넉넉한 값). 링크에서는 피스 하나가 한 글자다 */
@@ -135,20 +136,15 @@ const RULE_FIELDS = [
   ["j", b => bit(b.ihs), (b, v) => (b.ihs = v === "1")],
 ];
 
-const toBase64Url = bytes =>
-  btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-const fromBase64Url = text => {
-  const b64 = text.replace(/-/g, "+").replace(/_/g, "/");
-  return Uint8Array.from(atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4)), c => c.charCodeAt(0));
+/** 블록이 있는 가장 높은 줄까지의 높이(아래에서부터, 빈 판은 0) @param {Uint8Array} cells */
+export const usedHeight = cells => {
+  const first = cells.findIndex(Boolean);
+  return first < 0 ? 0 : VISIBLE_ROWS - Math.floor(first / WIDTH);
 };
 
 /** 쓰는 높이만: <높이 base36><hex> */
 const encodeBoard = cells => {
-  const first = cells.findIndex(Boolean);
-  const h = VISIBLE_ROWS - Math.floor(first / WIDTH);
+  const h = usedHeight(cells);
   const bits = [...cells.subarray(PUZZLE_CELLS - h * WIDTH)];
   while (bits.length % 4) bits.push(0);
   let hex = "";
@@ -254,6 +250,9 @@ export const decodePuzzle = code => {
   return p && valid(p) ? p : null;
 };
 
+/** 퍼즐 링크(다른 공유 링크와 같은 모양: 주소 + #puzzle=코드) @param {string} code @param {string} href */
+export const puzzleLink = (code, href) => `${String(href).split("#")[0]}#puzzle=${code}`;
+
 /** 같은 퍼즐인지 가리는 코드(확인 표시 빼고) @param {CustomPuzzle} p */
 export const puzzleId = p => encodePuzzle(p);
 
@@ -281,8 +280,7 @@ const totalPieces = p => p.pieces.length + (p.holdStart ? 1 : 0);
 export const searchOptions = puzzle => {
   const p = normalizePuzzle(puzzle);
   const filled = p.cells.reduce((n, v) => n + v, 0);
-  const first = p.cells.findIndex(Boolean);
-  const used = first < 0 ? 0 : VISIBLE_ROWS - Math.floor(first / WIDTH);
+  const used = usedHeight(p.cells);
   // 판 비우기에서 쌓인 높이는 앞으로 지울 줄 수를 넘지 않는다(빈 줄 위에 블록이 뜰 수 없으므로)
   const pcRows = Math.max(2, used, Math.floor((filled + 4 * totalPieces(p)) / WIDTH));
   return {
@@ -321,16 +319,7 @@ export const solutionTask = puzzle => {
 
 /** 목표 이름 @param {{ kind: string, lines?: number }} goal */
 export const goalLabel = goal =>
-  goal.kind === "lines"
-    ? t("{n}줄 지우기", { n: goal.lines ?? 1 })
-    : ({
-        pc: t("판 비우기"),
-        tsd: "T-spin Double",
-        tst: "T-spin Triple",
-        mini: "T-spin Mini",
-        quad: t("4줄 만들기"),
-        combo: t("콤보 이어 가기"),
-      }[goal.kind] ?? t("판 비우기"));
+  goal.kind === "lines" ? t("{n}줄 지우기", { n: goal.lines ?? 1 }) : (KIND_NAMES[goal.kind] ?? KIND_NAMES.pc);
 
 /**
  * 처음 형식(Modern·홀드 없음·중력 없음)과 다른 규칙을 짧게: "20G · 홀드 · ARS 회전"

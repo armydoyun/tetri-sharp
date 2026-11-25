@@ -2,6 +2,7 @@
 // 손가락마다 따로 추적(여러 버튼 동시 누르기 가능), 누른 순간을 다음 프레임까지 모아 둔다(키보드와 같은 방식).
 // 버튼은 data-touch="LEFT" 같은 동작 id를 가진다. RESTART·PAUSE는 시스템 동작.
 import { ACTIONS } from "./keymap.js";
+import { createPressQueue } from "./press-queue.js";
 
 /** 설정값과 기기(굵은 포인터=터치 화면)로 터치 버튼을 보일지 정한다. */
 export const touchVisible = (setting, coarsePointer) => setting === "on" || (setting === "auto" && coarsePointer);
@@ -16,7 +17,7 @@ export const createTouch = ({ root, onSystem, vibrate = () => true }) => {
   /** @type {Map<number, { id: string, button: HTMLElement }>} */
   const fingers = new Map();
   let held = 0;
-  let pending = [0];
+  const pending = createPressQueue();
   let enabled = false;
 
   const recompute = () => {
@@ -55,9 +56,7 @@ export const createTouch = ({ root, onSystem, vibrate = () => true }) => {
     }
     if (SYSTEM[id]) return onSystem(SYSTEM[id]);
     if (alreadyHeld) return;
-    const last = pending.length - 1;
-    if (pending[last] & BIT[id]) pending.push(BIT[id]);
-    else pending[last] |= BIT[id];
+    pending.press(BIT[id]);
   });
   root.addEventListener("lostpointercapture", release);
   // 캡처를 지원하지 않는 환경에서도 버튼 밖으로 손을 떼면 해제한다.
@@ -68,7 +67,7 @@ export const createTouch = ({ root, onSystem, vibrate = () => true }) => {
   const releaseAll = () => {
     fingers.clear();
     held = 0;
-    pending = [0];
+    pending.clear();
     for (const el of root.querySelectorAll(".is-down")) el.classList.remove("is-down");
   };
 
@@ -80,11 +79,7 @@ export const createTouch = ({ root, onSystem, vibrate = () => true }) => {
       if (enabled !== value) releaseAll();
       enabled = value;
     },
-    takePressed() {
-      const p = pending.shift() || 0;
-      if (!pending.length) pending.push(0);
-      return p;
-    },
+    takePressed: pending.take,
     releaseAll,
   };
 };

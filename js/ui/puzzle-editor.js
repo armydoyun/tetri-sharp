@@ -19,6 +19,7 @@ import {
   encodePuzzle,
   goalLabel,
   normalizePuzzle,
+  puzzleLink,
   ruleSummary,
   solutionTask,
 } from "../modes/custom-puzzle.js";
@@ -42,6 +43,7 @@ import {
   usedHeight,
 } from "../modes/puzzle-edit.js";
 import { el, fieldRow, fillDialog, focusKey, restoreFocus } from "./dom.js";
+import { copyText, revealForCopy } from "./clipboard.js";
 import {
   button,
   confirmButton,
@@ -956,18 +958,13 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         if (!code || copy.disabled) return;
         // 받는 쪽에 보일 확인 표시: 자동 확인으로 풀 수 있었는지, 만든 사람이 직접 풀어 봤는지
         const checked = checkedFor(code);
-        const url = new URL(location.href);
-        url.hash = `puzzle=${encodePuzzle({ ...current(), checked }, { checked: true })}`;
-        try {
-          await navigator.clipboard.writeText(url.href);
-          if (encodePuzzle(current()) === code && dialog.contains(link))
-            notice.textContent = t("퍼즐 링크를 복사했어요.");
-        } catch {
-          if (encodePuzzle(current()) !== code || !dialog.open || !dialog.contains(link)) return;
-          link.value = url.href;
-          link.hidden = false;
-          link.focus();
-          link.select();
+        const url = puzzleLink(encodePuzzle({ ...current(), checked }, { checked: true }) ?? code, location.href);
+        const copied = await copyText(url);
+        // 복사하는 사이 퍼즐을 고쳤거나 대화상자를 닫았으면 알리지 않는다
+        if (encodePuzzle(current()) !== code || !dialog.open || !dialog.contains(link)) return;
+        if (copied) notice.textContent = t("퍼즐 링크를 복사했어요.");
+        else {
+          revealForCopy(link, url);
           notice.textContent = t("자동 복사가 막혔어요. 선택된 링크를 직접 복사해 주세요.");
         }
       });

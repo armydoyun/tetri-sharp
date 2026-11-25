@@ -2,6 +2,7 @@
 import { el, fieldRow, fillDialog } from "./dom.js";
 import { button, textInput } from "./components.js";
 import { t } from "../i18n/index.js";
+import { copyText } from "./clipboard.js";
 
 /**
  * @param {{
@@ -13,14 +14,6 @@ import { t } from "../i18n/index.js";
  */
 export const createShareUI = ({ dialog, makeCode, makeLink, onSaveFile }) => {
   const notice = el("p", { class: "notice-slot", role: "status", id: "share-notice" });
-  const copy = async text => {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      return false;
-    }
-  };
 
   return {
     /** @param {any} replay @param {string} title */
@@ -42,7 +35,7 @@ export const createShareUI = ({ dialog, makeCode, makeLink, onSaveFile }) => {
         "aria-label": t("공유 링크"),
       });
       copyLink.addEventListener("click", async () => {
-        const copied = await copy(link);
+        const copied = await copyText(link);
         notice.textContent = copied
           ? t("링크를 복사했어요. 받은 사람이 열면 바로 재생하고 이 기록과 달릴 수 있어요")
           : t("자동 복사가 막혔어요. 선택된 링크를 직접 복사해 주세요.");

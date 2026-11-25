@@ -7,7 +7,7 @@ import { CELL_ID } from "../core/pieces.js";
 import { VISIBLE_TOP } from "../core/engine.js";
 import { createEffects } from "./effects.js";
 import { createSlide } from "./motion.js";
-import { drawMark, findTheme, gridDots, gridHashes, paletteFor } from "./themes.js";
+import { boxOrigin, drawMark, findTheme, gridDots, gridHashes, paletteFor } from "./themes.js";
 
 const MARGIN_TOP = 2; // 보드 위 여유 줄
 const ROWS = VISIBLE_ROWS + MARGIN_TOP;
@@ -80,12 +80,7 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
   /** 미리보기 상자(4×2칸) 가운데에 피스를 그린다. */
   const preview = (theme, palette, game, type, left, top, size, dim = false) => {
     const shape = game.shapeOf(type, 0);
-    const xs = shape.map(c => c[0]);
-    const ys = shape.map(c => c[1]);
-    const w = Math.max(...xs) - Math.min(...xs) + 1;
-    const h = Math.max(...ys) - Math.min(...ys) + 1;
-    const ox = left + ((4 - w) * size) / 2 - Math.min(...xs) * size;
-    const oy = top + ((2 - h) * size) / 2 - Math.min(...ys) * size;
+    const { ox, oy } = boxOrigin(shape, left, top, size);
     ctx.globalAlpha = dim ? 0.35 : 1;
     for (const [x, y] of shape) {
       theme.block(ctx, ox + x * size, oy + y * size, size, palette[CELL_ID[type]]);

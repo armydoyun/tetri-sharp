@@ -1,19 +1,9 @@
 // 리플레이 공유 코드: JSON → deflate 압축 → base64url, 앞에 "TD1-". 링크는 주소 뒤에 #daily=코드.
 // 압축은 브라우저 내장 CompressionStream을 쓴다(라이브러리 없음).
+import { fromBase64Url, toBase64Url } from "../core/base64url.js";
+
 const PREFIX = "TD1-";
 const MAX_CODE = 200_000;
-
-const toBase64Url = bytes => {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-};
-
-const fromBase64Url = text => {
-  const b64 = text.replace(/-/g, "+").replace(/_/g, "/");
-  const bin = atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4));
-  return Uint8Array.from(bin, c => c.charCodeAt(0));
-};
 
 const pipe = async (bytes, stream) =>
   new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());

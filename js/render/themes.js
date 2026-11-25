@@ -93,6 +93,21 @@ const isLight = hex => {
  * 블록 무늬: 셀 값(1~7 = I J L O S T Z, 8 = 쓰레기)마다 다른 모양을 셀 가운데에 그린다.
  * 색을 구분하기 어려워도 피스를 알아볼 수 있게 하는 접근성 설정.
  */
+/**
+ * 미리보기 상자(4×2칸) 가운데에 피스를 놓을 왼쪽 위 좌표(넥스트·홀드 칸, 테마 미리보기가 함께 쓴다)
+ * @param {ReadonlyArray<readonly [number, number]>} shape @param {number} left @param {number} top @param {number} size
+ */
+export const boxOrigin = (shape, left, top, size) => {
+  const xs = shape.map(c => c[0]);
+  const ys = shape.map(c => c[1]);
+  const w = Math.max(...xs) - Math.min(...xs) + 1;
+  const h = Math.max(...ys) - Math.min(...ys) + 1;
+  return {
+    ox: left + ((4 - w) * size) / 2 - Math.min(...xs) * size,
+    oy: top + ((2 - h) * size) / 2 - Math.min(...ys) * size,
+  };
+};
+
 export const drawMark = (ctx, x, y, size, value, color) => {
   const c = size / 2;
   const r = size * 0.2;

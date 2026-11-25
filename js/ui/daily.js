@@ -3,6 +3,7 @@ import { el, fieldRow, fillDialog } from "./dom.js";
 import { button, textInput } from "./components.js";
 import { t } from "../i18n/index.js";
 import { dropdown } from "./select.js";
+import { copyText } from "./clipboard.js";
 
 /**
  * @param {{
@@ -19,15 +20,6 @@ import { dropdown } from "./select.js";
 export const createDailyUI = ({ dialog, dates, getEntry, makeCode, makeLink, onStart, onWatch, onRace }) => {
   const notice = el("p", { class: "notice-slot", role: "status", id: "daily-notice" });
 
-  const copy = async text => {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
   const shareRows = async replay => {
     const code = await makeCode(replay);
     const codeInput = textInput({
@@ -39,7 +31,7 @@ export const createDailyUI = ({ dialog, dates, getEntry, makeCode, makeLink, onS
     const copyCode = button({ label: t("복사"), icon: "copy", size: "s", id: "daily-copy" });
     copyCode.disabled = !code;
     copyCode.addEventListener("click", async () => {
-      const ok = await copy(code);
+      const ok = await copyText(code);
       notice.textContent = ok
         ? t("결과 코드를 복사했어요. 친구에게 보내 보세요")
         : t("복사하지 못했어요. 코드를 선택해 직접 복사해 주세요");
@@ -48,7 +40,7 @@ export const createDailyUI = ({ dialog, dates, getEntry, makeCode, makeLink, onS
     const copyLink = button({ label: t("링크 복사"), icon: "link", size: "s", id: "daily-link" });
     copyLink.disabled = !code;
     copyLink.addEventListener("click", async () => {
-      notice.textContent = (await copy(makeLink(code)))
+      notice.textContent = (await copyText(makeLink(code)))
         ? t("링크를 복사했어요. 받은 사람이 열면 내 기록과 겨룰 수 있어요")
         : t("복사하지 못했어요");
     });

@@ -1002,22 +1002,25 @@ const logoTaps = () => {
   sfx.play("clear2");
 };
 
+/** 대화상자가 하나라도 열려 있으면 게임·메뉴 단축키는 그 대화상자에 맡긴다 */
+const anyDialogOpen = () =>
+  [
+    settingsUI,
+    rulesUI,
+    recordsUI,
+    statsUI,
+    practiceUI,
+    versusUI,
+    dailyUI,
+    achievementsUI,
+    helpUI,
+    puzzleUI,
+    shareUI,
+  ].some(ui => ui.isOpen);
+
 /** 로고: 첫 화면으로. 게임 중이면 먼저 묻는다 */
 $("go-home").addEventListener("click", () => {
-  if (
-    settingsUI.isOpen ||
-    rulesUI.isOpen ||
-    recordsUI.isOpen ||
-    statsUI.isOpen ||
-    practiceUI.isOpen ||
-    versusUI.isOpen ||
-    dailyUI.isOpen ||
-    achievementsUI.isOpen ||
-    helpUI.isOpen ||
-    puzzleUI.isOpen ||
-    shareUI.isOpen
-  )
-    return;
+  if (anyDialogOpen()) return;
   if (screen === "menu") {
     logoTaps();
     return window.scrollTo(0, 0);
@@ -1190,6 +1193,10 @@ const survivalResultText = (frame, previousBest) => {
   return `${goal} · ${comparison}`;
 };
 
+/** 결과 표: [이름, 값] 줄들을 dt·dd로 @param {ReadonlyArray<ReadonlyArray<string>>} rows */
+const renderResultStats = rows =>
+  $("results-stats").replaceChildren(...rows.flatMap(([k, v]) => [el("dt", { text: k }), el("dd", { text: v })]));
+
 const finish = () => {
   if (!game) return;
   const state = game.state;
@@ -1303,15 +1310,7 @@ const finish = () => {
     ];
     const s = versusStats()[versusStatKey(mode.versus.id, mode.versus.style)];
     vrows.push([t("전적"), s ? t("{win}승 {loss}패", { win: s.win, loss: s.loss }) : "—"]);
-    $("results-stats").replaceChildren(
-      ...vrows.flatMap(([k, v]) => {
-        const dt = document.createElement("dt");
-        dt.textContent = k;
-        const dd = document.createElement("dd");
-        dd.textContent = v;
-        return [dt, dd];
-      })
-    );
+    renderResultStats(vrows);
     renderResultSplits();
     showPanel("results");
     return;
@@ -1370,15 +1369,7 @@ const finish = () => {
     );
     say(`${summary.title}. ${rows[0][1]}. ${t("추천 입력")} ${rows[1][1]}`);
   }
-  $("results-stats").replaceChildren(
-    ...rows.flatMap(([k, v]) => {
-      const dt = document.createElement("dt");
-      dt.textContent = k;
-      const dd = document.createElement("dd");
-      dd.textContent = v;
-      return [dt, dd];
-    })
-  );
+  renderResultStats(rows);
   renderResultSplits();
   showPanel("results");
 };
@@ -1722,20 +1713,7 @@ $("records").addEventListener("close", () => {
 
 const handleSystem = (action, code = "") => {
   if (restoringRun) return;
-  if (
-    settingsUI.isOpen ||
-    rulesUI.isOpen ||
-    recordsUI.isOpen ||
-    statsUI.isOpen ||
-    practiceUI.isOpen ||
-    versusUI.isOpen ||
-    dailyUI.isOpen ||
-    achievementsUI.isOpen ||
-    helpUI.isOpen ||
-    puzzleUI.isOpen ||
-    shareUI.isOpen
-  )
-    return;
+  if (anyDialogOpen()) return;
   if (scenePractice) {
     if (action === "restart") resetSceneAttempt();
     else if (action === "pause" && code !== "Escape") {
@@ -1839,20 +1817,7 @@ noHover?.addEventListener?.("change", applyTouch);
 
 /** 메뉴·결과·일시정지 화면에서 게임패드로 버튼 사이를 옮겨 다니고 누른다. */
 const handlePadMenu = action => {
-  if (
-    settingsUI.isOpen ||
-    rulesUI.isOpen ||
-    recordsUI.isOpen ||
-    statsUI.isOpen ||
-    practiceUI.isOpen ||
-    versusUI.isOpen ||
-    dailyUI.isOpen ||
-    achievementsUI.isOpen ||
-    helpUI.isOpen ||
-    puzzleUI.isOpen ||
-    shareUI.isOpen
-  )
-    return;
+  if (anyDialogOpen()) return;
   const panel = Object.values(panels).find(p => !p.hidden);
   if (!panel || screen === "play" || screen === "countdown" || screen === "replay") return;
   const buttons = /** @type {HTMLButtonElement[]} */ ([...panel.querySelectorAll("button")]).filter(
@@ -2581,21 +2546,7 @@ for (const btn of replayBar.querySelectorAll("[data-replay]")) {
 
 // 리플레이 중 단축키: Space 일시정지, 1·2·4 속도 (Esc 닫기, R 처음부터는 시스템 키로 처리)
 window.addEventListener("keydown", e => {
-  if (
-    (screen !== "replay" && !scenePractice) ||
-    settingsUI.isOpen ||
-    rulesUI.isOpen ||
-    recordsUI.isOpen ||
-    statsUI.isOpen ||
-    practiceUI.isOpen ||
-    versusUI.isOpen ||
-    dailyUI.isOpen ||
-    achievementsUI.isOpen ||
-    helpUI.isOpen ||
-    puzzleUI.isOpen ||
-    shareUI.isOpen
-  )
-    return;
+  if ((screen !== "replay" && !scenePractice) || anyDialogOpen()) return;
   if (scenePractice) {
     if (!e.repeat && e.code === "Escape") exitScenePractice();
     return;
