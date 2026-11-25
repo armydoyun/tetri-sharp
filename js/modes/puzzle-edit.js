@@ -2,11 +2,58 @@
 // 판은 위에서 아래로 VISIBLE_ROWS줄 × WIDTH칸, 칸 값은 0(빔)·1(참)이다. index = row * WIDTH + col.
 import { HEIGHT, VISIBLE_ROWS, WIDTH, collides, createBoard } from "../core/board.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
+import { PIECES, cellsOf } from "../core/pieces.js";
 import { spawnOf } from "./puzzle-solver.js";
 import { PUZZLE_CELLS, MAX_PUZZLE_PIECES, normalizePuzzle, solverBoard, usedHeight } from "./custom-puzzle.js";
 
 export { solverBoard, usedHeight };
 import { PUZZLES } from "./puzzles.js";
+
+/**
+ * 게임(리플레이) 한 장면 → 퍼즐 재료(퍼즐 다시 보기 P4): 보이는 20줄의 판(색은 버리고 채움으로),
+ * 지금 피스 + 다음 피스(모두 count개까지), 홀드에 든 피스. 보이는 영역 위의 칸은 버린다
+ * @param {{ board: { cells: ArrayLike<number>, width: number }, active: { type: string } | null, queue: string[], hold: string | null }} state
+ */
+export const sceneToPuzzle = (state, count = 7) => {
+  const cells = new Uint8Array(PUZZLE_CELLS);
+  const top = HEIGHT - VISIBLE_ROWS;
+  for (let row = 0; row < VISIBLE_ROWS; row++)
+    for (let col = 0; col < WIDTH; col++)
+      if (state.board.cells[(top + row) * state.board.width + col]) cells[row * WIDTH + col] = 1;
+  const pieces = [...(state.active ? [state.active.type] : []), ...state.queue].slice(0, count).join("");
+  return { cells, pieces, holdStart: state.hold ?? "" };
+};
+
+/**
+ * 피스 도장(퍼즐 다시 보기 P9): 누른 칸에 피스 모양 네 칸. 누른 칸은 모양의 가운데 칸(상자 가운데에 가장 가까운 칸)이다.
+ * 판 밖이나 보이는 높이 위로 나가면 null
+ * @param {import("../core/pieces.js").PieceType} type @param {number} rot @param {number} index @param {number} [minRow] 보이는 맨 윗줄
+ */
+export const stampIndices = (type, rot, index, minRow = 0) => {
+  const shape = cellsOf(type, rot);
+  const mid = (PIECES[type].size - 1) / 2;
+  const pivot = shape.reduce((best, c) =>
+    Math.hypot(c[0] - mid, c[1] - mid) < Math.hypot(best[0] - mid, best[1] - mid) ? c : best
+  );
+  const row = Math.floor(index / WIDTH);
+  const col = index % WIDTH;
+  const out = [];
+  for (const [x, y] of shape) {
+    const r = row + y - pivot[1];
+    const c = col + x - pivot[0];
+    if (r < minRow || r >= VISIBLE_ROWS || c < 0 || c >= WIDTH) return null;
+    out.push(r * WIDTH + c);
+  }
+  return out;
+};
+
+/** 도장 찍기: 네 칸을 채운다. 이미 네 칸이 다 차 있으면 지운다(다른 칠하기 도구처럼 누른 곳이 그 모양이면 지우기) */
+export const stampCells = (cells, indices) => {
+  const out = cells.slice();
+  const erase = indices.every(i => cells[i]);
+  for (const i of indices) out[i] = erase ? 0 : 1;
+  return out;
+};
 
 /** 편집 화면에 보이는 높이(아래에서부터 줄 수) */
 export const EDIT_HEIGHTS = Object.freeze([8, 12, 20]);
@@ -73,6 +120,12 @@ export const mirrorCells = cells => {
   return out;
 };
 
+/**
+ * 좌우로 뒤집은 판에 맞는 피스: S와 Z, J와 L을 서로 바꾼다(I·O·T는 그대로). 판만 뒤집으면 원래 피스로는 대개 풀 수 없다(퍼즐 다시 보기 P1)
+ * @param {string} pieces  피스 글자들(처음 홀드 피스 한 글자에도 쓴다)
+ */
+export const mirrorPieces = pieces => pieces.replace(/[SZJL]/g, p => ({ S: "Z", Z: "S", J: "L", L: "J" })[p] ?? p);
+
 /** 블록이 다 보이는 가장 낮은 편집 높이 @param {Uint8Array} cells */
 export const fitHeight = cells => EDIT_HEIGHTS.find(h => h >= usedHeight(cells)) ?? VISIBLE_ROWS;
 
@@ -83,6 +136,25 @@ export const insertPiece = (pieces, at, piece) => {
   if (pieces.length >= MAX_PUZZLE_PIECES) return { pieces, at };
   const i = at === null ? pieces.length : at + 1;
   return { pieces: pieces.slice(0, i) + piece + pieces.slice(i), at: i };
+};
+
+/**
+ * 피스 글자 여러 개를 고른 자리 뒤에 차례로 넣는다(퍼즐 다시 보기 P5: 글자 키·붙여 넣기).
+ * 피스 글자와 띄어쓰기·쉼표·점·줄표만 있는 글이어야 한다("TSZ", "t s z", "I, O, T") — 다른 글자가 섞이면 넣지 않는다.
+ * 안전선(50개)을 넘는 글자는 버린다. added: 실제로 넣은 개수
+ * @param {string} pieces @param {number | null} at @param {string} text
+ */
+export const insertPieces = (pieces, at, text) => {
+  if (!/^[IJLOSTZ\s,.\-·]+$/i.test(text)) return { pieces, at, added: 0 };
+  let next = { pieces, at };
+  let added = 0;
+  for (const piece of text.toUpperCase().replace(/[^IJLOSTZ]/g, "")) {
+    const result = insertPiece(next.pieces, next.at, piece);
+    if (result.pieces === next.pieces) break;
+    next = result;
+    added += 1;
+  }
+  return { ...next, added };
 };
 
 /** 고른 자리(없으면 마지막)를 뺀다. 그다음 고를 자리는 같은 자리(끝이면 하나 앞). */

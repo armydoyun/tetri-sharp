@@ -3185,6 +3185,39 @@ test("퍼즐 만들기: 끌어서 칠하기·구멍 줄·되돌리기·높이·�
   // 끌어서 칠하기 한 번 = 되돌리기 한 번
   await drag(190, 194);
   assert.deepEqual(await pressed(), [190, 191, 192, 193, 194]);
+  // 바닥 줄을 아래로 밀면 지워지고, 그렇다고 알린다(퍼즐 다시 보기 P7). 되돌리면 돌아온다
+  await page.click('#puzzles [data-shift="0,1"]');
+  assert.deepEqual(await pressed(), []);
+  assert.match(await page.locator("#puzzles .dialog-foot .notice-slot").textContent(), /칸 5개가 판 밖으로/);
+  await page.keyboard.press("Control+z");
+  assert.deepEqual(await pressed(), [190, 191, 192, 193, 194]);
+  // 피스 도장(퍼즐 다시 보기 P9): 고른 피스 모양을 누른 칸에 찍고, R로 돌리며, 판 밖이면 찍지 않고 알린다
+  assert.ok(await page.locator("#puzzle-stamp").isDisabled(), "도장 도구가 아니면 도장 피스는 못 고른다");
+  await page.click('#puzzle-tool [data-value="piece"]');
+  await page.click("#puzzle-stamp");
+  await page.click('#puzzle-stamp-list [data-value="O"]');
+  await page.click('[data-cell="186"]');
+  assert.deepEqual(await pressed(), [186, 187, 190, 191, 192, 193, 194, 196, 197], "O는 누른 칸이 왼쪽 위");
+  await page.click('[data-cell="186"]');
+  assert.deepEqual(await pressed(), [190, 191, 192, 193, 194], "같은 자리에 다시 찍으면 지운다");
+  await page.click('[data-cell="189"]');
+  assert.match(await page.locator("#puzzles .dialog-foot .notice-slot").textContent(), /판 밖으로 나가/);
+  await page.click("#puzzle-stamp");
+  await page.click('#puzzle-stamp-list [data-value="I"]');
+  await page.focus('[data-cell="175"]');
+  await page.keyboard.press("r");
+  assert.deepEqual(
+    await page.$$eval("[data-stamp]", els => els.map(e => Number(e.dataset.cell))),
+    [165, 175, 185, 195],
+    "세운 I 미리보기"
+  );
+  await page.keyboard.press("Enter");
+  assert.equal((await pressed()).length, 9, "세운 I 네 칸");
+  await page.keyboard.press("Control+z");
+  await page.keyboard.press("Control+z");
+  await page.keyboard.press("Control+z");
+  assert.deepEqual(await pressed(), [190, 191, 192, 193, 194]);
+  await page.click('#puzzle-tool [data-value="cell"]');
   await page.keyboard.press("Control+z");
   assert.deepEqual(await pressed(), []);
   await page.keyboard.press("Control+Shift+z");
@@ -3221,9 +3254,30 @@ test("퍼즐 만들기: 끌어서 칠하기·구멍 줄·되돌리기·높이·�
   await page.focus('.puzzle-seq-chip[data-at="1"]');
   await page.keyboard.press("Alt+ArrowRight");
   assert.equal(await sequence(), "TISO");
+  // 좌우 뒤집기는 피스도 S와 Z, J와 L을 바꾸고, 되돌리기 한 번으로 판·피스가 함께 돌아간다(퍼즐 다시 보기 P1)
+  const mirrorButton = page.locator('#puzzles button[aria-label^="좌우 뒤집기"]');
+  await mirrorButton.click();
+  assert.equal(await sequence(), "TIZO");
+  await page.click("#puzzle-undo");
+  assert.equal(await sequence(), "TISO");
+  await page.focus('.puzzle-seq-chip[data-at="2"]');
   await page.keyboard.press("Delete");
   assert.equal(await sequence(), "TIO");
   assert.equal(await text(page, "puzzles .puzzle-editor-count"), `3 / 50`);
+  // 글자 키로 넣고, "S J" 같은 순서 글자를 붙여 넣는다 — 되돌리기는 키 한 번·붙여 넣기 한 번(퍼즐 다시 보기 P5)
+  await page.click('.puzzle-seq-chip[data-at="2"]');
+  await page.focus('#puzzles [data-piece="I"]');
+  await page.keyboard.press("z");
+  assert.equal(await sequence(), "TIOZ");
+  await page.evaluate(() => {
+    const data = new DataTransfer();
+    data.setData("text/plain", "s j");
+    document.activeElement.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true }));
+  });
+  assert.equal(await sequence(), "TIOZSJ");
+  await page.click("#puzzle-undo");
+  await page.click("#puzzle-undo");
+  assert.equal(await sequence(), "TIO");
 
   // 시작 틀: 퍼즐 1단계를 복사해 시험 플레이로 풀면 링크를 복사할 수 있다(되돌리면 이전 판)
   const stage = PUZZLES[0];
@@ -3247,9 +3301,97 @@ test("퍼즐 만들기: 끌어서 칠하기·구멍 줄·되돌리기·높이·�
   await context.close();
 });
 
-test("퍼즐 만들기 자동 확인: 풀 수 있으면 시험 없이 공유, 풀이를 한 수씩 보고, 미리 알려 주고, 긴 확인은 멈출 수 있다", async () => {
+test("리플레이의 '퍼즐로': 그 장면의 판·지금 피스와 다음 피스로 새 퍼즐을 연다(퍼즐 다시 보기 P4)", async () => {
+  const { context, page, errors } = await openPage(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  await page.click('[data-mode="sprint40"]');
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  for (let i = 0; i < 45 && (await page.evaluate(() => document.getElementById("results").hidden)); i++)
+    await page.keyboard.press("Space");
+  await page.waitForFunction(() => !document.getElementById("results").hidden);
+  await page.click('[data-action="watch"]');
+  await page.waitForFunction(() => document.body.dataset.screen === "replay");
+  // 끝 장면으로 가서 만든다(판이 쌓여 있다)
+  await page.$eval("#replay-progress", el => {
+    el.value = el.max;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await page.click('[data-replay="puzzle"]');
+  await page.waitForFunction(() => document.querySelector("#puzzles[open] .puzzle-editor"));
+  // 지금 피스 + 다음 5개(막혀 끝난 장면에는 지금 피스가 없다)
+  const chips = await page.locator(".puzzle-seq-chip").count();
+  assert.ok(chips === 5 || chips === 6, `피스 ${chips}개`);
+  assert.ok((await page.locator('[data-cell][aria-pressed="true"]').count()) > 0, "쌓인 판");
+  assert.equal(await text(page, "puzzle-saved"), "내 퍼즐에 저장했어요. 고치면 저절로 저장돼요.");
+  await page.keyboard.press("Escape");
+  assert.equal(await page.evaluate(() => document.body.dataset.screen), "replay", "닫으면 리플레이로");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("퍼즐 만들기: 닫았다 다시 열어도 저장 전 새 퍼즐은 이어서, 내 퍼즐은 되돌리기 기록이 남는다(퍼즐 다시 보기 P8·P11)", async () => {
+  const { context, page, errors } = await openPage();
+  const pressed = () => page.locator('[data-cell][aria-pressed="true"]').count();
+  // 이름만 적은 새 퍼즐(아직 저장되지 않는다)은 닫았다 다시 "퍼즐 만들기"를 누르면 이어서 보인다
+  await openList(page, "#open-puzzles");
+  await page.click("#puzzle-create");
+  await page.fill("#puzzle-title", "초안");
+  await page.click("#puzzle-editor-close");
+  await openList(page, "#open-puzzles");
+  await page.click("#puzzle-create");
+  assert.equal(await page.inputValue("#puzzle-title"), "초안");
+
+  // 판·피스를 넣어 저장된 퍼즐: 칸을 고치고 닫았다 목록에서 다시 열면 되돌릴 수 있다
+  await pickTemplate(page, `stage-${PUZZLES[0].number}`);
+  const before = await pressed();
+  await page.click('[data-cell="120"]');
+  assert.equal(await pressed(), before + 1);
+  await page.click("#puzzle-editor-close");
+  await openList(page, "#open-puzzles");
+  await page.click('#puzzles .dialog-tabs [data-value="mine"]');
+  await page.click("[data-made-edit]");
+  assert.ok(await page.locator("#puzzle-undo").isEnabled(), "다시 열어도 되돌리기 기록");
+  await page.click("#puzzle-undo");
+  assert.equal(await pressed(), before);
+
+  // 내 퍼즐 시험 플레이에서는 한 피스 되돌리기(U·버튼)를 쓸 수 있다(퍼즐 다시 보기 P10).
+  // 퍼즐은 틀린 수에서 바로 끝나므로, 실패 결과에서 되돌리면 그 수 앞으로 판에 돌아간다
+  await page.click("#puzzle-trial");
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  assert.equal(await visible(page, "undo-piece"), true);
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => document.body.dataset.screen === "results");
+  assert.equal(await text(page, "results-title"), "실패");
+  assert.equal(await visible(page, "undo-piece"), true, "실패 결과에서도 되돌리기");
+  await page.keyboard.press("KeyU");
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "0");
+  await page.keyboard.press("Escape");
+  await page.click('#pause [data-action="menu"]');
+  await page.click('[data-confirm="ok"]');
+  // 시험을 그만두면 내 퍼즐 목록이 열린다
+  await page.waitForFunction(() => document.querySelector("#puzzles[open] [data-made-edit]"));
+  await page.keyboard.press("Escape");
+  // 저장된 퍼즐을 닫은 뒤 새로 만들면 빈 편집기
+  await openList(page, "#open-puzzles");
+  await page.click("#puzzle-create");
+  assert.equal(await page.inputValue("#puzzle-title"), "");
+  assert.equal(await pressed(), 0);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("퍼즐 만들기 자동 확인: 고치기를 멈추면 저절로 확인하고, 풀 수 있으면 시험 없이 공유, 풀이를 한 수씩 보고, 미리 알려 주고, 긴 확인은 멈출 수 있다", async () => {
   const { context, page, errors } = await openPage();
   const status = () => text(page, "puzzle-status");
+  /** 저절로 확인(퍼즐 다시 보기 P3)이 끝나 결과가 나올 때까지 */
+  const autoChecked = pattern =>
+    page.waitForFunction(
+      source => new RegExp(source).test(document.getElementById("puzzle-status")?.textContent ?? ""),
+      pattern.source,
+      { timeout: 20000 }
+    );
   const settled = () =>
     page.waitForFunction(() => !document.getElementById("puzzle-status")?.textContent?.includes("찾는 중"), null, {
       timeout: 20000,
@@ -3263,9 +3405,8 @@ test("퍼즐 만들기 자동 확인: 풀 수 있으면 시험 없이 공유, �
   await pickTemplate(page, `stage-${stage.number}`);
   assert.ok(await page.locator("#puzzle-copy").isDisabled());
   assert.ok(await page.locator("#puzzle-solution-view").isDisabled());
-  await page.click("#puzzle-check");
-  await settled();
-  assert.match(await status(), /^풀 수 있어요 · \d수/);
+  assert.equal(await status(), "고치기를 멈추면 저절로 풀 수 있는지 찾아봐요.");
+  await autoChecked(/^풀 수 있어요 · \d수/);
   assert.ok(await page.locator("#puzzle-copy").isEnabled());
   assert.equal(await text(page, "puzzles .notice-slot"), "풀 수 있는 퍼즐이에요. 링크를 공유할 수 있어요.");
   assert.ok(await page.locator("#puzzle-check").isDisabled(), "같은 퍼즐은 다시 확인하지 않는다");
@@ -3284,7 +3425,7 @@ test("퍼즐 만들기 자동 확인: 풀 수 있으면 시험 없이 공유, �
   // 바꾸면 확인은 지워진다
   await page.click('#puzzles [data-piece="O"]');
   assert.ok(await page.locator("#puzzle-copy").isDisabled());
-  assert.equal(await status(), "확인을 누르면 풀 수 있는지 찾아봐요.");
+  assert.equal(await status(), "고치기를 멈추면 저절로 풀 수 있는지 찾아봐요.");
 
   // 미리 알려 주기: 홀수 칸이면 판을 비울 수 없다
   await pickTemplate(page, "empty");
@@ -3295,11 +3436,13 @@ test("퍼즐 만들기 자동 확인: 풀 수 있으면 시험 없이 공유, �
   await settled();
   assert.equal(await status(), "이 피스로는 판을 비울 수 없어요.");
 
-  // 오래 걸리는 확인은 멈출 수 있고, 그동안 화면은 움직인다
+  // 피스가 많으면(12개 넘게) 저절로 확인하지 않는다. 오래 걸리는 확인은 멈출 수 있고, 그동안 화면은 움직인다
   await pickTemplate(page, "empty");
   await page.click('#puzzle-height [data-value="12"]');
   for (let r = 10; r < 20; r++) for (let c = 4; c < 10; c++) await page.click(`[data-cell="${r * 10 + c}"]`);
-  for (const piece of "TSZOJLITSZ") await page.click(`#puzzles [data-piece="${piece}"]`);
+  for (const piece of "TSZOJLITSZOJLIT") await page.click(`#puzzles [data-piece="${piece}"]`);
+  await page.waitForTimeout(900);
+  assert.equal(await status(), "피스가 많아 확인을 눌러야 찾아봐요.");
   await page.click("#puzzle-check");
   assert.equal(await status(), "풀 수 있는지 찾는 중이에요…");
   await page.click('#puzzle-tool [data-value="row"]');
@@ -3321,10 +3464,6 @@ test("퍼즐 만들기 목표·고급 설정: 목표와 규칙이 링크로 가�
     Object.defineProperty(navigator, "clipboard", { value: undefined });
   });
   const status = () => text(page, "puzzle-status");
-  const settled = () =>
-    page.waitForFunction(() => !document.getElementById("puzzle-status")?.textContent?.includes("찾는 중"), null, {
-      timeout: 20000,
-    });
   const pick = async (id, value) => {
     await page.locator(`#${id}`).scrollIntoViewIfNeeded();
     await page.waitForTimeout(50);
@@ -3357,11 +3496,14 @@ test("퍼즐 만들기 목표·고급 설정: 목표와 규칙이 링크로 가�
   assert.equal(await text(page, "puzzles .puzzle-editor-advanced-summary"), "홀드(처음 I)");
   await page.click("#puzzle-redo");
 
-  // 자동 확인 → 링크 복사(자동 복사가 막혀 링크 칸에 나온다)
-  await page.locator("#puzzle-check").scrollIntoViewIfNeeded();
-  await page.click("#puzzle-check");
-  await settled();
-  assert.match(await status(), /^풀 수 있어요/);
+  // 저절로 확인 → 링크 복사(자동 복사가 막혀 링크 칸에 나온다)
+  await page.waitForFunction(
+    () => /^풀 수 있어요/.test(document.getElementById("puzzle-status")?.textContent ?? ""),
+    null,
+    {
+      timeout: 20000,
+    }
+  );
   await page.click("#puzzle-copy");
   const link = await page.locator("#custom-puzzle-link").inputValue();
   assert.match(link, /#puzzle=2\.od_g2_h1_pI_e1\./, link);
@@ -3460,6 +3602,20 @@ test("내 퍼즐·받은 퍼즐: 고치면 저절로 저장되고, 목록에서 
   await openTab("mine");
   assert.equal((await rows()).length, 1);
   assert.match((await rows())[0], /^고친 퍼즐 /);
+  assert.match((await rows())[0], /직접 풀어 봄/, "이름만 고치면 확인 표시는 그대로(퍼즐 다시 보기 P12)");
+
+  // 복제(퍼즐 다시 보기 P6): 같은 판·피스의 새 내 퍼즐을 열고, 확인 표시는 빼며 원본은 그대로
+  await page.click("[data-made-duplicate]");
+  assert.equal(await page.inputValue("#puzzle-title"), "고친 퍼즐 사본");
+  await page.click("#puzzle-editor-close");
+  await openTab("mine");
+  const afterCopy = await rows();
+  assert.equal(afterCopy.length, 2);
+  assert.ok(afterCopy.some(r => /^고친 퍼즐 사본 .*확인 안 됨/.test(r)));
+  assert.ok(afterCopy.some(r => /^고친 퍼즐 .*직접 풀어 봄/.test(r)));
+  await page.click('.custom-puzzle-row:has-text("사본") [data-made-delete]');
+  await page.click('.custom-puzzle-row:has-text("사본") [data-made-delete]');
+  assert.equal((await rows()).length, 1);
 
   // 받는 쪽: 링크로 열면 받은 퍼즐에 남고, 못 풀면 '아직', 풀면 시간
   const other = await browser.newContext({ locale: "ko-KR" });

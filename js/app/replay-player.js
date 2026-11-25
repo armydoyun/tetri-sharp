@@ -43,6 +43,7 @@ const MARK_LABELS = {
  *     onRace: (replay: any) => void,
  *     onShare: (replay: any, title: string) => void,
  *     onPractice: () => void,
+ *     onMakePuzzle: (state: any) => void,
  *   },
  * }} deps
  */
@@ -435,6 +436,12 @@ export const createReplayPlayer = deps => {
       if (action === "practice") {
         paused = true;
         return hooks.onPractice();
+      }
+      // 이 장면으로 퍼즐 만들기(퍼즐 다시 보기 P4): 멈추고 내 보드의 지금 판·피스·홀드를 편집기로
+      if (action === "puzzle" && player) {
+        paused = true;
+        updateReplayBar();
+        return hooks.onMakePuzzle(player.game.state);
       }
       if (action === "share" && playing && !player?.cpu)
         return hooks.onShare(playing, `${session.mode.name} · ${session.rules.name}`);

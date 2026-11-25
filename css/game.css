@@ -1652,7 +1652,8 @@ body.has-lesson-hints[data-screen="play"] .downstack-controls {
   width: 100%;
 }
 
-body.is-practice:not([data-screen="results"]) .undo-piece {
+body:is(.is-practice, .is-trial):not([data-screen="results"]) .undo-piece,
+body.is-trial-failed .undo-piece {
   display: inline-flex;
 }
 

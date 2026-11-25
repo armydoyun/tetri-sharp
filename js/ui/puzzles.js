@@ -39,6 +39,7 @@ const checkedLabel = checked =>
  *   onCreate: () => void,
  *   onEdit: (id: string) => void,
  *   onPlayMade: (id: string) => void,
+ *   onDuplicate: (id: string) => void,
  *   onPlayReceived: (code: string) => void,
  *   onCopyReceived: (code: string) => void,
  * }} options
@@ -63,6 +64,7 @@ export const createPuzzleUI = ({
   onCreate,
   onEdit,
   onPlayMade,
+  onDuplicate,
   onPlayReceived,
   onCopyReceived,
 }) => {
@@ -114,6 +116,16 @@ export const createPuzzleUI = ({
           disabled: !shareable,
           "data-made-link": item.id,
           onClick: () => copyLink(item.code),
+        }),
+        // 같은 판으로 변형을 만들 때(퍼즐 다시 보기 P6)
+        iconButton({
+          icon: "copy",
+          label: t("복제해서 편집"),
+          "data-made-duplicate": item.id,
+          onClick: () => {
+            dialog.close();
+            onDuplicate(item.id);
+          },
         }),
         confirmButton({
           label: t("지우기"),

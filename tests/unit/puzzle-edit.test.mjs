@@ -3,7 +3,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { WIDTH } from "../../js/core/board.js";
-import { createGame } from "../../js/core/engine.js";
+import { BTN, createGame } from "../../js/core/engine.js";
+const BTN_HARD = BTN.HARD;
+const BTN_HOLD = BTN.HOLD;
 import { MODERN } from "../../js/rules/presets.js";
 import { ROTATIONS } from "../../js/rules/rotation/index.js";
 import {
@@ -12,12 +14,17 @@ import {
   createHistory,
   fitHeight,
   insertPiece,
+  insertPieces,
   mirrorCells,
+  mirrorPieces,
   movePiece,
   puzzleWarnings,
   removePiece,
+  sceneToPuzzle,
   shiftCells,
   solverBoard,
+  stampCells,
+  stampIndices,
   strokeValue,
   template,
   usedHeight,
@@ -78,6 +85,68 @@ test("밀기: 밖으로 나간 칸은 사라지고 들어온 자리는 빈다. �
   assert.deepEqual(mirrorCells(mirrored), cells);
 });
 
+test("좌우 뒤집기: 피스도 S와 Z, J와 L을 바꿔야 뒤집은 판 비우기 퍼즐이 그대로 풀린다(퍼즐 다시 보기 P1)", () => {
+  assert.equal(mirrorPieces("ISZJLOT"), "IZSLJOT");
+  assert.equal(mirrorPieces(mirrorPieces("SJTZL")), "SJTZL");
+  assert.equal(mirrorPieces(""), "");
+  const solvable = (cells, pieces) =>
+    "moves" in
+    (runSolverTask({
+      type: "solution",
+      kind: "pc",
+      count: pieces.length,
+      rotation: "srs",
+      board: solverBoard(cells),
+      pieces: [...pieces],
+    }) ?? {});
+  // S·Z·J·L이 든 판 비우기 단계: 뒤집은 판 + 바꾼 피스는 풀리고, 피스를 안 바꾸면 못 푸는 단계가 있다
+  const stages = PUZZLES.filter(p => p.kind === "pc")
+    .map(p => template(`stage-${p.number}`))
+    .filter(st => st && /[SZJL]/.test(st.pieces))
+    .slice(0, 6);
+  assert.ok(stages.length >= 3);
+  let brokenWithoutSwap = 0;
+  for (const st of stages) {
+    assert.equal(solvable(st.cells, st.pieces), true);
+    assert.equal(solvable(mirrorCells(st.cells), mirrorPieces(st.pieces)), true, st.pieces);
+    if (!solvable(mirrorCells(st.cells), st.pieces)) brokenWithoutSwap += 1;
+  }
+  assert.ok(brokenWithoutSwap > 0, "판만 뒤집으면 못 푸는 단계가 있다");
+});
+
+test("게임 장면 → 퍼즐: 보이는 판은 채움으로, 지금 피스와 다음 피스, 홀드(퍼즐 다시 보기 P4)", () => {
+  const game = createGame({ rules: MODERN, seed: 3 });
+  for (let i = 0; i < 3 && !game.state.active; i++) game.step();
+  for (let i = 0; i < 3; i++) game.step({ held: 0, pressed: BTN_HARD });
+  game.step({ held: 0, pressed: 0 });
+  game.step({ held: 0, pressed: BTN_HOLD });
+  const state = game.state;
+  const scene = sceneToPuzzle(state);
+  const filled = [...scene.cells].filter(Boolean).length;
+  assert.equal(filled, 12, "세 피스 = 12칸(줄이 지워지지 않았다)");
+  assert.equal(scene.pieces, [state.active.type, ...state.queue].slice(0, 7).join(""));
+  assert.equal(scene.holdStart, state.hold);
+  assert.ok(scene.holdStart);
+  // 퍼즐 코드로 오갈 수 있다
+  assert.ok(encodePuzzle({ cells: scene.cells, pieces: scene.pieces }));
+});
+
+test("피스 도장: 누른 칸이 모양의 가운데, 판 밖·보이는 높이 위는 거절, 다 찬 자리는 지운다(퍼즐 다시 보기 P9)", () => {
+  assert.deepEqual(stampIndices("T", 0, BOTTOM + 5), [BOTTOM - 5, BOTTOM + 4, BOTTOM + 5, BOTTOM + 6]);
+  assert.deepEqual(stampIndices("I", 0, BOTTOM + 5), [BOTTOM + 4, BOTTOM + 5, BOTTOM + 6, BOTTOM + 7]);
+  assert.equal(stampIndices("I", 1, BOTTOM + 5), null, "세운 I는 바닥 밖으로");
+  assert.equal(stampIndices("O", 0, BOTTOM + 9), null, "오른쪽 밖으로");
+  assert.equal(stampIndices("T", 0, BOTTOM - 10 * 7 + 5, 12), null, "보이는 높이(8줄) 위로");
+  const once = stampCells(new Uint8Array(PUZZLE_CELLS), stampIndices("T", 0, BOTTOM + 5));
+  assert.equal(row(once, 19), "0000111000");
+  assert.equal(row(once, 18), "0000010000");
+  assert.equal(
+    stampCells(once, stampIndices("T", 0, BOTTOM + 5)).some(Boolean),
+    false,
+    "같은 자리에 다시 찍으면 지운다"
+  );
+});
+
 test("높이: 블록이 있는 가장 높은 줄까지, 그것이 다 보이는 가장 낮은 편집 높이", () => {
   const cells = new Uint8Array(PUZZLE_CELLS);
   assert.equal(usedHeight(cells), 0);
@@ -99,6 +168,19 @@ test("피스 순서: 고른 자리 뒤에 넣기, 빼기, 옮기기, 안전선",
   assert.deepEqual(movePiece("TOI", 0, -1), { pieces: "TOI", at: 0 }, "맨 앞은 더 앞으로 못 간다");
   const full = "I".repeat(MAX_PUZZLE_PIECES);
   assert.equal(insertPiece(full, null, "T").pieces, full);
+});
+
+test("피스 여러 개 넣기: 글자·띄어쓰기·쉼표만 받고, 고른 자리 뒤에 차례로, 안전선까지(퍼즐 다시 보기 P5)", () => {
+  assert.deepEqual(insertPieces("", null, "tsz"), { pieces: "TSZ", at: 2, added: 3 });
+  assert.deepEqual(insertPieces("IO", 0, "S, Z"), { pieces: "ISZO", at: 2, added: 2 });
+  assert.deepEqual(
+    insertPieces("IO", null, "hello"),
+    { pieces: "IO", at: null, added: 0 },
+    "다른 글자가 섞이면 넣지 않는다"
+  );
+  const full = insertPieces("I".repeat(MAX_PUZZLE_PIECES - 1), null, "TSZ");
+  assert.equal(full.added, 1);
+  assert.equal(full.pieces.length, MAX_PUZZLE_PIECES);
 });
 
 test("피스 50개 퍼즐도 링크로 오가고, 51개는 거절한다", () => {

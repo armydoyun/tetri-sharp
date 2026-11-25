@@ -17,7 +17,7 @@ export const ACTIONS = Object.freeze([
   { id: "HOLD", label: t("홀드"), bit: BTN.HOLD },
   { id: "RESTART", label: t("다시 시작"), system: "restart" },
   { id: "PAUSE", label: t("일시정지"), system: "pause" },
-  { id: "UNDO", label: t("되돌리기 (연습)"), system: "undo" },
+  { id: "UNDO", label: t("되돌리기 (연습·퍼즐 시험)"), system: "undo" },
   { id: "HINT", label: t("힌트·첫 수 보기 (퍼즐·연습)"), system: "hint" },
   { id: "NEXT", label: t("다음 단계 (결과 화면)"), system: "next" },
 ]);

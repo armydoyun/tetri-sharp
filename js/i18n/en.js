@@ -235,15 +235,12 @@ export const EN = {
   "판을 아래로 밀기": "Shift board down",
   "판을 왼쪽으로 밀기": "Shift board left",
   "판을 오른쪽으로 밀기": "Shift board right",
-  "좌우 뒤집기": "Mirror",
   "판 지우기": "Clear board",
   "{piece} 넣기": "Add {piece}",
   "{n}번째 {piece}": "Piece {n}: {piece}",
   "고른 피스를 앞으로": "Move selected piece earlier",
   "고른 피스를 뒤로": "Move selected piece later",
   빼기: "Remove",
-  "피스를 눌러 고르면 그 뒤에 넣고, 앞뒤로 옮기거나 뺄 수 있어요(Alt+화살표·Delete).":
-    "Select a piece to insert after it, move it, or remove it (Alt+arrows, Delete).",
   "피스가 많아 첫 수를 다 찾아보지 못했어요": "Too many pieces to finish searching for the first move",
   "시작 보드": "Starting board",
   "피스 순서": "Piece sequence",
@@ -503,7 +500,7 @@ export const EN = {
     "You received a result. Press Race to run against it with the same pieces",
 
   // ---- 편의·접근성 ----
-  "되돌리기 (연습)": "Undo (practice)",
+  "되돌리기 (연습·퍼즐 시험)": "Undo (practice, puzzle test)",
   되돌리기: "Undo",
   "{mode} 시작": "{mode} started",
   "더 되돌릴 수 없어요": "Nothing more to undo",
@@ -971,7 +968,7 @@ export const EN = {
   고스트: "Ghost",
   "피스가 떨어질 자리를 흐리게 보여 줘요": "Shows where the piece will land",
   "한 번에 바닥까지 떨어뜨리고 바로 고정": "Drop to the bottom and lock at once",
-  "고정·낙하": "Lock & gravity",
+  "고정·낙하": "Lock & fall",
   "고정 방식": "Lock type",
   "움직이면 리셋 (횟수 제한)": "Move reset (limited)",
   "더 내려갔을 때만 리셋": "Step reset",
@@ -1129,4 +1126,27 @@ export const EN = {
   "전체 화면": "Full screen",
   "Esc나 브라우저의 뒤로 가기로도 끝낼 수 있어요": "You can also leave with Esc or the browser's Back",
   "주소창과 탭을 숨겨 보드를 크게 봐요": "Hide the address bar and tabs for a bigger board",
+  "좌우 뒤집기 (피스도 S와 Z, J와 L을 바꿔요)": "Mirror (also swaps S with Z and J with L)",
+  "피스와 확인": "Pieces and check",
+  판: "Board",
+  '피스를 눌러 고르면 그 뒤에 넣고, 앞뒤로 옮기거나 뺄 수 있어요(Alt+화살표·Delete). 글자 키(I J L O S T Z)로 넣거나 "TSZ" 같은 순서를 붙여 넣어도 돼요.':
+    'Select a piece to insert after it, move it, or remove it (Alt+arrows, Delete). You can also type I J L O S T Z or paste an order like "TSZ".',
+  "피스 글자(I J L O S T Z)만 붙여 넣을 수 있어요.": "Only piece letters (I J L O S T Z) can be pasted.",
+  "피스 {n}개를 넣었어요.": "Added {n} pieces.",
+  사본: "copy",
+  "복제해서 편집": "Duplicate and edit",
+  "칸 {n}개가 판 밖으로 나가 지워졌어요. 되돌리기로 돌아갈 수 있어요.":
+    "{n} cells went off the board and were removed. Undo brings them back.",
+  "고치기를 멈추면 저절로 풀 수 있는지 찾아봐요.":
+    "When you stop editing, it checks by itself whether it can be solved.",
+  "피스가 많아 확인을 눌러야 찾아봐요.": "With this many pieces, press Check to search.",
+  퍼즐로: "Puzzle",
+  "이 장면으로 퍼즐 만들기": "Make a puzzle from this moment",
+  도장: "Stamp",
+  "도장 피스": "Stamp piece",
+  "도장 돌리기 (R)": "Rotate stamp (R)",
+  "판 밖으로 나가 찍을 수 없어요. 다른 칸이나 방향을 골라 보세요.":
+    "It would go off the board. Try another cell or rotation.",
+  "누른 칸에 {piece} 모양을 찍어요. 네 칸이 다 찬 자리를 누르면 지워요. R로 돌려요.":
+    "Stamps a {piece} where you press. Press where all four cells are filled to erase. R rotates.",
 };
