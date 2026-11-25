@@ -1068,12 +1068,53 @@
   }
 }
 
+/* 퍼즐 만들기: 이름 칸 + 조작 줄, 판, 판 도구, 피스 순서 */
+.puzzle-editor {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.puzzle-editor .field-help {
+  margin: 0;
+}
+
+.puzzle-editor-row {
+  display: grid;
+  grid-template-columns: 6.5em minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.puzzle-editor-label {
+  color: var(--text-dim);
+  font-size: var(--text-s);
+}
+
+/* 힌트는 도구마다 길이가 달라도 두 줄 자리를 남긴다(판이 움직이지 않게) */
+.puzzle-editor-hint {
+  min-height: calc(2 * 1.45em);
+  font-size: var(--text-s);
+  line-height: 1.45;
+}
+
+/* 판: 보이는 줄이 적을수록 칸을 크게 */
 .puzzle-editor-board {
+  --editor-width: 220px;
   display: grid;
   grid-template-columns: repeat(10, minmax(0, 1fr));
   gap: 2px;
-  width: min(100%, 240px);
+  width: min(100%, var(--editor-width));
   margin-inline: auto;
+  touch-action: none;
+  user-select: none;
+}
+
+.puzzle-editor-board[data-rows="8"] {
+  --editor-width: 320px;
+}
+
+.puzzle-editor-board[data-rows="12"] {
+  --editor-width: 280px;
 }
 
 .puzzle-editor-cell {
@@ -1087,6 +1128,7 @@
 }
 
 .puzzle-editor-cell[aria-pressed="true"] {
+  border-color: var(--accent-ledge);
   background: var(--accent);
 }
 
@@ -1096,15 +1138,50 @@
   z-index: 1;
 }
 
+.puzzle-editor-tools,
+.puzzle-editor-pieces,
 .puzzle-editor-sequence {
-  margin-block: 12px 4px;
-}
-
-.puzzle-editor-pieces {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-block-end: 8px;
+  justify-content: center;
+  gap: var(--space-1);
+}
+
+/* [피스 순서  4 / 50 ........ ← → 빼기] */
+.puzzle-editor-seq-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block-start: var(--space-2);
+}
+
+.puzzle-editor-seq-actions {
+  display: flex;
+  gap: var(--space-1);
+  margin-inline-start: auto;
+}
+
+.puzzle-editor-count {
+  color: var(--text-dim);
+  font-size: var(--text-s);
+}
+
+/* 피스 순서: 칩 줄. 비어 있어도 한 줄 자리를 남긴다 */
+.puzzle-editor-sequence {
+  justify-content: flex-start;
+  min-height: var(--control-h-s);
+  align-content: flex-start;
+}
+
+.puzzle-editor-empty {
+  align-self: center;
+  color: var(--text-dim);
+}
+
+.puzzle-seq-chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .sprint-history summary {

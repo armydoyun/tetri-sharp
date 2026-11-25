@@ -1491,6 +1491,10 @@ const togglePuzzleHint = () => {
     $("downstack-status").textContent = t("이 판에서는 더 풀 수 없어요. 다시 시작해 보세요");
     return;
   }
+  if ("exhausted" in move) {
+    $("downstack-status").textContent = t("피스가 많아 첫 수를 다 찾아보지 못했어요");
+    return;
+  }
   p.hintCells = move.cells;
   const spinLast = ["mini", "tsd", "tst"].includes(mode.puzzle.kind);
   $("downstack-status").textContent = t("첫 수 · {steps}", { steps: describeSteps(move.steps, spinLast) });

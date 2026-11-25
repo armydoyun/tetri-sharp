@@ -141,6 +141,23 @@ const scenarios = async (page, quick) => {
   await page.click("#open-practice");
   await check("연습");
   await esc();
+  await page.click("#open-puzzles");
+  await page.click("#puzzle-create");
+  await check("퍼즐 만들기");
+  for (const tool of ["row", "garbage", "cell"]) {
+    await page.click(`#puzzle-tool [data-value="${tool}"]`);
+    await check(`퍼즐 만들기 도구=${tool}`);
+  }
+  for (const id of ["stage-1", "well"]) {
+    await page.click("#puzzle-template");
+    await page.click(`#puzzle-template-list [data-value="${id}"]`);
+    await check(`퍼즐 만들기 시작 틀=${id}`);
+  }
+  for (const h of ["12", "20", "8"]) {
+    await page.click(`#puzzle-height [data-value="${h}"]`);
+    await check(`퍼즐 만들기 높이=${h}`);
+  }
+  await esc();
   if (await page.$('[data-mode="versus"]')) {
     await page.click('[data-mode="versus"]');
     await check("CPU 대전 난이도");

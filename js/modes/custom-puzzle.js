@@ -4,7 +4,8 @@ import { MODERN } from "../rules/presets.js";
 import { makePuzzleMode } from "./puzzles.js";
 
 export const PUZZLE_CELLS = WIDTH * VISIBLE_ROWS;
-export const MAX_PUZZLE_PIECES = 6;
+/** 피스 수 안전선(판 비우기 기준 판 높이에 맞춘 넉넉한 값). 링크에서는 피스 하나가 한 글자다 */
+export const MAX_PUZZLE_PIECES = 50;
 
 /** @typedef {{ cells: Uint8Array, pieces: string }} CustomPuzzle */
 

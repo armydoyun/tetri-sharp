@@ -86,6 +86,17 @@ export const ICONS = Object.freeze({
   "chevron-right": [["path", { d: "M9.5 6.5 15 12l-5.5 5.5" }]],
   check: [["path", { d: "M5.5 12.5 10 17l8.5-9.5" }]],
   undo: [["path", { d: "M9 7.5H4.5V3M4.8 7.3A8 8 0 1 1 4.5 15" }]],
+  redo: [["path", { d: "M15 7.5h4.5V3M19.2 7.3A8 8 0 1 0 19.5 15" }]],
+  // 좌우 뒤집기: 가운데 축과 마주 보는 두 삼각형
+  mirror: [["path", { d: "M12 3v18M9 7 4 17h5zM15 7l5 10h-5z" }]],
+  // 피스 모양(퍼즐 만들기의 피스 순서): 칸 테두리만
+  "piece-I": [["path", { d: "M2 9.5h20v5H2zM7 9.5v5M12 9.5v5M17 9.5v5" }]],
+  "piece-O": [["path", { d: "M6 6h12v12H6zM12 6v12M6 12h12" }]],
+  "piece-T": [["path", { d: "M3 6h18v6h-6v6H9v-6H3zM9 6v6M15 6v6M9 12h6" }]],
+  "piece-S": [["path", { d: "M9 6h12v6h-6v6H3v-6h6zM15 6v6M9 12v6M9 12h6" }]],
+  "piece-Z": [["path", { d: "M3 6h12v6h6v6H9v-6H3zM9 6v6M15 12v6M9 12h6" }]],
+  "piece-J": [["path", { d: "M3 6h6v6h12v6H3zM3 12h6M9 12v6M15 12v6" }]],
+  "piece-L": [["path", { d: "M15 6h6v12H3v-6h12zM15 12h6M9 12v6M15 12v6" }]],
   help: [
     ["circle", { cx: 12, cy: 12, r: 8.5 }],
     ["path", { d: "M9.6 9.6a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.4v.7M12 16.6v.4" }],

@@ -94,9 +94,11 @@ const topRow = board => {
  * @param {{ board: any, active: { type: string, x: number, y: number, rot: number }, combo: number }} state  지금 판(움직이는 피스 포함)
  * @param {string[]} rest  지금 피스 다음에 쓸 피스들
  * @param {any} rotation
- * @returns {null | { cells: Array<[number, number]>, steps: string[] }}
+ * @returns {null | { exhausted: true } | { cells: Array<[number, number]>, steps: string[] }}
+ *   null: 남은 피스로는 풀 수 없다. exhausted: 살펴볼 수 있는 만큼 살폈지만 길을 찾지 못했다(피스가 많은 판) — 풀 수 없다는 뜻은 아니다.
  */
 export const findFirstMove = (puzzle, state, rest, rotation) => {
+  let exhausted = false;
   for (const half of [false, true]) {
     const budget = { left: BUDGET };
     // 여러 피스로 푸는 판은 처음 판의 높이 안에서만 놓아 본다(판 비우기·4줄·콤보 — 그 위로 쌓는 풀이는 없다)
@@ -130,8 +132,9 @@ export const findFirstMove = (puzzle, state, rest, rotation) => {
         };
       }
     }
+    if (budget.left <= 0) exhausted = true;
   }
-  return null;
+  return exhausted ? { exhausted: true } : null;
 };
 
 /**

@@ -3061,6 +3061,93 @@ test("퍼즐: 단계를 풀면 성공·다음 단계로 이어지고, 첫 화면
   await context.close();
 });
 
+test("퍼즐 만들기: 끌어서 칠하기·구멍 줄·되돌리기·높이·피스 순서 편집, 시작 틀로 만든 퍼즐을 풀면 공유할 수 있다", async () => {
+  const { context, page, errors } = await openPage(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  const pressed = () => page.$$eval('[data-cell][aria-pressed="true"]', els => els.map(e => Number(e.dataset.cell)));
+  const center = async i => {
+    const r = await page.locator(`[data-cell="${i}"]`).boundingBox();
+    return [r.x + r.width / 2, r.y + r.height / 2];
+  };
+  const drag = async (from, to) => {
+    const [x, y] = await center(from);
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    const [x2, y2] = await center(to);
+    await page.mouse.move(x2, y2, { steps: 8 });
+    await page.mouse.up();
+  };
+  await openList(page, "#open-puzzles");
+  await page.click("#puzzle-create");
+  assert.equal(await page.locator("[data-cell]").count(), 80, "처음에는 아래 8줄만 크게");
+
+  // 끌어서 칠하기 한 번 = 되돌리기 한 번
+  await drag(190, 194);
+  assert.deepEqual(await pressed(), [190, 191, 192, 193, 194]);
+  await page.keyboard.press("Control+z");
+  assert.deepEqual(await pressed(), []);
+  await page.keyboard.press("Control+Shift+z");
+  assert.deepEqual(await pressed(), [190, 191, 192, 193, 194]);
+  // 같은 칸에서 다시 끌면 지운다
+  await drag(193, 194);
+  assert.deepEqual(await pressed(), [190, 191, 192]);
+
+  // 구멍 줄: 처음 누른 열(5)을 구멍으로 두고 위로 끈 줄마다
+  await page.click('#puzzle-tool [data-value="garbage"]');
+  await drag(185, 165);
+  for (const r of [16, 17, 18]) {
+    const line = (await pressed()).filter(i => Math.floor(i / 10) === r).map(i => i % 10);
+    assert.deepEqual(line, [0, 1, 2, 3, 4, 6, 7, 8, 9], `${r}행`);
+  }
+  await page.click("#puzzle-undo");
+  assert.deepEqual(await pressed(), [190, 191, 192]);
+
+  // 높이: 20줄이면 칸이 다 보이고, 블록이 8줄 위에 있으면 8줄은 고를 수 없다
+  await page.click('#puzzle-height [data-value="20"]');
+  assert.equal(await page.locator("[data-cell]").count(), 200);
+  await page.click('[data-cell="0"]');
+  assert.ok(await page.locator('#puzzle-height [data-value="8"]').isDisabled());
+  await page.click("#puzzle-undo");
+  await page.click('#puzzle-height [data-value="8"]');
+  assert.equal(await page.locator("[data-cell]").count(), 80);
+
+  // 피스 순서: 고른 피스 뒤에 넣고, Delete로 빼고, Alt+화살표로 옮긴다
+  const sequence = () => page.$$eval(".puzzle-seq-chip", els => els.map(e => e.textContent).join(""));
+  for (const piece of ["T", "I", "O"]) await page.click(`#puzzles [data-piece="${piece}"]`);
+  await page.click('.puzzle-seq-chip[data-at="0"]');
+  await page.click('#puzzles [data-piece="S"]');
+  assert.equal(await sequence(), "TSIO");
+  await page.focus('.puzzle-seq-chip[data-at="1"]');
+  await page.keyboard.press("Alt+ArrowRight");
+  assert.equal(await sequence(), "TISO");
+  await page.keyboard.press("Delete");
+  assert.equal(await sequence(), "TIO");
+  assert.equal(await text(page, "puzzles .puzzle-editor-count"), `3 / 50`);
+
+  // 시작 틀: 퍼즐 1단계를 복사해 시험 플레이로 풀면 링크를 복사할 수 있다(되돌리면 이전 판)
+  const stage = PUZZLES[0];
+  await page.click("#puzzle-template");
+  await page.click(`#puzzle-template-list [data-value="stage-${stage.number}"]`);
+  assert.equal(await sequence(), stage.pieces.join(""));
+  await page.click("#puzzle-undo");
+  assert.equal(await sequence(), "TIO");
+  await page.click("#puzzle-redo");
+  await page.click("#puzzle-trial");
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  for (const key of keysFor(solvePuzzle(stage))) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(20);
+  }
+  await page.waitForFunction(() => document.body.dataset.screen === "results");
+  assert.equal(await text(page, "results-title"), "성공!");
+  await page.click('#results [data-action="export"]');
+  assert.ok(await page.locator("#puzzle-copy").isEnabled());
+  assert.equal(await sequence(), stage.pieces.join(""), "다시 연 편집기는 시험한 퍼즐 그대로");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
 test("만든 퍼즐: 시험 플레이 성공 후에만 공유하고, 휴대폰에서 링크를 열어 풀 수 있다", async () => {
   const { context, page, errors } = await openPage(() => {
     localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
