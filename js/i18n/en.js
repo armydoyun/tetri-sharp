@@ -968,7 +968,7 @@ export const EN = {
   고스트: "Ghost",
   "피스가 떨어질 자리를 흐리게 보여 줘요": "Shows where the piece will land",
   "한 번에 바닥까지 떨어뜨리고 바로 고정": "Drop to the bottom and lock at once",
-  "고정·낙하": "Lock & gravity",
+  "고정·낙하": "Lock & fall",
   "고정 방식": "Lock type",
   "움직이면 리셋 (횟수 제한)": "Move reset (limited)",
   "더 내려갔을 때만 리셋": "Step reset",
