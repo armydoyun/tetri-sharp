@@ -1093,6 +1093,19 @@
 }
 
 /* 퍼즐 만들기: 이름 칸 + 조작 줄, 판, 판 도구, 피스 순서 */
+#puzzles:has(> .puzzle-editor) {
+  overflow: hidden;
+}
+
+#puzzles > .puzzle-editor {
+  min-block-size: 0;
+  overscroll-behavior: contain;
+}
+
+#puzzles:has(> .puzzle-editor) > :is(.dialog-head, .dialog-foot) {
+  flex: none;
+}
+
 .puzzle-editor {
   display: grid;
   gap: var(--space-2);
@@ -1105,7 +1118,8 @@
 /* 판과 피스를 한 화면에(퍼즐 다시 보기 P2): 좁으면 [판] 아래 [피스·확인], 넓으면 두 칸 */
 .puzzle-editor-work,
 .puzzle-editor-canvas,
-.puzzle-editor-side {
+.puzzle-editor-side,
+.puzzle-editor-queue {
   display: grid;
   align-content: start;
   gap: var(--space-2);
@@ -1116,10 +1130,6 @@
   .puzzle-editor-work {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: var(--space-4);
-  }
-
-  .puzzle-editor-side .puzzle-editor-seq-head {
-    margin-block-start: 0;
   }
 }
 
@@ -1225,7 +1235,6 @@
 }
 
 .puzzle-editor-tools,
-.puzzle-editor-pieces,
 .puzzle-editor-sequence {
   display: flex;
   flex-wrap: wrap;
@@ -1312,13 +1321,49 @@
   white-space: nowrap;
 }
 
+.puzzle-editor-palette {
+  display: grid;
+  gap: var(--space-1);
+  padding-block: var(--space-2);
+  border-bottom: var(--border-w) solid var(--border);
+  background: var(--surface);
+}
+
+.puzzle-editor-pieces {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.puzzle-editor-queue {
+  container-type: inline-size;
+}
+
+@container (min-width: 340px) {
+  .puzzle-editor-pieces {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
+/* 낮은 창에서는 본문에 피스 팔레트가 차지하는 공간을 남기지 않는다. */
+@media (min-height: 520px) {
+  .puzzle-editor-palette {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 2;
+  }
+
+  .puzzle-editor-queue :is(.puzzle-editor-seq-actions, .puzzle-editor-sequence) > button {
+    scroll-margin-block-start: calc(2 * max(var(--control-h), var(--touch-min, 0px)) + 2 * var(--space-5));
+  }
+}
+
 /* [피스 순서  4 / 50 ........ ← → 빼기] */
 .puzzle-editor-seq-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
-  margin-block-start: var(--space-2);
 }
 
 .puzzle-editor-seq-actions {
@@ -1347,12 +1392,6 @@
 .puzzle-editor-empty {
   align-self: center;
   color: var(--text-dim);
-}
-
-.puzzle-seq-chip[aria-pressed="true"] {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
 }
 
 .sprint-history summary {

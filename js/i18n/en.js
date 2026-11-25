@@ -244,6 +244,7 @@ export const EN = {
   "피스가 많아 첫 수를 다 찾아보지 못했어요": "Too many pieces to finish searching for the first move",
   "시작 보드": "Starting board",
   "피스 순서": "Piece sequence",
+  "피스 추가": "Add pieces",
   "피스 추가 (최대 {n}개)": "Add pieces (up to {n})",
   "링크의 퍼즐을 읽을 수 없었어요.": "Could not read the puzzle link.",
   "원래 판": "Original",

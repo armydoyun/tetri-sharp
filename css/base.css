@@ -43,6 +43,11 @@ html:has(> body:not([data-screen="menu"], [data-game-surface="scheme"])):has(dia
   background: color-mix(in srgb, rgb(0 0 0) 60%, var(--game-bg));
 }
 
+/* 퍼즐 편집기에서는 대화상자 본문만 스크롤한다. */
+html:has(#puzzles:modal > .puzzle-editor) {
+  overflow: hidden;
+}
+
 body {
   overscroll-behavior: none;
   transition: background-color 180ms var(--ease);
