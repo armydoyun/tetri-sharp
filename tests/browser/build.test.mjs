@@ -3685,7 +3685,11 @@ test("휴대폰: 일시정지·결과 카드가 잘리지 않고, 리플레이 �
     await page.waitForFunction(() => document.body.dataset.screen === "replay");
     await page.waitForTimeout(100);
     const board = await page.locator("#board").boundingBox();
-    assert.ok(board.width >= 110 && board.height >= 150, `리플레이 보드 ${board.width}×${board.height} · ${where}`);
+    // 알아볼 수 있는지는 판(10칸) 폭으로 본다 — 옆 홀드·다음 칸 폭은 화면마다 다르다(휴대폰 세로 2칸, 5차 검수 G2).
+    // 68px = 예전 기준(캔버스 110px, 16칸 중 10칸)과 같은 판 폭
+    const cols = Math.round((board.width / board.height) * 22);
+    const field = (board.width * 10) / cols;
+    assert.ok(field >= 68 && board.height >= 150, `리플레이 판 ${field}×${board.height}(${cols}칸) · ${where}`);
     await page.locator('[data-replay="share"]').scrollIntoViewIfNeeded();
     assert.deepEqual(await reachable(".replay-bar .btn"), [], `리플레이 조작이 스크롤로 다 닿는다 · ${where}`);
     assert.deepEqual(errors, []);

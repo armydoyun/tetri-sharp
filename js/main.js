@@ -335,10 +335,14 @@ const showPanel = name => {
   for (const [key, el] of Object.entries(panels)) el.hidden = key !== name;
   // 결과 화면은 버튼이 아니라 패널 자체에 포커스를 둔다: 하드 드롭(Space)을 연타하다 끝났을 때
   // 그 입력이 "다시 하기"를 눌러 결과를 건너뛰지 않게. 다시 하기·메뉴는 단축키(R·Esc)나 클릭으로.
+  // 첫 화면은 toMenu가 포커스를 정한다(마지막 모드·이어서 하기, 대화상자를 닫으면 연 버튼). 여기서 첫 버튼에 두면
+  // 맨 위로 옮긴 처음 안내의 "안내 보기"가 포커스를 가져간다(5차 검수 U60)
   const target =
     name === "results" || name === "sceneResult"
       ? panels[name]
-      : name && /** @type {HTMLElement | null} */ (panels[name].querySelector("button:not(:disabled)"));
+      : name && name !== "menu"
+        ? /** @type {HTMLElement | null} */ (panels[name].querySelector("button:not(:disabled)"))
+        : null;
   target?.focus();
   if (!name && document.activeElement instanceof HTMLElement) document.activeElement.blur();
 };
