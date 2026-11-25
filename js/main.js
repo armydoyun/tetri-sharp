@@ -1620,6 +1620,7 @@ const puzzleUI = createPuzzleUI({
   onCreate: () => puzzleEditor.openNew(),
   onEdit: id => puzzleEditor.openEntry(id),
   onPlayMade: id => puzzleEditor.playEntry(id),
+  onDuplicate: id => puzzleEditor.openDuplicate(id),
   onPlayReceived: code => playCustomPuzzle(code),
   onCopyReceived: code => puzzleEditor.openCopy(code),
 });

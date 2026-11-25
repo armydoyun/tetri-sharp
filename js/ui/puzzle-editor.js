@@ -33,6 +33,7 @@ import {
   createHistory,
   fitHeight,
   insertPiece,
+  insertPieces,
   mirrorCells,
   mirrorPieces,
   movePiece,
@@ -105,6 +106,12 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
   let settings = defaultSettings();
   /** 지금 편집 중인 퍼즐 */
   const current = () => ({ cells, pieces, ...settings });
+  /**
+   * 확인 표시(자동 확인·직접 풀어 봄)를 붙이는 열쇠: 이름·설명을 뺀 퍼즐 코드. 이름만 고쳐도 확인이 사라지던 것(퍼즐 다시 보기 P12)
+   * @param {any} p
+   */
+  const contentKey = p => encodePuzzle({ ...p, title: "", desc: "" });
+  const keyNow = () => contentKey(current());
   let cleared = /** @type {string | null} */ (null);
   /** 내 퍼즐에서 편집 중인 퍼즐의 id(아직 저장 전이면 null) */
   let entryId = /** @type {string | null} */ (null);
@@ -150,11 +157,11 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
     stopChecking();
   });
 
-  /** 그 퍼즐 코드에 붙일 확인 표시: 자동 확인으로 풀었는지, 직접 풀어 봤는지(이번에, 또는 저장돼 있던 것) */
-  const checkedFor = code =>
-    (verified?.code === code && verified.state === "solvable" ? CHECKED_AUTO : 0) |
-    (cleared === code ? CHECKED_TRIED : 0) |
-    (loaded?.code === code ? loaded.checked : 0);
+  /** 그 퍼즐(열쇠 contentKey)에 붙일 확인 표시: 자동 확인으로 풀었는지, 직접 풀어 봤는지(이번에, 또는 저장돼 있던 것) */
+  const checkedFor = key =>
+    (verified?.code === key && verified.state === "solvable" ? CHECKED_AUTO : 0) |
+    (cleared === key ? CHECKED_TRIED : 0) |
+    (loaded?.code === key ? loaded.checked : 0);
   /** 내 퍼즐에 저장한다(고칠 때마다 저절로). 링크로 보낼 수 있는 퍼즐만 */
   const save = () => {
     const code = encodePuzzle(current());
@@ -164,7 +171,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
     }
     const id = customs.save(
       entryId,
-      encodePuzzle({ ...current(), checked: checkedFor(code) }, { checked: true }) ?? ""
+      encodePuzzle({ ...current(), checked: checkedFor(keyNow()) }, { checked: true }) ?? ""
     );
     if (id) entryId = id;
     saveState = id ? "saved" : "full";
@@ -174,8 +181,8 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
     cells = puzzle ? puzzle.cells : new Uint8Array(PUZZLE_CELLS);
     pieces = puzzle ? puzzle.pieces : "";
     settings = puzzle ? settingsOf(puzzle) : defaultSettings();
-    const code = puzzle && encodePuzzle(puzzle);
-    loaded = code && puzzle ? { code, checked: puzzle.checked } : null;
+    const key = puzzle && contentKey(puzzle);
+    loaded = key && puzzle ? { code: key, checked: puzzle.checked } : null;
     entryId = id;
     cleared = null;
     selected = null;
@@ -193,8 +200,9 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       reset(puzzle, customs.findByCode(code)?.id ?? null);
     },
     markCleared(code) {
-      if (code !== encodePuzzle(current())) return;
-      cleared = code;
+      const puzzle = decodePuzzle(code);
+      if (!puzzle || contentKey(puzzle) !== keyNow()) return;
+      cleared = keyNow();
       save();
     },
     /** 새 퍼즐 */
@@ -217,6 +225,21 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       if (!puzzle) return;
       reset(puzzle, id);
       onTry(/** @type {string} */ (encodePuzzle(puzzle)));
+    },
+    /**
+     * 내 퍼즐을 복제해 새 내 퍼즐로 연다(퍼즐 다시 보기 P6): 같은 판으로 피스만 다른 쉬운·어려운 변형을 만들 때.
+     * 확인 표시는 빼고, 이름 뒤에 "사본"
+     * @param {string} id
+     */
+    openDuplicate(id) {
+      const item = customs.find(id);
+      const puzzle = item && decodePuzzle(item.code);
+      if (!puzzle) return editor.openNew();
+      const suffix = ` ${t("사본")}`;
+      const title = `${(puzzle.title || t("만든 퍼즐")).slice(0, MAX_TITLE - suffix.length)}${suffix}`;
+      reset({ ...puzzle, checked: 0, title });
+      save();
+      editor.open();
     },
     /** 받은 퍼즐을 복사해 새 내 퍼즐로(확인 표시는 빼고) @param {string} code */
     openCopy(code) {
@@ -307,7 +330,20 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         ["arrow-left", t("판을 왼쪽으로 밀기"), -1, 0],
         ["arrow-right", t("판을 오른쪽으로 밀기"), 1, 0],
       ]).map(([icon, label, dx, dy]) =>
-        iconButton({ icon, label, "data-shift": `${dx},${dy}`, onClick: () => edit(() => shiftCells(cells, dx, dy)) })
+        iconButton({
+          icon,
+          label,
+          "data-shift": `${dx},${dy}`,
+          onClick: () => {
+            const filled = board => board.reduce((n, v) => n + (v ? 1 : 0), 0);
+            const before = filled(cells);
+            edit(() => shiftCells(cells, dx, dy));
+            // 밖으로 나간 칸은 지워진다 — 조용히 사라지지 않게 알린다(퍼즐 다시 보기 P7). 일부러 바닥 줄을 지울 때도 쓴다
+            const lost = before - filled(cells);
+            if (lost > 0)
+              notice.textContent = t("칸 {n}개가 판 밖으로 나가 지워졌어요. 되돌리기로 돌아갈 수 있어요.", { n: lost });
+          },
+        })
       );
       // 판과 함께 피스 순서·처음 홀드 피스도 뒤집는다(S와 Z, J와 L을 서로 바꿈) — 되돌리기 한 번으로 함께 돌아간다
       const mirror = iconButton({
@@ -682,11 +718,11 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         renderSettings();
         trial.disabled = !code;
         // 퍼즐이 바뀌었으면 찾던 확인은 멈추고, 지난 결과는 쓰지 않는다
-        if (verified && verified.code !== code) {
+        if (verified && verified.code !== keyNow()) {
           stopChecking();
           verified = null;
         }
-        const checkedNow = code ? checkedFor(code) : 0;
+        const checkedNow = code ? checkedFor(keyNow()) : 0;
         const tried = Boolean(checkedNow & CHECKED_TRIED);
         const solvable = Boolean(checkedNow & CHECKED_AUTO) && canSearch(current());
         copy.disabled = !code || !(tried || solvable);
@@ -768,7 +804,8 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         return code ? t("확인을 누르면 풀 수 있는지 찾아봐요.") : "";
       };
       const changed = () => {
-        cleared = null;
+        // 이름·설명만 고쳤으면 직접 풀어 본 표시는 그대로
+        if (cleared !== keyNow()) cleared = null;
         viewStep = null;
         // 민 판이 보이는 높이 위로 올라가면 다 보이게 넓힌다
         if (usedHeight(cells) > height) {
@@ -899,6 +936,29 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         editPieces(removePiece(pieces, selected));
         if (remove.disabled) add[0].focus();
       });
+      // 글자 키로 넣기·순서 글자 붙여 넣기(퍼즐 다시 보기 P5): 피스 칸(순서·버튼)에 포커스가 있을 때 I J L O S T Z,
+      // 붙여 넣기는 글자 입력 칸 밖이면 어디서나. 여러 글자도 되돌리기 한 번
+      const pieceKeys = event => {
+        if (event.ctrlKey || event.metaKey || event.altKey || !/^[ijlostz]$/i.test(event.key)) return;
+        event.preventDefault();
+        editPieces(insertPiece(pieces, selected, event.key.toUpperCase()));
+      };
+      sequence.addEventListener("keydown", pieceKeys);
+      for (const piece of add) piece.addEventListener("keydown", pieceKeys);
+      const pastePieces = (/** @type {ClipboardEvent} */ event) => {
+        const target = /** @type {HTMLElement} */ (event.target);
+        if (target instanceof HTMLInputElement && target.type !== "checkbox") return;
+        const text = event.clipboardData?.getData("text") ?? "";
+        if (!text.trim()) return;
+        event.preventDefault();
+        const result = insertPieces(pieces, selected, text.trim());
+        if (!result.added) {
+          notice.textContent = t("피스 글자(I J L O S T Z)만 붙여 넣을 수 있어요.");
+          return;
+        }
+        editPieces(result);
+        notice.textContent = t("피스 {n}개를 넣었어요.", { n: result.added });
+      };
       moveBack.addEventListener("click", () => selected !== null && editPieces(movePiece(pieces, selected, -1)));
       moveForward.addEventListener("click", () => selected !== null && editPieces(movePiece(pieces, selected, 1)));
       sequence.addEventListener("keydown", event => {
@@ -920,7 +980,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       });
 
       check.addEventListener("click", () => {
-        const code = encodePuzzle(current());
+        const code = keyNow();
         if (!code || checking || !canSearch(current())) return;
         verified = { code, state: "checking" };
         const search = solver.run(solutionTask(current()));
@@ -972,7 +1032,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         const code = encodePuzzle(current());
         if (!code || copy.disabled) return;
         // 받는 쪽에 보일 확인 표시: 자동 확인으로 풀 수 있었는지, 만든 사람이 직접 풀어 봤는지
-        const checked = checkedFor(code);
+        const checked = checkedFor(keyNow());
         const url = puzzleLink(encodePuzzle({ ...current(), checked }, { checked: true }) ?? code, location.href);
         const copied = await copyText(url);
         // 복사하는 사이 퍼즐을 고쳤거나 대화상자를 닫았으면 알리지 않는다
@@ -1067,7 +1127,9 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
               el(
                 "p",
                 { class: "field-help" },
-                t("피스를 눌러 고르면 그 뒤에 넣고, 앞뒤로 옮기거나 뺄 수 있어요(Alt+화살표·Delete).")
+                t(
+                  '피스를 눌러 고르면 그 뒤에 넣고, 앞뒤로 옮기거나 뺄 수 있어요(Alt+화살표·Delete). 글자 키(I J L O S T Z)로 넣거나 "TSZ" 같은 순서를 붙여 넣어도 돼요.'
+                )
               ),
               el(
                 "div",
@@ -1090,6 +1152,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         actions: [trial, copy],
         closeId: "puzzle-editor-close",
       });
+      dialog.querySelector(".puzzle-editor")?.addEventListener("paste", pastePieces);
       layoutBoard();
       refresh();
       dialog.showModal();

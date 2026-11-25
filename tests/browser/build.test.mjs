@@ -3185,6 +3185,12 @@ test("퍼즐 만들기: 끌어서 칠하기·구멍 줄·되돌리기·높이·�
   // 끌어서 칠하기 한 번 = 되돌리기 한 번
   await drag(190, 194);
   assert.deepEqual(await pressed(), [190, 191, 192, 193, 194]);
+  // 바닥 줄을 아래로 밀면 지워지고, 그렇다고 알린다(퍼즐 다시 보기 P7). 되돌리면 돌아온다
+  await page.click('#puzzles [data-shift="0,1"]');
+  assert.deepEqual(await pressed(), []);
+  assert.match(await page.locator("#puzzles .dialog-foot .notice-slot").textContent(), /칸 5개가 판 밖으로/);
+  await page.keyboard.press("Control+z");
+  assert.deepEqual(await pressed(), [190, 191, 192, 193, 194]);
   await page.keyboard.press("Control+z");
   assert.deepEqual(await pressed(), []);
   await page.keyboard.press("Control+Shift+z");
@@ -3231,6 +3237,20 @@ test("퍼즐 만들기: 끌어서 칠하기·구멍 줄·되돌리기·높이·�
   await page.keyboard.press("Delete");
   assert.equal(await sequence(), "TIO");
   assert.equal(await text(page, "puzzles .puzzle-editor-count"), `3 / 50`);
+  // 글자 키로 넣고, "S J" 같은 순서 글자를 붙여 넣는다 — 되돌리기는 키 한 번·붙여 넣기 한 번(퍼즐 다시 보기 P5)
+  await page.click('.puzzle-seq-chip[data-at="2"]');
+  await page.focus('#puzzles [data-piece="I"]');
+  await page.keyboard.press("z");
+  assert.equal(await sequence(), "TIOZ");
+  await page.evaluate(() => {
+    const data = new DataTransfer();
+    data.setData("text/plain", "s j");
+    document.activeElement.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true }));
+  });
+  assert.equal(await sequence(), "TIOZSJ");
+  await page.click("#puzzle-undo");
+  await page.click("#puzzle-undo");
+  assert.equal(await sequence(), "TIO");
 
   // 시작 틀: 퍼즐 1단계를 복사해 시험 플레이로 풀면 링크를 복사할 수 있다(되돌리면 이전 판)
   const stage = PUZZLES[0];
@@ -3467,6 +3487,20 @@ test("내 퍼즐·받은 퍼즐: 고치면 저절로 저장되고, 목록에서 
   await openTab("mine");
   assert.equal((await rows()).length, 1);
   assert.match((await rows())[0], /^고친 퍼즐 /);
+  assert.match((await rows())[0], /직접 풀어 봄/, "이름만 고치면 확인 표시는 그대로(퍼즐 다시 보기 P12)");
+
+  // 복제(퍼즐 다시 보기 P6): 같은 판·피스의 새 내 퍼즐을 열고, 확인 표시는 빼며 원본은 그대로
+  await page.click("[data-made-duplicate]");
+  assert.equal(await page.inputValue("#puzzle-title"), "고친 퍼즐 사본");
+  await page.click("#puzzle-editor-close");
+  await openTab("mine");
+  const afterCopy = await rows();
+  assert.equal(afterCopy.length, 2);
+  assert.ok(afterCopy.some(r => /^고친 퍼즐 사본 .*확인 안 됨/.test(r)));
+  assert.ok(afterCopy.some(r => /^고친 퍼즐 .*직접 풀어 봄/.test(r)));
+  await page.click('.custom-puzzle-row:has-text("사본") [data-made-delete]');
+  await page.click('.custom-puzzle-row:has-text("사본") [data-made-delete]');
+  assert.equal((await rows()).length, 1);
 
   // 받는 쪽: 링크로 열면 받은 퍼즐에 남고, 못 풀면 '아직', 풀면 시간
   const other = await browser.newContext({ locale: "ko-KR" });

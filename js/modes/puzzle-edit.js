@@ -91,6 +91,25 @@ export const insertPiece = (pieces, at, piece) => {
   return { pieces: pieces.slice(0, i) + piece + pieces.slice(i), at: i };
 };
 
+/**
+ * 피스 글자 여러 개를 고른 자리 뒤에 차례로 넣는다(퍼즐 다시 보기 P5: 글자 키·붙여 넣기).
+ * 피스 글자와 띄어쓰기·쉼표·점·줄표만 있는 글이어야 한다("TSZ", "t s z", "I, O, T") — 다른 글자가 섞이면 넣지 않는다.
+ * 안전선(50개)을 넘는 글자는 버린다. added: 실제로 넣은 개수
+ * @param {string} pieces @param {number | null} at @param {string} text
+ */
+export const insertPieces = (pieces, at, text) => {
+  if (!/^[IJLOSTZ\s,.\-·]+$/i.test(text)) return { pieces, at, added: 0 };
+  let next = { pieces, at };
+  let added = 0;
+  for (const piece of text.toUpperCase().replace(/[^IJLOSTZ]/g, "")) {
+    const result = insertPiece(next.pieces, next.at, piece);
+    if (result.pieces === next.pieces) break;
+    next = result;
+    added += 1;
+  }
+  return { ...next, added };
+};
+
 /** 고른 자리(없으면 마지막)를 뺀다. 그다음 고를 자리는 같은 자리(끝이면 하나 앞). */
 export const removePiece = (pieces, at) => {
   if (!pieces.length) return { pieces, at: null };

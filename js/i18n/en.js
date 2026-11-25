@@ -241,8 +241,6 @@ export const EN = {
   "고른 피스를 앞으로": "Move selected piece earlier",
   "고른 피스를 뒤로": "Move selected piece later",
   빼기: "Remove",
-  "피스를 눌러 고르면 그 뒤에 넣고, 앞뒤로 옮기거나 뺄 수 있어요(Alt+화살표·Delete).":
-    "Select a piece to insert after it, move it, or remove it (Alt+arrows, Delete).",
   "피스가 많아 첫 수를 다 찾아보지 못했어요": "Too many pieces to finish searching for the first move",
   "시작 보드": "Starting board",
   "피스 순서": "Piece sequence",
@@ -1131,4 +1129,12 @@ export const EN = {
   "좌우 뒤집기 (피스도 S와 Z, J와 L을 바꿔요)": "Mirror (also swaps S with Z and J with L)",
   "피스와 확인": "Pieces and check",
   판: "Board",
+  '피스를 눌러 고르면 그 뒤에 넣고, 앞뒤로 옮기거나 뺄 수 있어요(Alt+화살표·Delete). 글자 키(I J L O S T Z)로 넣거나 "TSZ" 같은 순서를 붙여 넣어도 돼요.':
+    'Select a piece to insert after it, move it, or remove it (Alt+arrows, Delete). You can also type I J L O S T Z or paste an order like "TSZ".',
+  "피스 글자(I J L O S T Z)만 붙여 넣을 수 있어요.": "Only piece letters (I J L O S T Z) can be pasted.",
+  "피스 {n}개를 넣었어요.": "Added {n} pieces.",
+  사본: "copy",
+  "복제해서 편집": "Duplicate and edit",
+  "칸 {n}개가 판 밖으로 나가 지워졌어요. 되돌리기로 돌아갈 수 있어요.":
+    "{n} cells went off the board and were removed. Undo brings them back.",
 };

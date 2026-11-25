@@ -12,6 +12,7 @@ import {
   createHistory,
   fitHeight,
   insertPiece,
+  insertPieces,
   mirrorCells,
   mirrorPieces,
   movePiece,
@@ -129,6 +130,19 @@ test("피스 순서: 고른 자리 뒤에 넣기, 빼기, 옮기기, 안전선",
   assert.deepEqual(movePiece("TOI", 0, -1), { pieces: "TOI", at: 0 }, "맨 앞은 더 앞으로 못 간다");
   const full = "I".repeat(MAX_PUZZLE_PIECES);
   assert.equal(insertPiece(full, null, "T").pieces, full);
+});
+
+test("피스 여러 개 넣기: 글자·띄어쓰기·쉼표만 받고, 고른 자리 뒤에 차례로, 안전선까지(퍼즐 다시 보기 P5)", () => {
+  assert.deepEqual(insertPieces("", null, "tsz"), { pieces: "TSZ", at: 2, added: 3 });
+  assert.deepEqual(insertPieces("IO", 0, "S, Z"), { pieces: "ISZO", at: 2, added: 2 });
+  assert.deepEqual(
+    insertPieces("IO", null, "hello"),
+    { pieces: "IO", at: null, added: 0 },
+    "다른 글자가 섞이면 넣지 않는다"
+  );
+  const full = insertPieces("I".repeat(MAX_PUZZLE_PIECES - 1), null, "TSZ");
+  assert.equal(full.added, 1);
+  assert.equal(full.pieces.length, MAX_PUZZLE_PIECES);
 });
 
 test("피스 50개 퍼즐도 링크로 오가고, 51개는 거절한다", () => {
