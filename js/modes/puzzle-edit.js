@@ -1,6 +1,9 @@
 // 퍼즐 만들기의 편집 동작(DOM 없이 돈다 — 단위 테스트가 직접 부른다).
 // 판은 위에서 아래로 VISIBLE_ROWS줄 × WIDTH칸, 칸 값은 0(빔)·1(참)이다. index = row * WIDTH + col.
-import { VISIBLE_ROWS, WIDTH, createBoard } from "../core/board.js";
+import { HEIGHT, VISIBLE_ROWS, WIDTH, collides, createBoard } from "../core/board.js";
+import { GARBAGE } from "../core/pieces.js";
+import { ROTATIONS } from "../rules/rotation/index.js";
+import { spawnOf } from "./puzzle-solver.js";
 import { PUZZLE_CELLS, MAX_PUZZLE_PIECES } from "./custom-puzzle.js";
 import { PUZZLES } from "./puzzles.js";
 
@@ -184,4 +187,49 @@ export const template = id => {
   const number = Number(/^stage-(\d+)$/.exec(id)?.[1]);
   const stage = COPYABLE_STAGES.find(p => p.number === number);
   return stage ? { cells: stageCells(stage), pieces: stage.pieces.join("") } : null;
+};
+
+// ---- 자동 확인·미리 막아 주기 ----
+
+/** 편집 칸(보이는 20줄)을 엔진 판(40줄) 칸으로 */
+export const solverBoard = cells => {
+  const board = new Uint8Array(WIDTH * HEIGHT);
+  board.set(
+    cells.map(v => v * GARBAGE),
+    board.length - PUZZLE_CELLS
+  );
+  return board;
+};
+
+/**
+ * 만들기 전에 알려 줄 것(판 비우기 기준).
+ * - count: 칸 수와 피스로는 블록 수가 10의 배수가 되지 않아 판을 다 비울 수 없다
+ * - full: 다 찬 줄이 있다(처음부터 지워질 줄)
+ * - spawn: 첫 피스가 나온 자리 바로 아래가 막혀 판으로 내려오지 못한다
+ * @param {Uint8Array} cells
+ * @param {string} pieces
+ * @param {string} [rotationId]
+ * @returns {Array<{ key: "count", cells: number } | { key: "full" } | { key: "spawn" }>}
+ */
+export const puzzleWarnings = (cells, pieces, rotationId = "srs") => {
+  /** @type {ReturnType<typeof puzzleWarnings>} */
+  const out = [];
+  const filled = cells.reduce((n, v) => n + v, 0);
+  // 판을 비우는 순간 끝나므로 피스를 다 쓰지 않아도 된다: 앞에서 k개를 놓은 블록 수가 10의 배수가 되는 k가 있어야 한다
+  const reachable = Array.from({ length: pieces.length }, (_, k) => filled + (k + 1) * 4).some(n => n % WIDTH === 0);
+  if (pieces.length && filled && !reachable) out.push({ key: "count", cells: filled });
+  for (let row = 0; row < VISIBLE_ROWS; row++)
+    if (cells.subarray(row * WIDTH, (row + 1) * WIDTH).every(Boolean)) {
+      out.push({ key: "full" });
+      break;
+    }
+  if (pieces.length) {
+    const rotation = ROTATIONS[rotationId] ?? ROTATIONS.srs;
+    const board = { width: WIDTH, height: HEIGHT, cells: solverBoard(cells) };
+    const type = /** @type {import("../core/pieces.js").PieceType} */ (pieces[0]);
+    const s = spawnOf(board, rotation, type);
+    // 피스는 보이는 판 위(숨은 줄)에 나온다. 바로 아래 칸이 막혀 내려오지 못하면 시작하자마자 끝난다
+    if (collides(board, rotation.cells(type, s.rot), s.x, s.y + 1)) out.push({ key: "spawn" });
+  }
+  return out;
 };

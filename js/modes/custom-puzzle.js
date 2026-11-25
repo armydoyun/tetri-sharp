@@ -2,6 +2,7 @@ import { VISIBLE_ROWS, WIDTH } from "../core/board.js";
 import { GARBAGE } from "../core/pieces.js";
 import { MODERN } from "../rules/presets.js";
 import { makePuzzleMode } from "./puzzles.js";
+import { goalOf } from "./puzzle-goals.js";
 
 export const PUZZLE_CELLS = WIDTH * VISIBLE_ROWS;
 /** 피스 수 안전선(판 비우기 기준 판 높이에 맞춘 넉넉한 값). 링크에서는 피스 하나가 한 글자다 */
@@ -55,7 +56,7 @@ export const customPuzzleMode = ({ cells, pieces }) => {
         cells.map(value => value * GARBAGE),
         board.cells.length - PUZZLE_CELLS
       ),
-    goal: event => event.perfect,
+    ...goalOf("pc", pieces.length),
   };
   return makePuzzleMode(puzzle, RULES);
 };

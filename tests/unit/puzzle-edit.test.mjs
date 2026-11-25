@@ -1,4 +1,5 @@
-// 퍼즐 만들기 편집 동작(js/modes/puzzle-edit.js): 칠하기 도구, 밀기·뒤집기, 피스 순서, 되돌리기, 시작 틀
+// 퍼즐 만들기(js/modes/puzzle-edit.js·puzzle-solver.js·app/solver.js): 칠하기 도구, 밀기·뒤집기, 피스 순서, 되돌리기, 시작 틀,
+// 자동 확인(풀이 탐색), 미리 막아 주기
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { WIDTH } from "../../js/core/board.js";
@@ -13,8 +14,10 @@ import {
   insertPiece,
   mirrorCells,
   movePiece,
+  puzzleWarnings,
   removePiece,
   shiftCells,
+  solverBoard,
   strokeValue,
   template,
   usedHeight,
@@ -27,6 +30,10 @@ import {
   encodePuzzle,
 } from "../../js/modes/custom-puzzle.js";
 import { findFirstMove } from "../../js/modes/puzzle-hint.js";
+import { runSolverTask } from "../../js/modes/puzzle-solver.js";
+import { goalOf } from "../../js/modes/puzzle-goals.js";
+import { PUZZLES } from "../../js/modes/puzzles.js";
+import { createSolver } from "../../js/app/solver.js";
 
 const BOTTOM = PUZZLE_CELLS - WIDTH;
 const row = (cells, r) => [...cells.subarray(r * WIDTH, (r + 1) * WIDTH)].join("");
@@ -160,4 +167,96 @@ test("첫 수 보기: 다 찾아보지 못하면 풀 수 없다고 하지 않는
     ROTATIONS[MODERN.rotation]
   );
   assert.deepEqual(move, { exhausted: true });
+});
+
+test("자동 확인: 시작 틀의 풀이를 처음부터 끝까지 찾고, 수마다 놓기 전 판과 놓을 칸 네 개", () => {
+  const start = template("stage-14") ?? template("well");
+  const result = runSolverTask({
+    type: "solution",
+    kind: "pc",
+    count: start.pieces.length,
+    rotation: "srs",
+    board: solverBoard(start.cells),
+    pieces: [...start.pieces],
+  });
+  assert.ok(result && "moves" in result);
+  assert.ok(result.moves.length >= 1 && result.moves.length <= start.pieces.length);
+  for (const [i, move] of result.moves.entries()) {
+    assert.equal(move.type, start.pieces[i]);
+    assert.equal(move.cells.length, 4);
+    for (const [x, y] of move.cells) assert.equal(move.board[y * WIDTH + x], 0, "빈 칸에 놓는다");
+  }
+  // 피스 하나로는 못 비우는 판
+  const cells = new Uint8Array(PUZZLE_CELLS);
+  cells[BOTTOM] = 1;
+  assert.equal(
+    runSolverTask({
+      type: "solution",
+      kind: "pc",
+      count: 1,
+      rotation: "srs",
+      board: solverBoard(cells),
+      pieces: ["O"],
+    }),
+    null
+  );
+});
+
+test("미리 막아 주기: 블록 수, 다 찬 줄, 막힌 나올 자리", () => {
+  const cells = new Uint8Array(PUZZLE_CELLS);
+  for (let i = 0; i < 6; i++) cells[BOTTOM + i] = 1;
+  assert.deepEqual(puzzleWarnings(cells, "I"), [], "6칸 + I = 10");
+  assert.deepEqual(puzzleWarnings(cells, "IIO"), [], "판을 비우는 순간 끝나므로 남는 피스는 괜찮다");
+  cells[BOTTOM + 6] = 1;
+  assert.deepEqual(puzzleWarnings(cells, "IIIII".slice(0, 4)), [{ key: "count", cells: 7 }], "홀수 칸은 늘 안 된다");
+  assert.deepEqual(puzzleWarnings(cells, ""), [], "피스가 없으면 아직 알리지 않는다");
+  const full = new Uint8Array(PUZZLE_CELLS);
+  full.fill(1, BOTTOM);
+  assert.deepEqual(
+    puzzleWarnings(full, "").map(w => w.key),
+    ["full"]
+  );
+  const top = new Uint8Array(PUZZLE_CELLS);
+  top.fill(1, 3, 7);
+  assert.ok(
+    puzzleWarnings(top, "T").some(w => w.key === "spawn"),
+    "맨 윗줄 가운데가 막히면 내려오지 못한다"
+  );
+  assert.ok(!puzzleWarnings(template("well").cells, "I").some(w => w.key === "spawn"));
+});
+
+test("풀이 탐색 창구: Worker가 없으면(Node·개발 실행) 잠깐 뒤 화면 쪽에서 돌리고, 취소하면 undefined", async () => {
+  const solver = createSolver();
+  assert.equal(solver.usesWorker(), false);
+  const start = template("well");
+  const task = /** @type {const} */ ({
+    type: "solution",
+    kind: "pc",
+    count: 1,
+    rotation: "srs",
+    board: solverBoard(start.cells),
+    pieces: ["I"],
+  });
+  const done = await solver.run(task).promise;
+  assert.ok(done && "moves" in done);
+  const cancelled = solver.run(task);
+  cancelled.cancel();
+  assert.equal(await cancelled.promise, undefined);
+});
+
+test("목표: 기본 퍼즐의 목표는 종류·피스 수로 다시 만든 목표와 같다(Worker에 보낼 때 쓰는 것)", () => {
+  const events = [
+    { lines: 2, tspin: "full", perfect: false, combo: 0 },
+    { lines: 3, tspin: "full", perfect: false, combo: 1 },
+    { lines: 1, tspin: "mini", perfect: false, combo: 2 },
+    { lines: 4, tspin: null, perfect: true, combo: 0 },
+    { lines: 0, tspin: null, perfect: false, combo: -1 },
+  ];
+  for (const p of PUZZLES) {
+    const again = goalOf(p.kind, p.pieces.length);
+    for (const ev of events) {
+      assert.equal(again.goal(ev), p.goal(ev), `${p.number} goal`);
+      assert.equal(Boolean(again.broken?.(ev)), Boolean(p.broken?.(ev)), `${p.number} broken`);
+    }
+  }
 });

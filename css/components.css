@@ -1147,6 +1147,64 @@
   gap: var(--space-1);
 }
 
+/* 풀이 보기: 놓을 칸은 점선, 판을 누르면 편집으로 돌아온다 */
+.puzzle-editor-cell[data-ghost] {
+  border: 2px dashed var(--accent);
+  background: var(--accent-soft);
+}
+
+.puzzle-editor-board.is-viewing .puzzle-editor-cell[aria-pressed="true"] {
+  opacity: 0.75;
+}
+
+/* 자동 확인: [확인 · 멈추기] / 결과·경고(두 줄 자리) / [풀이 보기 스위치 ← 1 / 3 →] */
+.puzzle-editor-check {
+  display: grid;
+  gap: var(--space-1);
+  padding-block: var(--space-2);
+  border-block: var(--border-w) solid var(--border);
+}
+
+.puzzle-editor-check-actions,
+.puzzle-editor-solution {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.puzzle-editor-status {
+  min-height: calc(2 * 1.45em);
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--text-s);
+  line-height: 1.45;
+  text-align: center;
+}
+
+.puzzle-editor-status[data-tone="warn"] {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.puzzle-editor-status[data-tone="ok"] {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.puzzle-editor-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-inline-end: var(--space-2);
+}
+
+.puzzle-editor-step {
+  min-width: 5ch;
+  text-align: center;
+}
+
 /* [피스 순서  4 / 50 ........ ← → 빼기] */
 .puzzle-editor-seq-head {
   display: flex;

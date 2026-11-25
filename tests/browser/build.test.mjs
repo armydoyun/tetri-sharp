@@ -3061,6 +3061,17 @@ test("퍼즐: 단계를 풀면 성공·다음 단계로 이어지고, 첫 화면
   await context.close();
 });
 
+/**
+ * 퍼즐 만들기의 시작 틀 고르기. 드롭다운은 바깥이 스크롤되면 닫히므로(고정 위치 목록) 열기 단추를 먼저 보이게 하고
+ * 스크롤 이벤트가 지나간 뒤 연다.
+ */
+const pickTemplate = async (page, value) => {
+  await page.locator("#puzzle-template").scrollIntoViewIfNeeded();
+  await page.waitForTimeout(50);
+  await page.click("#puzzle-template");
+  await page.click(`#puzzle-template-list [data-value="${value}"]`);
+};
+
 test("퍼즐 만들기: 끌어서 칠하기·구멍 줄·되돌리기·높이·피스 순서 편집, 시작 틀로 만든 퍼즐을 풀면 공유할 수 있다", async () => {
   const { context, page, errors } = await openPage(() =>
     localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
@@ -3127,8 +3138,7 @@ test("퍼즐 만들기: 끌어서 칠하기·구멍 줄·되돌리기·높이·�
 
   // 시작 틀: 퍼즐 1단계를 복사해 시험 플레이로 풀면 링크를 복사할 수 있다(되돌리면 이전 판)
   const stage = PUZZLES[0];
-  await page.click("#puzzle-template");
-  await page.click(`#puzzle-template-list [data-value="stage-${stage.number}"]`);
+  await pickTemplate(page, `stage-${stage.number}`);
   assert.equal(await sequence(), stage.pieces.join(""));
   await page.click("#puzzle-undo");
   assert.equal(await sequence(), "TIO");
@@ -3144,6 +3154,74 @@ test("퍼즐 만들기: 끌어서 칠하기·구멍 줄·되돌리기·높이·�
   await page.click('#results [data-action="export"]');
   assert.ok(await page.locator("#puzzle-copy").isEnabled());
   assert.equal(await sequence(), stage.pieces.join(""), "다시 연 편집기는 시험한 퍼즐 그대로");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("퍼즐 만들기 자동 확인: 풀 수 있으면 시험 없이 공유, 풀이를 한 수씩 보고, 미리 알려 주고, 긴 확인은 멈출 수 있다", async () => {
+  const { context, page, errors } = await openPage();
+  const status = () => text(page, "puzzle-status");
+  const settled = () =>
+    page.waitForFunction(() => !document.getElementById("puzzle-status")?.textContent?.includes("찾는 중"), null, {
+      timeout: 20000,
+    });
+  await openList(page, "#open-puzzles");
+  await page.click("#puzzle-create");
+  assert.equal(await page.evaluate(() => typeof window.__TETRISHARP_SOLVER__), "string", "배포본에 Worker 소스");
+
+  // 풀 수 있는 판: 시험 플레이 없이 링크를 복사할 수 있다
+  const stage = PUZZLES.find(p => p.kind === "pc" && p.pieces.length === 3);
+  await pickTemplate(page, `stage-${stage.number}`);
+  assert.ok(await page.locator("#puzzle-copy").isDisabled());
+  assert.ok(await page.locator("#puzzle-solution-view").isDisabled());
+  await page.click("#puzzle-check");
+  await settled();
+  assert.match(await status(), /^풀 수 있어요 · \d수/);
+  assert.ok(await page.locator("#puzzle-copy").isEnabled());
+  assert.equal(await text(page, "puzzles .notice-slot"), "풀 수 있는 퍼즐이에요. 링크를 공유할 수 있어요.");
+  assert.ok(await page.locator("#puzzle-check").isDisabled(), "같은 퍼즐은 다시 확인하지 않는다");
+
+  // 풀이 보기: 수마다 놓을 칸 네 개, 판을 누르면 편집으로(칸은 바뀌지 않는다)
+  const before = await page.$$eval('[data-cell][aria-pressed="true"]', els => els.length);
+  await page.click("label.puzzle-editor-switch");
+  assert.equal(await text(page, "puzzle-solution-step"), `1 / ${(await status()).match(/(\d)수/)[1]}`);
+  assert.equal(await page.locator("[data-ghost]").count(), 4);
+  await page.click("#puzzle-solution-next");
+  assert.match(await text(page, "puzzle-solution-step"), /^2 \//);
+  await page.click('[data-cell="150"]');
+  assert.equal(await page.locator("[data-ghost]").count(), 0);
+  assert.equal(await page.$$eval('[data-cell][aria-pressed="true"]', els => els.length), before);
+
+  // 바꾸면 확인은 지워진다
+  await page.click('#puzzles [data-piece="O"]');
+  assert.ok(await page.locator("#puzzle-copy").isDisabled());
+  assert.equal(await status(), "확인을 누르면 풀 수 있는지 찾아봐요.");
+
+  // 미리 알려 주기: 홀수 칸이면 판을 비울 수 없다
+  await pickTemplate(page, "empty");
+  for (const cell of [190, 191, 192]) await page.click(`[data-cell="${cell}"]`);
+  await page.click('#puzzles [data-piece="T"]');
+  assert.match(await status(), /^칸 3개와 이 피스로는/);
+  await page.click("#puzzle-check");
+  await settled();
+  assert.equal(await status(), "이 피스로는 판을 비울 수 없어요.");
+
+  // 오래 걸리는 확인은 멈출 수 있고, 그동안 화면은 움직인다
+  await pickTemplate(page, "empty");
+  await page.click('#puzzle-height [data-value="12"]');
+  for (let r = 10; r < 20; r++) for (let c = 4; c < 10; c++) await page.click(`[data-cell="${r * 10 + c}"]`);
+  for (const piece of "TSZOJLITSZ") await page.click(`#puzzles [data-piece="${piece}"]`);
+  await page.click("#puzzle-check");
+  assert.equal(await status(), "풀 수 있는지 찾는 중이에요…");
+  await page.click('#puzzle-tool [data-value="row"]');
+  assert.equal(await page.locator('#puzzle-tool [data-value="row"]').getAttribute("aria-pressed"), "true");
+  await page.click("#puzzle-check-stop");
+  assert.equal(await status(), "확인을 누르면 풀 수 있는지 찾아봐요.");
+  assert.ok(await page.locator("#puzzle-check").isEnabled());
+  await page.click("#puzzle-check");
+  await settled();
+  assert.equal(await status(), "너무 길어서 자동으로 확인하지 못했어요. 시험 플레이로 직접 풀어 주세요.");
+  assert.ok(await page.locator("#puzzle-copy").isDisabled(), "확인하지 못한 퍼즐은 직접 풀어야 공유한다");
   assert.deepEqual(errors, []);
   await context.close();
 });
@@ -3956,6 +4034,14 @@ test("퍼즐 첫 수 보기와 목록으로: 힌트는 자리와 누를 순서�
   assert.equal(await page.locator("#downstack-hint").isVisible(), true, "퍼즐에도 힌트 단추");
   assert.equal(await page.locator("#downstack-hint .btn-label").textContent(), "첫 수 보기");
   await page.click("#downstack-hint");
+  // 첫 수는 화면 밖(Worker)에서 찾는다: 찾는 동안 문구가 먼저 보이고, 찾으면 바뀐다
+  await page.waitForFunction(
+    () => document.getElementById("downstack-status")?.textContent?.startsWith("첫 수 ·"),
+    null,
+    {
+      polling: 50,
+    }
+  );
   assert.match(await text(page, "downstack-status"), /^첫 수 · .*반시계 회전/);
   assert.equal(await page.locator("#downstack-hint .btn-label").textContent(), "힌트 숨기기");
   await page.click("#downstack-hint");
@@ -4002,7 +4088,14 @@ test("단축키: H는 첫 수 보기, 결과에서 N은 다음 단계", async ()
   await openPuzzle(page, first.number);
   assert.equal(await page.locator("#downstack-hint kbd[data-key]").textContent(), "H", "단추에 단축키 표시");
   await page.keyboard.press("KeyH");
-  assert.match(await text(page, "downstack-status"), /^첫 수 · /);
+  // 첫 수는 화면 밖(Worker)에서 찾는다. 이 판은 그리기 프레임을 멈춰 두었으니 시간 간격으로 기다린다
+  await page.waitForFunction(
+    () => document.getElementById("downstack-status")?.textContent?.startsWith("첫 수 ·"),
+    null,
+    {
+      polling: 50,
+    }
+  );
   await page.keyboard.press("KeyH");
   assert.equal(await text(page, "downstack-status"), "");
   // 밀어 넣어 성공 → 결과에서 N = 다음 단계

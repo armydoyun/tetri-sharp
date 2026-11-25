@@ -13,6 +13,7 @@ import { WIDTH } from "../core/board.js";
 import { GARBAGE } from "../core/pieces.js";
 import { buildPcExact, buildQuadExact, buildTsd, buildTst } from "./practice.js";
 import { t } from "../i18n/index.js";
+import { goalOf } from "./puzzle-goals.js";
 
 const TYPES = ["I", "J", "L", "O", "S", "T", "Z"];
 
@@ -236,12 +237,12 @@ const makeStage = index => {
       kind,
       pieces: ["T"],
       build: board => (kind === "tsd" ? buildTsd(board, where, right) : buildTst(board, where, right)),
-      goal: ev => ev.tspin === "full" && ev.lines === (kind === "tsd" ? 2 : 3),
+      ...goalOf(kind, 1),
     };
   }
   if (kind === "tuck" || kind === "spin") {
     const [piece, rows] = (kind === "tuck" ? TUCK_BOARDS : SPIN_BOARDS)[nthOfKind(index)];
-    return { kind, pieces: [piece], build: board => drawRows(board, rows), goal: ev => ev.lines === 2 };
+    return { kind, pieces: [piece], build: board => drawRows(board, rows), ...goalOf(kind, 1) };
   }
   if (kind === "mini") {
     const [piece, rows] = MINI_BOARDS[nthOfKind(index)];
@@ -249,7 +250,7 @@ const makeStage = index => {
       kind,
       pieces: [piece],
       build: board => drawRows(board, rows),
-      goal: ev => ev.tspin === "mini" && ev.lines >= 1,
+      ...goalOf(kind, 1),
     };
   }
   if (kind === "combo") {
@@ -267,9 +268,7 @@ const makeStage = index => {
             if (!inWell || (y === board.height - 1 && x !== left + gap)) board.cells[y * WIDTH + x] = GARBAGE;
           }
       },
-      // 피스마다 줄을 지워 콤보가 피스 수 - 1까지 이어지면 성공, 한 번이라도 못 지우면 바로 실패
-      goal: ev => ev.lines > 0 && ev.combo === count - 1,
-      broken: ev => ev.lines === 0,
+      ...goalOf(kind, count),
     };
   }
   if (kind === "quad") {
@@ -287,7 +286,7 @@ const makeStage = index => {
         kind,
         pieces: [...front, "I"],
         build: target => target.cells.set(cells),
-        goal: ev => ev.lines === 4,
+        ...goalOf(kind, count),
       };
     }
     throw new Error(`퍼즐 단계를 만들 수 없습니다: ${index + 1}`);
@@ -303,7 +302,7 @@ const makeStage = index => {
       kind,
       pieces,
       build: target => target.cells.set(cells),
-      goal: ev => ev.perfect,
+      ...goalOf(kind, count),
     };
   }
   throw new Error(`퍼즐 단계를 만들 수 없습니다: ${index + 1}`);

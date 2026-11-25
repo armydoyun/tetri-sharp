@@ -149,6 +149,9 @@ const scenarios = async (page, quick) => {
     await check(`퍼즐 만들기 도구=${tool}`);
   }
   for (const id of ["stage-1", "well"]) {
+    // 드롭다운은 바깥이 스크롤되면 닫힌다: 열기 단추를 먼저 보이게 하고 스크롤 이벤트가 지나간 뒤 연다
+    await page.locator("#puzzle-template").scrollIntoViewIfNeeded();
+    await page.waitForTimeout(50);
     await page.click("#puzzle-template");
     await page.click(`#puzzle-template-list [data-value="${id}"]`);
     await check(`퍼즐 만들기 시작 틀=${id}`);

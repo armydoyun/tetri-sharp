@@ -124,8 +124,30 @@ export const EN = {
   "퍼즐 편집·공유": "Edit or share puzzle",
   "시험 플레이": "Test play",
   "피스를 추가하세요": "Add pieces",
-  "시험 플레이에서 판을 비우면 링크를 공유할 수 있어요.": "Clear the board in a test play to unlock sharing.",
-  "퍼즐을 풀었어요. 이제 링크를 공유할 수 있어요.": "Puzzle cleared. You can now share the link.",
+  "직접 풀어 봤어요. 링크를 공유할 수 있어요.": "You solved it yourself. You can share the link.",
+  "풀 수 있는 퍼즐이에요. 링크를 공유할 수 있어요.": "This puzzle can be solved. You can share the link.",
+  "풀 수 있는지 확인하거나 시험 플레이에서 풀면 링크를 공유할 수 있어요.":
+    "Check that it can be solved, or solve it in a test play, to share the link.",
+  "풀 수 있는지 확인": "Check it's solvable",
+  멈추기: "Stop",
+  "이전 수": "Previous move",
+  "다음 수": "Next move",
+  "풀이 보기": "Show solution",
+  "풀 수 있는지 찾는 중이에요…": "Looking for a solution…",
+  "풀 수 있어요 · {n}수. 풀이 보기로 한 수씩 볼 수 있어요.":
+    "Solvable in {n} moves. Turn on Show solution to step through it.",
+  "이 피스로는 판을 비울 수 없어요.": "These pieces can't clear the board.",
+  "너무 길어서 자동으로 확인하지 못했어요. 시험 플레이로 직접 풀어 주세요.":
+    "Too long to check automatically. Solve it yourself in a test play.",
+  "칸 {n}개와 이 피스로는 블록 수가 10의 배수가 되지 않아 판을 다 비울 수 없어요.":
+    "With {n} cells, these pieces can never make a multiple of 10 blocks, so the board can't be cleared.",
+  "다 찬 줄이 있어요. 판 비우기에서는 처음부터 지워질 줄이에요.":
+    "A row is already full. It would clear before you place anything.",
+  "첫 피스가 나오는 자리 바로 아래가 막혀 있어 판으로 내려오지 못해요.":
+    "The cells right under the first piece's spawn are filled, so it can't enter the board.",
+  "확인을 누르면 풀 수 있는지 찾아봐요.": "Press Check to see if it can be solved.",
+  "첫 수를 찾는 중…": "Finding the first move…",
+  "찾기 멈추기": "Stop search",
   "{row}행 {col}열": "Row {row}, column {col}",
   "퍼즐 링크를 복사했어요.": "Puzzle link copied.",
   "지금은 Modern 규칙, 홀드 없이 판 비우기 퍼즐을 만들 수 있어요.":

@@ -74,7 +74,8 @@ import { createGestures } from "./input/gestures.js";
 import { createUndo } from "./modes/undo.js";
 import { createHelpUI } from "./ui/help.js";
 import { PUZZLES, createPuzzleProgress, findPuzzle, puzzleMode } from "./modes/puzzles.js";
-import { describeSteps, findFirstMove } from "./modes/puzzle-hint.js";
+import { describeSteps } from "./modes/puzzle-hint.js";
+import { createSolver } from "./app/solver.js";
 import { customPuzzleMode, decodePuzzle } from "./modes/custom-puzzle.js";
 import { createPuzzleEditor } from "./ui/puzzle-editor.js";
 import { createPuzzleUI } from "./ui/puzzles.js";
@@ -1464,6 +1465,7 @@ const downstackHint = $("downstack-hint");
 // 이름만 바꾼다(단추 안의 단축키 표시는 그대로)
 const hintLabel = /** @type {HTMLElement} */ (downstackHint.querySelector(".btn-label"));
 const resetLessonHint = () => {
+  cancelPuzzleHint();
   hintLabel.textContent = mode.puzzle ? t("첫 수 보기") : t("힌트");
   $("downstack-status").textContent = "";
   if (game?.state.puzzle) game.state.puzzle.hintCells = [];
@@ -1473,32 +1475,64 @@ const resetLessonHint = () => {
  * 퍼즐 첫 수 보기: 지금 피스를 놓을 자리(점선 칸)와 누를 순서. 한 번 더 누르면 숨긴다.
  * 지금 판에서 더 풀 수 없으면(이미 다른 자리에 놓았으면) 다시 하라고 알려 준다.
  */
+/** 퍼즐 풀이 탐색(첫 수 보기·퍼즐 만들기의 자동 확인)을 화면 밖에서 */
+const solver = createSolver();
+/** 찾는 중인 첫 수 탐색(Worker). 판이 바뀌거나 다시 누르면 취소한다 */
+let puzzleHintSearch = /** @type {null | { cancel: () => void }} */ (null);
+const cancelPuzzleHint = () => {
+  puzzleHintSearch?.cancel();
+  puzzleHintSearch = null;
+};
 const togglePuzzleHint = () => {
   const p = game.state.puzzle;
-  if (p.hintCells?.length) return resetLessonHint();
+  if (p.hintCells?.length || puzzleHintSearch) return resetLessonHint();
   const active = game.state.active;
   // 남은 피스: 지금 피스(홀드로 바꿨을 수도 있다)를 한 개 뺀 나머지
   const remaining = mode.puzzle.pieces.slice(p.placed);
   const at = remaining.indexOf(active.type);
   const rest = at >= 0 ? [...remaining.slice(0, at), ...remaining.slice(at + 1)] : remaining.slice(1);
-  const move = findFirstMove(
-    mode.puzzle,
-    { board: game.state.board, active, combo: game.state.combo ?? -1 },
+  const asked = { game, placed: p.placed, x: active.x, y: active.y, rot: active.rot, type: active.type };
+  const search = solver.run({
+    type: "first",
+    kind: mode.puzzle.kind,
+    count: mode.puzzle.pieces.length,
+    rotation: rules.rotation,
+    board: game.state.board.cells.slice(),
+    active: { type: active.type, x: active.x, y: active.y, rot: active.rot },
+    combo: game.state.combo ?? -1,
     rest,
-    ROTATIONS[rules.rotation]
-  );
-  if (!move) {
-    $("downstack-status").textContent = t("이 판에서는 더 풀 수 없어요. 다시 시작해 보세요");
-    return;
-  }
-  if ("exhausted" in move) {
-    $("downstack-status").textContent = t("피스가 많아 첫 수를 다 찾아보지 못했어요");
-    return;
-  }
-  p.hintCells = move.cells;
-  const spinLast = ["mini", "tsd", "tst"].includes(mode.puzzle.kind);
-  $("downstack-status").textContent = t("첫 수 · {steps}", { steps: describeSteps(move.steps, spinLast) });
-  hintLabel.textContent = t("힌트 숨기기");
+  });
+  puzzleHintSearch = search;
+  $("downstack-status").textContent = t("첫 수를 찾는 중…");
+  hintLabel.textContent = t("찾기 멈추기");
+  search.promise.then(move => {
+    if (puzzleHintSearch !== search) return;
+    puzzleHintSearch = null;
+    const now = game?.state.active;
+    // 찾는 사이에 피스를 움직였거나 놓았으면 그 판의 답이 아니다
+    const same =
+      game === asked.game &&
+      game.state.puzzle?.placed === asked.placed &&
+      now?.x === asked.x &&
+      now?.y === asked.y &&
+      now?.rot === asked.rot &&
+      now?.type === asked.type;
+    if (move === undefined || !same) return resetLessonHint();
+    hintLabel.textContent = t("첫 수 보기");
+    if (!move) {
+      $("downstack-status").textContent = t("이 판에서는 더 풀 수 없어요. 다시 시작해 보세요");
+      return;
+    }
+    if ("exhausted" in move) {
+      $("downstack-status").textContent = t("피스가 많아 첫 수를 다 찾아보지 못했어요");
+      return;
+    }
+    if (!("cells" in move)) return;
+    game.state.puzzle.hintCells = move.cells;
+    const spinLast = ["mini", "tsd", "tst"].includes(mode.puzzle.kind);
+    $("downstack-status").textContent = t("첫 수 · {steps}", { steps: describeSteps(move.steps, spinLast) });
+    hintLabel.textContent = t("힌트 숨기기");
+  });
 };
 const downstackRetry = $("downstack-retry");
 for (const control of [downstackHint, downstackRetry]) {
@@ -1542,7 +1576,11 @@ const playCustomPuzzle = (code, trial = false) => {
   const custom = customPuzzleMode(puzzle);
   start({ ...custom, puzzleCode: code, trialCode: trial ? code : null }, custom.rules);
 };
-const puzzleEditor = createPuzzleEditor({ dialog: puzzleDialog, onTry: code => playCustomPuzzle(code, true) });
+const puzzleEditor = createPuzzleEditor({
+  dialog: puzzleDialog,
+  solver,
+  onTry: code => playCustomPuzzle(code, true),
+});
 const puzzleUI = createPuzzleUI({
   dialog: puzzleDialog,
   onCreate: () => puzzleEditor.open(),
