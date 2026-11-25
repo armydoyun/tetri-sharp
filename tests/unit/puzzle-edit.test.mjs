@@ -3,7 +3,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { WIDTH } from "../../js/core/board.js";
-import { createGame } from "../../js/core/engine.js";
+import { BTN, createGame } from "../../js/core/engine.js";
+const BTN_HARD = BTN.HARD;
+const BTN_HOLD = BTN.HOLD;
 import { MODERN } from "../../js/rules/presets.js";
 import { ROTATIONS } from "../../js/rules/rotation/index.js";
 import {
@@ -18,6 +20,7 @@ import {
   movePiece,
   puzzleWarnings,
   removePiece,
+  sceneToPuzzle,
   shiftCells,
   solverBoard,
   strokeValue,
@@ -107,6 +110,23 @@ test("좌우 뒤집기: 피스도 S와 Z, J와 L을 바꿔야 뒤집은 판 비�
     if (!solvable(mirrorCells(st.cells), st.pieces)) brokenWithoutSwap += 1;
   }
   assert.ok(brokenWithoutSwap > 0, "판만 뒤집으면 못 푸는 단계가 있다");
+});
+
+test("게임 장면 → 퍼즐: 보이는 판은 채움으로, 지금 피스와 다음 피스, 홀드(퍼즐 다시 보기 P4)", () => {
+  const game = createGame({ rules: MODERN, seed: 3 });
+  for (let i = 0; i < 3 && !game.state.active; i++) game.step();
+  for (let i = 0; i < 3; i++) game.step({ held: 0, pressed: BTN_HARD });
+  game.step({ held: 0, pressed: 0 });
+  game.step({ held: 0, pressed: BTN_HOLD });
+  const state = game.state;
+  const scene = sceneToPuzzle(state);
+  const filled = [...scene.cells].filter(Boolean).length;
+  assert.equal(filled, 12, "세 피스 = 12칸(줄이 지워지지 않았다)");
+  assert.equal(scene.pieces, [state.active.type, ...state.queue].slice(0, 7).join(""));
+  assert.equal(scene.holdStart, state.hold);
+  assert.ok(scene.holdStart);
+  // 퍼즐 코드로 오갈 수 있다
+  assert.ok(encodePuzzle({ cells: scene.cells, pieces: scene.pieces }));
 });
 
 test("높이: 블록이 있는 가장 높은 줄까지, 그것이 다 보이는 가장 낮은 편집 높이", () => {

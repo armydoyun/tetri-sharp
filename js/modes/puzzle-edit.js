@@ -8,6 +8,21 @@ import { PUZZLE_CELLS, MAX_PUZZLE_PIECES, normalizePuzzle, solverBoard, usedHeig
 export { solverBoard, usedHeight };
 import { PUZZLES } from "./puzzles.js";
 
+/**
+ * 게임(리플레이) 한 장면 → 퍼즐 재료(퍼즐 다시 보기 P4): 보이는 20줄의 판(색은 버리고 채움으로),
+ * 지금 피스 + 다음 피스(모두 count개까지), 홀드에 든 피스. 보이는 영역 위의 칸은 버린다
+ * @param {{ board: { cells: ArrayLike<number>, width: number }, active: { type: string } | null, queue: string[], hold: string | null }} state
+ */
+export const sceneToPuzzle = (state, count = 7) => {
+  const cells = new Uint8Array(PUZZLE_CELLS);
+  const top = HEIGHT - VISIBLE_ROWS;
+  for (let row = 0; row < VISIBLE_ROWS; row++)
+    for (let col = 0; col < WIDTH; col++)
+      if (state.board.cells[(top + row) * state.board.width + col]) cells[row * WIDTH + col] = 1;
+  const pieces = [...(state.active ? [state.active.type] : []), ...state.queue].slice(0, count).join("");
+  return { cells, pieces, holdStart: state.hold ?? "" };
+};
+
 /** 편집 화면에 보이는 높이(아래에서부터 줄 수) */
 export const EDIT_HEIGHTS = Object.freeze([8, 12, 20]);
 

@@ -3274,6 +3274,35 @@ test("퍼즐 만들기: 끌어서 칠하기·구멍 줄·되돌리기·높이·�
   await context.close();
 });
 
+test("리플레이의 '퍼즐로': 그 장면의 판·지금 피스와 다음 피스로 새 퍼즐을 연다(퍼즐 다시 보기 P4)", async () => {
+  const { context, page, errors } = await openPage(() =>
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+  );
+  await page.click('[data-mode="sprint40"]');
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  for (let i = 0; i < 45 && (await page.evaluate(() => document.getElementById("results").hidden)); i++)
+    await page.keyboard.press("Space");
+  await page.waitForFunction(() => !document.getElementById("results").hidden);
+  await page.click('[data-action="watch"]');
+  await page.waitForFunction(() => document.body.dataset.screen === "replay");
+  // 끝 장면으로 가서 만든다(판이 쌓여 있다)
+  await page.$eval("#replay-progress", el => {
+    el.value = el.max;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await page.click('[data-replay="puzzle"]');
+  await page.waitForFunction(() => document.querySelector("#puzzles[open] .puzzle-editor"));
+  // 지금 피스 + 다음 5개(막혀 끝난 장면에는 지금 피스가 없다)
+  const chips = await page.locator(".puzzle-seq-chip").count();
+  assert.ok(chips === 5 || chips === 6, `피스 ${chips}개`);
+  assert.ok((await page.locator('[data-cell][aria-pressed="true"]').count()) > 0, "쌓인 판");
+  assert.equal(await text(page, "puzzle-saved"), "내 퍼즐에 저장했어요. 고치면 저절로 저장돼요.");
+  await page.keyboard.press("Escape");
+  assert.equal(await page.evaluate(() => document.body.dataset.screen), "replay", "닫으면 리플레이로");
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
 test("퍼즐 만들기 자동 확인: 고치기를 멈추면 저절로 확인하고, 풀 수 있으면 시험 없이 공유, 풀이를 한 수씩 보고, 미리 알려 주고, 긴 확인은 멈출 수 있다", async () => {
   const { context, page, errors } = await openPage();
   const status = () => text(page, "puzzle-status");

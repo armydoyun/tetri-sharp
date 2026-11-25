@@ -244,6 +244,23 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       save();
       editor.open();
     },
+    /**
+     * 게임 장면으로 새 퍼즐(퍼즐 다시 보기 P4): 판·피스·홀드를 넣고 연다. 홀드에 피스가 있었으면 홀드를 켠다.
+     * 목표는 판 비우기로 시작하고, 고르기는 만드는 사람이 한다
+     * @param {{ cells: Uint8Array, pieces: string, holdStart: string }} scene
+     */
+    openScene(scene) {
+      reset(null);
+      cells = scene.cells;
+      pieces = scene.pieces;
+      if (scene.holdStart) {
+        const rules = { ...settings.rules, hold: { enabled: true } };
+        settings = settingsOf(normalizePuzzle({ cells, pieces, ...settings, rules, holdStart: scene.holdStart }));
+      }
+      height = fitHeight(cells);
+      save();
+      editor.open();
+    },
     /** 받은 퍼즐을 복사해 새 내 퍼즐로(확인 표시는 빼고) @param {string} code */
     openCopy(code) {
       const puzzle = decodePuzzle(code);

@@ -75,6 +75,7 @@ import {
   ruleSummary,
   searchOptions,
 } from "./modes/custom-puzzle.js";
+import { sceneToPuzzle } from "./modes/puzzle-edit.js";
 import { createPuzzleEditor } from "./ui/puzzle-editor.js";
 import { createCustomPuzzles } from "./storage/custom-puzzles.js";
 import { createPuzzleUI } from "./ui/puzzles.js";
@@ -2005,6 +2006,7 @@ const replayView = createReplayPlayer({
     onRace: replay => raceReplay(replay),
     onShare: (replay, title) => shareUI.open(replay, title),
     onPractice: () => sceneView.enter(),
+    onMakePuzzle: state => puzzleEditor.openScene(sceneToPuzzle(state)),
   },
 });
 

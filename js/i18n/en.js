@@ -1140,4 +1140,6 @@ export const EN = {
   "고치기를 멈추면 저절로 풀 수 있는지 찾아봐요.":
     "When you stop editing, it checks by itself whether it can be solved.",
   "피스가 많아 확인을 눌러야 찾아봐요.": "With this many pieces, press Check to search.",
+  퍼즐로: "Puzzle",
+  "이 장면으로 퍼즐 만들기": "Make a puzzle from this moment",
 };
