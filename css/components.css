@@ -1467,3 +1467,34 @@
     grid-area: foot;
   }
 }
+
+/* 내 퍼즐·받은 퍼즐 줄: [목록 줄 | 플레이 · 링크 · 지우기]. 좁으면 버튼은 아래 오른쪽으로 */
+.custom-puzzle-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.custom-puzzle-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.custom-puzzle-empty {
+  margin: var(--space-4) 0;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  .custom-puzzle-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+  }
+
+  .custom-puzzle-actions {
+    justify-content: flex-end;
+  }
+}

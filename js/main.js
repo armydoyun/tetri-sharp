@@ -86,6 +86,7 @@ import {
   searchOptions,
 } from "./modes/custom-puzzle.js";
 import { createPuzzleEditor } from "./ui/puzzle-editor.js";
+import { createCustomPuzzles } from "./storage/custom-puzzles.js";
 import { createPuzzleUI } from "./ui/puzzles.js";
 import { createShareUI } from "./ui/share.js";
 import { createVersusUI } from "./ui/versus.js";
@@ -838,6 +839,12 @@ const backList = () => {
   if (scenePractice) return null;
   const number = mode.puzzle?.number;
   if (number) return { label: t("퍼즐 목록"), open: () => puzzleUI.open(number) };
+  // 만든 퍼즐: 시험 플레이·내 퍼즐이면 내 퍼즐 목록, 받은 퍼즐이면 받은 퍼즐 목록
+  if (mode.puzzle?.custom)
+    return {
+      label: t("퍼즐 목록"),
+      open: () => puzzleUI.open(undefined, mode.trialCode || customs.findByCode(mode.puzzleCode) ? "mine" : "received"),
+    };
   const group = mode.intro
     ? "intro"
     : mode.lesson
@@ -1215,6 +1222,13 @@ const finish = () => {
   // 퍼즐: 깬 단계를 남기고, 깼으면 "다음 단계"를 보인다(마지막 단계면 다시 하기만)
   if (mode.puzzle?.number && state.over === "clear") puzzleProgress.markCleared(mode.puzzle.id);
   if (mode.trialCode && state.over === "clear") puzzleEditor.markCleared(mode.trialCode);
+  // 받은 퍼즐: 풀었는지·가장 빠른 시간·첫 수 보기를 썼는지
+  if (mode.puzzleCode && !mode.trialCode)
+    customs.recordReceived(mode.puzzleCode, {
+      solved: state.over === "clear",
+      hinted: Boolean(state.puzzle?.hinted),
+      frames: state.frame,
+    });
   // 업적: 이번 판에 처음 이룬 것(플레이 업적은 실제 모드·오늘의 도전·CPU 대전에서만)
   const freshAchievements = achievements.evaluate(achievementContext(state));
   // Custom 규칙 판은 업적이 쌓이지 않는다 → 결과에서 그렇다고 알려 준다(말없이 안 쌓여 고장처럼 보였다)
@@ -1561,6 +1575,7 @@ const togglePuzzleHint = () => {
     }
     if (!("cells" in move)) return;
     game.state.puzzle.hintCells = move.cells;
+    game.state.puzzle.hinted = true;
     const spinLast = ["mini", "tsd", "tst"].includes(mode.puzzle.kind);
     const steps = describeSteps(move.steps, spinLast);
     $("downstack-status").textContent = move.hold
@@ -1611,16 +1626,24 @@ const playCustomPuzzle = (code, trial = false) => {
   const custom = customPuzzleMode(puzzle);
   start({ ...custom, puzzleCode: code, trialCode: trial ? code : null }, custom.rules);
 };
+/** 내 퍼즐·받은 퍼즐(이 기기) */
+const customs = createCustomPuzzles(store);
 const puzzleEditor = createPuzzleEditor({
   dialog: puzzleDialog,
   solver,
+  customs,
   onTry: code => playCustomPuzzle(code, true),
 });
 const puzzleUI = createPuzzleUI({
   dialog: puzzleDialog,
-  onCreate: () => puzzleEditor.open(),
   progress: puzzleProgress,
+  customs,
   onPick: p => start(puzzleMode(p), MODERN),
+  onCreate: () => puzzleEditor.openNew(),
+  onEdit: id => puzzleEditor.openEntry(id),
+  onPlayMade: id => puzzleEditor.playEntry(id),
+  onPlayReceived: code => playCustomPuzzle(code),
+  onCopyReceived: code => puzzleEditor.openCopy(code),
 });
 $("open-puzzles").addEventListener("click", () => puzzleUI.open());
 $("puzzles").addEventListener("close", () => {
@@ -2978,8 +3001,12 @@ renderKeyHelp();
 if (importRulesFromLink()) renderKeyHelp();
 toMenu(true);
 const puzzleHash = takeLinkHash("puzzle");
-if (puzzleHash) playCustomPuzzle(new URLSearchParams(puzzleHash.slice(1)).get("puzzle"));
-else {
+if (puzzleHash) {
+  // 링크로 받은 퍼즐은 받은 퍼즐 목록에 남긴다(내가 만든 퍼즐이면 남기지 않는다)
+  const code = new URLSearchParams(puzzleHash.slice(1)).get("puzzle");
+  if (code && decodePuzzle(code)) customs.receive(code);
+  playCustomPuzzle(code);
+} else {
   importDailyFromLink();
   importReplayFromLink();
 }

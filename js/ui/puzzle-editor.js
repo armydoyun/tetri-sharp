@@ -8,8 +8,10 @@ import {
   CHECKED_AUTO,
   CHECKED_TRIED,
   DEFAULT_RULES,
+  MAX_DESC,
   MAX_GOAL_LINES,
   MAX_PUZZLE_PIECES,
+  MAX_TITLE,
   PUZZLE_CELLS,
   baseRules,
   canSearch,
@@ -22,6 +24,7 @@ import {
 } from "../modes/custom-puzzle.js";
 import { GOAL_KINDS } from "../modes/puzzle-goals.js";
 import { LOCK_TYPES } from "../rules/sanitize.js";
+import { MAX_MADE } from "../storage/custom-puzzles.js";
 import {
   COPYABLE_STAGES,
   EDIT_HEIGHTS,
@@ -52,8 +55,8 @@ import {
 
 /** @typedef {"cell" | "row" | "garbage"} Tool */
 /**
- * 판·피스 말고 퍼즐에 담기는 것: 목표·중력·바탕 규칙·규칙 내용·처음 홀드 피스
- * @typedef {{ goal: { kind: string, lines: number }, gravity: "none" | "20g" | "rules", base: "modern" | "retro" | "arcade", rules: import("../modes/custom-puzzle.js").RuleBody, holdStart: string }} Settings
+ * 판·피스 말고 퍼즐에 담기는 것: 목표·중력·바탕 규칙·규칙 내용·처음 홀드 피스·제목·설명
+ * @typedef {{ goal: { kind: string, lines: number }, gravity: "none" | "20g" | "rules", base: "modern" | "retro" | "arcade", rules: import("../modes/custom-puzzle.js").RuleBody, holdStart: string, title: string, desc: string }} Settings
  * @typedef {{ cells: Uint8Array, pieces: string, settings: Settings }} Snapshot
  */
 
@@ -64,6 +67,8 @@ const defaultSettings = () => ({
   base: "modern",
   rules: structuredClone(DEFAULT_RULES),
   holdStart: "",
+  title: "",
+  desc: "",
 });
 
 /** 퍼즐 → 설정 부분 @param {import("../modes/custom-puzzle.js").FullPuzzle} p @returns {Settings} */
@@ -73,6 +78,8 @@ const settingsOf = p => ({
   base: /** @type {Settings["base"]} */ (p.base),
   rules: structuredClone(p.rules),
   holdStart: p.holdStart,
+  title: p.title,
+  desc: p.desc,
 });
 
 /** @typedef {{ type: string, hold: boolean, board: Uint8Array, cells: Array<[number, number]> }} SolutionMove */
@@ -85,16 +92,23 @@ const settingsOf = p => ({
  * @param {{
  *   dialog: HTMLDialogElement,
  *   solver: ReturnType<typeof import("../app/solver.js").createSolver>,
+ *   customs: ReturnType<typeof import("../storage/custom-puzzles.js").createCustomPuzzles>,
  *   onTry: (code: string) => void,
  * }} options
  */
-export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
+export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
   let cells = new Uint8Array(PUZZLE_CELLS);
   let pieces = "";
   let settings = defaultSettings();
   /** 지금 편집 중인 퍼즐 */
   const current = () => ({ cells, pieces, ...settings });
   let cleared = /** @type {string | null} */ (null);
+  /** 내 퍼즐에서 편집 중인 퍼즐의 id(아직 저장 전이면 null) */
+  let entryId = /** @type {string | null} */ (null);
+  /** 내 퍼즐에 저장돼 있던 확인 표시: 그 퍼즐 그대로일 때만 쓴다 */
+  let loaded = /** @type {{ code: string, checked: number } | null} */ (null);
+  /** 저장 결과: saved 저장함, full 가득 참, none 아직 저장할 수 없는 퍼즐 */
+  let saveState = /** @type {"saved" | "full" | "none"} */ ("none");
   /** @type {Tool} */
   let tool = "cell";
   let height = EDIT_HEIGHTS[0];
@@ -130,22 +144,82 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
     stopChecking();
   });
 
-  return {
+  /** 그 퍼즐 코드에 붙일 확인 표시: 자동 확인으로 풀었는지, 직접 풀어 봤는지(이번에, 또는 저장돼 있던 것) */
+  const checkedFor = code =>
+    (verified?.code === code && verified.state === "solvable" ? CHECKED_AUTO : 0) |
+    (cleared === code ? CHECKED_TRIED : 0) |
+    (loaded?.code === code ? loaded.checked : 0);
+  /** 내 퍼즐에 저장한다(고칠 때마다 저절로). 링크로 보낼 수 있는 퍼즐만 */
+  const save = () => {
+    const code = encodePuzzle(current());
+    if (!code) {
+      saveState = "none";
+      return;
+    }
+    const id = customs.save(
+      entryId,
+      encodePuzzle({ ...current(), checked: checkedFor(code) }, { checked: true }) ?? ""
+    );
+    if (id) entryId = id;
+    saveState = id ? "saved" : "full";
+  };
+  /** 편집기 상태를 이 퍼즐로(없으면 빈 판) */
+  const reset = (/** @type {import("../modes/custom-puzzle.js").FullPuzzle | null} */ puzzle, id = null) => {
+    cells = puzzle ? puzzle.cells : new Uint8Array(PUZZLE_CELLS);
+    pieces = puzzle ? puzzle.pieces : "";
+    settings = puzzle ? settingsOf(puzzle) : defaultSettings();
+    const code = puzzle && encodePuzzle(puzzle);
+    loaded = code && puzzle ? { code, checked: puzzle.checked } : null;
+    entryId = id;
+    cleared = null;
+    selected = null;
+    height = puzzle ? fitHeight(cells) : EDIT_HEIGHTS[0];
+    history.clear();
+    stopChecking();
+    verified = null;
+    saveState = puzzle ? "saved" : "none";
+  };
+  const editor = {
+    /** 이어서 하기로 돌아온 시험 플레이의 퍼즐: 내 퍼즐에 있으면 그 퍼즐로 */
     load(code) {
       const puzzle = decodePuzzle(code);
       if (!puzzle) return;
-      cells = puzzle.cells;
-      pieces = puzzle.pieces;
-      settings = settingsOf(puzzle);
-      cleared = null;
-      selected = null;
-      height = fitHeight(cells);
-      history.clear();
-      stopChecking();
-      verified = null;
+      reset(puzzle, customs.findByCode(code)?.id ?? null);
     },
     markCleared(code) {
-      if (code === encodePuzzle(current())) cleared = code;
+      if (code !== encodePuzzle(current())) return;
+      cleared = code;
+      save();
+    },
+    /** 새 퍼즐 */
+    openNew() {
+      reset(null);
+      editor.open();
+    },
+    /** 내 퍼즐 하나를 편집 @param {string} id */
+    openEntry(id) {
+      const item = customs.find(id);
+      const puzzle = item && decodePuzzle(item.code);
+      if (!puzzle) return editor.openNew();
+      reset(puzzle, id);
+      editor.open();
+    },
+    /** 내 퍼즐 하나를 시험 플레이 @param {string} id */
+    playEntry(id) {
+      const item = customs.find(id);
+      const puzzle = item && decodePuzzle(item.code);
+      if (!puzzle) return;
+      reset(puzzle, id);
+      onTry(/** @type {string} */ (encodePuzzle(puzzle)));
+    },
+    /** 받은 퍼즐을 복사해 새 내 퍼즐로(확인 표시는 빼고) @param {string} code */
+    openCopy(code) {
+      const puzzle = decodePuzzle(code);
+      if (!puzzle) return editor.openNew();
+      reset({ ...puzzle, checked: 0 });
+      loaded = null;
+      save();
+      editor.open();
     },
     open() {
       const notice = el("p", { class: "notice-slot", role: "status" });
@@ -318,6 +392,27 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
         });
       let templates = makeTemplates();
 
+      // ---- 이름·설명: 링크에 담겨 받는 쪽 목록·게임 화면에 보인다. 입력 중에는 그대로 두고, 칸을 떠날 때 되돌리기에 남긴다 ----
+      const saved = el("p", { class: "field-help puzzle-editor-saved", id: "puzzle-saved", role: "status" });
+      const textField = (/** @type {"title" | "desc"} */ key, id, max, placeholder) => {
+        const input = textInput({ id, maxLength: max, value: settings[key], placeholder, autocomplete: "off" });
+        /** @type {Snapshot | null} */
+        let before = null;
+        input.addEventListener("focus", () => (before = snapshot()));
+        input.addEventListener("input", () => {
+          settings = { ...settings, [key]: input.value };
+          refresh();
+        });
+        input.addEventListener("change", () => {
+          if (before && before.settings[key] !== input.value) history.record(before);
+          before = snapshot();
+          refresh();
+        });
+        return input;
+      };
+      const titleInput = textField("title", "puzzle-title", MAX_TITLE, t("예: 첫 T-spin"));
+      const descInput = textField("desc", "puzzle-desc", MAX_DESC, t("받는 사람에게 한 줄 힌트"));
+
       // ---- 목표 · 고급 설정(규칙·중력) ----
       /** 설정 바꾸기 — 되돌리기에 남기고, 허용된 값으로 정리한다 */
       const editSettings = (/** @type {(next: Settings) => void} */ mutate) => {
@@ -345,7 +440,7 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
       let renderedSettings = "";
       /** 설정이 바뀌었을 때만 목표 줄과 고급 설정을 다시 그린다(포커스는 같은 조작으로 돌려준다) */
       const renderSettings = () => {
-        const key = JSON.stringify(settings);
+        const key = JSON.stringify({ ...settings, title: "", desc: "" });
         advancedSummary.textContent = ruleSummary(current()) || t("Modern · 홀드 없음 · 중력 없음");
         if (key === renderedSettings) return;
         renderedSettings = key;
@@ -574,9 +669,17 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
           stopChecking();
           verified = null;
         }
-        const solvable = verified?.state === "solvable";
-        const tried = Boolean(cleared) && cleared === code;
+        const checkedNow = code ? checkedFor(code) : 0;
+        const tried = Boolean(checkedNow & CHECKED_TRIED);
+        const solvable = Boolean(checkedNow & CHECKED_AUTO) && canSearch(current());
         copy.disabled = !code || !(tried || solvable);
+        save();
+        saved.textContent =
+          saveState === "saved"
+            ? t("내 퍼즐에 저장했어요. 고치면 저절로 저장돼요.")
+            : saveState === "full"
+              ? t("내 퍼즐이 가득 찼어요({n}개). 퍼즐 목록에서 하나를 지우면 저장돼요.", { n: MAX_MADE })
+              : t("판과 피스를 넣으면 내 퍼즐에 저절로 저장돼요.");
         link.hidden = true;
         link.value = "";
         renderSequence();
@@ -678,6 +781,8 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
         cells = state.cells;
         pieces = state.pieces;
         settings = state.settings;
+        titleInput.value = settings.title;
+        descInput.value = settings.desc;
         if (selected !== null && selected >= pieces.length) selected = null;
         changed();
       };
@@ -850,9 +955,7 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
         const code = encodePuzzle(current());
         if (!code || copy.disabled) return;
         // 받는 쪽에 보일 확인 표시: 자동 확인으로 풀 수 있었는지, 만든 사람이 직접 풀어 봤는지
-        const checked =
-          (verified?.code === code && verified.state === "solvable" ? CHECKED_AUTO : 0) |
-          (cleared === code ? CHECKED_TRIED : 0);
+        const checked = checkedFor(code);
         const url = new URL(location.href);
         url.hash = `puzzle=${encodePuzzle({ ...current(), checked }, { checked: true })}`;
         try {
@@ -878,6 +981,19 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
             class: "field-help",
             text: t("판을 칠하고 피스와 목표를 고르세요. 규칙과 중력은 아래 고급 설정에서 바꿀 수 있어요."),
           }),
+          el(
+            "div",
+            { class: "puzzle-editor-row" },
+            el("label", { class: "puzzle-editor-label", htmlFor: "puzzle-title", text: t("이름") }),
+            titleInput
+          ),
+          el(
+            "div",
+            { class: "puzzle-editor-row" },
+            el("label", { class: "puzzle-editor-label", htmlFor: "puzzle-desc", text: t("설명") }),
+            descInput
+          ),
+          saved,
           el(
             "div",
             { class: "puzzle-editor-row" },
@@ -955,4 +1071,5 @@ export const createPuzzleEditor = ({ dialog, solver, onTry }) => {
       tiles[focusIndex].focus();
     },
   };
+  return editor;
 };
