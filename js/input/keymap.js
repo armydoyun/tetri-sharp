@@ -39,7 +39,7 @@ export const DEFAULT_KEYMAP = Object.freeze({
 });
 
 /** 바꿀 수 없는 키: Esc는 언제나 일시정지/뒤로. */
-export const RESERVED = Object.freeze(["Escape"]);
+const RESERVED = Object.freeze(["Escape"]);
 
 const isCode = c => typeof c === "string" && /^[A-Za-z][A-Za-z0-9]{0,30}$/.test(c) && !RESERVED.includes(c);
 

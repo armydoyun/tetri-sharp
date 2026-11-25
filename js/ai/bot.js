@@ -20,7 +20,7 @@ import { createRng } from "../core/rng.js";
  * ready: 한 칸만 빈 줄 하나당 가산점
  * (콤보 성향도 만들어 봤지만 한 수만 보는 봇은 줄을 한 줄씩 이어 지우지 못해 안정 성향과 같아져 뺐다.)
  */
-export const STYLE_WEIGHTS = Object.freeze({
+const STYLE_WEIGHTS = Object.freeze({
   balanced: { height: 0.45, calm: 8, ready: 0, low: [0, -2.5, -1.5, 1, 14], high: [0, 2, 4, 6, 14] },
   quad: { height: 0.3, calm: 7, ready: 2, low: [0, -3, -3, -2, 9], high: [0, 6, 7, 8, 9] },
   safe: { height: 0.75, calm: 0, ready: 0, low: [0, 2, 4, 6, 10], high: [0, 2, 4, 6, 10] },

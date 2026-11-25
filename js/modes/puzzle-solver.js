@@ -262,7 +262,7 @@ export const findFirstMove = (puzzle, state, rest, rotation, opts = {}) => {
  * @param {SearchOptions & { holdStart?: string | null }} [opts]
  * @returns {null | { exhausted: true } | { moves: Array<{ type: string, hold: boolean, board: Uint8Array, cells: Array<[number, number]> }> }}
  */
-export const findSolution = (puzzle, board, pieces, rotation, opts = {}) => {
+const findSolution = (puzzle, board, pieces, rotation, opts = {}) => {
   const moves = [];
   let combo = -1;
   let total = 0;

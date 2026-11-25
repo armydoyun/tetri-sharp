@@ -13,7 +13,7 @@ export const THEME_IDS = Object.freeze([
 ]);
 export const DEFAULT_THEME = "modern";
 /** 처음에는 목록에 없다가 열리는 테마(열렸는지는 업적이 기억한다 — js/storage/achievements.js) */
-export const SECRET_THEME_IDS = Object.freeze(["sharp"]);
+const SECRET_THEME_IDS = Object.freeze(["sharp"]);
 /** 저장해도 되는 테마 키 전부 */
 export const ALL_THEME_IDS = Object.freeze([...THEME_IDS, ...SECRET_THEME_IDS]);
 

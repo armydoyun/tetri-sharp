@@ -1,5 +1,5 @@
 export const SPRINT_HISTORY_KEY = "sprint:history";
-export const SPRINT_HISTORY_LIMIT = 20;
+const SPRINT_HISTORY_LIMIT = 20;
 const MAX_RULE_SETS = 50;
 
 export const sanitizeSprintHistory = raw => {

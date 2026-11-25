@@ -21,7 +21,7 @@ import { t } from "../i18n/index.js";
 /** @typedef {"stages" | "mine" | "received"} PuzzleTab */
 
 /** 만든 퍼즐 이름: 제목, 없으면 목표 · 피스 수 @param {import("../modes/custom-puzzle.js").FullPuzzle} p */
-export const customPuzzleName = p =>
+const customPuzzleName = p =>
   p.title || t("{goal} · {n}피스", { goal: goalLabel(p.goal), n: p.pieces.length + (p.holdStart ? 1 : 0) });
 
 /** 확인 표시 글 @param {number} checked */

@@ -205,12 +205,6 @@ body[data-screen="menu"] .stage {
   min-height: var(--control-h-s);
 }
 
-.block-note {
-  margin: calc(-1 * var(--space-1)) 0 0;
-  color: var(--text-dim);
-  font-size: var(--text-s);
-}
-
 /* 규칙: 네 칸 세그먼트 + 설명 두 줄 */
 .rule-tabs {
   display: grid;
@@ -2129,9 +2123,8 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
   .active-rules { text-decoration: none; pointer-events: none; }
 }
 
-.mode-objective:empty,
-.inline-notice:empty { display: none; }
-.mode-objective, .inline-notice {
+.mode-objective:empty { display: none; }
+.mode-objective {
   margin: 0;
   color: var(--text-dim);
   font-size: var(--text-s);

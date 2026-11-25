@@ -7,7 +7,7 @@ import { rankOf, RANK_ORDER } from "../modes/ranks.js";
 export const ACHIEVEMENTS_KEY = "achievements";
 /** 누적 업적의 합계(실제 판에서만 센다). 기록 지우기로는 지우지 않는다 */
 export const ACHIEVEMENT_TOTALS_KEY = "achievements:totals";
-export const TOTAL_KEYS = Object.freeze(["games", "lines", "quads", "tspins", "wins"]);
+const TOTAL_KEYS = Object.freeze(["games", "lines", "quads", "tspins", "wins"]);
 
 const MIN = 3600; // 1분 = 3600프레임
 

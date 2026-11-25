@@ -9,7 +9,7 @@ import { settleBattleFrame } from "../modes/versus.js";
 import { PRESETS } from "../rules/presets.js";
 import { makeCustomRules } from "../rules/sanitize.js";
 
-export const REPLAY_VERSION = 1;
+const REPLAY_VERSION = 1;
 const APP = "tetri-sharp";
 const MAX_INPUTS = 500000;
 
