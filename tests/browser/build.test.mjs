@@ -3092,6 +3092,18 @@ test("퍼즐 만들기: 끌어서 칠하기·구멍 줄·되돌리기·높이·�
   await openList(page, "#open-puzzles");
   await page.click("#puzzle-create");
   assert.equal(await page.locator("[data-cell]").count(), 80, "처음에는 아래 8줄만 크게");
+  // 열면 맨 위(이름·시작 틀·목표)부터 보이고, 닫기는 다른 버튼과 같은 줄 오른쪽 끝(5차 검수 F39·U54)
+  const opened = await page.evaluate(() => {
+    const body = document.querySelector("dialog[open] .dialog-body");
+    const close = document.getElementById("puzzle-editor-close").getBoundingClientRect();
+    const trial = document.getElementById("puzzle-trial").getBoundingClientRect();
+    return {
+      scrollTop: body.scrollTop,
+      sameRow: Math.abs(close.top - trial.top) < 2,
+      closeRight: close.right > trial.right,
+    };
+  });
+  assert.deepEqual(opened, { scrollTop: 0, sameRow: true, closeRight: true });
 
   // 끌어서 칠하기 한 번 = 되돌리기 한 번
   await drag(190, 194);
