@@ -968,6 +968,8 @@ export const EN = {
   "효과음 종류": "Sound set",
   "테마 따라": "Match theme",
   "첫 수 보기": "Show first move",
+  "힌트·첫 수 보기 (퍼즐·연습)": "Hint / first move (puzzles, practice)",
+  "다음 단계 (결과 화면)": "Next stage (results)",
   "퍼즐 목록": "Puzzle list",
   "{list}으로": "Back to {list}",
   "{list}으로 갈까요?": "Go back to {list}?",

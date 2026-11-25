@@ -20,6 +20,8 @@ export const DEFAULT_PADMAP = Object.freeze({
   RESTART: [8],
   PAUSE: [9],
   UNDO: [],
+  HINT: [],
+  NEXT: [],
 });
 
 /** 버튼 이름(패드에 적힌 글자). 십자키는 화면에서 화살표 아이콘으로 보여 준다(PAD_ICONS). */
@@ -102,7 +104,7 @@ export const clearPadButton = (padmap, actionId, slot) => ({
 export const compilePadmap = padmap => {
   /** @type {Record<number, number>} */
   const buttons = {};
-  /** @type {Record<number, "restart" | "pause" | "undo">} */
+  /** @type {Record<number, "restart" | "pause" | "undo" | "hint" | "next">} */
   const system = {};
   for (const action of ACTIONS) {
     for (const i of padmap[action.id] ?? []) {
