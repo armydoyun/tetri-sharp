@@ -296,8 +296,16 @@
   border-color: var(--accent);
 }
 
-.select:disabled {
+/* 쓸 수 없는 드롭다운·스위치는 버튼처럼 흐리게(누를 수 있어 보이지 않게).
+   설정 줄이 통째로 꺼져 있으면(.field-row.is-disabled) 줄이 이미 흐리므로 한 번 더 흐리지 않는다 */
+.select:disabled,
+.switch:disabled {
+  opacity: 0.4;
   cursor: default;
+}
+
+.field-row.is-disabled :is(.select, .switch):disabled {
+  opacity: 1;
 }
 
 .select-value {
@@ -392,10 +400,6 @@
   --knob: var(--accent);
   --knob-x: calc(100% - 3px);
   border-color: var(--accent-ledge);
-}
-
-.switch:disabled {
-  cursor: default;
 }
 
 /* ---- 슬라이더: 칸으로 나뉜 막대(채운 칸은 강조색) + 블록 손잡이 ---- */

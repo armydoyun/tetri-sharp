@@ -3249,11 +3249,17 @@ test("퍼즐 만들기 목표·고급 설정: 목표와 규칙이 링크로 가�
   await pickTemplate(page, "tsd");
   assert.equal(await page.getAttribute("#puzzle-goal", "data-value"), "tsd");
   assert.ok(await page.locator("#puzzle-goal-lines").isDisabled(), "줄 수는 'N줄 지우기'에서만");
+  // 쓸 수 없는 드롭다운·스위치는 흐리게(누를 수 있어 보이지 않게)
+  const opacity = sel => page.$eval(sel, e => getComputedStyle(e).opacity);
+  assert.equal(await opacity("#puzzle-goal-lines"), "0.4");
+  assert.equal(await opacity("#puzzle-goal"), "1");
+  assert.equal(await opacity("#puzzle-solution-view"), "0.4");
 
   // 고급 설정: 홀드 켜기·처음 홀드 피스, 20G. 요약 한 줄과 되돌리기
   assert.equal(await text(page, "puzzles .puzzle-editor-advanced-summary"), "Modern · 홀드 없음 · 중력 없음");
   await page.click("#puzzle-advanced summary");
   assert.ok(await page.locator("#puzzle-hold-start").isDisabled(), "홀드가 꺼져 있으면 처음 홀드 피스는 못 고른다");
+  assert.equal(await opacity("#puzzle-hold-start"), "1", "줄이 통째로 흐리므로 한 번 더 흐리지 않는다");
   await page.click("#puzzle-hold");
   await pick("puzzle-hold-start", "I");
   await page.click('#puzzle-gravity [data-value="20g"]');
