@@ -47,12 +47,6 @@ import {
   sanitizeReplay,
   verifyReplay,
 } from "./replay/replay.js";
-import {
-  createSceneAttempt,
-  createSurvivalAttempt,
-  findSurvivalRescue,
-  splitAttemptOutcome,
-} from "./replay/practice.js";
 import { recordKey } from "./storage/records.js";
 import { MODERN, PRESETS, PRESET_LIST } from "./rules/presets.js";
 import { makeCustomRules, sanitizeRuleBody } from "./rules/sanitize.js";
@@ -67,6 +61,7 @@ import { SPRINT_HISTORY_KEY, createSprintHistory } from "./storage/sprint-histor
 import { FINESSE_LESSONS } from "./modes/finesse-lessons.js";
 import { createFinesseTracker } from "./modes/finesse.js";
 import { createReplayPlayer } from "./app/replay-player.js";
+import { createScenePractice } from "./app/scene-practice.js";
 import { ROTATIONS } from "./rules/rotation/index.js";
 import { STYLES, WIN, settleBattleFrame, versusMode, versusStatKey } from "./modes/versus.js";
 import { createBot } from "./ai/bot.js";
@@ -204,11 +199,6 @@ const addVersusResult = (levelId, won) => {
 
 /** @type {"menu" | "countdown" | "play" | "paused" | "results" | "replay"} */
 let screen = "menu";
-/** @typedef {{from: number, to: number, endFrame: number}} SceneSplit */
-/** @typedef {import("./replay/analyze.js").FinesseScene} FinesseScene */
-/** @type {{spawnFrame: number, split: SceneSplit | null, target: FinesseScene | null, rescue: ReturnType<typeof findSurvivalRescue>, startFrame: number, best: number | null, ended: boolean} | null} */
-let scenePractice = null;
-let sceneFinesse = null;
 /** 모드 찾기: 오늘의 도전(날짜별) + 나머지 */
 const findMode = id => findDaily(id) ?? findPuzzle(id) ?? findBaseMode(id);
 let mode = findMode(store.get("lastMode", null));
@@ -295,7 +285,7 @@ const beginJournal = (seed, target, scene = null) => {
   });
 };
 const saveRun = (force = true) => {
-  if (restoringRun || !runJournal || !game || game.state.over || scenePractice?.ended) return;
+  if (restoringRun || !runJournal || !game || game.state.over || sceneView.current?.ended) return;
   const entry = runJournal.entry;
   if (!force && entry.steps - lastSavedStep < SAVE_INTERVAL) return;
   const current = savedRun();
@@ -308,7 +298,7 @@ const saveRun = (force = true) => {
     ...entry,
     frame: game.state.frame,
     lines: game.state.stats.lines,
-    fingerprint: runFingerprint(game, scenePractice ? null : (versus?.cpu ?? race?.player.game)),
+    fingerprint: runFingerprint(game, sceneView.current ? null : (versus?.cpu ?? race?.player.game)),
   };
   if (store.set(SUSPENDED_RUN_KEY, snapshot)) {
     savedRunId = entry.id;
@@ -357,8 +347,8 @@ const notifyData = text => {
 const showPanel = name => {
   if (
     name === "pause" &&
-    (scenePractice?.split || scenePractice?.target || scenePractice?.rescue) &&
-    scenePractice.ended
+    (sceneView.current?.split || sceneView.current?.target || sceneView.current?.rescue) &&
+    sceneView.current.ended
   )
     name = "sceneResult";
   for (const [key, el] of Object.entries(panels)) el.hidden = key !== name;
@@ -607,7 +597,7 @@ const updateHud = () => {
   const frame = game?.state.frame ?? 0;
   if (lastHud?.game === game && lastHud.frame === frame && lastHud.mode === mode && lastHud.screen === screen) return;
   lastHud = { game, frame, mode, screen };
-  if (scenePractice?.split && game) updateSceneSplitProgress(game.state);
+  if (sceneView.current?.split && game) sceneView.updateSplitProgress(game.state);
   const stats = game?.state.stats ?? { pieces: 0, lines: 0 };
   const lines = game ? mode.hudLines(game.state) : { label: t("줄"), value: "0" };
   const time = game ? mode.hudTime(game.state) : { label: t("시간"), frames: 0 };
@@ -654,7 +644,7 @@ const setScreen = next => {
   document.body.classList.toggle("has-lesson-hints", hasHintControls(mode) && next !== "menu");
   document.body.classList.toggle("is-finesse-lesson", Boolean(mode.lesson) && next !== "menu");
   const modeTitle = mode.versus ? versusTitle(mode.versus) : mode.name;
-  $("session-title").textContent = next === "menu" ? "" : scenePractice ? scenePracticeTitle() : modeTitle;
+  $("session-title").textContent = next === "menu" ? "" : sceneView.current ? sceneView.title() : modeTitle;
   $("session-title").classList.remove("is-secret");
   $("mode-objective").textContent =
     next === "menu" || next === "replay"
@@ -828,7 +818,7 @@ const pause = () => {
 $("pause-game").addEventListener("click", pause);
 
 const resume = () => {
-  if (screen !== "paused" || scenePractice?.ended) return;
+  if (screen !== "paused" || sceneView.current?.ended) return;
   confirming = null;
   showPanel(null);
   setScreen(pausedFrom);
@@ -847,7 +837,7 @@ const inProgress = () => screen === "play" || screen === "countdown" || screen =
  * 목록은 첫 화면 위에 열리므로, 목록을 닫으면 그대로 첫 화면이다.
  */
 const backList = () => {
-  if (scenePractice) return null;
+  if (sceneView.current) return null;
   const number = mode.puzzle?.number;
   if (number) return { label: t("퍼즐 목록"), open: () => puzzleUI.open(number) };
   // 만든 퍼즐: 시험 플레이·내 퍼즐이면 내 퍼즐 목록, 받은 퍼즐이면 받은 퍼즐 목록
@@ -878,7 +868,7 @@ const updateBackLabels = () => {
   const back = backList();
   /** @type {HTMLElement} */ (panels.results.querySelector('[data-action="menu"] .btn-label')).textContent =
     back?.label ?? t("첫 화면");
-  if (!scenePractice)
+  if (!sceneView.current)
     /** @type {HTMLElement} */ (panels.pause.querySelector('[data-action="menu"] .btn-label')).textContent = back
       ? t("{list}으로", { list: back.label })
       : t("첫 화면으로");
@@ -931,7 +921,7 @@ const cancelConfirm = () => {
 };
 
 /** 업적을 셀 수 있는 판: 메뉴의 실제 모드·오늘의 도전·CPU 대전(연습·퍼즐·장면 연습 제외) */
-const playCounts = () => !scenePractice && (MODES.includes(mode) || Boolean(mode.daily) || Boolean(mode.versus));
+const playCounts = () => !sceneView.current && (MODES.includes(mode) || Boolean(mode.daily) || Boolean(mode.versus));
 
 /** 업적 판정에 넘길 이번 판 정보 */
 const achievementContext = (state, abandoned = false) => ({
@@ -964,8 +954,8 @@ const acceptConfirm = () => {
   if (kind === "restart") start(mode, rules, race?.target);
   else {
     clearRun();
-    if (scenePractice) {
-      exitScenePractice();
+    if (sceneView.current) {
+      sceneView.exit();
       replayView.stop();
     }
     leaveToMenu();
@@ -1036,7 +1026,7 @@ $("go-home").addEventListener("click", () => {
     logoTaps();
     return window.scrollTo(0, 0);
   }
-  if (scenePractice) exitScenePractice();
+  if (sceneView.current) sceneView.exit();
   if (inProgress()) return askConfirm("menu");
   if (screen === "replay") replayView.stop();
   toMenu();
@@ -1128,7 +1118,7 @@ const renderResultSplits = () => {
         replayView.start(replay, "results", "", true);
         if (target) {
           replayView.seek(target.spawnFrame, true);
-          enterScenePractice(null, target);
+          sceneView.enter(null, target);
           return;
         }
         const index = mode.splits.indexOf(slowest.to);
@@ -1139,7 +1129,7 @@ const renderResultSplits = () => {
           while (!replayView.player.done && !replayView.player.game.state.active) replayView.player.step();
           replayView.updateBar();
         }
-        enterScenePractice({ from: slowest.from, to: slowest.to, endFrame });
+        sceneView.enter({ from: slowest.from, to: slowest.to, endFrame });
       };
     }
   }
@@ -1724,8 +1714,8 @@ $("records").addEventListener("close", () => {
 const handleSystem = (action, code = "") => {
   if (restoringRun) return;
   if (anyDialogOpen()) return;
-  if (scenePractice) {
-    if (action === "restart") resetSceneAttempt();
+  if (sceneView.current) {
+    if (action === "restart") sceneView.reset();
     else if (action === "pause" && code !== "Escape") {
       if (screen === "paused") resume();
       else pause();
@@ -1901,8 +1891,8 @@ $("open-settings").addEventListener("click", () => {
 for (const btn of document.querySelectorAll("[data-action]")) {
   btn.addEventListener("click", () => {
     const action = btn.getAttribute("data-action");
-    if (action === "scene-retry" || (scenePractice && action === "retry")) return resetSceneAttempt();
-    if (action === "scene-exit" || (scenePractice && action === "menu")) return exitScenePractice();
+    if (action === "scene-retry" || (sceneView.current && action === "retry")) return sceneView.reset();
+    if (action === "scene-exit" || (sceneView.current && action === "menu")) return sceneView.exit();
     if (action === "resume") resume();
     if (action === "retry") {
       if (inProgress()) askConfirm("restart");
@@ -1956,7 +1946,7 @@ let recorder = null;
 /** 방금 끝난 판의 리플레이 */
 let lastReplay = null;
 
-/** 리플레이 재생기 등 떼어 낸 화면과 함께 쓰는 판 상태 */
+/** 리플레이 재생기·장면 연습 등 떼어 낸 화면과 함께 쓰는 판 상태 */
 const session = {
   get game() {
     return game;
@@ -1981,6 +1971,17 @@ const session = {
   },
   get versus() {
     return versus;
+  },
+  /** 게임 시작 "GO" 표시 남은 시간 */
+  get goTimer() {
+    return goTimer;
+  },
+  set goTimer(value) {
+    goTimer = value;
+  },
+  /** 이어서 하기로 판을 되살리는 중 */
+  get restoring() {
+    return restoringRun;
   },
   /** 쌓인 프레임 시간을 비운다(화면이 바뀐 뒤 밀린 프레임을 한꺼번에 돌리지 않게) */
   resetClock() {
@@ -2009,234 +2010,42 @@ const replayView = createReplayPlayer({
     canRace: replay => canRace(replay),
     onRace: replay => raceReplay(replay),
     onShare: (replay, title) => shareUI.open(replay, title),
-    onPractice: () => enterScenePractice(),
+    onPractice: () => sceneView.enter(),
   },
 });
 
-// ---- 장면 연습: 리플레이의 한 장면(구간·피네스·Survival 구조)을 그 자리에서 다시 해 본다 ----
-const sceneControls = $("scene-practice-controls");
-const sceneStatus = $("scene-practice-status");
-const pauseResume = /** @type {HTMLButtonElement} */ (panels.pause.querySelector('[data-action="resume"]'));
-
-const sceneSplitProgress = $("scene-split-progress");
-const sceneSplitMeter = /** @type {HTMLProgressElement} */ ($("scene-split-meter"));
-
-const updateSceneSplitProgress = state => {
-  const split = scenePractice.split;
-  const cleared = Math.min(state.stats.lines, split.to);
-  $("scene-split-lines").textContent = t("{n} / {goal}줄", { n: cleared, goal: split.to });
-  $("scene-split-elapsed").textContent = formatTime(state.frame - scenePractice.startFrame);
-  sceneSplitMeter.value = cleared - split.from;
-};
-
-const showSceneOutcome = outcome => {
-  const { split } = scenePractice;
-  const { delta, frames, original } = outcome;
-  if (delta !== null) scenePractice.best = Math.min(scenePractice.best ?? frames, frames);
-  $("scene-result-range").textContent = t("{from}–{to}줄 구간", split);
-  $("scene-result-title").textContent = delta === null ? t("구간 미완료") : t("구간 완료");
-  $("scene-result-original").textContent = formatTime(original);
-  $("scene-result-attempt").textContent = delta === null ? "—" : formatTime(frames);
-  const feedback = $("scene-result-delta");
-  feedback.dataset.comparison = delta === null ? "incomplete" : delta < 0 ? "faster" : delta > 0 ? "slower" : "even";
-  feedback.textContent =
-    delta === null
-      ? t("목표 {goal}줄 중 {n}줄까지 도달했어요.", { goal: split.to, n: game.state.stats.lines })
-      : delta === 0
-        ? t("원래 판과 같은 시간이에요.")
-        : t(delta < 0 ? "원래 판보다 {time}초 단축" : "원래 판보다 {time}초 느림", {
-            time: (Math.abs(delta) / 60).toFixed(2),
-          });
-  $("scene-result-best").textContent =
-    scenePractice.best === null ? "" : t("이번 연습 최고 · {time}", { time: formatTime(scenePractice.best) });
-};
-
-const showFinesseSceneOutcome = (lock, inputs) => {
-  const target = scenePractice.target;
-  const same =
-    lock?.piece === target.piece && target.cells.every(([x, y]) => lock.cells.some(([cx, cy]) => cx === x && cy === y));
-  const delta = target.inputs - inputs;
-  $("scene-result-range").textContent = t("{piece} 피네스 연습", { piece: target.piece });
-  $("scene-result-title").textContent = same ? t("목표에 놓았어요") : t("목표와 다른 칸에 놓았어요");
-  $("scene-result-original").textContent = t("{n}회 입력", { n: target.inputs });
-  $("scene-result-attempt").textContent = t("{n}회 입력", { n: inputs });
-  const feedback = $("scene-result-delta");
-  feedback.dataset.comparison = !same ? "incomplete" : delta > 0 ? "faster" : delta < 0 ? "slower" : "even";
-  feedback.textContent = !same
-    ? t("점선과 같은 위치에 놓아야 비교할 수 있어요.")
-    : delta === 0
-      ? t("원래 판과 입력 횟수가 같아요.")
-      : t(delta > 0 ? "원래 판보다 {n}회 적게 입력했어요." : "원래 판보다 {n}회 더 입력했어요.", {
-          n: Math.abs(delta),
-        });
-  $("scene-result-best").textContent = "";
-};
-
-const showRescueOutcome = () => {
-  const { originalFrame, originalBlocked } = scenePractice.rescue;
-  const delta = game.state.frame - originalFrame;
-  $("scene-result-range").textContent = t("Survival 구조 연습");
-  $("scene-result-title").textContent = t("구조 시도 결과");
-  $("scene-result-original").textContent = formatTime(originalFrame - scenePractice.startFrame);
-  $("scene-result-attempt").textContent = formatTime(game.state.frame - scenePractice.startFrame);
-  $("scene-result-delta").dataset.comparison = delta > 0 ? "faster" : delta === 0 ? "even" : "slower";
-  $("scene-result-delta").textContent =
-    delta === 0
-      ? t("원래 판과 같은 시간이에요.")
-      : t(delta > 0 ? "원래 판보다 {time}초 더 버텼어요." : "원래 판보다 {time}초 덜 버텼어요.", {
-          time: (Math.abs(delta) / 60).toFixed(2),
-        });
-  const blocked = game.state.garbage.blocked - originalBlocked;
-  $("scene-result-best").textContent = t("막은 쓰레기 줄 차이 {n}", { n: blocked > 0 ? `+${blocked}` : blocked });
-};
-
-const scenePracticeTitle = () =>
-  scenePractice.rescue
-    ? t("Survival 구조 연습")
-    : scenePractice.target
-      ? t("피네스 장면 연습")
-      : scenePractice.split
-        ? t("구간 연습")
-        : t("장면 연습");
-const sceneRetryLabel = () => (scenePractice.split ? t("구간 재시도") : t("장면 재시도"));
-
-const setScenePauseLabels = () => {
-  const ended = Boolean(scenePractice?.ended);
-  pauseResume.disabled = ended;
-  panels.pause.querySelector(".panel-title").textContent = ended ? t("장면 연습 종료") : t("일시정지");
-  panels.pause.querySelector('[data-action="retry"] .btn-label').textContent = scenePractice
-    ? sceneRetryLabel()
-    : t("다시 시작");
-  if (scenePractice) panels.pause.querySelector('[data-action="menu"] .btn-label').textContent = t("리플레이로");
-  else updateBackLabels();
-};
-
-const resetSceneAttempt = (restored = null) => {
-  if (!scenePractice) return;
-  const attempt = scenePractice.rescue
-    ? createSurvivalAttempt(replayView.playing, findMode, scenePractice.spawnFrame)
-    : createSceneAttempt(replayView.playing, findMode, scenePractice.spawnFrame);
-  const split = scenePractice.split;
-  if (
-    !attempt ||
-    (split &&
-      (attempt.state.stats.lines < split.from ||
-        attempt.state.stats.lines >= split.to ||
-        attempt.state.frame >= split.endFrame))
-  ) {
-    exitScenePractice();
-    replayView.setNote(t("이 장면을 연습할 수 없어요. 다른 위치를 선택해 주세요."));
-    return;
-  }
-  game = attempt;
-  const target = scenePractice.target;
-  if (target) game.state.finesseTarget = target.cells;
-  sceneFinesse = target ? createFinesseTracker(game, ROTATIONS[rules.rotation]) : null;
-  scenePractice.startFrame = game.state.frame;
-  scenePractice.ended = false;
-  if (!scenePractice.rescue) game.setHandling(toEngineHandling(restored?.handling ?? settings.handling));
-  keyboard.releaseAll();
-  touch.releaseAll();
-  gestures.setEnabled(false);
-  acc = 0;
-  goTimer = 0;
-  countdownEl.hidden = true;
-  fb.clearAction();
-  renderer.clearEffects();
-  inputDisplay.show(0, 0);
-  showPanel(null);
-  setScreen("play");
-  showModeHud(scenePractice.rescue ? mode : { hud: [] });
-  setScenePauseLabels();
-  sceneControls.querySelector('[data-action="scene-retry"] .btn-label').textContent = sceneRetryLabel();
-  sceneStatus.textContent = target
-    ? t("점선 칸에 맞춘 뒤 하드 드롭하세요.")
-    : split
-      ? t("{from}–{to}줄 구간", split)
-      : t("연습 시작점 · {time}", { time: formatTime(scenePractice.spawnFrame) });
-  if (!restoringRun) {
-    beginJournal(replayView.playing.seed, null, {
-      source: replayView.playing,
-      returnFrame: replayView.player.frame,
-      spawnFrame: scenePractice.spawnFrame,
-      split: scenePractice.split,
-      target: scenePractice.target,
-      rescue: scenePractice.rescue,
-      best: scenePractice.best,
-    });
-    saveRun();
-  }
-  sceneSplitProgress.hidden = !split;
-  if (split) {
-    sceneSplitMeter.max = split.to - split.from;
-    updateSceneSplitProgress(game.state);
-  }
-  /** @type {HTMLElement | null} */ (sceneControls.querySelector('[data-action="scene-retry"]'))?.focus({
-    preventScroll: true,
-  });
-};
-
-/** @param {SceneSplit | null} split @param {FinesseScene | null} target */
-const enterScenePractice = (split = null, target = null, rescue = null, restored = null, confirmed = false) => {
-  if (
-    !replayView.paused ||
-    !(replayView.canPracticeScene() || (rescue && replayView.player && !replayView.player.done))
-  )
-    return;
-  if (!restoringRun && !confirmed && replacesSavedRun()) {
-    confirmReplaceRun(() => enterScenePractice(split, target, rescue, restored, true));
-    return;
-  }
-  scenePractice = {
-    spawnFrame: restored?.scene.spawnFrame ?? rescue?.spawnFrame ?? target?.spawnFrame ?? replayView.player.spawnFrame,
-    split,
-    target,
-    rescue,
-    startFrame: 0,
-    best: restored?.scene.best ?? null,
-    ended: false,
-  };
-  document.body.dataset.scenePractice = rescue ? "rescue" : target ? "finesse" : split ? "split" : "scene";
-  replayView.showBar(false);
-  sceneControls.hidden = false;
-  resetSceneAttempt(restored);
-};
-
-const exitScenePractice = () => {
-  if (!scenePractice || !replayView.player) return;
-  clearRun();
-  scenePractice = null;
-  sceneFinesse = null;
-  document.body.removeAttribute("data-scene-practice");
-  sceneControls.hidden = true;
-  game = replayView.player.game;
-  renderer.clearEffects();
-  fb.clearAction();
-  inputDisplay.show(replayView.player.input.held, replayView.player.input.pressed);
-  showPanel(null);
-  setScreen("replay");
-  showModeHud(mode, true);
-  setScenePauseLabels();
-  replayView.showBar(true);
-  replayView.updateBar();
-  replayView.focusAfterPractice();
-};
-
-$("survival-rescue").addEventListener("click", () => {
-  const rescue = lastReplay && findSurvivalRescue(lastReplay, findMode);
-  if (!rescue) return;
-  replayView.start(lastReplay, "results", "", true);
-  replayView.seek(rescue.spawnFrame, true);
-  enterScenePractice(null, null, rescue);
+/** 장면 연습(js/app/scene-practice.js) */
+const sceneView = createScenePractice({
+  session,
+  replayView,
+  findMode,
+  panels,
+  countdownEl,
+  renderer,
+  fb,
+  sfx,
+  inputDisplay,
+  input: { keyboard, touch, gestures },
+  getSettings: () => settings,
+  getLastReplay: () => lastReplay,
+  journal: { begin: beginJournal, save: () => saveRun(), clear: clearRun },
+  replacesSavedRun,
+  confirmReplaceRun,
+  showPanel,
+  setScreen,
+  showModeHud,
+  updateBackLabels,
+  feedback,
+  pause,
 });
 
 // ---- 리플레이 파일·단축키 ----
 // 리플레이·장면 연습 중 단축키: 장면 연습은 Esc로 리플레이로 돌아가고, 리플레이는 재생기가 처리한다
 // (R 처음부터·Esc 닫기는 시스템 키로도 처리한다)
 window.addEventListener("keydown", e => {
-  if ((screen !== "replay" && !scenePractice) || anyDialogOpen()) return;
-  if (scenePractice) {
-    if (!e.repeat && e.code === "Escape") exitScenePractice();
+  if ((screen !== "replay" && !sceneView.current) || anyDialogOpen()) return;
+  if (sceneView.current) {
+    if (!e.repeat && e.code === "Escape") sceneView.exit();
     return;
   }
   replayView.handleKey(e);
@@ -2328,41 +2137,11 @@ const backupActions = setupBackup({
 
 const applyRunHandling = handling => {
   game.setHandling(toEngineHandling(handling));
-  if (!scenePractice) recorder?.handlingChanged(game.handling);
+  if (!sceneView.current) recorder?.handlingChanged(game.handling);
 };
 
 const advanceRun = (held, pressed, reconstructing = false) => {
-  if (scenePractice) {
-    const hadActive = Boolean(game.state.active);
-    const events = game.step({ held, pressed });
-    sceneFinesse?.frame(held, pressed, hadActive, events);
-    const lock = scenePractice.target && events.find(event => event.type === "lock");
-    const split = scenePractice.split;
-    const outcome = split && splitAttemptOutcome(game.state, scenePractice.startFrame, split.to, split.endFrame);
-    const ended = Boolean(outcome || lock || game.state.over);
-    if (ended) scenePractice.ended = true;
-    if (reconstructing) return;
-    inputDisplay.show(held, pressed);
-    renderer.addEvents(events);
-    sfx.events(events);
-    feedback(events);
-    if (ended) {
-      clearRun();
-      if (outcome) {
-        showSceneOutcome(outcome);
-        fb.clearAction();
-      } else if (scenePractice.target) {
-        showFinesseSceneOutcome(lock, sceneFinesse.lastInputs);
-        fb.clearAction();
-      } else if (scenePractice.rescue) {
-        showRescueOutcome();
-        fb.clearAction();
-      }
-      setScenePauseLabels();
-      pause();
-    }
-    return;
-  }
+  if (sceneView.current) return sceneView.step(held, pressed, reconstructing);
   if (mode.practice && !isGuidedPractice()) undo.track(game.state);
   recorder?.input(held, pressed);
   const hadActive = Boolean(game.state.active);
@@ -2408,8 +2187,8 @@ const restoreRun = async () => {
       replayView.start(source, "menu", "", true);
       replayView.seek(entry.scene.returnFrame, true);
       const { split, target, rescue } = entry.scene;
-      enterScenePractice(split, target, rescue, { ...entry, handling: initialHandling });
-      if (!scenePractice) throw new Error("scene");
+      sceneView.enter(split, target, rescue, { ...entry, handling: initialHandling });
+      if (!sceneView.current) throw new Error("scene");
     } else {
       const savedRules =
         m.puzzle || isGuidedPractice(m) ? m.rules : (PRESETS[entry.rules.id] ?? makeCustomRules(entry.rules));
@@ -2432,12 +2211,12 @@ const restoreRun = async () => {
       },
       applyInput(held, pressed) {
         advanceRun(held, pressed, true);
-        if (game.state.over || scenePractice?.ended) throw new Error("finished");
+        if (game.state.over || sceneView.current?.ended) throw new Error("finished");
       },
     });
     if (
       savedRun()?.id !== entry.id ||
-      runFingerprint(game, scenePractice ? null : (versus?.cpu ?? race?.player.game)) !== entry.fingerprint
+      runFingerprint(game, sceneView.current ? null : (versus?.cpu ?? race?.player.game)) !== entry.fingerprint
     )
       throw new Error("checkpoint");
     if (m.trialCode) puzzleEditor.load(m.trialCode);
@@ -2449,7 +2228,7 @@ const restoreRun = async () => {
     lastSavedStep = -1;
     success = true;
   } catch {
-    if (scenePractice) exitScenePractice();
+    if (sceneView.current) sceneView.exit();
     replayView.stop();
     toMenu();
     countdownEl.hidden = true;
@@ -2460,7 +2239,7 @@ const restoreRun = async () => {
   }
   if (!success) return;
   if (race) updateRaceProgress();
-  if (scenePractice?.split) updateSceneSplitProgress(game.state);
+  if (sceneView.current?.split) sceneView.updateSplitProgress(game.state);
   renderer.clearEffects();
   acc = 0;
   last = performance.now();
@@ -2492,7 +2271,7 @@ const tick = () => {
   if (screen === "replay") return replayView.tick();
   if (screen !== "play" || !game) return;
   if (goTimer > 0 && --goTimer === 0) countdownEl.hidden = true;
-  const allowed = scenePractice?.target ? ~(BTN.HOLD | BTN.SOFT) : mode.lesson ? ~BTN.SOFT : -1;
+  const allowed = sceneView.current?.target ? ~(BTN.HOLD | BTN.SOFT) : mode.lesson ? ~BTN.SOFT : -1;
   const held = (keyboard.held | pad.held | touch.held | gestures.held) & allowed;
   const pressed = (keyboard.takePressed() | touch.takePressed() | gestures.takePressed()) & allowed;
   runJournal?.input(held, pressed);
@@ -2523,7 +2302,8 @@ const loop = now => {
   }
   renderer.draw(game);
   if (screen === "replay" && replayView.player?.cpu) replayCpuRenderer.draw(replayView.player.cpu);
-  if (race && !scenePractice && screen !== "replay" && raceBoardVisible.matches) raceRenderer.draw(race.player.game);
+  if (race && !sceneView.current && screen !== "replay" && raceBoardVisible.matches)
+    raceRenderer.draw(race.player.game);
   if (versus && screen !== "replay" && raceBoardVisible.matches) cpuRenderer.draw(versus.cpu);
   updateHud();
   inputDisplay.paint();
