@@ -92,20 +92,33 @@ const slotPath =
 
 const drawCombo = (ctx, material, theme, color, right, slot, combo, accent) => {
   const left = right + 0.4;
-  const gap = 0.12;
-  const width = (slot - 0.8 - 3 * gap) / 4;
+  const top = 6.94;
+  const panelWidth = slot - 0.8;
+  const inset = 0.3;
+  const count = 4;
+  const gap = 0.14;
+  const width = (panelWidth - 2 * inset - (count - 1) * gap) / count;
+  const trackTop = top + 1.16;
+  const trackHeight = 0.3;
+
   ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(left, top, panelWidth, 1.78, Math.min(0.16, theme.radius));
   ctx.fillStyle = theme.board.bg;
-  ctx.fillRect(left, 7, slot - 0.8, 1.72);
+  ctx.fill();
+  ctx.strokeStyle = theme.board.edge;
+  ctx.lineWidth = 0.055;
+  ctx.stroke();
+
   ctx.fillStyle = color;
   ctx.font = "600 0.62px system-ui, sans-serif";
-  ctx.globalAlpha = 0.85;
-  ctx.fillText(t("콤보"), left, 7.28);
-  for (let index = 0; index < 4; index++) {
-    const x = left + index * (width + gap);
-    ctx.globalAlpha = index < combo ? 0.67 : 0.17;
-    ctx.fillRect(x, 8.15, width, 0.26);
-    if (index === combo - 1) stroke(ctx, material, color, accent, path => path.rect(x, 8.15, width, 0.26));
+  ctx.globalAlpha = 0.9;
+  ctx.fillText(t("콤보"), left + inset, top + 0.24);
+  for (let index = 0; index < count; index++) {
+    const x = left + inset + index * (width + gap);
+    ctx.globalAlpha = index < combo ? 0.74 : 0.2;
+    ctx.fillRect(x, trackTop, width, trackHeight);
+    if (index === combo - 1) stroke(ctx, material, color, accent, path => path.rect(x, trackTop, width, trackHeight));
   }
   ctx.restore();
 };
