@@ -378,8 +378,16 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
           title: t("{piece} 넣기", { piece }),
         })
       );
-      const moveBack = iconButton({ icon: "arrow-left", label: t("고른 피스를 앞으로") });
-      const moveForward = iconButton({ icon: "arrow-right", label: t("고른 피스를 뒤로") });
+      const moveBack = iconButton({
+        icon: "arrow-left",
+        label: t("고른 피스를 앞으로"),
+        "aria-keyshortcuts": "Shift+ArrowLeft Alt+ArrowLeft",
+      });
+      const moveForward = iconButton({
+        icon: "arrow-right",
+        label: t("고른 피스를 뒤로"),
+        "aria-keyshortcuts": "Shift+ArrowRight Alt+ArrowRight",
+      });
       const remove = button({ label: t("빼기"), size: "s", id: "puzzle-piece-remove" });
 
       // ---- 판 도구 ----
@@ -460,7 +468,12 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         stampRot = (stampRot + 1) % 4;
         paintTiles();
       };
-      const stampRotate = iconButton({ icon: "rotate-cw", label: t("도장 돌리기 (R)"), onClick: rotateStamp });
+      const stampRotate = iconButton({
+        icon: "rotate-cw",
+        label: t("도장 돌리기 (R)"),
+        "aria-keyshortcuts": "R",
+        onClick: rotateStamp,
+      });
       const doStamp = index => {
         const at = stampIndices(stampType, stampRot, index, firstVisible() / WIDTH);
         if (!at) {
@@ -1059,13 +1072,8 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         }
       });
       board.addEventListener("keydown", event => {
+        if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
         const cell = cellAt(event.target);
-        // 도장은 R로 돌린다
-        if (tool === "piece" && cell && event.key.toLowerCase() === "r" && !event.ctrlKey && !event.metaKey) {
-          event.preventDefault();
-          rotateStamp();
-          return;
-        }
         const offset = { ArrowUp: -WIDTH, ArrowDown: WIDTH, ArrowLeft: -1, ArrowRight: 1 }[event.key];
         if (!cell || offset === undefined) return;
         event.preventDefault();
@@ -1111,6 +1119,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       moveBack.addEventListener("click", () => selected !== null && editPieces(movePiece(pieces, selected, -1)));
       moveForward.addEventListener("click", () => selected !== null && editPieces(movePiece(pieces, selected, 1)));
       sequence.addEventListener("keydown", event => {
+        if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
         const at = Number(/** @type {HTMLElement} */ (event.target).dataset.at);
         if (Number.isNaN(at)) return;
         if (event.key === "Delete" || event.key === "Backspace") {
@@ -1119,14 +1128,29 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
           event.preventDefault();
           const offset = event.key === "ArrowLeft" ? -1 : 1;
-          // Alt+화살표는 피스를 옮기고, 화살표만은 옆 칩으로 간다
-          if (event.altKey) editPieces(movePiece(pieces, at, offset));
-          else {
-            const next = /** @type {HTMLElement | undefined} */ (sequence.children[at + offset]);
-            next?.focus();
-          }
+          const next = /** @type {HTMLElement | undefined} */ (sequence.children[at + offset]);
+          next?.focus();
         }
       });
+
+      /** @param {KeyboardEvent} event */
+      const editorShortcuts = event => {
+        if (event.defaultPrevented || event.ctrlKey || event.metaKey) return;
+        const target = /** @type {HTMLElement} */ (event.target);
+        if (target.matches('input:not([type="checkbox"]), textarea, select') || target.isContentEditable) return;
+        // 도장 설정 단추에 포커스가 남아 있어도, 한글 배열의 R 자리에서도 돌린다.
+        if (tool === "piece" && !event.altKey && (event.code === "KeyR" || event.key.toLowerCase() === "r")) {
+          event.preventDefault();
+          rotateStamp();
+          return;
+        }
+        // 브라우저가 Alt+화살표를 탐색 키로 잡는 경우에는 Shift+화살표를 쓴다.
+        if (event.shiftKey === event.altKey || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
+        const at = target.matches(".puzzle-seq-chip") ? Number(target.dataset.at) : selected;
+        if (at === null) return;
+        event.preventDefault();
+        editPieces(movePiece(pieces, at, event.key === "ArrowLeft" ? -1 : 1));
+      };
 
       /** 풀 수 있는지 찾는다. auto: 고치기를 멈추면 저절로(포커스는 옮기지 않는다) */
       const runCheck = (auto = false) => {
@@ -1298,7 +1322,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
                 "p",
                 { class: "field-help" },
                 t(
-                  '피스를 눌러 고르면 그 뒤에 넣고, 앞뒤로 옮기거나 뺄 수 있어요(Alt+화살표·Delete). 글자 키(I J L O S T Z)로 넣거나 "TSZ" 같은 순서를 붙여 넣어도 돼요.'
+                  '고른 피스 뒤에 넣어요. Shift+좌우 화살표로 옮기고, 순서 칸에서 Delete로 빼요. 글자 키(I J L O S T Z)로 넣거나 "TSZ"처럼 붙여 넣을 수 있어요.'
                 )
               ),
               el(
@@ -1322,7 +1346,9 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         actions: [trial, copy],
         closeId: "puzzle-editor-close",
       });
-      dialog.querySelector(".puzzle-editor")?.addEventListener("paste", pastePieces);
+      const editorBody = /** @type {HTMLElement | null} */ (dialog.querySelector(".puzzle-editor"));
+      editorBody?.addEventListener("paste", pastePieces);
+      editorBody?.addEventListener("keydown", editorShortcuts);
       layoutBoard();
       refresh();
       dialog.showModal();

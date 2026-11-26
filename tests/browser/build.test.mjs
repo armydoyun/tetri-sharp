@@ -3149,6 +3149,52 @@ const pickTemplate = async (page, value) => {
   await page.click(`#puzzle-template-list [data-value="${value}"]`);
 };
 
+test("퍼즐 만들기: 도장과 피스 순서 단축키는 조작 버튼에 포커스가 있어도 동작한다", async () => {
+  const { context, page } = await openPage();
+  try {
+    await openList(page, "#open-puzzles");
+    await page.click("#puzzle-create");
+    await page.click('#puzzle-tool [data-value="piece"]');
+    await choose(page, "puzzle-stamp", "I");
+    await page.hover('[data-cell="175"]');
+    const preview = () => page.$$eval("[data-stamp]", cells => cells.map(cell => Number(cell.dataset.cell)));
+    const horizontal = await preview();
+    assert.equal(horizontal.length, 4);
+    assert.equal(await page.locator(":focus").getAttribute("id"), "puzzle-stamp");
+
+    await page.keyboard.press("r");
+    assert.deepEqual(await preview(), [165, 175, 185, 195]);
+    await page.locator("#puzzle-stamp").dispatchEvent("keydown", { key: "ㄱ", code: "KeyR" });
+    assert.deepEqual(await preview(), horizontal);
+
+    for (const piece of ["I", "O", "T"]) await page.click(`.puzzle-editor-pieces [data-piece="${piece}"]`);
+    const order = () => page.locator(".puzzle-seq-chip").allTextContents();
+    assert.deepEqual(await order(), ["01 I", "02 O", "03 T"]);
+    await page.keyboard.press("Alt+ArrowLeft");
+    assert.deepEqual(await order(), ["01 I", "02 T", "03 O"]);
+    await page.keyboard.press("Alt+ArrowRight");
+    assert.deepEqual(await order(), ["01 I", "02 O", "03 T"]);
+    await page.keyboard.press("Shift+ArrowLeft");
+    assert.deepEqual(await order(), ["01 I", "02 T", "03 O"]);
+
+    await page.getByRole("button", { name: "2번째 T", exact: true }).focus();
+    await page.keyboard.press("Alt+ArrowRight");
+    assert.deepEqual(await order(), ["01 I", "02 O", "03 T"]);
+    await page.keyboard.press("ArrowLeft");
+    assert.equal(await page.locator(":focus").textContent(), "02 O");
+    assert.deepEqual(await order(), ["01 I", "02 O", "03 T"]);
+
+    await page.focus("#puzzle-title");
+    await page.keyboard.type("ar");
+    await page.keyboard.press("Shift+ArrowLeft");
+    assert.equal(await page.locator("#puzzle-title").inputValue(), "ar");
+    assert.equal(await page.locator("#puzzle-title").evaluate(input => input.selectionStart), 1);
+    assert.deepEqual(await order(), ["01 I", "02 O", "03 T"]);
+  } finally {
+    await context.close();
+  }
+});
+
 test("퍼즐 만들기: 피스 50개를 넣어도 추가 버튼은 같은 자리에 있고 본문만 스크롤한다", async () => {
   for (const viewport of [
     { width: 1280, height: 900 },
