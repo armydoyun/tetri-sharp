@@ -64,6 +64,8 @@ test("배포본 파일: index.html·매니페스트·아이콘·링크 배너·�
   assert.equal(manifest.start_url, "./");
   const html = fs.readFileSync(path.join(dir, "index.html"), "utf8");
   assert.match(html, /<link rel="manifest" href="\.\/manifest\.webmanifest">/);
+  assert.equal((html.match(/<link rel="icon"/g) ?? []).length, 1);
+  assert.match(html, /<link rel="icon" href="data:image\/svg\+xml;base64,[^"]+"/);
   assert.match(fs.readFileSync(path.join(dir, "sw.js"), "utf8"), /const VERSION = "[0-9a-f]{12}"/);
   // 링크 배너: 메신저가 읽는 태그(이미지는 절대 주소, 1200×630 PNG)
   assert.match(html, /<meta property="og:image" content="https:\/\/[^"]+\/og\.png">/);
@@ -84,6 +86,8 @@ test("설치 캐시로 서버 장애와 오프라인 상태에서도 기록·리
     page.on("pageerror", e => errors.push(e.message));
     await page.goto(base);
     await ready(page);
+    const icon = await page.locator('link[rel="icon"]').getAttribute("href");
+    assert.equal(await page.locator(".logo-mark").evaluate(mark => getComputedStyle(mark).maskImage), `url("${icon}")`);
     await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller), null, { timeout: 5000 });
     await page.evaluate(({ record, replay }) => {
       localStorage.setItem("tetrisharp:records", JSON.stringify({ "sprint40|modern": [record] }));
