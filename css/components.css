@@ -949,6 +949,20 @@
 }
 
 /* 오늘의 퍼즐 */
+.daily-puzzle-body {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+}
+
+.daily-puzzle-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
 .daily-puzzle-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

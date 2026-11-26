@@ -7,6 +7,7 @@ import path from "node:path";
 import { chromium } from "playwright";
 import { build } from "../../tools/build.mjs";
 import { launchOptions } from "../helpers/browser.mjs";
+import { dailyPuzzleTitle } from "../../js/modes/daily-puzzle.js";
 import { generateDay } from "../../js/modes/daily-puzzle-generation.js";
 
 test("본편 오늘의 퍼즐: 날짜 시드로 플레이하고 새로고침 뒤 이어서 풀면 완료가 남는다", { timeout: 45_000 }, async t => {
@@ -45,7 +46,10 @@ test("본편 오늘의 퍼즐: 날짜 시드로 플레이하고 새로고침 뒤
   await workerReady;
   const play = page.locator("#daily-puzzle-play");
   await play.and(page.locator(":enabled")).waitFor();
-  assert.equal(await page.locator("#daily-puzzle-name").textContent(), "짧은 판 비우기");
+  const today = generateDay("2026-11-26");
+  const name = dailyPuzzleTitle(today.family, today.key, today.cells);
+  assert.equal(await page.locator("#daily-puzzle-name").textContent(), name);
+  assert.equal(await page.locator("#daily-puzzle-type").textContent(), "짧은 판 비우기");
   assert.equal(await page.locator("#daily-puzzle-level").textContent(), "입문");
   assert.equal(await page.locator("#daily-puzzle-pieces").textContent(), "J");
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
@@ -53,10 +57,10 @@ test("본편 오늘의 퍼즐: 날짜 시드로 플레이하고 새로고침 뒤
   await page.waitForFunction(() => document.body.dataset.screen === "play");
 
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:run:suspended")));
-  assert.equal(saved.puzzle, generateDay("2026-11-26").code);
+  assert.equal(saved.puzzle, today.code);
   assert.deepEqual(saved.dailyPuzzle, { key: "2026-11-26", family: "fill" });
   await page.reload();
-  assert.match(await page.locator("#continue-run-info").textContent(), /짧은 판 비우기 · 2026-11-26/);
+  assert.ok((await page.locator("#continue-run-info").textContent()).includes(`${name} · 2026-11-26`));
   await page.locator("#continue-run").click();
   await page.waitForFunction(() => document.body.dataset.screen === "play");
   for (const key of ["ArrowUp", "ArrowLeft", "ArrowLeft", "ArrowLeft", "ArrowLeft", "Space"]) {
@@ -64,7 +68,7 @@ test("본편 오늘의 퍼즐: 날짜 시드로 플레이하고 새로고침 뒤
   }
   await page.locator("#results").waitFor();
   assert.equal(await page.locator("#results-title").textContent(), "성공!");
-  assert.match(await page.locator("#results-mode").textContent(), /짧은 판 비우기 · 2026-11-26/);
+  assert.ok((await page.locator("#results-mode").textContent()).includes(`${name} · 2026-11-26`));
   await page.locator('#results [data-action="menu"]').click();
   await page.locator("#daily-puzzle[open]").waitFor();
   await page.locator("#daily-puzzle-status").filter({ hasText: "이 퍼즐을 풀었어요." }).waitFor();
@@ -73,7 +77,18 @@ test("본편 오늘의 퍼즐: 날짜 시드로 플레이하고 새로고침 뒤
   await page.clock.setFixedTime(new Date("2026-11-27T01:00:00Z"));
   await page.locator("#open-daily-puzzle").click();
   await play.and(page.locator(":enabled")).waitFor();
-  assert.equal(await page.locator("#daily-puzzle-name").textContent(), "콤보 설계");
+  assert.equal(await page.locator("#daily-puzzle-type").textContent(), "콤보 설계");
   assert.equal(await page.locator("#daily-puzzle-status").textContent(), "");
+  await page.locator("#daily-puzzle-date").click();
+  assert.equal(await page.getByRole("option").count(), 7);
+  await page.getByRole("option", { name: "2026-11-26 · 완료", exact: true }).click();
+  await play.and(page.locator(":enabled")).waitFor();
+  assert.equal(await page.locator("#daily-puzzle-name").textContent(), name);
+  assert.equal(await page.locator("#daily-puzzle-status").textContent(), "이 퍼즐을 풀었어요.");
+  await play.click();
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  const reopened = await page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:run:suspended")));
+  assert.equal(reopened.puzzle, today.code);
+  assert.equal(reopened.dailyPuzzle.key, today.key);
   assert.deepEqual(errors, []);
 });

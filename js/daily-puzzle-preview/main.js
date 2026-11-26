@@ -1,7 +1,7 @@
 import { WIDTH, clearLines, createBoard } from "../core/board.js";
 import { CELL_ID, GARBAGE } from "../core/pieces.js";
 import { lang, t, translateDom } from "../i18n/index.js";
-import { DAILY_PUZZLE_FAMILIES, dailyPuzzleInfo, dailyPuzzleLevel } from "../modes/daily-puzzle.js";
+import { DAILY_PUZZLE_FAMILIES, dailyPuzzleInfo, dailyPuzzleLevel, dailyPuzzleTitle } from "../modes/daily-puzzle.js";
 import { createDailyPuzzleBoard } from "../render/daily-puzzle-board.js";
 import { ORIGINAL_THEMES } from "../render/themes.js";
 import { button } from "../ui/components.js";
@@ -11,7 +11,7 @@ import { dropdown } from "../ui/select.js";
 /** @typedef {{ type: string, hold: boolean, cells: [number, number][], lines: number, tspin: string }} Move */
 /**
  * @typedef {{ key: string, seed: number, family: string, planned: string, pieces: string,
- *   rows: string[], code: string, goal: string, level: number, similarDate: string | null, similarRouteDate: string | null,
+ *   rows: string[], code: string, goal: string, level: number, planning: number, execution: number, similarDate: string | null, similarRouteDate: string | null,
  *   stats: { firstChoices: number, wins: number, holdWins: number, deepestDeadEnd: number, height: number, path: Move[] } }} Day
  */
 
@@ -123,6 +123,8 @@ const select = day => {
   moveIndex = -1;
   buttons.get(day.key)?.setAttribute("aria-pressed", "true");
   element("selected-date").textContent = day.key;
+  const cells = day.rows.flatMap(row => [...row].map(Number));
+  element("selected-name").textContent = dailyPuzzleTitle(day.family, day.key, cells);
   element("selected-family").textContent = familyNames[day.family];
   element("selected-level").textContent = levels[day.level - 1];
   element("selected-description").textContent = dailyPuzzleInfo(day.family, day.goal).description;
@@ -134,6 +136,8 @@ const select = day => {
     })
   );
   fields(element("selected-metrics"), [
+    [t("판단 난이도"), dailyPuzzleLevel(day.planning)],
+    [t("조작 난이도"), dailyPuzzleLevel(day.execution)],
     [t("첫 배치 후보"), day.stats.firstChoices],
     [t("완주 가능한 첫 배치"), day.stats.wins],
     [t("오답 경로 최대 수"), day.stats.deepestDeadEnd || "—"],

@@ -3,7 +3,7 @@ import { HEIGHT, WIDTH, clearLines, createBoard } from "../core/board.js";
 import { GARBAGE } from "../core/pieces.js";
 import { searchOptions, solverBoard, usedHeight } from "./custom-puzzle.js";
 import { goalOf } from "./puzzle-goals.js";
-import { placeOn, reachable, spawnOf } from "./puzzle-solver.js";
+import { inputsForPlacement, placeOn, reachable, spawnOf } from "./puzzle-solver.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
 
 const rotation = ROTATIONS.srs;
@@ -136,4 +136,38 @@ export const hasStraightClear = (puzzle, path) => {
       )
     );
   });
+};
+
+/** 대표 풀이에서 내리기 이후의 이동과 회전을 기록한다. 단순 하드 드롭의 낙하 거리는 제외한다. */
+export const analyzeDailyControls = (puzzle, path) => {
+  const board = createBoard();
+  board.cells = solverBoard(puzzle.cells);
+  const inputs = [];
+  let lateMoves = 0;
+  let lateTurns = 0;
+  let maxManeuvers = 0;
+  for (const move of path) {
+    const steps = inputsForPlacement(board, rotation, move);
+    if (!steps) return null;
+    inputs.push(steps);
+    const firstDrop = steps.indexOf("D");
+    if (firstDrop >= 0) {
+      let maneuvers = 0;
+      // 같은 높이에서 같은 방향으로 여러 칸 가는 것은 이동 한 번으로 센다.
+      for (let i = firstDrop + 1; i < steps.length; i++) {
+        const step = steps[i];
+        if ((step === "L" || step === "R") && step !== steps[i - 1]) {
+          lateMoves++;
+          maneuvers++;
+        } else if (step === "CW" || step === "CCW") {
+          lateTurns++;
+          maneuvers++;
+        }
+      }
+      maxManeuvers = Math.max(maxManeuvers, maneuvers);
+    }
+    for (const [x, y] of move.cells) board.cells[y * WIDTH + x] = GARBAGE;
+    clearLines(board);
+  }
+  return { inputs, lateMoves, lateTurns, maxManeuvers };
 };
