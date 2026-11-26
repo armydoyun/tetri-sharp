@@ -146,7 +146,18 @@ export const drawMotionAccents = (
     }
   }
 
-  if (spin) drawTSpin(ctx, { ...spin, themeId, theme, left, right, rows: ROWS, reduced });
+  if (spin)
+    drawTSpin(ctx, {
+      ...spin,
+      themeId,
+      theme,
+      left,
+      right,
+      rows: ROWS,
+      reduced,
+      duration: duration + 105,
+      growth: finish === "wave" ? 0.82 : 0.66,
+    });
 
   const perfectLength = duration + 290;
   const perfect = opacity(perfectAge, perfectLength, reduced, 1.1);
