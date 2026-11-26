@@ -1,6 +1,7 @@
 // 퍼즐 만들기 편집기: [시작 틀 · 도구 · 높이] [판] [판 도구 줄] [피스 순서] → 시험 플레이 · 링크 복사.
 // 판은 누르거나 끌어서 칠한다(마우스·터치·펜 모두 Pointer Events). 편집 동작 자체는 js/modes/puzzle-edit.js(DOM 없음).
 // 계획: docs/PUZZLE_MAKER.md
+import { createPuzzleVerification } from "../app/puzzle-verification.js";
 import { WIDTH, VISIBLE_ROWS } from "../core/board.js";
 import { PIECE_TYPES } from "../core/pieces.js";
 import { t } from "../i18n/index.js";
@@ -21,7 +22,6 @@ import {
   normalizePuzzle,
   puzzleLink,
   ruleSummary,
-  solutionTask,
 } from "../modes/custom-puzzle.js";
 import { GOAL_KINDS } from "../modes/puzzle-goals.js";
 import { LOCK_TYPES } from "../rules/sanitize.js";
@@ -59,9 +59,6 @@ import {
   textInput,
   toggle,
 } from "./components.js";
-
-/** 저절로 확인하는 퍼즐의 피스 수 한도(이보다 많으면 확인 버튼으로만) */
-const AUTO_CHECK_PIECES = 12;
 
 /** @param {HTMLElement} controls @param {string} help */
 const editorContext = (controls, help) => {
@@ -103,12 +100,6 @@ const settingsOf = p => ({
   title: p.title,
   desc: p.desc,
 });
-
-/** @typedef {{ type: string, hold: boolean, board: Uint8Array, cells: Array<[number, number]> }} SolutionMove */
-/**
- * 자동 확인 결과(그 퍼즐 코드에 대해). checking: 찾는 중
- * @typedef {{ code: string, state: "checking" | "solvable" | "unsolvable" | "exhausted", moves?: SolutionMove[] }} Verified
- */
 
 /**
  * @param {{
@@ -155,15 +146,13 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
   let draft = null;
   /** @returns {Snapshot} */
   const snapshot = () => ({ cells: cells.slice(), pieces, settings: structuredClone(settings) });
-  /** @type {Verified | null} */
-  let verified = null;
-  /** 찾는 중인 자동 확인(대화상자를 닫거나 퍼즐이 바뀌면 멈춘다) */
-  let checking = /** @type {null | { cancel: () => void }} */ (null);
-  const stopChecking = () => {
-    checking?.cancel();
-    checking = null;
-    if (verified?.state === "checking") verified = null;
-  };
+  const warnings = () => puzzleWarnings(current());
+  const verifier = createPuzzleVerification({
+    solver,
+    getPuzzle: current,
+    getKey: keyNow,
+    hasWarnings: () => warnings().length > 0,
+  });
   /** 편집기가 열려 있을 때만 단축키(Ctrl+Z)를 받는다 */
   let undoKeys = /** @type {null | ((redo: boolean) => void)} */ (null);
 
@@ -187,14 +176,18 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       draft = entryId === null && touched ? { state: snapshot(), history } : null;
     }
     undoKeys = null;
-    stopChecking();
+    verifier.suspend();
   });
 
   /** 그 퍼즐(열쇠 contentKey)에 붙일 확인 표시: 자동 확인으로 풀었는지, 직접 풀어 봤는지(이번에, 또는 저장돼 있던 것) */
-  const checkedFor = key =>
-    (verified?.code === key && verified.state === "solvable" ? CHECKED_AUTO : 0) |
-    (cleared === key ? CHECKED_TRIED : 0) |
-    (loaded?.code === key ? loaded.checked : 0);
+  const checkedFor = key => {
+    const verified = verifier.result;
+    return (
+      (verified?.code === key && verified.state === "solvable" ? CHECKED_AUTO : 0) |
+      (cleared === key ? CHECKED_TRIED : 0) |
+      (loaded?.code === key ? loaded.checked : 0)
+    );
+  };
   /** 내 퍼즐에 저장한다(고칠 때마다 저절로). 링크로 보낼 수 있는 퍼즐만 */
   const save = () => {
     const code = encodePuzzle(current());
@@ -224,8 +217,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
     selected = null;
     height = puzzle ? fitHeight(cells) : EDIT_HEIGHTS[0];
     history = (id && histories.get(id)) || createHistory();
-    stopChecking();
-    verified = null;
+    verifier.reset();
     saveState = puzzle ? "saved" : "none";
   };
   const editor = {
@@ -313,9 +305,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
     },
     open() {
       const notice = el("p", { class: "notice-slot", role: "status" });
-      let autoTimer = 0;
-      /** 사용자가 멈춘 퍼즐(열쇠): 다시 고치기 전까지 저절로 확인하지 않는다 */
-      let autoSkip = /** @type {string | null} */ (null);
+      verifier.begin();
       const trial = button({ id: "puzzle-trial", label: t("시험 플레이") });
       const copy = button({ id: "puzzle-copy", label: t("링크 복사"), icon: "link" });
       const link = textInput({
@@ -347,7 +337,10 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       const firstVisible = () => (VISIBLE_ROWS - height) * WIDTH;
       /** 풀이 보기: 몇 번째 수를 보여 주는지(null이면 편집 중) */
       let viewStep = /** @type {number | null} */ (null);
-      const solution = () => (verified?.state === "solvable" && verified.moves) || null;
+      const solution = () => {
+        const verified = verifier.result;
+        return verified?.state === "solvable" ? verified.moves : null;
+      };
       const paintTiles = () => {
         const move = viewStep !== null ? solution()?.[viewStep] : null;
         // 피스 도장 미리보기: 올린(또는 포커스한) 칸에 찍힐 네 칸
@@ -859,11 +852,8 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         const code = encodePuzzle(current());
         renderSettings();
         trial.disabled = !code;
-        // 퍼즐이 바뀌었으면 찾던 확인은 멈추고, 지난 결과는 쓰지 않는다
-        if (verified && verified.code !== keyNow()) {
-          stopChecking();
-          verified = null;
-        }
+        verifier.sync();
+        const verified = verifier.result;
         const checkedNow = code ? checkedFor(keyNow()) : 0;
         const tried = Boolean(checkedNow & CHECKED_TRIED);
         const solvable = Boolean(checkedNow & CHECKED_AUTO) && canSearch(current());
@@ -901,8 +891,8 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         // 자동 확인
         const moves = solution();
         if (!moves) viewStep = null;
-        check.disabled = !code || !canSearch(current()) || Boolean(checking) || Boolean(verified);
-        stop.disabled = !checking;
+        check.disabled = !code || !canSearch(current()) || verifier.checking || Boolean(verified);
+        stop.disabled = !verifier.checking;
         view.disabled = !moves;
         view.checked = viewStep !== null;
         prevStep.disabled = viewStep === null || viewStep === 0;
@@ -915,7 +905,10 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
           : "- / -";
         status.textContent = statusText(code);
         verification.show(Boolean(code));
-        scheduleAutoCheck();
+        verifier.schedule(
+          () => dialog.open && dialog.contains(status),
+          () => runCheck(true)
+        );
         status.dataset.tone = verified?.state === "solvable" ? "ok" : verified || warnings().length ? "warn" : "";
         paintTiles();
         notice.textContent = tried
@@ -924,27 +917,9 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
             ? t("풀 수 있는 퍼즐이에요. 링크를 공유할 수 있어요.")
             : t("풀 수 있는지 확인하거나 시험 플레이에서 풀면 링크를 공유할 수 있어요.");
       };
-      const warnings = () => puzzleWarnings(current());
-      /**
-       * 저절로 확인(퍼즐 다시 보기 P3): 고치기를 멈추고 0.6초 뒤 Worker로 찾는다. 다시 고치면 찾던 것은 멈춘다(refresh).
-       * 피스가 많으면(12개 넘게) 오래 걸릴 수 있어 버튼으로만. 미리 알려 줄 것이 있거나 멈춘 퍼즐도 하지 않는다
-       */
-      const autoCheckable = () =>
-        pieces.length <= AUTO_CHECK_PIECES &&
-        canSearch(current()) &&
-        !warnings().length &&
-        !checking &&
-        keyNow() !== autoSkip &&
-        !(verified && verified.code === keyNow());
-      const scheduleAutoCheck = () => {
-        clearTimeout(autoTimer);
-        if (!keyNow() || !autoCheckable()) return;
-        autoTimer = setTimeout(() => {
-          if (dialog.open && dialog.contains(status) && autoCheckable()) runCheck(true);
-        }, 600);
-      };
       /** 확인 결과가 있으면 그것, 없으면 미리 알려 줄 것 */
       const statusText = code => {
+        const verified = verifier.result;
         if (verified?.state === "checking") return t("풀 수 있는지 찾는 중이에요…");
         if (verified?.state === "solvable")
           return t("풀 수 있어요 · {n}수. 풀이 보기로 한 수씩 볼 수 있어요.", { n: verified.moves?.length ?? 0 });
@@ -970,8 +945,8 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
             )
             .join(" ");
         if (!code) return "";
-        if (keyNow() === autoSkip) return t("확인을 누르면 풀 수 있는지 찾아봐요.");
-        return pieces.length <= AUTO_CHECK_PIECES
+        if (verifier.isStopped()) return t("확인을 누르면 풀 수 있는지 찾아봐요.");
+        return verifier.isSmall()
           ? t("고치기를 멈추면 저절로 풀 수 있는지 찾아봐요.")
           : t("피스가 많아 확인을 눌러야 찾아봐요.");
       };
@@ -1198,34 +1173,21 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
 
       /** 풀 수 있는지 찾는다. auto: 고치기를 멈추면 저절로(포커스는 옮기지 않는다) */
       const runCheck = (auto = false) => {
-        const code = keyNow();
-        if (!code || checking || !canSearch(current())) return;
-        verified = { code, state: "checking" };
-        const search = solver.run(solutionTask(current()));
-        checking = search;
-        refresh();
-        if (!auto) stop.focus();
-        search.promise.then(result => {
-          if (checking !== search) return;
-          checking = null;
-          if (result === undefined) return;
-          verified =
-            result && "moves" in result
-              ? { code, state: "solvable", moves: result.moves }
-              : { code, state: result ? "exhausted" : "unsolvable" };
-          if (dialog.contains(status)) {
-            // 저절로 확인한 것이면 포커스는 사용자가 두던 곳에 그대로
+        if (
+          !verifier.start(() => {
+            if (!dialog.contains(status)) return;
             const keepFocus = auto && document.activeElement !== stop;
             refresh();
             if (!keepFocus) (view.disabled ? check : view).focus();
-          }
-        });
+          })
+        )
+          return;
+        refresh();
+        if (!auto) stop.focus();
       };
       check.addEventListener("click", () => runCheck());
       stop.addEventListener("click", () => {
-        // 멈춘 퍼즐은 다시 고치기 전까지 저절로 확인하지 않는다
-        autoSkip = keyNow();
-        stopChecking();
+        verifier.stop();
         refresh();
         check.focus();
       });
