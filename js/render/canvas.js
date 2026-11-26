@@ -190,6 +190,19 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     pattern = visual.pattern === "on";
     drawGrid(theme, bx, by, visual.grid !== "off");
     effects.drawDrops(ctx, { bx, by, cell, toY }, now, theme.board.ink);
+    const drawBlock = (x, y, size, value) => {
+      theme.block(ctx, x, y, size, palette[value]);
+      if (pattern) drawMark(ctx, x, y, size, value, palette[value]);
+    };
+    // 이전 줄의 잔상 뒤에 현재 보드를 그려 이미 내려온 블록을 가리지 않는다.
+    effects.drawClearedBlocks(
+      ctx,
+      { bx, cell, toY, cols: COLS },
+      now,
+      effectLevel,
+      drawBlock,
+      visual.clearEffectLength
+    );
 
     // 방금 놓인 피스의 아래 모서리를 기준으로 높이만 압축한다.
     for (let y = VISIBLE_TOP - MARGIN_TOP; y < board.height; y++) {
@@ -204,8 +217,7 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
           ctx.scale(1, impact.scale);
           ctx.translate(0, -floor);
         }
-        theme.block(ctx, bx + x * cell, toY(y), cell, palette[value]);
-        if (pattern) drawMark(ctx, bx + x * cell, toY(y), cell, value, palette[value]);
+        drawBlock(bx + x * cell, toY(y), cell, value);
         if (impact) ctx.restore();
       }
     }

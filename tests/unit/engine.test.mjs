@@ -36,6 +36,24 @@ test("하드 드롭: 즉시 고정하고 다음 피스", () => {
   assert.ok(filled > 0, "바닥 줄에 블록이 놓였다");
 });
 
+test("삭제 이벤트는 삭제 직전 블록 색을 담고 다음 피스는 즉시 생성된다", () => {
+  const g = make();
+  tick(g);
+  g.state.active = { type: "O", rot: 0, x: 3, y: HEIGHT - 3 };
+  const open = new Set(g.activeCells().map(([x]) => x));
+  for (let x = 0; x < WIDTH; x++) if (!open.has(x)) set(g.state.board, x, HEIGHT - 1, 8);
+  const next = g.state.queue[0];
+  const events = tick(g, 0, BTN.HARD);
+  const lock = events.find(e => e.type === "lock");
+  assert.deepEqual(lock.rows, [HEIGHT - 1]);
+  assert.deepEqual(
+    [...lock.clearedCells[0]],
+    Array.from({ length: WIDTH }, (_, x) => (open.has(x) ? 4 : 8))
+  );
+  assert.equal(g.state.active.type, next);
+  assert.equal(get(g.state.board, 0, HEIGHT - 1), 0);
+});
+
 test("같은 시드와 입력이면 결과가 같다(결정론)", () => {
   const play = () => {
     const g = make({}, HANDLING, 99);

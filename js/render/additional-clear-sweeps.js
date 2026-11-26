@@ -1,5 +1,5 @@
 // 선의 결을 띠의 간격과 두께로 표현한다. 색은 각 보드 안에서만 쓰는 삭제 연출용이다.
-/** @type {Record<string, import("../render/clear-sweep.js").ClearSweep>} */
+/** @type {Record<string, import("./clear-sweep.js").ClearSweep>} */
 export const CLEAR_SWEEPS = Object.freeze({
   porcelain: {
     shape: "chip",

@@ -25,7 +25,15 @@ import {
 import { el, fieldRow, fillDialog, focusKey, restoreFocus } from "./dom.js";
 import { button, choiceCards, confirmButton, rangeRow, segmented, slider, tabBar, toggle } from "./components.js";
 import { dropdown } from "./select.js";
-import { COLOR_SWATCHES, PIECE_ORDER, THEMES, THEME_IDS, findTheme, paletteFor } from "../render/themes.js";
+import {
+  ADDITIONAL_THEMES,
+  COLOR_SWATCHES,
+  PIECE_ORDER,
+  THEMES,
+  THEME_IDS,
+  findTheme,
+  paletteFor,
+} from "../render/themes.js";
 import { keycap } from "./keycap.js";
 import { createThemeStage, drawThemeSwatch } from "../render/preview.js";
 import { t } from "../i18n/index.js";
@@ -746,7 +754,7 @@ export const createSettingsUI = ({
     return fieldRow({
       id: "set-sound",
       label: t("효과음 종류"),
-      hint: t(SOUND_HINTS[value] ?? SOUND_HINTS.theme),
+      hint: ADDITIONAL_THEMES[value]?.sound ?? t(SOUND_HINTS[value] ?? SOUND_HINTS.theme),
       // 다섯 가지라 세그먼트는 휴대폰에서 글자가 두 줄로 찌그러진다 → 목록(설명은 목록 안에)
       control: dropdown({
         id: "set-sound",
@@ -757,7 +765,7 @@ export const createSettingsUI = ({
           ...[...THEME_IDS, ...openedThemes()].map(id => ({
             value: id,
             label: THEMES[id].name,
-            hint: t(SOUND_HINTS[id] ?? ""),
+            hint: ADDITIONAL_THEMES[id]?.sound ?? t(SOUND_HINTS[id] ?? ""),
           })),
         ],
         value,

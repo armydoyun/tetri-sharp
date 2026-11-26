@@ -113,7 +113,7 @@ test("독립 테마 견본에서 보드를 비교하고 효과음을 재생·정
     const ctx = canvas.getContext("2d");
     const cell = canvas.height / 9;
     const bx = Math.round(4.4 * cell);
-    const pixel = x => Array.from(ctx.getImageData(bx + (x + 0.375) * cell, 4.25 * cell, 1, 1).data);
+    const pixel = x => Array.from(ctx.getImageData(bx + (x + 0.375) * cell, 4.75 * cell, 1, 1).data);
     const read = () => [pixel(0), pixel(2)];
     const raf = window.requestAnimationFrame;
     let step;

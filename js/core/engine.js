@@ -244,7 +244,8 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
     state.holdUsed = false;
     state.stats.pieces += 1;
 
-    const cleared = clearLines(board);
+    const clearedCells = [];
+    const cleared = clearLines(board, (_row, cells) => clearedCells.push(cells));
     const lines = cleared.length;
     const perfect = lines > 0 && isEmpty(board);
     const scoreLevel = mode?.scoreLevel ? mode.scoreLevel(state) : state.level;
@@ -264,6 +265,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
       cells: shape.map(([cx, cy]) => [a.x + cx, a.y + cy]),
       lines,
       rows: cleared,
+      ...(lines > 0 ? { clearedCells } : {}),
       tspin,
       perfect,
       points: scored.points,

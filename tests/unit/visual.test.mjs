@@ -4,13 +4,18 @@ import { CELL_ID } from "../../js/core/pieces.js";
 import { createEffects } from "../../js/render/effects.js";
 import { clearSections } from "../../js/render/clear-sweep.js";
 import { createSlide } from "../../js/render/motion.js";
-import { CONTRAST_PALETTE, DEFAULT_THEME, THEMES, THEME_IDS, findTheme } from "../../js/render/themes.js";
+import {
+  ADDITIONAL_THEMES,
+  CONTRAST_PALETTE,
+  DEFAULT_THEME,
+  ORIGINAL_THEMES,
+  THEMES,
+  THEME_IDS,
+  findTheme,
+} from "../../js/render/themes.js";
 import { sanitizeSettings, sanitizeVisual } from "../../js/storage/settings.js";
-import { CANDIDATES } from "../../js/theme-preview/candidates.js";
-import { EXISTING_PREVIEWS } from "../../js/theme-preview/existing.js";
 
-const previewThemes = Object.values(CANDIDATES).map(({ theme }) => theme);
-const allThemes = [...Object.values(THEMES), ...previewThemes];
+const allThemes = Object.values(THEMES);
 
 const lockEvent = {
   type: "lock",
@@ -41,7 +46,7 @@ const fakeCtx = (calls = []) =>
 
 test("견본 줄 삭제는 테마별로 다른 형태로 블록을 지우고 행 안에 머문다", () => {
   const signatures = new Set();
-  const variants = [...previewThemes, ...Object.values(EXISTING_PREVIEWS).map(({ theme }) => theme)];
+  const variants = allThemes;
   const remaining = sections =>
     sections.reduce(
       (sum, { visible, alpha }) =>
@@ -71,7 +76,7 @@ test("견본 줄 삭제는 테마별로 다른 형태로 블록을 지우고 행
     signatures.add(JSON.stringify([sweep.shape, sweep.ink, bands]));
   }
   assert.equal(signatures.size, variants.length);
-  const frame = (id, at = 0.32) => clearSections(CANDIDATES[id].theme.motion.clearSweep, at, null, 10);
+  const frame = (id, at = 0.32) => clearSections(THEMES[id].motion.clearSweep, at, null, 10);
   assert.equal(frame("tide")[0].visible.length, 2);
   assert.ok(frame("tide")[0].trail[0][0] > 0);
   assert.ok(frame("press")[0].sy < 1);
@@ -80,30 +85,26 @@ test("견본 줄 삭제는 테마별로 다른 형태로 블록을 지우고 행
   assert.ok(frame("ink")[0].alpha < 1);
 });
 
-test("기존 테마의 새 연출은 견본 설정에만 붙는다", () => {
-  assert.deepEqual(Object.keys(EXISTING_PREVIEWS).sort(), Object.keys(THEMES).sort());
-  for (const [id, { theme, reference }] of Object.entries(EXISTING_PREVIEWS)) {
-    assert.equal(reference, id);
-    assert.equal(theme.palette, THEMES[id].palette);
-    assert.ok(theme.motion.clearSweep);
-    assert.equal(THEMES[id].motion.clearSweep, undefined);
+test("게임은 견본 연출을 쓰고 원본 테마를 비교용으로 보존한다", () => {
+  for (const [id, original] of Object.entries(ORIGINAL_THEMES)) {
+    assert.equal(THEMES[id].palette, original.palette);
+    assert.ok(THEMES[id].motion.clearSweep);
+    assert.equal(original.motion.clearSweep, undefined);
   }
-  assert.equal(EXISTING_PREVIEWS.sharp.theme.motion.clearSweep.crossbars, true);
-  assert.equal(THEMES.sharp.motion.clear, "hash");
+  assert.equal(THEMES.sharp.motion.clearSweep.crossbars, true);
+  assert.equal(ORIGINAL_THEMES.sharp.motion.clear, "hash");
 });
 
-test("테마 아홉 가지, 기본은 모던", () => {
-  assert.deepEqual([...THEME_IDS].sort(), [
-    "forest",
-    "frame",
-    "graphite",
-    "midnight",
-    "minimal",
-    "modern",
-    "retro",
-    "stone",
-    "white",
-  ]);
+test("공개 테마 스무 가지, 샤프는 별도 잠금 해제", () => {
+  assert.equal(THEME_IDS.length, 20);
+  assert.equal(new Set(THEME_IDS).size, 20);
+  assert.deepEqual(
+    [...THEME_IDS].sort(),
+    Object.keys(THEMES)
+      .filter(id => id !== "sharp")
+      .sort()
+  );
+  for (const [id, { theme }] of Object.entries(ADDITIONAL_THEMES)) assert.equal(findTheme(id), theme);
   assert.equal(DEFAULT_THEME, "modern");
   assert.equal(findTheme("없음"), THEMES.modern);
 });
@@ -128,7 +129,7 @@ test("테마마다 보드 색 · 격자·마감·모서리 묶음 · 줄 삭제 
     themes.length,
     "격자·마감·모서리가 모두 같은 테마는 없다"
   );
-  assert.equal(new Set(Object.values(THEMES).map(theme => theme.motion.clear)).size, Object.keys(THEMES).length);
+  assert.equal(new Set(allThemes.map(theme => JSON.stringify(theme.motion.clearSweep))).size, allThemes.length);
   for (const theme of themes) {
     assert.ok(["lines", "dots", "none", "hash"].includes(theme.gridStyle), theme.name);
     assert.ok(["flat", "inset", "frame"].includes(theme.finish), theme.name);
@@ -283,7 +284,7 @@ test("줄 삭제 표시가 차지하는 범위와 수명은 효과 수준에 따
 
 test("하드 드롭은 테마마다 다른 압축과 짧은 잔상을 만들고 줄임·끄기에서는 생략한다", () => {
   const samples = [];
-  for (const { motion } of Object.values(THEMES)) {
+  for (const { motion } of Object.values(ORIGINAL_THEMES)) {
     const fx = createEffects();
     fx.add([dropEvent, lockEvent], "full", 0, motion);
     samples.push(fx.landing(0, 39, CELL_ID.L, motion.landMs * 0.2).scale);
@@ -312,8 +313,8 @@ test("하드 드롭은 테마마다 다른 압축과 짧은 잔상을 만들고 
   assert.equal(samples[0], 0.8);
 });
 
-test("줄 삭제는 스튜디오에서 가운데로부터, 페이퍼에서 왼쪽부터, 블루프린트에서 두 줄로 그린다", () => {
-  const marks = Object.values(THEMES).map(({ motion }) => {
+test("비교용 원본: 줄 삭제는 스튜디오에서 가운데로부터, 페이퍼에서 왼쪽부터, 블루프린트에서 두 줄로 그린다", () => {
+  const marks = Object.values(ORIGINAL_THEMES).map(({ motion }) => {
     const fx = createEffects();
     fx.add([clearEvent], "full", 0, motion);
     const calls = [];
@@ -360,8 +361,13 @@ test("연속 삭제로 같은 줄이 겹치면 새로운 효과만 남긴다", (
   fx.add([clearEvent], "full", 0, studio);
   fx.add([clearEvent], "full", 40, studio);
   const calls = [];
-  fx.draw(fakeCtx(calls), { bx: 0, cell: 10, toY: y => y * 10, cols: 10 }, 75, "#fff", "full");
-  assert.equal(calls.filter(([name]) => name === "fillRect").length, 1);
+  const geometry = { bx: 0, cell: 10, cols: 10, toY: y => y * 10 };
+  fx.draw(fakeCtx(calls), geometry, 75, "#fff", "full");
+  const single = createEffects();
+  single.add([clearEvent], "full", 40, studio);
+  const expected = [];
+  single.draw(fakeCtx(expected), geometry, 75, "#fff", "full");
+  assert.deepEqual(calls, expected);
 });
 
 test("미끄러짐: 같은 피스는 짧게 따라가고, 새 피스나 0ms는 바로 그 자리", () => {

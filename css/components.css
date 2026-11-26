@@ -732,6 +732,12 @@
   align-content: start;
 }
 
+@media (min-width: 600px) {
+  .theme-picker > .choice-cards.is-compact {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 /* 넓은 화면: 미리보기 왼쪽, 칩 오른쪽(칩에 올리면 옆에서 바로 바뀐다) */
 @media (min-width: 900px) {
   .theme-picker {

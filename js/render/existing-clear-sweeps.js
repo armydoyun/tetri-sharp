@@ -1,7 +1,5 @@
-import { ALL_THEME_IDS, THEMES } from "../render/themes.js";
-
-/** @type {Record<string, import("../render/clear-sweep.js").ClearSweep>} */
-const sweeps = {
+/** @type {Record<string, import("./clear-sweep.js").ClearSweep>} */
+export const EXISTING_CLEAR_SWEEPS = {
   modern: {
     shape: "sweep",
     from: "center",
@@ -121,18 +119,3 @@ const sweeps = {
     crossbars: true,
   },
 };
-
-export const EXISTING_PREVIEWS = Object.freeze(
-  Object.fromEntries(
-    ALL_THEME_IDS.map(id => {
-      const theme = THEMES[id];
-      return [
-        id,
-        {
-          reference: id,
-          theme: { ...theme, motion: { ...theme.motion, clearMs: theme.motion.clearMs + 100, clearSweep: sweeps[id] } },
-        },
-      ];
-    })
-  )
-);

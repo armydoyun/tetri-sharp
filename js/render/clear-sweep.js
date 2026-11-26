@@ -135,6 +135,37 @@ export const clearSections = (sweep, t, pivot, cols) => {
   });
 };
 
+/** 삭제 중인 한 줄의 블록을 견본과 게임에서 같은 영역·이동·투명도로 그린다. */
+export const drawClearCells = (ctx, { bx, cols, cell, toY }, y, sections, row, drawBlock) => {
+  const rowWidth = cols * cell;
+  const top = toY(y);
+  for (const { visible, alpha, left, right, sx, sy, dy } of sections) {
+    if (!visible.length || alpha <= 0) continue;
+    const region = new Path2D();
+    for (const rect of visible)
+      region.rect(
+        bx + rect.left * rowWidth,
+        top + rect.top * cell,
+        (rect.right - rect.left) * rowWidth,
+        (rect.bottom - rect.top) * cell
+      );
+    ctx.save();
+    ctx.clip(region);
+    ctx.globalAlpha = alpha;
+    if (sx !== 1 || sy !== 1 || dy !== 0) {
+      const centerX = bx + ((left + right) / 2) * rowWidth;
+      const centerY = top + cell / 2;
+      ctx.translate(centerX, centerY + dy * cell);
+      ctx.scale(sx, sy);
+      ctx.translate(-centerX, -centerY);
+    }
+    for (let x = Math.round(left * cols); x < Math.round(right * cols); x++) {
+      if (row[x]) drawBlock(bx + x * cell, top, cell, row[x]);
+    }
+    ctx.restore();
+  }
+};
+
 // 재질을 암시하는 작은 선만 남긴다. 모든 경로는 행 높이 안에 있다.
 const texture = (ctx, style, x, w, y, cell, p, fade) => {
   if (!style || w <= 0) return;
