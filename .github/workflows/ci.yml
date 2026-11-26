@@ -8,9 +8,9 @@ on:
   pull_request:
   workflow_dispatch:
 
-# 같은 브랜치에 새 커밋이 올라오면 이전 실행은 취소한다.
+# 같은 PR이나 같은 브랜치의 동일한 이벤트만 이전 실행을 취소한다.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
