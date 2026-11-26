@@ -1,7 +1,8 @@
-import { HEIGHT, WIDTH, clearLines, createBoard } from "../core/board.js";
+import { WIDTH, clearLines, createBoard } from "../core/board.js";
 import { CELL_ID, GARBAGE } from "../core/pieces.js";
 import { lang, t, translateDom } from "../i18n/index.js";
-import { createBoardGrid } from "../render/board-grid.js";
+import { DAILY_PUZZLE_FAMILIES, dailyPuzzleInfo, dailyPuzzleLevel } from "../modes/daily-puzzle.js";
+import { createDailyPuzzleBoard } from "../render/daily-puzzle-board.js";
 import { ORIGINAL_THEMES } from "../render/themes.js";
 import { button } from "../ui/components.js";
 import { el } from "../ui/dom.js";
@@ -21,36 +22,8 @@ const { days, duplicates, similar } =
 const gameBase64 = /** @type {typeof globalThis & { __TETRI_DAILY_GAME__: string }} */ (globalThis)
   .__TETRI_DAILY_GAME__;
 const element = id => document.getElementById(id);
-const familyNames = {
-  fill: t("짧은 판 비우기"),
-  combo: t("콤보 설계"),
-  hold: t("홀드 순서"),
-  tuck: t("처마 아래 끼워 넣기"),
-  quad: t("4줄 우물 만들기"),
-  spin: t("T스핀 자리 만들기"),
-  trap: t("첫 배치 함정"),
-};
-const levels = [t("입문"), t("보통"), t("어려움")];
-const describe = day => {
-  switch (day.family) {
-    case "combo":
-      return t("피스마다 한 줄 이상을 지워 콤보를 끝까지 이어 보세요.");
-    case "hold":
-      return t("홀드를 사용해 주어진 피스로 판을 비워 보세요.");
-    case "tuck":
-      return t("처마 아래 빈칸까지 피스를 보내 두 줄을 지우세요.");
-    case "quad":
-      return t("앞 피스로 빈칸을 채운 뒤, 한 번에 네 줄을 지우세요.");
-    case "spin":
-      return day.goal === "tst"
-        ? t("첫 피스로 자리를 만든 뒤 T-spin Triple을 하세요.")
-        : t("첫 피스로 자리를 만든 뒤 T-spin Double을 하세요.");
-    case "trap":
-      return t("네 피스로 판을 비우세요. 마지막에 남을 모양까지 생각해 보세요.");
-    default:
-      return t("주어진 피스로 판을 비워 보세요.");
-  }
-};
+const familyNames = Object.fromEntries(Object.entries(DAILY_PUZZLE_FAMILIES).map(([id, data]) => [id, t(data.title)]));
+const levels = [1, 2, 3].map(dailyPuzzleLevel);
 
 document.documentElement.lang = lang;
 translateDom();
@@ -61,13 +34,8 @@ element("sample-range").textContent = t("{from}부터 {to}까지 · 날짜 시�
 });
 
 const canvas = /** @type {HTMLCanvasElement} */ (element("sample-board"));
-const cell = 32;
-const rows = 7;
-canvas.width = WIDTH * cell;
-canvas.height = rows * cell;
-const ctx = canvas.getContext("2d");
+const drawBoard = createDailyPuzzleBoard(canvas);
 const theme = ORIGINAL_THEMES.modern;
-const grid = createBoardGrid(0, 0, WIDTH, rows, cell);
 
 let selected = days[0];
 let filter = "all";
@@ -130,13 +98,7 @@ const renderBoard = () => {
     clearLines(board);
   }
   if (move) for (const [x, y] of move.cells) board.cells[y * WIDTH + x] = CELL_ID[move.type];
-  grid(ctx, theme, true);
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < WIDTH; x++) {
-      const value = board.cells[(HEIGHT - rows + y) * WIDTH + x];
-      if (value) theme.block(ctx, x * cell, y * cell, cell, theme.palette[value]);
-    }
-  }
+  drawBoard(board.cells, theme);
   canvas.setAttribute("aria-label", t("{name} 퍼즐 보드", { name: familyNames[selected.family] }));
   solution.setAttribute("aria-pressed", String(Boolean(move)));
   element("solution-controls").classList.toggle("is-invisible", !move);
@@ -163,7 +125,7 @@ const select = day => {
   element("selected-date").textContent = day.key;
   element("selected-family").textContent = familyNames[day.family];
   element("selected-level").textContent = levels[day.level - 1];
-  element("selected-description").textContent = describe(day);
+  element("selected-description").textContent = dailyPuzzleInfo(day.family, day.goal).description;
   element("sample-pieces").replaceChildren(
     ...[...day.pieces].map(piece => {
       const item = el("li", { text: piece });

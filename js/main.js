@@ -14,6 +14,9 @@ import { MODES, RECORD_MODES, SURVIVAL_MILESTONES, findMode as findBaseMode } fr
 import { dailyMode, dateKey, findDaily, recentDailyKeys } from "./modes/daily.js";
 import { decodeReplayCode, encodeReplayCode, replayLink } from "./replay/share.js";
 import { createDailyUI } from "./ui/daily.js";
+import { createDailyPuzzleUI } from "./ui/daily-puzzle.js";
+import { dailyPuzzleMode } from "./modes/daily-puzzle.js";
+import { createDailyPuzzleProgress } from "./storage/daily-puzzle.js";
 import { formatScore, formatTime } from "./modes/format.js";
 import { createStore } from "./storage/store.js";
 import { runFingerprint } from "./storage/suspended-run.js";
@@ -861,6 +864,10 @@ const inProgress = () => screen === "play" || screen === "countdown" || screen =
  */
 const backList = () => {
   if (sceneView.current) return null;
+  if (mode.dailyPuzzle) {
+    const { key } = mode.dailyPuzzle;
+    return { label: t("오늘의 퍼즐"), open: () => dailyPuzzleUI.open(key) };
+  }
   const number = mode.puzzle?.number;
   if (number) return { label: t("퍼즐 목록"), open: () => puzzleUI.open(number) };
   // 만든 퍼즐: 시험 플레이·내 퍼즐이면 내 퍼즐 목록, 받은 퍼즐이면 받은 퍼즐 목록
@@ -1036,6 +1043,7 @@ const anyDialogOpen = () =>
     practiceUI,
     versusUI,
     dailyUI,
+    dailyPuzzleUI,
     achievementsUI,
     helpUI,
     puzzleUI,
@@ -1251,9 +1259,10 @@ const finish = () => {
   if (mode.versus) addVersusResult(versusStatKey(mode.versus.id, mode.versus.style), state.over === WIN);
   // 퍼즐: 깬 단계를 남기고, 깼으면 "다음 단계"를 보인다(마지막 단계면 다시 하기만)
   if (mode.puzzle?.number && state.over === "clear") puzzleProgress.markCleared(mode.puzzle.id);
+  if (mode.dailyPuzzle && state.over === "clear") dailyPuzzleProgress.mark(mode.dailyPuzzle.key);
   if (mode.trialCode && state.over === "clear") puzzleEditor.markCleared(mode.trialCode);
   // 받은 퍼즐: 풀었는지·가장 빠른 시간·첫 수 보기를 썼는지
-  if (mode.puzzleCode && !mode.trialCode)
+  if (mode.puzzleCode && !mode.trialCode && !mode.dailyPuzzle)
     customs.recordReceived(mode.puzzleCode, {
       solved: state.over === "clear",
       hinted: Boolean(state.puzzle?.hinted),
@@ -1370,7 +1379,9 @@ const finish = () => {
       [t("시간"), formatTime(state.frame)],
       [t("쓴 피스"), `${state.stats.pieces} / ${mode.puzzle.pieces.length}`],
       [t("줄"), String(state.stats.lines)],
-      [t("깬 단계"), mode.puzzle.number ? `${puzzleProgress.cleared().size} / ${PUZZLES.length}` : "—"]
+      mode.dailyPuzzle
+        ? [t("날짜"), mode.dailyPuzzle.key]
+        : [t("깬 단계"), mode.puzzle.number ? `${puzzleProgress.cleared().size} / ${PUZZLES.length}` : "—"]
     );
   }
   if (mode.lesson) {
@@ -1630,6 +1641,24 @@ $("open-practice").addEventListener("click", () => practiceUI.open());
 
 // ---- 퍼즐 ----
 const puzzleProgress = createPuzzleProgress(store);
+const dailyPuzzleProgress = createDailyPuzzleProgress(store);
+const dailyPuzzleDialog = /** @type {HTMLDialogElement} */ ($("daily-puzzle"));
+const dailyPuzzleUI = createDailyPuzzleUI({
+  dialog: dailyPuzzleDialog,
+  solver,
+  progress: dailyPuzzleProgress,
+  getVisual: () => settings.visual,
+  onPlay: day => {
+    const m = dailyPuzzleMode(day.code, day);
+    if (m) start(m, m.rules);
+  },
+});
+const openDailyPuzzle = $("open-daily-puzzle");
+openDailyPuzzle.addEventListener("click", () => dailyPuzzleUI.open());
+dailyPuzzleDialog.addEventListener("close", () => {
+  if (!dailyPuzzleDialog.open && screen === "menu") returnFocus(openDailyPuzzle);
+});
+
 const puzzleDialog = /** @type {HTMLDialogElement} */ ($("puzzles"));
 const playCustomPuzzle = (code, trial = false) => {
   const puzzle = decodePuzzle(code);

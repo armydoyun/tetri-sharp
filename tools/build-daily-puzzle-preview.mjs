@@ -4,8 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import { build, CSS_OPTIONS, JS_OPTIONS, inlineCssUrls } from "./build.mjs";
 import { cssHrefs, inlineHtml } from "./inline-html.mjs";
-import { dayKey, FAMILIES, generateSample, SAMPLE_START } from "../js/daily-puzzle-preview/generate.js";
+import { dayKey, generateSample, SAMPLE_START } from "../js/modes/daily-puzzle-generation.js";
 import { WIDTH } from "../js/core/board.js";
+import { DAILY_PUZZLE_FAMILIES } from "../js/modes/daily-puzzle.js";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const ENTRY = "js/daily-puzzle-preview/main.js";
@@ -20,7 +21,7 @@ const previewData = start => {
     code,
     seed,
     goal: goal.kind,
-    level: FAMILIES[family].level,
+    level: DAILY_PUZZLE_FAMILIES[family].level,
     rows: Array.from({ length: cells.length / WIDTH }, (_, i) => cells.slice(i * WIDTH, (i + 1) * WIDTH).join("")),
   }));
   const seen = [];

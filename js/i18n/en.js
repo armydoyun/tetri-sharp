@@ -1233,6 +1233,11 @@ export const EN = {
   "도장으로 {n}칸을 지웠어요.": "Erased {n} cells with the stamp.",
   "눌러 찍고, 네 칸이 찬 곳은 눌러 지워요. I J L O S T Z로 모양을 바꾸고 R로 돌려요.":
     "Press to stamp or erase where all four cells are filled. I J L O S T Z change the shape. R rotates.",
+  "오늘의 퍼즐": "Daily puzzle",
+  "{kind} · {date}": "{kind} · {date}",
+  "이 퍼즐을 풀었어요.": "You solved this puzzle.",
+  "오늘의 퍼즐을 만드는 중이에요…": "Generating the daily puzzle…",
+  "퍼즐을 만들지 못했어요. 창을 닫고 다시 열어 주세요.": "Could not generate the puzzle. Close and reopen this window.",
   // 오늘의 퍼즐 견본
   입문: "Beginner",
   "Tetri# · 오늘의 퍼즐 견본": "Tetri# · Daily puzzle preview",

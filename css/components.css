@@ -948,6 +948,29 @@
   margin-top: var(--space-3);
 }
 
+/* 오늘의 퍼즐 */
+.daily-puzzle-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.daily-puzzle-board {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.daily-puzzle-info {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.daily-puzzle-info :is(h3, p) {
+  margin: 0;
+}
+
 /* ---- 퍼즐 단계 격자 ---- */
 /* 장: 제목 줄(이름 · 깬 수) + 격자 */
 .puzzle-chapter-title {

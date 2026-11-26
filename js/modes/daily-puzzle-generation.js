@@ -1,16 +1,14 @@
 import { HEIGHT, WIDTH, createBoard } from "../core/board.js";
 import { GARBAGE, PIECE_TYPES } from "../core/pieces.js";
 import { createRng } from "../core/rng.js";
-import { DEFAULT_RULES, encodePuzzle, PUZZLE_CELLS } from "../modes/custom-puzzle.js";
-import { dailySeed } from "../modes/daily.js";
-import { buildPcExact, buildQuadExact, buildTsd, buildTst } from "../modes/practice.js";
+import { DEFAULT_RULES, encodePuzzle, PUZZLE_CELLS } from "./custom-puzzle.js";
+import { dailyPuzzleSeed } from "./daily-puzzle.js";
+import { buildPcExact, buildQuadExact, buildTsd, buildTst } from "./practice.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
-import { analyzeDailyPuzzle, hasStraightClear } from "./analyze.js";
+import { analyzeDailyPuzzle, hasStraightClear } from "./daily-puzzle-analysis.js";
 
 const DAY = 86_400_000;
-export const SAMPLE_START = "2026-11-26";
-export const SAMPLE_DAYS = 90;
-const EPOCH = Date.parse(SAMPLE_START);
+const EPOCH = Date.UTC(2026, 10, 26);
 const MAX_ATTEMPTS = 24;
 const pick = (rng, values) => values[rng.int(values.length)];
 
@@ -107,26 +105,23 @@ const fallback = rng => {
   return complete(board, "O", "pc");
 };
 
-export const FAMILIES = {
+const FAMILIES = {
   fill: {
-    level: 1,
     make: rng => pc(rng, 1 + rng.int(2), false, 2 + rng.int(2)),
     accepts: stats => stats.path.length <= 2,
   },
   trap: {
-    level: 3,
     make: rng => pc(rng, 4, false, 2 + rng.int(2)),
     accepts: stats => stats.wins <= 3 && stats.deepestDeadEnd >= 3,
   },
   hold: {
-    level: 2,
     make: rng => pc(rng, 2 + rng.int(2), true),
     accepts: stats => stats.holdWins === stats.wins,
   },
-  quad: { level: 2, make: quad, accepts: stats => stats.path.length >= 3 },
-  combo: { level: 2, make: combo, accepts: stats => stats.wins <= 4 },
+  quad: { make: quad, accepts: stats => stats.path.length >= 3 },
+  combo: { make: combo, accepts: stats => stats.wins <= 4 },
   spin: { level: 3, make: spinSetup, accepts: stats => stats.path.length === 2 },
-  tuck: { level: 2, make: tuck, accepts: (_, puzzle) => !hasStraightClear(puzzle) },
+  tuck: { make: tuck, accepts: (_, puzzle) => !hasStraightClear(puzzle) },
 };
 const WEEK = ["fill", "combo", "hold", "tuck", "quad", "spin", "trap"];
 
@@ -136,7 +131,7 @@ export const dayKey = day => new Date(day).toISOString().slice(0, 10);
 export const generateDay = key => {
   const index = Math.round((Date.parse(key) - EPOCH) / DAY);
   const planned = WEEK[((index % WEEK.length) + WEEK.length) % WEEK.length];
-  const seed = dailySeed(`puzzle-v1:${key}`);
+  const seed = dailyPuzzleSeed(key);
   const rng = createRng(seed);
   for (const [pass, family] of [planned, "fill"].entries()) {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -148,8 +143,9 @@ export const generateDay = key => {
       if (code) return { key, seed, family, planned, attempt, ...puzzle, stats, code };
     }
   }
-  throw new Error(`견본 생성 실패 (${key})`);
+  throw new Error(`오늘의 퍼즐 생성 실패 (${key})`);
 };
 
-export const generateSample = (start = SAMPLE_START, count = SAMPLE_DAYS) =>
+export const SAMPLE_START = "2026-11-26";
+export const generateSample = (start = SAMPLE_START, count = 90) =>
   Array.from({ length: count }, (_, i) => generateDay(dayKey(Date.parse(start) + i * DAY)));

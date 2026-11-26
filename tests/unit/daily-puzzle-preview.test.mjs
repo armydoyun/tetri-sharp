@@ -2,13 +2,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { decodePuzzle, solutionTask } from "../../js/modes/custom-puzzle.js";
 import { runSolverTask } from "../../js/modes/puzzle-solver.js";
-import { FAMILIES, generateDay, generateSample } from "../../js/daily-puzzle-preview/generate.js";
+import { generateDay, generateSample } from "../../js/modes/daily-puzzle-generation.js";
+import { DAILY_PUZZLE_FAMILIES } from "../../js/modes/daily-puzzle.js";
 
 test("시드 퍼즐 견본: 90일의 퍼즐을 날짜로 다시 만들고 본편 풀이기로 검증한다", { timeout: 90_000 }, () => {
   const days = generateSample();
   assert.equal(days.length, 90);
   assert.equal(new Set(days.map(day => day.seed)).size, days.length);
-  assert.deepEqual(new Set(days.map(day => day.family)), new Set(Object.keys(FAMILIES)));
+  assert.deepEqual(new Set(days.map(day => day.family)), new Set(Object.keys(DAILY_PUZZLE_FAMILIES)));
   const last = days.at(-1);
   assert.equal(generateDay(last.key).code, last.code);
 

@@ -1,8 +1,8 @@
 // 견본용 탐색. 같은 고정 칸으로 이어지는 입력은 하나의 선택으로 센다.
 import { HEIGHT, WIDTH, createBoard } from "../core/board.js";
-import { searchOptions, solverBoard, usedHeight } from "../modes/custom-puzzle.js";
-import { goalOf } from "../modes/puzzle-goals.js";
-import { placeOn, reachable, spawnOf } from "../modes/puzzle-solver.js";
+import { searchOptions, solverBoard, usedHeight } from "./custom-puzzle.js";
+import { goalOf } from "./puzzle-goals.js";
+import { placeOn, reachable, spawnOf } from "./puzzle-solver.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
 
 const rotation = ROTATIONS.srs;
@@ -15,7 +15,7 @@ const placements = (board, type, budget) => {
 
 /**
  * 탐색 범위 안에서 첫 배치별로 완주 가능 여부를 센다. 90° 회전만 쓴다.
- * @param {import("../modes/custom-puzzle.js").CustomPuzzle} puzzle
+ * @param {import("./custom-puzzle.js").CustomPuzzle} puzzle
  */
 export const analyzeDailyPuzzle = puzzle => {
   const { pieces, goal } = puzzle;
