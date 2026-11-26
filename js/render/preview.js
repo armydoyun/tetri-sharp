@@ -19,8 +19,7 @@ const SMALL = 0.62;
 
 /**
  * @typedef {{
- *   piece: {type: import("../core/pieces.js").PieceType, cells: number[][], ghost: number[][], down: number,
- *     turn?: {x: number, y: number, angle: number}} | null,
+ *   piece: {type: import("../core/pieces.js").PieceType, cells: number[][], ghost: number[][], down: number} | null,
  *   queue: readonly string[],
  *   board: number[][],
  *   clear: {rows: number[], landed: number[][]} | null,
@@ -119,17 +118,7 @@ export const createThemeStage = canvas => {
     if (piece) {
       const value = CELL_ID[piece.type];
       for (const [x, y] of piece.ghost) theme.ghost(ctx, bx + x * cell, y * cell, cell, palette[value], visual.ghost);
-      const { turn } = piece;
-      if (turn) {
-        const pivotX = bx + turn.x * cell;
-        const pivotY = turn.y * cell;
-        ctx.save();
-        ctx.translate(pivotX, pivotY);
-        ctx.rotate(turn.angle);
-        ctx.translate(-pivotX, -pivotY);
-      }
       for (const [x, y] of piece.cells) block(bx + x * cell, (y + piece.down) * cell, cell, value);
-      if (turn) ctx.restore();
     }
 
     // 홀드·다음: 글자는 바깥 글자색(게임 화면과 같다)

@@ -49,18 +49,14 @@ const shiftedQueue = ["O", "S", "J"];
 /** @param {PieceType} type */
 const active = (type, cells, ghost = []) => ({ type, cells, ghost, down: 0 });
 
-const sceneAt = (time, reduced) => {
+const sceneAt = time => {
   const scene = { ...idle, piece: null, clear: null, queue: initialQueue, board: startBoard };
   if (time < HOLD_AT) return { ...scene, piece: active("Z", pieceCells("Z", 0, 4, 0)) };
   if (time < SPIN_AT) {
     const turned = time >= TURN_AT;
     const y = Math.min(SPIN_Y, Math.floor(Math.max(0, time - TURN_AT) / 112));
-    if (time < ROTATE_AT) return { ...scene, piece: active("T", pieceCells("T", turned ? 3 : 0, SPIN_X, y)) };
-    const remaining = (SPIN_AT - time) / (SPIN_AT - ROTATE_AT);
-    const turn = reduced
-      ? undefined
-      : { x: spinPivot.x, y: spinPivot.y, angle: (-spinPivot.direction * Math.PI * remaining ** 2) / 2 };
-    return { ...scene, piece: { ...active("T", spinCells), turn } };
+    const rot = time >= ROTATE_AT ? 2 : turned ? 3 : 0;
+    return { ...scene, piece: active("T", pieceCells("T", rot, SPIN_X, y)) };
   }
   if (time < NEXT_AT) {
     return { ...scene, clear: spin, clearAge: time - SPIN_AT, board: spin.after, pivot: spinPivot.x / COLS };
@@ -112,7 +108,7 @@ export const playMotionSample = (stage, id, themeId, theme, reduced) => {
     : visuals.filter(({ at }) => at >= start && at < end).map(cue => ({ ...cue, at: cue.at - start }));
   stage.playSample(
     end - start,
-    elapsed => sceneAt(start + elapsed, reduced),
+    elapsed => sceneAt(start + elapsed),
     cues,
     (elapsed, scene) => {
       const time = start + elapsed;

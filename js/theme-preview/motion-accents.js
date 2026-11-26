@@ -146,7 +146,7 @@ export const drawMotionAccents = (
     }
   }
 
-  if (spin) drawTSpin(ctx, { ...spin, themeId, color: ink, left, right, rows: ROWS, reduced });
+  if (spin) drawTSpin(ctx, { ...spin, themeId, theme, left, right, rows: ROWS, reduced });
 
   const perfectLength = duration + 290;
   const perfect = opacity(perfectAge, perfectLength, reduced, 1.1);
