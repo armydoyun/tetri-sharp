@@ -11,12 +11,12 @@ import { dropdown } from "../ui/select.js";
 /** @typedef {{ type: string, hold: boolean, cells: [number, number][], lines: number, tspin: string }} Move */
 /**
  * @typedef {{ key: string, seed: number, family: string, planned: string, pieces: string,
- *   rows: string[], code: string, goal: string, level: number, similarDate: string | null,
+ *   rows: string[], code: string, goal: string, level: number, similarDate: string | null, similarRouteDate: string | null,
  *   stats: { firstChoices: number, wins: number, holdWins: number, deepestDeadEnd: number, height: number, path: Move[] } }} Day
  */
 
-const { days, duplicates, similar } =
-  /** @type {typeof globalThis & { __TETRI_DAILY_SAMPLE__: { days: Day[], duplicates: number, similar: number } }} */ (
+const { days, duplicates, similar, similarRoutes } =
+  /** @type {typeof globalThis & { __TETRI_DAILY_SAMPLE__: { days: Day[], duplicates: number, similar: number, similarRoutes: number } }} */ (
     globalThis
   ).__TETRI_DAILY_SAMPLE__;
 const gameBase64 = /** @type {typeof globalThis & { __TETRI_DAILY_GAME__: string }} */ (globalThis)
@@ -139,6 +139,7 @@ const select = day => {
     [t("오답 경로 최대 수"), day.stats.deepestDeadEnd || "—"],
     [t("탐색 높이"), t("{n}줄", { n: day.stats.height })],
     [t("비슷한 판의 날짜"), day.similarDate ?? "—"],
+    [t("같은 대표 풀이 날짜"), day.similarRouteDate ?? "—"],
   ]);
   renderBoard();
 };
@@ -187,6 +188,7 @@ fields(element("sample-audit"), [
   [t("입문 / 보통 / 어려움"), levels.map((_, index) => days.filter(day => day.level === index + 1).length).join(" / ")],
   [t("반복된 판"), duplicates],
   [t("비슷한 판"), similar],
+  [t("같은 대표 풀이"), similarRoutes],
   [t("계획과 달라진 유형"), days.filter(day => day.family !== day.planned).length],
 ]);
 

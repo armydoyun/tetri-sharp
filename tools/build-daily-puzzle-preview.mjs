@@ -6,51 +6,47 @@ import { build, CSS_OPTIONS, JS_OPTIONS, inlineCssUrls } from "./build.mjs";
 import { cssHrefs, inlineHtml } from "./inline-html.mjs";
 import { dayKey, generateSample, SAMPLE_START } from "../js/modes/daily-puzzle-generation.js";
 import { WIDTH } from "../js/core/board.js";
-import { DAILY_PUZZLE_FAMILIES } from "../js/modes/daily-puzzle.js";
+import { comparePuzzleFingerprints, puzzleFingerprint } from "../js/modes/daily-puzzle-variety.js";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const ENTRY = "js/daily-puzzle-preview/main.js";
 
 const previewData = start => {
-  const days = generateSample(start).map(({ key, family, planned, pieces, stats, code, cells, seed, goal }) => ({
-    key,
-    family,
-    planned,
-    pieces,
-    stats,
-    code,
-    seed,
-    goal: goal.kind,
-    level: DAILY_PUZZLE_FAMILIES[family].level,
-    rows: Array.from({ length: cells.length / WIDTH }, (_, i) => cells.slice(i * WIDTH, (i + 1) * WIDTH).join("")),
-  }));
   const seen = [];
   let duplicates = 0;
   let similar = 0;
-  for (const day of days) {
-    const board = day.rows.join("");
-    const mirrored = day.rows.map(row => [...row].reverse().join("")).join("");
-    const mirrorKey = board < mirrored ? board : mirrored;
-    const repeat = seen.find(other => other.mirrorKey === mirrorKey);
-    const nearby =
-      repeat ??
-      seen.find(
-        other =>
-          other.family === day.family &&
-          [board, mirrored].some(shape => {
-            let diff = 0;
-            for (let i = 0; i < shape.length && diff <= 2; i++) {
-              if (shape[i] !== other.board[i]) diff += 1;
-            }
-            return diff <= 2;
-          })
-      );
+  let similarRoutes = 0;
+  const days = generateSample(start).map(day => {
+    const { key, family, planned, pieces, stats, code, cells, seed, goal, level } = day;
+    const fingerprint = puzzleFingerprint(day);
+    const matches = seen.map(previous => ({
+      key: previous.key,
+      sameFamily: previous.family === family,
+      ...comparePuzzleFingerprints(fingerprint, previous.fingerprint),
+    }));
+    const repeat = matches.find(match => match.sameBoard);
+    const nearby = matches.find(match => match.sameFamily && match.nearBoard);
+    const sameRoute = matches.find(match => match.sameRoute);
     if (repeat) duplicates += 1;
     else if (nearby) similar += 1;
-    day.similarDate = nearby?.key ?? null;
-    seen.push({ key: day.key, board, mirrorKey, family: day.family });
-  }
-  return { days, duplicates, similar };
+    if (sameRoute) similarRoutes += 1;
+    seen.push({ key, family, fingerprint });
+    return {
+      key,
+      family,
+      planned,
+      pieces,
+      stats,
+      code,
+      seed,
+      level,
+      goal: goal.kind,
+      rows: Array.from({ length: cells.length / WIDTH }, (_, i) => cells.slice(i * WIDTH, (i + 1) * WIDTH).join("")),
+      similarDate: (repeat ?? nearby)?.key ?? null,
+      similarRouteDate: sameRoute?.key ?? null,
+    };
+  });
+  return { days, duplicates, similar, similarRoutes };
 };
 
 export const buildDailyPuzzlePreview = async (
@@ -96,6 +92,8 @@ export const buildDailyPuzzlePreview = async (
 if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
   const start = process.argv.find(arg => arg.startsWith("--start="))?.slice(8);
   const out = process.argv.find(arg => arg.startsWith("--out="))?.slice(6);
-  const { outFile, days, duplicates, similar } = await buildDailyPuzzlePreview(out, start);
-  console.log(`${path.relative(ROOT, outFile)} · ${days.length}일 · 중복 판 ${duplicates} · 비슷한 판 ${similar}`);
+  const { outFile, days, duplicates, similar, similarRoutes } = await buildDailyPuzzlePreview(out, start);
+  console.log(
+    `${path.relative(ROOT, outFile)} · ${days.length}일 · 중복 판 ${duplicates} · 비슷한 판 ${similar} · 같은 대표 풀이 ${similarRoutes}`
+  );
 }

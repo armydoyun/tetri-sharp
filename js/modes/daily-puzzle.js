@@ -3,15 +3,15 @@ import { dailySeed } from "./daily.js";
 import { customPuzzleMode, decodePuzzle } from "./custom-puzzle.js";
 
 export const DAILY_PUZZLE_FAMILIES = Object.freeze({
-  fill: { title: "짧은 판 비우기", level: 1, description: "주어진 피스로 판을 비워 보세요." },
-  combo: { title: "콤보 설계", level: 2, description: "피스마다 한 줄 이상을 지워 콤보를 끝까지 이어 보세요." },
-  hold: { title: "홀드 순서", level: 2, description: "홀드를 사용해 주어진 피스로 판을 비워 보세요." },
-  tuck: { title: "처마 아래 끼워 넣기", level: 2, description: "처마 아래 빈칸까지 피스를 보내 두 줄을 지우세요." },
-  quad: { title: "4줄 우물 만들기", level: 2, description: "앞 피스로 빈칸을 채운 뒤, 한 번에 네 줄을 지우세요." },
-  spin: { title: "T스핀 자리 만들기", level: 3, description: "첫 피스로 자리를 만든 뒤 T-spin Double을 하세요." },
+  fill: { title: "짧은 판 비우기", description: "주어진 피스로 판을 비워 보세요." },
+  combo: { title: "콤보 설계", description: "피스마다 한 줄 이상을 지워 콤보를 끝까지 이어 보세요." },
+  hold: { title: "홀드 순서", description: "홀드를 사용해 주어진 피스로 판을 비워 보세요." },
+  tuck: { title: "처마 아래 끼워 넣기", description: "처마 아래 빈칸까지 피스를 보내 두 줄을 지우세요." },
+  quad: { title: "4줄 우물 만들기", description: "앞 피스로 빈칸을 채운 뒤, 한 번에 네 줄을 지우세요." },
+  spin: { title: "T스핀 자리 만들기", description: "첫 피스로 자리를 만든 뒤 T-spin Double을 하세요." },
   trap: {
     title: "첫 배치 함정",
-    level: 3,
+
     description: "네 피스로 판을 비우세요. 마지막에 남을 모양까지 생각해 보세요.",
   },
 });
@@ -22,7 +22,6 @@ export const dailyPuzzleInfo = (family, goal) => {
   const info = DAILY_PUZZLE_FAMILIES[family];
   return {
     title: t(info.title),
-    level: info.level,
     description: goal === "tst" ? t("첫 피스로 자리를 만든 뒤 T-spin Triple을 하세요.") : t(info.description),
   };
 };
