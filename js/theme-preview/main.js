@@ -1,10 +1,11 @@
 import { createSfx, SOUND_SETS } from "../audio/sfx.js";
 import { lang, t, translateDom } from "../i18n/index.js";
 import { createThemeStage, drawThemeSwatch } from "../render/preview.js";
-import { THEMES, THEME_IDS } from "../render/themes.js";
+import { ALL_THEME_IDS, THEMES } from "../render/themes.js";
 import { button, choiceCards, dropdown, rangeRow, segmented, setSegmented, slider } from "../ui/components.js";
 import { el } from "../ui/dom.js";
 import { CANDIDATES } from "./candidates.js";
+import { EXISTING_PREVIEWS } from "./existing.js";
 import { CANDIDATE_SOUNDS } from "./sounds.js";
 
 document.documentElement.lang = lang;
@@ -19,8 +20,11 @@ const soundSets = { ...SOUND_SETS, ...CANDIDATE_SOUNDS };
 const stages = [stageFor("candidate-board"), stageFor("reference-board")];
 const cards = [node("candidate-card"), node("reference-card")];
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
-let candidate = "porcelain";
-let reference = CANDIDATES[candidate].reference;
+const catalog = { new: CANDIDATES, existing: EXISTING_PREVIEWS };
+const selected = { new: "porcelain", existing: "modern" };
+let category = "new";
+const selectedPreview = () => catalog[category][selected[category]];
+let reference = selectedPreview().reference;
 let mode = "candidate";
 let boardsPlaying = false;
 
@@ -53,7 +57,7 @@ const stopButton = button({
 
 /**
  * @param {string} message
- * @param {number} [source] 보드 순서. 새 테마는 0, 기존 테마는 1.
+ * @param {number} [source] 보드 순서. 견본은 0, 원본은 1.
  */
 const showPlayback = (message, source = -1) => {
   status.textContent = message;
@@ -119,18 +123,20 @@ const listen = (cues, label) => {
   }
   if (visuals.length && boardsPlaying) setBoardsPlaying(false);
   const sources = mode === "compare" ? [0, 1] : [mode === "reference" ? 1 : 0];
-  const sets = [candidate, reference];
+  const sets = [selected[category], reference];
   let start = 0;
   for (const source of sources) {
     const set = sets[source];
-    const theme = source === 0 ? CANDIDATES[candidate].theme : THEMES[reference];
+    const theme = source === 0 ? selectedPreview().theme : THEMES[reference];
     for (const [at, sound, mix] of cues) {
       if (!muted && !sfx.play(sound, mix, { set, delay: start + at }) && !visuals.length) {
         stop(t("이 브라우저에서 효과음을 재생할 수 없어요."));
         return;
       }
     }
-    const message = t("{theme} · {sound} 재생 중", { theme: theme.name, sound: label });
+    const name =
+      sets[0] === sets[1] ? t(source === 0 ? "{theme} 견본" : "{theme} 원본", { theme: theme.name }) : theme.name;
+    const message = t("{theme} · {sound} 재생 중", { theme: name, sound: label });
     schedule(start, () => showPlayback(message, source));
     for (const [at, sound] of visuals)
       schedule(start + at, () => stages[source].playClear(CLEAR_SOUNDS[sound], sound === "tspin"));
@@ -143,10 +149,10 @@ const listen = (cues, label) => {
 
 const modeControl = segmented({
   id: "audition-mode",
-  label: t("들을 테마"),
+  label: t("재생할 보드"),
   options: [
-    ["candidate", t("새 테마")],
-    ["reference", t("기존 테마")],
+    ["candidate", t("견본")],
+    ["reference", t("원본")],
     ["compare", t("A/B 비교")],
   ],
   value: mode,
@@ -250,9 +256,9 @@ const draw = (stage, theme) => {
 };
 
 const drawBoards = () => {
-  const { theme, sound } = CANDIDATES[candidate];
+  const { theme, sound } = selectedPreview();
   node("candidate-name").textContent = theme.name;
-  node("candidate-desc").textContent = `${theme.description} · ${sound}`;
+  node("candidate-desc").textContent = sound ? `${theme.description} · ${sound}` : theme.description;
   node("reference-desc").textContent = THEMES[reference].description;
   draw(stages[0], theme);
   draw(stages[1], THEMES[reference]);
@@ -261,7 +267,7 @@ const drawBoards = () => {
 const referencePicker = dropdown({
   id: "audition-reference",
   label: t("비교할 기존 테마"),
-  options: THEME_IDS.map(id => ({ value: id, label: THEMES[id].name })),
+  options: ALL_THEME_IDS.map(id => ({ value: id, label: THEMES[id].name })),
   value: reference,
   onChange: value => {
     stop();
@@ -273,27 +279,53 @@ referencePicker.querySelector(".select-value").id = "reference-value";
 referencePicker.setAttribute("aria-labelledby", "reference-title reference-value");
 node("reference-picker").append(referencePicker);
 
-const choices = choiceCards({
-  id: "audition-candidates",
-  label: t("새 테마"),
-  compact: true,
-  options: Object.entries(CANDIDATES).map(([value, { theme }]) => {
-    const preview = el("canvas", { class: "audition-swatch", "aria-hidden": "true" });
-    drawThemeSwatch(preview, theme, theme.palette);
-    return { value, title: theme.name, preview };
-  }),
-  value: candidate,
+const updateReference = () => {
+  const nextReference = selectedPreview().reference;
+  if (reference === nextReference) drawBoards();
+  else referencePicker.setValue(nextReference);
+};
+
+const drawChoices = () => {
+  const choices = choiceCards({
+    id: "audition-candidates",
+    label: t("테마 목록"),
+    compact: true,
+    options: Object.entries(catalog[category]).map(([value, { theme }]) => {
+      const preview = el("canvas", { class: "audition-swatch", "aria-hidden": "true" });
+      drawThemeSwatch(preview, theme, theme.palette);
+      return { value, title: theme.name, preview };
+    }),
+    value: selected[category],
+    onChange: value => {
+      if (selected[category] === value) return;
+      stop();
+      selected[category] = value;
+      setSegmented(choices, value);
+      updateReference();
+    },
+  });
+  node("candidates").replaceChildren(choices);
+};
+
+const categoryControl = segmented({
+  label: t("테마 종류"),
+  options: [
+    ["new", t("새 테마")],
+    ["existing", t("기존 테마")],
+  ],
+  value: category,
+  arrows: true,
   onChange: value => {
-    if (candidate === value) return;
+    if (category === value) return;
     stop();
-    candidate = value;
-    setSegmented(choices, candidate);
-    const nextReference = CANDIDATES[value].reference;
-    if (reference === nextReference) drawBoards();
-    else referencePicker.setValue(nextReference);
+    category = value;
+    setSegmented(categoryControl, value);
+    drawChoices();
+    updateReference();
   },
 });
-node("candidates").append(choices);
+node("theme-category").append(categoryControl);
+drawChoices();
 reduceMotion.addEventListener("change", drawBoards);
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {

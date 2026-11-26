@@ -60,6 +60,10 @@
   margin-block-end: var(--space-3);
 }
 
+.audition-category {
+  margin-block-end: var(--space-2);
+}
+
 .audition-picker .choice-cards.is-compact {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }

@@ -155,6 +155,20 @@ test("독립 테마 견본에서 보드를 비교하고 효과음을 재생·정
   await status.filter({ hasText: "먹빛 · 게임 오버 재생 중" }).waitFor();
   await status.filter({ hasText: "재생 완료" }).waitFor();
   assert.ok((await page.evaluate(() => window.auditionAudio.connections)) > 2);
+
+  const categories = page.locator("#theme-category");
+  await categories.getByRole("button", { name: "기존 테마" }).click();
+  assert.equal(await choices.count(), 10);
+  await page.locator('#audition-candidates button[data-value="sharp"]').click();
+  assert.equal(await page.locator("#candidate-name").textContent(), "샤프");
+  assert.equal(await page.locator("#audition-reference").getAttribute("data-value"), "sharp");
+  await page.getByRole("button", { name: "2줄", exact: true }).click();
+  await status.filter({ hasText: "샤프 견본 · 2줄 재생 중" }).waitFor();
+  await status.filter({ hasText: "샤프 원본 · 2줄 재생 중" }).waitFor();
+  await status.filter({ hasText: "재생 완료" }).waitFor();
+  await categories.getByRole("button", { name: "새 테마" }).click();
+  assert.equal(await choices.count(), 11);
+  assert.equal(await page.locator("#candidate-name").textContent(), "먹빛");
   assert.deepEqual(errors, []);
   assert.deepEqual(requests, [url]);
 

@@ -19,11 +19,12 @@
     <main class="audition-shell audition-main">
       <header class="audition-intro">
         <h1>테마와 효과음 견본</h1>
-        <p>새 테마의 보드를 보고, 같은 동작을 기존 테마와 번갈아 들어보세요.</p>
+        <p>새 테마와 기존 테마의 삭제 연출을 보고, 원본과 나란히 비교해 보세요.</p>
       </header>
       <div class="audition-layout">
         <section class="audition-picker" aria-labelledby="candidate-title">
-          <h2 id="candidate-title" class="section-title">새 테마</h2>
+          <h2 id="candidate-title" class="section-title">테마 목록</h2>
+          <div class="audition-category" id="theme-category"></div>
           <div id="candidates"></div>
         </section>
         <section class="audition-boards" aria-labelledby="boards-title">
@@ -34,7 +35,7 @@
           <div class="audition-board-grid">
             <article class="audition-board audition-board-candidate" id="candidate-card">
               <div class="audition-board-info">
-                <p class="audition-board-kind">새 테마</p>
+                <p class="audition-board-kind">견본</p>
                 <h3 id="candidate-name"></h3>
               </div>
               <div class="audition-stage">
@@ -49,7 +50,7 @@
             </article>
             <article class="audition-board" id="reference-card">
               <div class="audition-board-info">
-                <p class="audition-board-kind" id="reference-title">기존 테마</p>
+                <p class="audition-board-kind" id="reference-title">원본</p>
                 <div id="reference-picker"></div>
               </div>
               <div class="audition-stage">

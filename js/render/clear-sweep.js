@@ -7,7 +7,9 @@
  *   ink: string,
  *   edge: string,
  *   bands: Array<[offset: number, height: number, opacity: number]>,
- *   tip: number
+ *   tip: number,
+ *   settle?: number,
+ *   crossbars?: boolean
  * }} ClearSweep
  */
 
@@ -38,12 +40,23 @@ export const drawClearSweep = (ctx, sweep, { bx, cell, cols }, middle, t, spinCo
   const spans = clearedSpans(sweep, t, spinColumn === null ? null : spinColumn / cols);
   const fade = 1 - t;
   const squeeze = 0.35 + 0.65 * fade;
+  middle += cell * (sweep.settle ?? 0) * t;
   ctx.fillStyle = sweep.ink;
   for (const [left, right] of spans) {
     for (const [offset, height, opacity] of sweep.bands) {
       const h = Math.max(1, cell * height * squeeze);
       ctx.globalAlpha = opacity * fade;
       ctx.fillRect(bx + width * left, middle + cell * offset * squeeze - h / 2, width * (right - left), h);
+    }
+    if (sweep.crossbars) {
+      const height = cell * 0.48 * squeeze;
+      const thickness = Math.max(1, cell * 0.055 * squeeze);
+      ctx.globalAlpha = 0.66 * fade;
+      for (let column = 1; column < cols; column += 2) {
+        const x = column / cols;
+        if (x > left && x < right)
+          ctx.fillRect(bx + column * cell - thickness / 2, middle - height / 2, thickness, height);
+      }
     }
   }
   if (t >= sweep.travel) return;

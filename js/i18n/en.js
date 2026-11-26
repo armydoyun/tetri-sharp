@@ -4,10 +4,17 @@
 export const EN = {
   "Tetri# · 테마와 효과음 견본": "Tetri# · Theme & sound preview",
   "테마와 효과음 견본": "Theme & sound preview",
-  "새 테마의 보드를 보고, 같은 동작을 기존 테마와 번갈아 들어보세요.":
-    "See the new boards and compare the same sounds with existing themes.",
+  "새 테마와 기존 테마의 삭제 연출을 보고, 원본과 나란히 비교해 보세요.":
+    "Preview line clears for new and existing themes alongside the originals.",
   "새 테마": "New theme",
   "기존 테마": "Existing theme",
+  "테마 목록": "Theme library",
+  "테마 종류": "Theme category",
+  "재생할 보드": "Board to play",
+  견본: "Preview",
+  원본: "Original",
+  "{theme} 견본": "{theme} preview",
+  "{theme} 원본": "{theme} original",
   "보드 비교": "Board comparison",
   "효과음 듣기": "Listen to effects",
   "견본을 보려면 자바스크립트를 켜 주세요.": "Enable JavaScript to open the preview.",

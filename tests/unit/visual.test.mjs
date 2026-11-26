@@ -7,6 +7,7 @@ import { createSlide } from "../../js/render/motion.js";
 import { CONTRAST_PALETTE, DEFAULT_THEME, THEMES, THEME_IDS, findTheme } from "../../js/render/themes.js";
 import { sanitizeSettings, sanitizeVisual } from "../../js/storage/settings.js";
 import { CANDIDATES } from "../../js/theme-preview/candidates.js";
+import { EXISTING_PREVIEWS } from "../../js/theme-preview/existing.js";
 
 const previewThemes = Object.values(CANDIDATES).map(({ theme }) => theme);
 const allThemes = [...Object.values(THEMES), ...previewThemes];
@@ -40,7 +41,8 @@ const fakeCtx = (calls = []) =>
 
 test("견본 삭제 선은 행 안에서 퍼지고 회전 중심에서 시작할 수도 있다", () => {
   const signatures = new Set();
-  for (const { motion } of previewThemes) {
+  const variants = [...previewThemes, ...Object.values(EXISTING_PREVIEWS).map(({ theme }) => theme)];
+  for (const { motion } of variants) {
     const sweep = motion.clearSweep;
     const early = clearedSpans(sweep, sweep.travel * 0.25, null);
     const late = clearedSpans(sweep, sweep.travel * 0.75, null);
@@ -63,7 +65,19 @@ test("견본 삭제 선은 행 안에서 퍼지고 회전 중심에서 시작할
     }
     signatures.add(JSON.stringify(bands));
   }
-  assert.equal(signatures.size, previewThemes.length);
+  assert.equal(signatures.size, variants.length);
+});
+
+test("기존 테마의 새 연출은 견본 설정에만 붙는다", () => {
+  assert.deepEqual(Object.keys(EXISTING_PREVIEWS).sort(), Object.keys(THEMES).sort());
+  for (const [id, { theme, reference }] of Object.entries(EXISTING_PREVIEWS)) {
+    assert.equal(reference, id);
+    assert.equal(theme.palette, THEMES[id].palette);
+    assert.ok(theme.motion.clearSweep);
+    assert.equal(THEMES[id].motion.clearSweep, undefined);
+  }
+  assert.equal(EXISTING_PREVIEWS.sharp.theme.motion.clearSweep.crossbars, true);
+  assert.equal(THEMES.sharp.motion.clear, "hash");
 });
 
 test("테마 아홉 가지, 기본은 모던", () => {
