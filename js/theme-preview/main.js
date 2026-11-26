@@ -4,6 +4,7 @@ import { createThemeStage, drawThemeSwatch } from "../render/preview.js";
 import { ADDITIONAL_THEMES, ORIGINAL_THEMES, THEMES } from "../render/themes.js";
 import { button, choiceCards, dropdown, rangeRow, segmented, setSegmented, slider } from "../ui/components.js";
 import { el } from "../ui/dom.js";
+import { MOTION_SAMPLES, motionSounds, playMotionSample } from "./motion-scenes.js";
 
 document.documentElement.lang = lang;
 translateDom();
@@ -27,6 +28,7 @@ const selectedPreview = () => catalog[category][selected[category]];
 let reference = selectedPreview().reference;
 let mode = "candidate";
 let boardsPlaying = false;
+let playingVisuals = false;
 
 const volume = slider({ id: "audition-volume", min: 0, max: 100, step: 1, value: 70 });
 const volumeText = el("output", { class: "num", text: `${volume.value}%` });
@@ -35,7 +37,7 @@ const sfx = createSfx({ getVolume: () => Number(volume.value) });
 volume.addEventListener("input", () => {
   volumeText.textContent = `${volume.value}%`;
   sfx.setVolume();
-  if (volume.value === "0") stop(t("음량이 0이에요."));
+  if (volume.value === "0" && !playingVisuals) stop(t("음량이 0이에요."));
 });
 node("volume-control").append(
   el("label", { htmlFor: volume.id, text: t("음량") }),
@@ -69,6 +71,7 @@ const showPlayback = (message, source = -1) => {
 const stop = (message = ready) => {
   for (const timer of timers) clearTimeout(timer);
   timers = [];
+  playingVisuals = false;
   sfx.stop();
   if (!boardsPlaying) for (const stage of stages) stage.stop();
   stopButton.disabled = true;
@@ -107,21 +110,24 @@ const schedule = (delay, action) => {
 /** @param {string} set @param {readonly Cue[]} cues */
 const durationOf = (set, cues) =>
   Math.max(
+    0,
     ...cues.flatMap(([at, sound]) =>
       SOUND_SETS[set][sound].map(part => at + part.at + part.dur * (part.decay === "slow" ? 1.6 : 1) + 0.035)
     )
   );
 
-/** @param {readonly Cue[]} cues @param {string} label */
-const listen = (cues, label) => {
+/** @param {readonly Cue[]} cues @param {string} label @param {keyof typeof MOTION_SAMPLES} [sampleId] */
+const listen = (cues, label, sampleId) => {
   stop();
   const visuals = cues.filter(([, sound]) => Object.hasOwn(CLEAR_SOUNDS, sound));
   const muted = volume.value === "0";
-  if (muted && !visuals.length) {
+  const sample = sampleId && MOTION_SAMPLES[sampleId];
+  playingVisuals = Boolean(sample || visuals.length);
+  if (muted && !playingVisuals) {
     showPlayback(t("음량이 0이에요."));
     return;
   }
-  if (visuals.length && boardsPlaying) setBoardsPlaying(false);
+  if (playingVisuals && boardsPlaying) setBoardsPlaying(false);
   const sources = mode === "compare" ? [0, 1] : [mode === "reference" ? 1 : 0];
   const sets = [selected[category], reference];
   let start = 0;
@@ -129,7 +135,7 @@ const listen = (cues, label) => {
     const set = sets[source];
     const theme = source === 0 ? selectedPreview().theme : ORIGINAL_THEMES[reference];
     for (const [at, sound, mix] of cues) {
-      if (!muted && !sfx.play(sound, mix, { set, delay: start + at }) && !visuals.length) {
+      if (!muted && !sfx.play(sound, mix, { set, delay: start + at }) && !playingVisuals) {
         stop(t("이 브라우저에서 효과음을 재생할 수 없어요."));
         return;
       }
@@ -138,9 +144,15 @@ const listen = (cues, label) => {
       sets[0] === sets[1] ? t(source === 0 ? "{theme} 견본" : "{theme} 원본", { theme: theme.name }) : theme.name;
     const message = t("{theme} · {sound} 재생 중", { theme: name, sound: label });
     schedule(start, () => showPlayback(message, source));
-    for (const [at, sound] of visuals)
-      schedule(start + at, () => stages[source].playClear(CLEAR_SOUNDS[sound], sound === "tspin"));
-    const visualEnd = visuals.length ? visuals.at(-1)[0] + (Math.max(200, theme.motion.clearMs) + 170) / 1000 : 0;
+    let visualEnd = 0;
+    if (sample) {
+      schedule(start, () => playMotionSample(stages[source], sampleId, set, theme, reduceMotion.matches));
+      visualEnd = (sample.end - sample.start) / 1000;
+    } else if (visuals.length) {
+      for (const [at, sound] of visuals)
+        schedule(start + at, () => stages[source].playClear(CLEAR_SOUNDS[sound], sound === "tspin"));
+      visualEnd = visuals.at(-1)[0] + (Math.max(200, theme.motion.clearMs) + 170) / 1000;
+    }
     start += Math.max(visualEnd, durationOf(set, cues)) + (source === sources.at(-1) ? 0.14 : 0.28);
   }
   stopButton.disabled = false;
@@ -170,7 +182,30 @@ node("listen-actions").append(
     icon: "play",
     variant: "primary",
     onClick: () => listen(PLAY_SEQUENCE, t("연속 재생")),
-  }),
+  })
+);
+
+/** @type {readonly (readonly [keyof typeof MOTION_SAMPLES, string])[]} */
+const motionActions = [
+  ["flow", t("플레이 흐름")],
+  ["next", t("다음 피스 등장")],
+  ["hold", t("홀드 교환")],
+  ["spin", t("T스핀 회전 강조")],
+  ["perfect", t("퍼펙트 클리어")],
+  ["combo", t("콤보 표시")],
+];
+node("motion-actions").append(
+  ...motionActions.map(([id, label]) =>
+    button({
+      label,
+      icon: id === "flow" ? "play" : undefined,
+      variant: id === "flow" ? "primary" : "default",
+      size: "s",
+      wrap: true,
+      "data-motion": id,
+      onClick: () => listen(motionSounds(id), label, id),
+    })
+  ),
   stopButton
 );
 

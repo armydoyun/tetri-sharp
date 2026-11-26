@@ -8,7 +8,7 @@ import { chromium } from "playwright";
 import { buildThemePreview } from "../../tools/build-theme-preview.mjs";
 import { launchOptions } from "../helpers/browser.mjs";
 
-test("독립 테마 견본에서 보드를 비교하고 효과음을 재생·정지한다", { timeout: 30_000 }, async t => {
+const openPreview = async t => {
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), "tetri-theme-preview-"));
   t.after(() => fs.rm(temp, { recursive: true, force: true }));
   const html = await fs.readFile(await buildThemePreview(path.join(temp, "preview.html")));
@@ -20,7 +20,11 @@ test("독립 테마 견본에서 보드를 비교하고 효과음을 재생·정
   const url = `http://127.0.0.1:${server.address().port}/theme-preview.html`;
   const browser = await chromium.launch(launchOptions(chromium));
   t.after(() => browser.close());
+  return { browser, url };
+};
 
+test("독립 테마 견본에서 보드를 비교하고 효과음을 재생·정지한다", { timeout: 30_000 }, async t => {
+  const { browser, url } = await openPreview(t);
   const page = await browser.newPage({ locale: "ko-KR", viewport: { width: 1280, height: 900 } });
   page.setDefaultTimeout(5000);
   const requests = [];
@@ -187,13 +191,67 @@ test("독립 테마 견본에서 보드를 비교하고 효과음을 재생·정
       width: document.documentElement.scrollWidth,
       viewport: document.documentElement.clientWidth,
       sounds: document.querySelectorAll("[data-sound]").length,
+      samples: document.querySelectorAll("[data-motion]").length,
       clipped: [...document.querySelectorAll(".select-value, .btn-label, .choice-card strong")].filter(
         label => label.scrollWidth > label.clientWidth + 1
       ).length,
     }));
     assert.equal(layout.width, layout.viewport, `${locale} ${width} 가로 넘침`);
     assert.equal(layout.sounds, 14);
+    assert.equal(layout.samples, 6);
     assert.equal(layout.clipped, 0, `${locale} ${width} 단추 이름 잘림`);
     await mobile.close();
   }
+});
+
+test("테마 21종에서 무음으로 재생해도 다섯 연출과 연속 장면이 그려진다", { timeout: 45_000 }, async t => {
+  const { browser, url } = await openPreview(t);
+  const page = await browser.newPage({ locale: "ko-KR" });
+  const errors = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.clock.install();
+  await page.goto(url);
+  await page.getByRole("slider", { name: "음량" }).focus();
+  await page.keyboard.press("Home");
+  const samples = [
+    ["next", 320],
+    ["hold", 530],
+    ["spin", 485],
+    ["perfect", 900],
+    ["combo", 440],
+    ["flow", 2900],
+  ];
+  const choices = page.locator("#audition-candidates button");
+  const canvas = page.locator("#candidate-board");
+  const stamp = () => canvas.evaluate(el => el.toDataURL());
+  const tested = new Set();
+  for (const category of ["새 테마", "기존 테마"]) {
+    await page.getByRole("button", { name: category }).click();
+    for (const choice of await choices.all()) {
+      await choice.evaluate(button => button.click());
+      const theme = await choice.getAttribute("data-value");
+      tested.add(theme);
+      const idle = await stamp();
+      for (const [id, at] of samples) {
+        await page.locator(`[data-motion="${id}"]`).evaluate(button => button.click());
+        const initial = await stamp();
+        assert.notEqual(initial, idle, `${theme} ${id} 장면 진입`);
+        await page.clock.fastForward(at);
+        assert.notEqual(await stamp(), initial, `${theme} ${id} 연출 진행`);
+      }
+      await page.getByRole("button", { name: "정지" }).evaluate(button => button.click());
+      assert.equal(await stamp(), idle, `${theme} 정지 후 복귀`);
+    }
+  }
+  assert.equal(tested.size, 21);
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.getByRole("button", { name: "A/B 비교" }).click();
+  await page.locator('[data-motion="hold"]').click();
+  assert.equal(await page.locator("#candidate-card").getAttribute("data-playing"), "true");
+  await page.clock.fastForward(1400);
+  assert.equal(await page.locator("#reference-card").getAttribute("data-playing"), "true");
+  await page.clock.fastForward(1400);
+  assert.equal(await page.locator("#play-status").textContent(), "재생 완료");
+  assert.deepEqual(errors, []);
 });

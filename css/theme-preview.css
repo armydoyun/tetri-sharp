@@ -203,16 +203,14 @@
   border-top: var(--border-w) solid var(--border);
 }
 
-.audition-clear-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  justify-content: space-between;
+.audition-preview-controls {
+  display: grid;
+  justify-items: start;
   margin-block-start: var(--space-3);
-  gap: var(--space-2) var(--space-4);
+  gap: var(--space-3);
 }
 
-.audition-clear-controls .audition-event-grid {
+.audition-preview-controls .audition-event-grid {
   display: flex;
   flex-wrap: wrap;
 }

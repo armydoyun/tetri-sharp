@@ -19,7 +19,7 @@
     <main class="audition-shell audition-main">
       <header class="audition-intro">
         <h1>테마와 효과음 견본</h1>
-        <p>새 테마와 기존 테마의 삭제 연출을 보고, 원본과 나란히 비교해 보세요.</p>
+        <p>테마를 고르고 플레이 연출과 효과음을 원본 보드와 비교해 보세요.</p>
       </header>
       <div class="audition-layout">
         <section class="audition-picker" aria-labelledby="candidate-title">
@@ -64,9 +64,14 @@
               <p class="audition-board-desc" id="reference-desc"></p>
             </article>
           </div>
-          <div class="audition-clear-controls">
-            <div id="clear-actions"></div>
+          <div class="audition-preview-controls">
             <div id="listen-mode"></div>
+            <section class="audition-sound-group" aria-labelledby="motion-title">
+              <h3 id="motion-title">플레이 연출</h3>
+              <div class="audition-event-grid" id="motion-actions"></div>
+            </section>
+            <div id="clear-actions"></div>
+            <p class="audition-status" id="play-status" role="status" aria-atomic="true"></p>
           </div>
         </section>
         <section class="audition-sounds" aria-labelledby="sounds-title">
@@ -77,7 +82,6 @@
           <div class="audition-transport">
             <div class="audition-actions" id="listen-actions"></div>
           </div>
-          <p class="audition-status" id="play-status" role="status" aria-atomic="true"></p>
           <div class="audition-sound-groups" id="sound-groups"></div>
         </section>
       </div>
