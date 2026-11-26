@@ -55,6 +55,7 @@ npx serve .        # 또는 아무 정적 서버. ES 모듈이라 file://로는 
 |---|---|
 | `npm run build` | `deploy/index.html` 한 파일 생성 (file://로 더블클릭해도 동작) |
 | `npm run build:pages` | `deploy-pages/` — 위 파일 + 설치형 앱(PWA) 파일. GitHub Pages용 |
+| `npm run build:theme-preview` | `deploy/theme-preview.html` — 새 테마의 보드와 효과음을 비교하는 오프라인 견본 |
 | `npm run test:unit` | Node 단위 테스트 (코어·규칙·빌드 도구) |
 | `npm run test:browser` | 배포본을 Chromium으로 열어 보는 테스트 (`npx playwright install chromium` 필요) |
 | `npm run lint` / `npm run format` | ESLint / Prettier |

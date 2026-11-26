@@ -358,3 +358,5 @@ export const SOUND_SETS = Object.freeze({
 });
 
 export const SOUND_NAMES = Object.freeze(Object.keys(STUDIO));
+
+export { kit as makeSoundSet, P as tonePart, noise as noisePart };

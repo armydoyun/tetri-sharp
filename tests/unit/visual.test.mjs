@@ -5,6 +5,10 @@ import { createEffects } from "../../js/render/effects.js";
 import { createSlide } from "../../js/render/motion.js";
 import { CONTRAST_PALETTE, DEFAULT_THEME, THEMES, THEME_IDS, findTheme } from "../../js/render/themes.js";
 import { sanitizeSettings, sanitizeVisual } from "../../js/storage/settings.js";
+import { CANDIDATES } from "../../js/theme-preview/candidates.js";
+
+const previewThemes = Object.values(CANDIDATES).map(({ theme }) => theme);
+const allThemes = [...Object.values(THEMES), ...previewThemes];
 
 const lockEvent = {
   type: "lock",
@@ -50,7 +54,7 @@ test("테마 아홉 가지, 기본은 모던", () => {
 });
 
 test("테마마다 8색이 모두 다르고, 블록·고스트를 그린다", () => {
-  for (const theme of Object.values(THEMES)) {
+  for (const theme of allThemes) {
     assert.equal(theme.palette.length, 9, theme.id);
     assert.equal(new Set(theme.palette.slice(1)).size, 8, `${theme.id} 색 중복`);
     const calls = [];
@@ -62,14 +66,14 @@ test("테마마다 8색이 모두 다르고, 블록·고스트를 그린다", ()
 });
 
 test("테마마다 보드 색 · 격자·마감·모서리 묶음 · 줄 삭제 모양이 서로 다르다", () => {
-  const themes = Object.values(THEMES);
+  const themes = allThemes;
   assert.equal(new Set(themes.map(theme => theme.board.bg)).size, themes.length);
   assert.equal(
     new Set(themes.map(theme => `${theme.gridStyle}/${theme.finish}/${theme.radius}`)).size,
     themes.length,
     "격자·마감·모서리가 모두 같은 테마는 없다"
   );
-  assert.equal(new Set(themes.map(theme => theme.motion.clear)).size, themes.length);
+  assert.equal(new Set(Object.values(THEMES).map(theme => theme.motion.clear)).size, Object.keys(THEMES).length);
   for (const theme of themes) {
     assert.ok(["lines", "dots", "none", "hash"].includes(theme.gridStyle), theme.name);
     assert.ok(["flat", "inset", "frame"].includes(theme.finish), theme.name);
@@ -98,7 +102,7 @@ const lab = hex => {
 const deltaE = (a, b) => Math.hypot(...lab(a).map((v, i) => v - lab(b)[i]));
 
 test("테마 원칙 '명료': 일곱 피스는 보드와 3:1 넘게 대비되고 서로 ΔE 15 넘게 다르다. 쓰레기도 보인다", () => {
-  for (const theme of Object.values(THEMES)) {
+  for (const theme of allThemes) {
     const pieces = theme.palette.slice(1, 8);
     for (const [i, color] of pieces.entries())
       assert.ok(contrast(color, theme.board.bg) >= 3, `${theme.name} ${"IJLOSTZ"[i]} 대비`);
@@ -110,7 +114,7 @@ test("테마 원칙 '명료': 일곱 피스는 보드와 3:1 넘게 대비되고
 });
 
 test("테마 원칙 '고전 느낌 없이': 블록·고스트에 그라데이션·그림자·빛 번짐을 쓰지 않는다", () => {
-  for (const theme of Object.values(THEMES)) {
+  for (const theme of allThemes) {
     const calls = [];
     const ctx = new Proxy(
       {},

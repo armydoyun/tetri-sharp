@@ -196,7 +196,7 @@ export const gridHashes = (bx, by, cols, rows, cell) => {
 /** 고스트 진하기 → [윤곽 투명도, 채움 투명도] */
 const GHOST_LEVEL = { faint: [0.32, 0], normal: [0.58, 0], strong: [0.95, 0.22] };
 
-const makeTheme = spec => {
+export const makeTheme = spec => {
   const theme = {
     ...spec,
     palette: Object.freeze(["", ...spec.palette]),
