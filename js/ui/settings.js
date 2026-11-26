@@ -439,7 +439,8 @@ export const createSettingsUI = ({
     const id = "set-clear-effect-length";
     const { min, max, step } = CLEAR_EFFECT_LENGTH_LIMITS;
     const format = value => `${value}%`;
-    const input = slider({ id, min, max, step, value: visual.clearEffectLength });
+    const disabled = visual.effects !== "full";
+    const input = slider({ id, min, max, step, value: visual.clearEffectLength, disabled });
     const output = el("output", { text: format(visual.clearEffectLength) });
     output.htmlFor.add(id);
     input.addEventListener("input", () => {
@@ -452,8 +453,8 @@ export const createSettingsUI = ({
     return fieldRow({
       id,
       label: t("줄 삭제 효과 길이"),
-      hint: t("테마 기본 시간 기준 · 0%는 끄기"),
-      className: visual.effects === "full" ? undefined : "is-invisible",
+      hint: disabled ? t("화면 효과 ‘전체’에서 조절해요") : t("테마 기본 시간 기준 · 0%는 끄기"),
+      disabled,
       control: rangeRow(input, output, format),
     });
   };

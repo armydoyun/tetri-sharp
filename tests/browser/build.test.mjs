@@ -980,9 +980,10 @@ test("줄 삭제 효과 길이: 전체에서만 배율을 바꾸고 0%와 이전
     assert.equal(await slider.inputValue(), "145");
     for (const mode of ["reduced", "off"]) {
       await select(mode);
-      assert.equal(await slider.isVisible(), false);
+      assert.equal(await slider.isDisabled(), true);
     }
     await select("full");
+    assert.equal(await slider.isEnabled(), true);
     assert.equal(await slider.inputValue(), "145");
     await slider.press("Home");
     assert.equal(await slider.inputValue(), "0");
