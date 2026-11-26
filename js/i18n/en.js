@@ -1146,6 +1146,7 @@ export const EN = {
   "반시계 회전 {n}번": "rotate left {n} times",
   "그대로 두기": "let it lock",
   "소리 들어 보기": "Hear it",
+  "소리가 꺼져 있어요.": "Sound is off.",
   "게임 테마마다 다른 소리. 뜻과 박자는 같고 음색만 달라요":
     "Each game theme has its own sound. Same cues and timing, different tone",
   "깔끔한 클릭과 짧은 음": "Clean clicks and short tones",

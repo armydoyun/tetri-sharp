@@ -701,13 +701,30 @@
 
 .theme-stage-actions {
   display: flex;
+  align-items: center;
+  gap: var(--space-2);
   margin-top: var(--space-1);
 }
 
-.theme-stage-desc {
+.theme-stage-descriptions {
+  display: grid;
+  min-width: 0;
+}
+
+.theme-stage-descriptions,
+.theme-stage-notice {
   font-size: var(--text-s);
   line-height: 1.45;
   color: var(--text-dim);
+}
+
+.theme-stage-descriptions > small {
+  grid-area: 1 / 1;
+  font-size: inherit;
+}
+
+.theme-stage-descriptions > [aria-hidden="true"] {
+  visibility: hidden;
 }
 
 /* 휴대폰: 미리보기를 줄여 처음 열었을 때 칩 세 줄이 함께 보이게 */
@@ -721,7 +738,7 @@
     max-width: 210px;
   }
 
-  .theme-stage-desc {
+  .theme-stage-descriptions {
     line-height: 1.35;
   }
 }
@@ -730,6 +747,12 @@
 .choice-cards.is-compact {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   align-content: start;
+}
+
+@media (min-width: 600px) {
+  .theme-picker > .choice-cards.is-compact {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 /* 넓은 화면: 미리보기 왼쪽, 칩 오른쪽(칩에 올리면 옆에서 바로 바뀐다) */

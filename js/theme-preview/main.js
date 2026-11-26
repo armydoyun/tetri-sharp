@@ -1,12 +1,9 @@
 import { createSfx, SOUND_SETS } from "../audio/sfx.js";
 import { lang, t, translateDom } from "../i18n/index.js";
 import { createThemeStage, drawThemeSwatch } from "../render/preview.js";
-import { ALL_THEME_IDS, THEMES } from "../render/themes.js";
+import { ADDITIONAL_THEMES, ORIGINAL_THEMES, THEMES } from "../render/themes.js";
 import { button, choiceCards, dropdown, rangeRow, segmented, setSegmented, slider } from "../ui/components.js";
 import { el } from "../ui/dom.js";
-import { CANDIDATES } from "./candidates.js";
-import { EXISTING_PREVIEWS } from "./existing.js";
-import { CANDIDATE_SOUNDS } from "./sounds.js";
 
 document.documentElement.lang = lang;
 translateDom();
@@ -16,11 +13,14 @@ const node = id => document.getElementById(id);
 /** @param {string} id */
 const stageFor = id => createThemeStage(/** @type {HTMLCanvasElement} */ (node(id)));
 
-const soundSets = { ...SOUND_SETS, ...CANDIDATE_SOUNDS };
 const stages = [stageFor("candidate-board"), stageFor("reference-board")];
 const cards = [node("candidate-card"), node("reference-card")];
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
-const catalog = { new: CANDIDATES, existing: EXISTING_PREVIEWS };
+const originalIds = Object.keys(ORIGINAL_THEMES);
+const catalog = {
+  new: ADDITIONAL_THEMES,
+  existing: Object.fromEntries(originalIds.map(id => [id, { reference: id, theme: THEMES[id] }])),
+};
 const selected = { new: "porcelain", existing: "modern" };
 let category = "new";
 const selectedPreview = () => catalog[category][selected[category]];
@@ -31,7 +31,7 @@ let boardsPlaying = false;
 const volume = slider({ id: "audition-volume", min: 0, max: 100, step: 1, value: 70 });
 const volumeText = el("output", { class: "num", text: `${volume.value}%` });
 volumeText.htmlFor.add(volume.id);
-const sfx = createSfx({ sets: soundSets, getVolume: () => Number(volume.value) });
+const sfx = createSfx({ getVolume: () => Number(volume.value) });
 volume.addEventListener("input", () => {
   volumeText.textContent = `${volume.value}%`;
   sfx.setVolume();
@@ -108,7 +108,7 @@ const schedule = (delay, action) => {
 const durationOf = (set, cues) =>
   Math.max(
     ...cues.flatMap(([at, sound]) =>
-      soundSets[set][sound].map(part => at + part.at + part.dur * (part.decay === "slow" ? 1.6 : 1) + 0.035)
+      SOUND_SETS[set][sound].map(part => at + part.at + part.dur * (part.decay === "slow" ? 1.6 : 1) + 0.035)
     )
   );
 
@@ -127,7 +127,7 @@ const listen = (cues, label) => {
   let start = 0;
   for (const source of sources) {
     const set = sets[source];
-    const theme = source === 0 ? selectedPreview().theme : THEMES[reference];
+    const theme = source === 0 ? selectedPreview().theme : ORIGINAL_THEMES[reference];
     for (const [at, sound, mix] of cues) {
       if (!muted && !sfx.play(sound, mix, { set, delay: start + at }) && !visuals.length) {
         stop(t("이 브라우저에서 효과음을 재생할 수 없어요."));
@@ -259,15 +259,15 @@ const drawBoards = () => {
   const { theme, sound } = selectedPreview();
   node("candidate-name").textContent = theme.name;
   node("candidate-desc").textContent = sound ? `${theme.description} · ${sound}` : theme.description;
-  node("reference-desc").textContent = THEMES[reference].description;
+  node("reference-desc").textContent = ORIGINAL_THEMES[reference].description;
   draw(stages[0], theme);
-  draw(stages[1], THEMES[reference]);
+  draw(stages[1], ORIGINAL_THEMES[reference]);
 };
 
 const referencePicker = dropdown({
   id: "audition-reference",
   label: t("비교할 기존 테마"),
-  options: ALL_THEME_IDS.map(id => ({ value: id, label: THEMES[id].name })),
+  options: originalIds.map(id => ({ value: id, label: ORIGINAL_THEMES[id].name })),
   value: reference,
   onChange: value => {
     stop();

@@ -998,7 +998,7 @@ test("줄 삭제 효과 길이: 전체에서만 배율을 바꾸고 0%와 이전
   }
 });
 
-test("게임 테마: 아홉 테마가 서로 다르게 그려지고, 설정에서 바꾸면 바로 반영된다", async () => {
+test("게임 테마: 공개 테마 스무 개가 서로 다르게 그려지고, 설정에서 바꾸면 바로 반영된다", async () => {
   const { context, page, errors } = await openPage();
   await startMode(page, "dig");
   const snapshot = () =>
@@ -1011,7 +1011,28 @@ test("게임 테마: 아홉 테마가 서로 다르게 그려지고, 설정에�
     });
   await page.keyboard.press("Escape"); // 일시정지해서 화면을 멈춘다
   const seen = new Set();
-  for (const theme of ["retro", "minimal", "graphite", "frame", "stone", "midnight", "forest", "white", "modern"]) {
+  for (const theme of [
+    "retro",
+    "minimal",
+    "graphite",
+    "frame",
+    "stone",
+    "midnight",
+    "forest",
+    "white",
+    "modern",
+    "porcelain",
+    "relay",
+    "tide",
+    "velvet",
+    "press",
+    "film",
+    "post",
+    "carbon",
+    "chestnut",
+    "whiteNight",
+    "ink",
+  ]) {
     await page.click("#open-settings");
     await page.click('.dialog-tabs [data-value="visual"]');
     await page.click(`#set-theme [data-value="${theme}"]`);
@@ -1019,7 +1040,7 @@ test("게임 테마: 아홉 테마가 서로 다르게 그려지고, 설정에�
     await page.waitForTimeout(100);
     seen.add(await snapshot());
   }
-  assert.equal(seen.size, 9, "테마마다 다른 그림");
+  assert.equal(seen.size, 20, "테마마다 다른 그림");
   assert.deepEqual(errors, []);
   await context.close();
 });
@@ -1045,14 +1066,38 @@ test("게임 테마: 미리보기는 움직이고, 칩에 올리면 미리보기
     assert.equal(await name.textContent(), "스튜디오");
     assert.equal(await state.textContent(), "사용 중");
     assert.ok(await moves(), "미리보기가 장면을 되풀이한다");
-    assert.equal(await page.locator("#set-theme canvas.theme-swatch").count(), 9, "칩마다 견본");
+    assert.equal(await page.locator("#set-theme canvas.theme-swatch").count(), 20, "칩마다 견본");
 
     // 올리면 미리보기만 바뀌고 선택은 그대로
     const card = page.locator('#set-theme [data-value="retro"]');
+    const layout = () =>
+      stage.evaluate(canvas => ({
+        stageHeight: canvas.closest(".theme-stage").getBoundingClientRect().height,
+        dialogHeight: canvas.closest(".dialog-body").scrollHeight,
+      }));
+    const size = await layout();
     await card.hover();
     assert.equal(await name.textContent(), "페이퍼");
     assert.equal(await state.textContent(), "미리보기");
     assert.equal(await card.getAttribute("aria-pressed"), "false", "올리기만으로는 적용되지 않는다");
+    assert.deepEqual(await layout(), size);
+    const a = await card.boundingBox();
+    const b = await page.locator('#set-theme [data-value="minimal"]').boundingBox();
+    await page.mouse.move((a.x + a.width + b.x) / 2, a.y + a.height / 2);
+    assert.equal(await name.textContent(), "페이퍼", "칩 사이 여백에서 직전 미리보기 유지");
+    await page.locator("#theme-listen").hover();
+    assert.equal(await name.textContent(), "페이퍼", "소리 버튼으로 이동해도 미리보기 유지");
+    const heights = await stage.evaluate(canvas => {
+      const panel = canvas.closest(".theme-stage");
+      return Array.from(document.querySelectorAll("#set-theme button"), item => {
+        item.dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse" }));
+        return panel.getBoundingClientRect().height;
+      });
+    });
+    assert.ok(
+      heights.every(height => height === size.stageHeight),
+      "모든 설명의 줄바꿈에서 높이 유지"
+    );
     await page.locator("#settings-close").hover();
     assert.equal(await name.textContent(), "스튜디오", "벗어나면 사용 중 테마로");
 
@@ -1069,6 +1114,55 @@ test("게임 테마: 미리보기는 움직이고, 칩에 올리면 미리보기
     await page.click('.dialog-tabs [data-value="control"]');
     await page.click('.dialog-tabs [data-value="visual"]');
     assert.equal(await moves(), false, "다시 열어도 멈춰 있다");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("게임 테마: 소리 미리보기는 0%에서 안내만 하고 설정 음량으로 재생한다", async () => {
+  const { context, page, errors } = await openPage(() => {
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ volume: 0 }));
+    window.themeAudio = { contexts: 0, tones: 0, gain: null };
+    const Real = window.AudioContext;
+    window.AudioContext = class extends Real {
+      constructor() {
+        super();
+        window.themeAudio.contexts++;
+      }
+      createGain() {
+        const node = super.createGain();
+        window.themeAudio.gain ??= node.gain;
+        return node;
+      }
+      createOscillator() {
+        window.themeAudio.tones++;
+        return super.createOscillator();
+      }
+    };
+  });
+  try {
+    await page.click("#open-settings");
+    await page.click('.dialog-tabs [data-value="visual"]');
+    const listen = page.locator("#theme-listen");
+    const notice = page.locator("#theme-sound-notice");
+    await listen.click();
+    assert.equal(await notice.textContent(), "소리가 꺼져 있어요.");
+    assert.equal(await page.evaluate(() => window.themeAudio.contexts), 0);
+
+    const volume = page.locator("#set-volume");
+    await volume.fill("30");
+    assert.equal(await notice.textContent(), "");
+    const tones = await page.evaluate(() => window.themeAudio.tones);
+    await listen.click();
+    assert.ok((await page.evaluate(() => window.themeAudio.tones)) > tones);
+    assert.ok(Math.abs((await page.evaluate(() => window.themeAudio.gain.value)) - 0.3 ** 2) < 1e-6);
+    await volume.fill("0");
+    assert.equal(await page.evaluate(() => window.themeAudio.gain.value), 0);
+    const last = await page.evaluate(() => window.themeAudio.tones);
+    await listen.click();
+    assert.equal(await notice.textContent(), "소리가 꺼져 있어요.");
+    assert.equal(await page.evaluate(() => window.themeAudio.tones), last);
     assert.deepEqual(errors, []);
   } finally {
     await context.close();
@@ -3143,9 +3237,18 @@ test("편의: 제스처 방식이면 보드 아래 버튼 대신 보드를 튕�
 });
 
 test("퍼즐: 단계를 풀면 성공·다음 단계로 이어지고, 첫 화면에 진행도가 남는다. 틀리면 실패", async () => {
-  const { context, page, errors } = await openPage(() =>
-    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
-  );
+  const { context, page, errors } = await openPage(() => {
+    localStorage.setItem(
+      "tetrisharp:settings",
+      JSON.stringify({ access: { countdown: "off" }, visual: { theme: "film", effects: "full" } })
+    );
+    window.clearedPaints = 0;
+    const clip = CanvasRenderingContext2D.prototype.clip;
+    CanvasRenderingContext2D.prototype.clip = function (...args) {
+      if (this.canvas.id === "board") window.clearedPaints++;
+      return clip.apply(this, args);
+    };
+  });
   assert.equal(await text(page, "puzzle-progress"), `0 / ${PUZZLES.length}`);
   await openList(page, "#open-puzzles");
   assert.equal(await page.locator(".puzzle-tile").count(), PUZZLES.length);
@@ -3160,6 +3263,7 @@ test("퍼즐: 단계를 풀면 성공·다음 단계로 이어지고, 첫 화면
   }
   await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
   assert.equal(await text(page, "results-title"), "성공!");
+  await page.waitForFunction(() => window.clearedPaints > 0);
   assert.equal(await page.locator('[data-action="next-puzzle"]').isVisible(), true);
   await page.click('[data-action="next-puzzle"]');
   await page.waitForFunction(() => document.body.dataset.screen === "play");
@@ -4724,7 +4828,7 @@ test("첫 화면 로고: 여섯 번은 아무 일 없고, 3초 안에 일곱 번
     assert.equal(await text(page, "menu-notice"), "", "여섯 번은 조용하다");
     await page.click("#open-settings");
     await page.click('.dialog-tabs [data-value="visual"]');
-    assert.equal(await themeChips(), 9, "아직 숨어 있다");
+    assert.equal(await themeChips(), 20, "아직 숨어 있다");
     await page.click("#settings-close");
 
     await page.waitForTimeout(3100); // 앞의 여섯 번은 3초가 지나 사라진다
@@ -4742,7 +4846,7 @@ test("첫 화면 로고: 여섯 번은 아무 일 없고, 3초 안에 일곱 번
     );
     await page.click("#open-settings");
     await page.click('.dialog-tabs [data-value="visual"]');
-    assert.equal(await themeChips(), 10);
+    assert.equal(await themeChips(), 21);
     assert.equal(await page.locator('#set-theme [data-value="sharp"]').getAttribute("aria-pressed"), "true");
     assert.equal(await page.locator(".theme-stage-name").textContent(), "샤프");
     await page.click("#settings-close");

@@ -5,7 +5,7 @@
 import { SOUND_SETS } from "./sound-sets.js";
 
 export { SOUND_NAMES, SOUND_SETS } from "./sound-sets.js";
-/** @typedef {import("./sound-sets.js").Part} Part */
+/** @typedef {import("./sound-kit.js").Part} Part */
 
 /**
  * 이벤트 한 프레임 분량 → 낼 소리 이름들(순서대로, 중복 없음)

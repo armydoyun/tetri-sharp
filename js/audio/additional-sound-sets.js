@@ -1,5 +1,5 @@
-// 견본에서만 불러오는 악기. 게임의 멜로디 틀과 합성기를 그대로 쓴다.
-import { makeSoundSet, noisePart as noise, note, tonePart as tone } from "../audio/sound-sets.js";
+// 새 테마 11종의 악기. 같은 멜로디 틀과 합성기를 쓴다.
+import { kit, noise, note, P as tone } from "./sound-kit.js";
 
 const ceramicTap = (at, hz, gain) =>
   tone(at, hz, 0.046, "sine", gain, {
@@ -11,7 +11,7 @@ const ceramicTap = (at, hz, gain) =>
     attack: 0.001,
   });
 
-const porcelain = makeSoundSet({
+const porcelain = kit({
   tone: (at, m, long, k) => [
     tone(at, note(m), long ? 0.25 : 0.13, "sine", 0.21 * k, {
       partials: [
@@ -35,7 +35,7 @@ const contact = (at, hz, gain) => noise(at, 0.016, gain, "bandpass", hz, { q: 1.
 const coil = (at, hz, gain) =>
   tone(at, hz, 0.073, "triangle", gain, { to: hz * 0.66, filter: "lowpass", ff: 1500, attack: 0.002 });
 
-const relay = makeSoundSet({
+const relay = kit({
   tone: (at, m, long, k) => [
     tone(at, note(m), long ? 0.23 : 0.095, "triangle", 0.2 * k, {
       filter: "lowpass",
@@ -57,7 +57,7 @@ const bubble = (at, hz, to, gain) =>
   tone(at, hz, 0.056, "sine", gain, { to, attack: 0.011, partials: [[1.94, 0.14]], decay: "fast" });
 const current = (at, hz, to, gain) => noise(at, 0.073, gain, "bandpass", hz, { fto: to, q: 2, attack: 0.014 });
 
-const tide = makeSoundSet({
+const tide = kit({
   tone: (at, m, long, k) => [
     tone(at, note(m), long ? 0.29 : 0.15, "sine", 0.22 * k, {
       partials: [[2, 0.17]],
@@ -75,7 +75,7 @@ const tide = makeSoundSet({
 
 const brush = (at, hz, to, gain, dur) => noise(at, dur, gain, "lowpass", hz, { fto: to, attack: dur * 0.25 });
 
-const velvet = makeSoundSet({
+const velvet = kit({
   tone: (at, m, long, k) => [
     tone(at, note(m), long ? 0.32 : 0.16, "sine", 0.19 * k, {
       partials: [
@@ -103,7 +103,7 @@ const tap = (at, hz, gain) => noise(at, 0.022, gain, "bandpass", hz, { q: 1.8, a
 const sweep = (at, hz, to, gain, dur) => noise(at, dur, gain, "bandpass", hz, { fto: to, q: 0.8, attack: dur * 0.18 });
 const thud = (at, hz, to, dur, gain) => tone(at, hz, dur, "sine", gain, { to, attack: 0.004 });
 
-const press = makeSoundSet({
+const press = kit({
   tone: (at, m, long, k) => [
     tone(at, note(m - 12), long ? 0.2 : 0.095, "triangle", 0.23 * k, { filter: "lowpass", ff: 970 }),
     tap(at, 1150, 0.075 * k),
@@ -119,7 +119,7 @@ const press = makeSoundSet({
 
 const sprocket = (at, hz, gain) => noise(at, 0.011, gain, "bandpass", hz, { q: 3, attack: 0.001 });
 const shutter = (at, gain) => [sprocket(at, 2900, gain), sprocket(at + 0.018, 1700, gain * 0.75)];
-const film = makeSoundSet({
+const film = kit({
   tone: (at, m, long, k) => [
     ...shutter(at, 0.115 * k),
     tone(at + 0.01, note(m), long ? 0.25 : 0.12, "sine", 0.185 * k),
@@ -138,7 +138,7 @@ const stamp = (at, gain) => [
   noise(at, 0.041, gain * 0.75, "lowpass", 830, { attack: 0.002 }),
   thud(at, 244, 98, 0.088, gain),
 ];
-const post = makeSoundSet({
+const post = kit({
   tone: (at, m, long, k) => [
     flick(at, 2300, 0.075 * k, 0.03),
     tone(at, note(m), long ? 0.26 : 0.135, "triangle", 0.205 * k, { filter: "lowpass", ff: 1480 }),
@@ -154,7 +154,7 @@ const post = makeSoundSet({
 
 const graphiteTip = (at, hz, gain) =>
   tone(at, hz, 0.024, "sine", gain, { partials: [[1.77, 0.28]], decay: "fast", attack: 0.001 });
-const carbon = makeSoundSet({
+const carbon = kit({
   tone: (at, m, long, k) => [
     tone(at, note(m), long ? 0.22 : 0.095, "sine", 0.2 * k, { partials: [[2.08, 0.4]], decay: "fast" }),
     tap(at, 1650, 0.065 * k),
@@ -170,7 +170,7 @@ const carbon = makeSoundSet({
 
 const seed = (at, hz, gain) =>
   tone(at, hz, 0.04, "sine", gain, { to: hz * 0.83, partials: [[2.45, 0.23]], decay: "fast", attack: 0.002 });
-const chestnut = makeSoundSet({
+const chestnut = kit({
   tone: (at, m, long, k) => [
     tone(at, note(m - 12), long ? 0.3 : 0.155, "triangle", 0.218 * k, {
       partials: [
@@ -200,7 +200,7 @@ const flute = (at, hz, dur, gain) =>
     ],
     attack: 0.025,
   });
-const whiteNight = makeSoundSet({
+const whiteNight = kit({
   tone: (at, m, long, k) => [flute(at, note(m), long ? 0.36 : 0.17, 0.21 * k), sweep(at, 2250, 1600, 0.042 * k, 0.065)],
   move: [foot(0, 0.115), thud(0, 320, 240, 0.039, 0.045)],
   rotate: [foot(0, 0.125), foot(0.04, 0.09)],
@@ -211,7 +211,7 @@ const whiteNight = makeSoundSet({
   garbage: [flute(0, 294, 0.12, 0.22), flute(0.13, 220, 0.18, 0.22)],
 });
 
-const ink = makeSoundSet({
+const ink = kit({
   tone: (at, m, long, k) => [
     tone(at, note(m - 12), long ? 0.33 : 0.17, "sine", 0.215 * k, {
       partials: [
@@ -230,7 +230,7 @@ const ink = makeSoundSet({
   garbage: [thud(0, 145, 72, 0.105, 0.27), thud(0.14, 118, 53, 0.13, 0.28)],
 });
 
-export const CANDIDATE_SOUNDS = Object.freeze({
+export const ADDITIONAL_SOUND_SETS = Object.freeze({
   porcelain,
   relay,
   tide,

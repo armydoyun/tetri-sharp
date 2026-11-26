@@ -5,10 +5,6 @@ import { THEMES } from "../../js/render/themes.js";
 import { createGame } from "../../js/core/engine.js";
 import { MODERN } from "../../js/rules/presets.js";
 import { DEFAULT_SETTINGS, sanitizeSettings } from "../../js/storage/settings.js";
-import { CANDIDATES } from "../../js/theme-preview/candidates.js";
-import { CANDIDATE_SOUNDS } from "../../js/theme-preview/sounds.js";
-
-const auditionSets = { ...SOUND_SETS, ...CANDIDATE_SOUNDS };
 
 test("이벤트 → 소리: 같은 프레임의 같은 소리는 한 번만", () => {
   assert.deepEqual(soundsFor([{ type: "move" }, { type: "move" }, { type: "rotate", kick: 0 }]), ["move", "rotate"]);
@@ -109,21 +105,20 @@ test("같은 프레임의 클리어는 조작과 하드 드롭보다 앞에 들�
 
 test("효과음 묶음: 테마마다 하나, 모든 묶음이 모든 소리를 갖고 서로 다르다", () => {
   assert.deepEqual(Object.keys(SOUND_SETS).sort(), Object.keys(THEMES).sort());
-  assert.deepEqual(Object.keys(CANDIDATE_SOUNDS).sort(), Object.keys(CANDIDATES).sort());
-  for (const [id, set] of Object.entries(auditionSets))
+  for (const [id, set] of Object.entries(SOUND_SETS))
     for (const name of SOUND_NAMES) assert.ok(set[name]?.length, `${id}.${name}`);
   // 같은 사건이라도 묶음마다 음색이 다르다(이동·착지·1줄 셋을 묶어 비교)
   const sig = set => JSON.stringify([set.move, set.lock, set.clear1]);
-  assert.equal(new Set(Object.values(auditionSets).map(sig)).size, Object.keys(auditionSets).length);
+  assert.equal(new Set(Object.values(SOUND_SETS).map(sig)).size, Object.keys(SOUND_SETS).length);
   // 고전 게임기 느낌(네모파·톱니파)은 쓰지 않는다
-  for (const [id, set] of Object.entries(auditionSets))
+  for (const [id, set] of Object.entries(SOUND_SETS))
     for (const [name, parts] of Object.entries(set))
       for (const p of parts) assert.ok(!["square", "sawtooth"].includes(p.wave), `${id}.${name} ${p.wave}`);
 });
 
 test("효과음 묶음: 크기가 고르다(조각 하나 0.4 이하), 쓰레기 경고·게임 오버는 어느 묶음에서나 또렷하다", () => {
   const loud = parts => Math.max(...parts.map(p => p.gain * (1 + (p.partials ?? []).reduce((s, [, g]) => s + g, 0))));
-  for (const [id, set] of Object.entries(auditionSets)) {
+  for (const [id, set] of Object.entries(SOUND_SETS)) {
     for (const [name, parts] of Object.entries(set)) assert.ok(loud(parts) <= 0.4, `${id}.${name} ${loud(parts)}`);
     for (const name of ["garbage", "gameOver"]) assert.ok(loud(set[name]) >= 0.15, `${id}.${name} ${loud(set[name])}`);
     assert.ok(loud(set.move) < loud(set.clear1), `${id}: 이동 < 1줄`);

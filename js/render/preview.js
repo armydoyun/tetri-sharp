@@ -4,7 +4,7 @@
 //    다음 T가 하드 드롭으로 두 줄을 지우는 장면이 천천히 되풀이된다 → 일곱 피스 색, 쓰레기 줄, 고스트, 효과를 한눈에.
 //  - 견본(drawThemeSwatch): 선택 칩 안의 작은 띠. 테마 보드색 위에 일곱 피스를 한 칸씩.
 import { clearEffectDuration, createEffects } from "./effects.js";
-import { clearSections } from "./clear-sweep.js";
+import { clearSections, drawClearCells } from "./clear-sweep.js";
 import { boxOrigin, drawMark, gridDots, gridHashes } from "./themes.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
 import { t } from "../i18n/index.js";
@@ -196,8 +196,8 @@ export const createThemeStage = canvas => {
     const sections = isErasing ? clearSections(sweep, clearTime, sample?.pivot ?? null, COLS) : [];
     // 쌓인 블록: 기다리는 피스가 있으면 그 전의 판, 다 떨어졌으면 마지막 판
     const board = isErasing ? clear.landed : (sample?.after ?? (step ? step.before : SCENE[SCENE.length - 1].after));
-    const drawRow = (row, y, left = 0, right = COLS) => {
-      for (let x = left; x < right; x++) {
+    const drawRow = (row, y) => {
+      for (let x = 0; x < COLS; x++) {
         const value = row[x];
         if (!value) continue;
         const impact = effects.landing(x, y, value, elapsed);
@@ -213,34 +213,8 @@ export const createThemeStage = canvas => {
       }
     };
     board.forEach((row, y) => {
-      if (!isErasing || !clear.rows.includes(y)) {
-        drawRow(row, y);
-        return;
-      }
-      const rowWidth = COLS * cell;
-      for (const { visible, alpha, left, right, sx, sy, dy } of sections) {
-        if (!visible.length) continue;
-        const region = new Path2D();
-        for (const rect of visible)
-          region.rect(
-            bx + rect.left * rowWidth,
-            (y + rect.top) * cell,
-            (rect.right - rect.left) * rowWidth,
-            (rect.bottom - rect.top) * cell
-          );
-        ctx.save();
-        ctx.clip(region);
-        ctx.globalAlpha = alpha;
-        if (sx !== 1 || sy !== 1 || dy !== 0) {
-          const centerX = bx + ((left + right) / 2) * rowWidth;
-          const centerY = (y + 0.5) * cell;
-          ctx.translate(centerX, centerY + dy * cell);
-          ctx.scale(sx, sy);
-          ctx.translate(-centerX, -centerY);
-        }
-        drawRow(row, y, Math.round(left * COLS), Math.round(right * COLS));
-        ctx.restore();
-      }
+      if (isErasing && clear.rows.includes(y)) drawClearCells(ctx, geometry, y, sections, row, block);
+      else drawRow(row, y);
     });
     // 줄 삭제 효과는 블록 위, 떨어질 피스·고스트는 그 위
     effects.draw(ctx, geometry, elapsed, ink, visual.effects, visual.clearEffectLength);

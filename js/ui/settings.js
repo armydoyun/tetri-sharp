@@ -25,7 +25,15 @@ import {
 import { el, fieldRow, fillDialog, focusKey, restoreFocus } from "./dom.js";
 import { button, choiceCards, confirmButton, rangeRow, segmented, slider, tabBar, toggle } from "./components.js";
 import { dropdown } from "./select.js";
-import { COLOR_SWATCHES, PIECE_ORDER, THEMES, THEME_IDS, findTheme, paletteFor } from "../render/themes.js";
+import {
+  ADDITIONAL_THEMES,
+  COLOR_SWATCHES,
+  PIECE_ORDER,
+  THEMES,
+  THEME_IDS,
+  findTheme,
+  paletteFor,
+} from "../render/themes.js";
 import { keycap } from "./keycap.js";
 import { createThemeStage, drawThemeSwatch } from "../render/preview.js";
 import { t } from "../i18n/index.js";
@@ -509,15 +517,25 @@ export const createSettingsUI = ({
     const name = el("strong", { class: "theme-stage-name" });
     const state = el("span", { class: "theme-stage-state" });
     const desc = el("small", { class: "theme-stage-desc" });
+    const soundNotice = el("small", { id: "theme-sound-notice", class: "theme-stage-notice", role: "status" });
     const stage = createThemeStage(canvas);
     // 지금 미리보기에 보이는 테마(칩에 올리면 바뀐다) → "소리 들어 보기"가 그 테마의 소리를 낸다
     let shown = visual.theme;
+    let hovered = null;
+    let keyboardPreview = null;
     const listen = button({
       label: t("소리 들어 보기"),
       icon: "sound",
       size: "s",
       id: "theme-listen",
-      onClick: () => onPreviewTheme?.(shown),
+      onClick: () => {
+        if (getSettings().volume === 0) {
+          soundNotice.textContent = t("소리가 꺼져 있어요.");
+          return;
+        }
+        soundNotice.textContent = "";
+        onPreviewTheme?.(shown);
+      },
     });
     const showTheme = id => {
       shown = id;
@@ -547,19 +565,21 @@ export const createSettingsUI = ({
     cards.querySelectorAll("button").forEach((card, index) => {
       const id = ids[index];
       card.addEventListener("pointerenter", e => {
-        if (e.pointerType === "mouse") showTheme(id);
+        if (e.pointerType !== "mouse") return;
+        hovered = id;
+        showTheme(id);
       });
-      card.addEventListener("pointerleave", () => showTheme(visual.theme));
       card.addEventListener("focus", () => {
-        if (card.matches(":focus-visible")) showTheme(id);
+        if (!card.matches(":focus-visible")) return;
+        keyboardPreview = id;
+        showTheme(id);
       });
-      card.addEventListener("blur", () => showTheme(visual.theme));
     });
     if (!reducedMotion.matches) {
       playingPreview = stage;
       stage.play();
     }
-    return el(
+    const picker = el(
       "div",
       { class: "theme-picker" },
       el(
@@ -571,12 +591,29 @@ export const createSettingsUI = ({
           "div",
           { class: "theme-stage-caption" },
           el("div", { class: "theme-stage-title" }, name, state),
-          desc,
-          el("div", { class: "theme-stage-actions" }, listen)
+          el(
+            "div",
+            { class: "theme-stage-descriptions" },
+            desc,
+            // 같은 칸에 포개서 현재 너비에서 가장 긴 설명의 높이를 잡는다.
+            ...ids.map(id => el("small", { "aria-hidden": "true", text: THEMES[id].description }))
+          ),
+          el("div", { class: "theme-stage-actions" }, listen, soundNotice)
         )
       ),
       cards
     );
+    picker.addEventListener("pointerleave", e => {
+      if (e.pointerType !== "mouse") return;
+      hovered = null;
+      showTheme(keyboardPreview ?? visual.theme);
+    });
+    picker.addEventListener("focusout", e => {
+      if (e.relatedTarget instanceof Node && picker.contains(e.relatedTarget)) return;
+      keyboardPreview = null;
+      showTheme(hovered ?? visual.theme);
+    });
+    return picker;
   };
 
   const visualSection = () => {
@@ -728,6 +765,7 @@ export const createSettingsUI = ({
     input.addEventListener("input", () => {
       const v = Number(input.value);
       output.textContent = formatVolume(v);
+      if (v > 0) dialog.querySelector("#theme-sound-notice")?.replaceChildren();
       update({ volume: v });
     });
     // 손을 뗄 때 한 번 들려준다(끄기면 조용).
@@ -746,7 +784,7 @@ export const createSettingsUI = ({
     return fieldRow({
       id: "set-sound",
       label: t("효과음 종류"),
-      hint: t(SOUND_HINTS[value] ?? SOUND_HINTS.theme),
+      hint: ADDITIONAL_THEMES[value]?.sound ?? t(SOUND_HINTS[value] ?? SOUND_HINTS.theme),
       // 다섯 가지라 세그먼트는 휴대폰에서 글자가 두 줄로 찌그러진다 → 목록(설명은 목록 안에)
       control: dropdown({
         id: "set-sound",
@@ -757,7 +795,7 @@ export const createSettingsUI = ({
           ...[...THEME_IDS, ...openedThemes()].map(id => ({
             value: id,
             label: THEMES[id].name,
-            hint: t(SOUND_HINTS[id] ?? ""),
+            hint: ADDITIONAL_THEMES[id]?.sound ?? t(SOUND_HINTS[id] ?? ""),
           })),
         ],
         value,

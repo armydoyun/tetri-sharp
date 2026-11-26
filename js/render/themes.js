@@ -1,6 +1,8 @@
 import { t } from "../i18n/index.js";
+import { createAdditionalThemes } from "./additional-themes.js";
+import { EXISTING_CLEAR_SWEEPS } from "./existing-clear-sweeps.js";
 // 저장된 테마 키는 유지한다. 테마는 보드와 블록의 색·모양을 정의한다.
-export const THEME_IDS = Object.freeze([
+const ORIGINAL_PUBLIC_IDS = Object.freeze([
   "modern",
   "retro",
   "minimal",
@@ -14,8 +16,6 @@ export const THEME_IDS = Object.freeze([
 export const DEFAULT_THEME = "modern";
 /** 처음에는 목록에 없다가 열리는 테마(열렸는지는 업적이 기억한다 — js/storage/achievements.js) */
 const SECRET_THEME_IDS = Object.freeze(["sharp"]);
-/** 저장해도 되는 테마 키 전부 */
-export const ALL_THEME_IDS = Object.freeze([...THEME_IDS, ...SECRET_THEME_IDS]);
 
 export const CONTRAST_PALETTE = Object.freeze([
   "",
@@ -229,7 +229,7 @@ export const makeTheme = spec => {
  * 테마마다 보드색·격자(선·점·없음)·블록 마감·모서리·효과를 묶어 성격을 나눈다.
  * 저장 키는 예전 그대로 둔다(minimal = 블루프린트, stone = 샌드).
  */
-export const THEMES = Object.freeze({
+export const ORIGINAL_THEMES = Object.freeze({
   modern: makeTheme({
     name: t("스튜디오"),
     description: t("차콜 보드에 또렷한 무광 블록 · 기본"),
@@ -451,6 +451,29 @@ export const THEMES = Object.freeze({
     },
   }),
 });
+export const ADDITIONAL_THEMES = createAdditionalThemes(makeTheme, ORIGINAL_THEMES.modern.motion);
+export const THEME_IDS = Object.freeze([...ORIGINAL_PUBLIC_IDS, ...Object.keys(ADDITIONAL_THEMES)]);
+/** 저장해도 되는 테마 키 전부 */
+export const ALL_THEME_IDS = Object.freeze([...THEME_IDS, ...SECRET_THEME_IDS]);
+
+const updatedOriginals = Object.fromEntries(
+  Object.entries(ORIGINAL_THEMES).map(([id, theme]) => [
+    id,
+    Object.freeze({
+      ...theme,
+      motion: Object.freeze({
+        ...theme.motion,
+        clearMs: theme.motion.clearMs + 100,
+        clearSweep: EXISTING_CLEAR_SWEEPS[id],
+      }),
+    }),
+  ])
+);
+export const THEMES = Object.freeze({
+  ...updatedOriginals,
+  ...Object.fromEntries(Object.entries(ADDITIONAL_THEMES).map(([id, { theme }]) => [id, theme])),
+});
+
 /** 블록 색 직접 고르기에 쓰는 견본(어두운·밝은 보드 모두에서 잘 보이는 색) */
 export const COLOR_SWATCHES = Object.freeze([
   "#8ed6cd",

@@ -1,7 +1,7 @@
 // 착지와 줄 삭제 이벤트를 화면 시계로 재생한다. 엔진 보드는 그대로 읽는다.
 import { WIDTH } from "../core/board.js";
 import { CELL_ID } from "../core/pieces.js";
-import { drawClearSweep } from "./clear-sweep.js";
+import { clearSections, drawClearCells, drawClearSweep } from "./clear-sweep.js";
 
 const REDUCED_CLEAR_MS = 175;
 export const clearEffectDuration = (motion, percent = 100) => (motion.clearMs * percent) / 100;
@@ -100,7 +100,8 @@ export const createEffects = () => {
         });
         const spin = (e.tspin === "full" || e.tspin === "mini") && e.cells?.length;
         const spinColumn = spin ? e.cells.reduce((sum, [x]) => sum + x + 0.5, 0) / e.cells.length : null;
-        clears.push({ rows: e.rows, start: now, motion, spinColumn, b2b: Boolean(e.b2b) });
+        const cellsByRow = e.clearedCells && new Map(e.rows.map((y, i) => [y, e.clearedCells[i]]));
+        clears.push({ rows: e.rows, cellsByRow, start: now, motion, spinColumn, b2b: Boolean(e.b2b) });
       } else if (full && e.cells?.length) {
         const floors = new Map();
         for (const [x, y] of e.cells) floors.set(x, Math.max(floors.get(x) ?? 0, y + 1));
@@ -230,9 +231,24 @@ export const createEffects = () => {
           ctx.fillRect(bx, middle + offset - thickness / 2, width, thickness);
         }
       }
-      if (full && !motion.clearSweep) drawClearAccents(ctx, clear, geometry, t);
+      if (full) {
+        ctx.fillStyle = color;
+        drawClearAccents(ctx, clear, geometry, t);
+      }
     }
     ctx.restore();
+  };
+
+  const drawClearedBlocks = (ctx, geometry, now, level, drawBlock, clearPercent = 100) => {
+    if (level !== "full" || clearPercent <= 0) return;
+    for (const { rows, cellsByRow, motion, start, spinColumn } of clears) {
+      if (!cellsByRow || !motion.clearSweep) continue;
+      const t = Math.max(0, (now - start) / clearEffectDuration(motion, clearPercent));
+      if (t >= motion.clearSweep.travel) continue;
+      const pivot = spinColumn === null ? null : spinColumn / geometry.cols;
+      const sections = clearSections(motion.clearSweep, t, pivot, geometry.cols);
+      for (const y of rows) drawClearCells(ctx, geometry, y, sections, cellsByRow.get(y), drawBlock);
+    }
   };
 
   return {
@@ -241,6 +257,7 @@ export const createEffects = () => {
     },
     add,
     drawDrops,
+    drawClearedBlocks,
     prune,
     landing,
     draw,
