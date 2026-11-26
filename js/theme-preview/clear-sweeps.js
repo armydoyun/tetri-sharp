@@ -2,7 +2,10 @@
 /** @type {Record<string, import("../render/clear-sweep.js").ClearSweep>} */
 export const CLEAR_SWEEPS = Object.freeze({
   porcelain: {
-    shape: "split",
+    shape: "chip",
+    groups: 5,
+    beat: "scatter",
+    trace: "crack",
     pace: "easeOut",
     travel: 0.66,
     ink: "#3d707b",
@@ -15,6 +18,7 @@ export const CLEAR_SWEEPS = Object.freeze({
   },
   relay: {
     shape: "retract",
+    trace: "contact",
     groups: 5,
     beat: "alternating",
     pace: "even",
@@ -27,7 +31,9 @@ export const CLEAR_SWEEPS = Object.freeze({
     ],
   },
   tide: {
-    shape: "lift",
+    shape: "sweep",
+    from: "center",
+    trace: "wave",
     pace: "easeOut",
     travel: 0.76,
     ink: "#8fc7c6",
@@ -61,7 +67,8 @@ export const CLEAR_SWEEPS = Object.freeze({
     ],
   },
   film: {
-    shape: "retract",
+    shape: "stamp",
+    trace: "perforation",
     groups: 5,
     beat: "paired",
     pace: "even",
@@ -75,7 +82,8 @@ export const CLEAR_SWEEPS = Object.freeze({
     ],
   },
   post: {
-    shape: "sink",
+    shape: "sweep",
+    from: "left",
     pace: "easeOut",
     travel: 0.71,
     ink: "#8b5b43",
@@ -87,9 +95,8 @@ export const CLEAR_SWEEPS = Object.freeze({
     ],
   },
   carbon: {
-    shape: "split",
-    groups: 5,
-    beat: "alternating",
+    shape: "sweep",
+    from: "right",
     pace: "easeIn",
     travel: 0.65,
     ink: "#a7bcd2",
@@ -100,7 +107,8 @@ export const CLEAR_SWEEPS = Object.freeze({
     ],
   },
   chestnut: {
-    shape: "fold",
+    shape: "slide",
+    slide: 1,
     groups: 5,
     beat: "scatter",
     pace: "even",
@@ -127,7 +135,8 @@ export const CLEAR_SWEEPS = Object.freeze({
     ],
   },
   ink: {
-    shape: "fold",
+    shape: "fade",
+    trace: "brush",
     wash: true,
     settle: 0.17,
     pace: "easeIn",
@@ -135,7 +144,7 @@ export const CLEAR_SWEEPS = Object.freeze({
     ink: "#9fb4ca",
     edge: "#cfdfed",
     bands: [
-      [0, 0.26, 0.8],
+      [0, 0.26, 0.48],
       [-0.19, 0.09, 0.35],
       [0.14, 0.07, 0.5],
     ],

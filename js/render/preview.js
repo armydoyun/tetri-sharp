@@ -217,7 +217,7 @@ export const createThemeStage = canvas => {
         return;
       }
       const rowWidth = COLS * cell;
-      for (const { visible, alpha, left, right } of sections) {
+      for (const { visible, alpha, left, right, sx, sy, dy } of sections) {
         if (!visible.length) continue;
         const region = new Path2D();
         for (const rect of visible)
@@ -230,6 +230,13 @@ export const createThemeStage = canvas => {
         ctx.save();
         ctx.clip(region);
         ctx.globalAlpha = alpha;
+        if (sx !== 1 || sy !== 1 || dy !== 0) {
+          const centerX = bx + ((left + right) / 2) * rowWidth;
+          const centerY = (y + 0.5) * cell;
+          ctx.translate(centerX, centerY + dy * cell);
+          ctx.scale(sx, sy);
+          ctx.translate(-centerX, -centerY);
+        }
         drawRow(row, y, Math.round(left * COLS), Math.round(right * COLS));
         ctx.restore();
       }

@@ -135,7 +135,6 @@ test("독립 테마 견본에서 보드를 비교하고 효과음을 재생·정
   });
   assert.notDeepEqual(sweep.initial[0], sweep.middle[0]);
   assert.deepEqual(sweep.middle[0], sweep.end[0]);
-  assert.deepEqual(sweep.initial[1], sweep.middle[1]);
   assert.notDeepEqual(sweep.middle[1], sweep.end[1]);
   await page.getByRole("button", { name: "4줄", exact: true }).click();
   assert.notEqual(await clearStage.evaluate(el => el.toDataURL()), baseline);

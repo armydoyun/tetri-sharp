@@ -48,7 +48,7 @@ test("견본 줄 삭제는 테마별로 다른 형태로 블록을 지우고 행
         sum + visible.reduce((area, rect) => area + (rect.right - rect.left) * (rect.bottom - rect.top) * alpha, 0),
       0
     );
-  assert.equal(new Set(variants.map(({ motion }) => motion.clearSweep.shape)).size, 7);
+  assert.equal(new Set(variants.map(({ motion }) => motion.clearSweep.shape)).size, 10);
   for (const { motion } of variants) {
     const sweep = motion.clearSweep;
     for (const pivot of [null, 0.3]) {
@@ -71,6 +71,13 @@ test("견본 줄 삭제는 테마별로 다른 형태로 블록을 지우고 행
     signatures.add(JSON.stringify([sweep.shape, sweep.ink, bands]));
   }
   assert.equal(signatures.size, variants.length);
+  const frame = (id, at = 0.32) => clearSections(CANDIDATES[id].theme.motion.clearSweep, at, null, 10);
+  assert.equal(frame("tide")[0].visible.length, 2);
+  assert.ok(frame("tide")[0].trail[0][0] > 0);
+  assert.ok(frame("press")[0].sy < 1);
+  assert.ok(frame("porcelain").some(section => section.sx < 1 && section.sy < 1));
+  assert.notEqual(frame("film", 0.48)[0].alpha, frame("film", 0.48)[2].alpha);
+  assert.ok(frame("ink")[0].alpha < 1);
 });
 
 test("기존 테마의 새 연출은 견본 설정에만 붙는다", () => {

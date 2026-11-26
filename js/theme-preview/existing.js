@@ -3,9 +3,8 @@ import { ALL_THEME_IDS, THEMES } from "../render/themes.js";
 /** @type {Record<string, import("../render/clear-sweep.js").ClearSweep>} */
 const sweeps = {
   modern: {
-    shape: "fold",
-    groups: 5,
-    beat: "paired",
+    shape: "sweep",
+    from: "center",
     pace: "easeOut",
     travel: 0.69,
     ink: "#c3d77a",
@@ -16,7 +15,8 @@ const sweeps = {
     ],
   },
   retro: {
-    shape: "lift",
+    shape: "slide",
+    slide: -1,
     pace: "even",
     travel: 0.68,
     ink: "#74695a",
@@ -46,8 +46,8 @@ const sweeps = {
     bands: [[0, 0.105, 0.73]],
   },
   frame: {
-    shape: "retract",
-    groups: 2,
+    shape: "sweep",
+    from: "right",
     pace: "even",
     travel: 0.76,
     ink: "#a8bac4",
@@ -58,7 +58,7 @@ const sweeps = {
     ],
   },
   stone: {
-    shape: "retract",
+    shape: "chip",
     groups: 10,
     beat: "scatter",
     pace: "easeIn",
@@ -108,7 +108,8 @@ const sweeps = {
     settle: 0.21,
   },
   sharp: {
-    shape: "split",
+    shape: "sweep",
+    from: "ends",
     pace: "easeOut",
     travel: 0.74,
     ink: "#bbd581",
