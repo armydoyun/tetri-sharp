@@ -29,7 +29,7 @@ import { createRecordsUI } from "./ui/records.js";
 import { createStatsUI } from "./ui/stats.js";
 import { createPracticeUI } from "./ui/practice.js";
 import { practiceMode } from "./modes/practice.js";
-import { advanceSplits, analyzeSplits, formatDelta, splitDelta } from "./modes/splits.js";
+import { advanceSplits, splitDelta } from "./modes/splits.js";
 import { hydrateIcons, icon } from "./ui/icons.js";
 import { keycap } from "./ui/keycap.js";
 import {
@@ -57,6 +57,7 @@ import { createFinesseTracker } from "./modes/finesse.js";
 import { createReplayPlayer } from "./app/replay-player.js";
 import { createScenePractice } from "./app/scene-practice.js";
 import { createRunSaver } from "./app/run-saver.js";
+import { createResultSplits } from "./app/result-splits.js";
 import { formatSplitComparison, formatSurvivalGoal, resultNoteFor, resultRows } from "./app/results.js";
 import { ROTATIONS } from "./rules/rotation/index.js";
 import { STYLES, WIN, settleBattleFrame, versusMode, versusStatKey } from "./modes/versus.js";
@@ -65,8 +66,8 @@ import { createGestures } from "./input/gestures.js";
 import { createUndo } from "./modes/undo.js";
 import { createHelpUI } from "./ui/help.js";
 import { PUZZLES, createPuzzleProgress, findPuzzle, puzzleMode } from "./modes/puzzles.js";
-import { describeSteps } from "./modes/puzzle-hint.js";
 import { createSolver } from "./app/solver.js";
+import { createGameHints, hasHintControls, hasLessonHints, lessonHintState } from "./app/game-hints.js";
 import {
   CHECKED_AUTO,
   CHECKED_TRIED,
@@ -74,7 +75,6 @@ import {
   decodePuzzle,
   goalLabel,
   ruleSummary,
-  searchOptions,
 } from "./modes/custom-puzzle.js";
 import { sceneToPuzzle } from "./modes/puzzle-edit.js";
 import { createPuzzleEditor } from "./ui/puzzle-editor.js";
@@ -281,7 +281,7 @@ const runs = createRunSaver({
       if (kind === "handling") applyRunHandling(sanitizeSettings({ handling: value }).handling);
       if (kind === "undo" && !undo.undo(game.state)) throw new Error("undo");
       // 퍼즐의 첫 수 보기는 판을 바꾸지 않는 표시라 다시 할 것이 없다(연습의 힌트만 단계가 남는다)
-      if (kind === "hint" && !mode.puzzle) applyLessonHint();
+      if (kind === "hint" && !mode.puzzle) gameHints.applyLesson();
     },
     applyInput(held, pressed) {
       advanceRun(held, pressed, true);
@@ -796,7 +796,7 @@ const start = (
   }
   acc = 0;
   countdown = hasLessonHints(m) || m.battleLesson ? 0 : (COUNTDOWN_FRAMES[settings.access.countdown] ?? READY_FRAMES);
-  if (hasHintControls(m)) resetLessonHint();
+  if (hasHintControls(m)) gameHints.reset();
   updateBackLabels();
   goTimer = 0;
   undo.reset();
@@ -1066,103 +1066,6 @@ const isShortGame = state => {
   return state.stats.pieces < SHORT_GAME_PIECES || (!survives && state.stats.lines === 0);
 };
 
-const renderResultSplits = () => {
-  const details = /** @type {HTMLDetailsElement} */ ($("results-splits"));
-  details.hidden = !mode.splits;
-  details.open = false;
-  const practice = $("results-practice-scene");
-  practice.hidden = true;
-  practice.onclick = null;
-  if (!mode.splits) return;
-
-  const { rows, slowest } = analyzeSplits(mode.splits, splits, resultPbSplits);
-  const replay = lastReplay;
-  /** @type {HTMLButtonElement} */ ($("results-race-best")).disabled = !raceTargetFor(mode, rules);
-  $("results-split-rows").replaceChildren(
-    ...rows.map(({ to, frames, delta }, index) => {
-      const row = document.createElement("tr");
-      const from = mode.splits[index - 1] ?? 0;
-      const startFrame = splits[index - 1] ?? 0;
-      const label = t("{from}–{to}줄", { from, to });
-      row.classList.toggle("is-slowest", slowest?.to === to);
-      const segment = row.insertCell();
-      if (replay) {
-        segment.append(
-          button({
-            label,
-            size: "s",
-            "aria-label": t("{segment} 구간 다시 보기", { segment: label }),
-            onClick: () => {
-              replayView.start(replay, "results", "", true);
-              replayView.seek(startFrame, true);
-            },
-          })
-        );
-      } else segment.textContent = label;
-      const priorDelta = index === 0 ? 0 : rows[index - 1].delta;
-      row.insertCell().textContent = formatTime(frames - startFrame);
-      row.insertCell().textContent = formatSplitComparison(
-        delta === null || priorDelta === null ? null : (delta - priorDelta) / 60
-      );
-      return row;
-    })
-  );
-  const note = slowest
-    ? t("가장 많이 밀린 구간 {from}–{to}줄 ({delta}초)", {
-        from: slowest.from,
-        to: slowest.to,
-        delta: formatDelta(slowest.lost / 60),
-      })
-    : rows.length === 0
-      ? t("10줄부터 구간 기록이 남아요.")
-      : rows.every(row => row.delta === null)
-        ? ""
-        : t("완료한 비교 구간에서 잃은 시간이 없어요.");
-  $("results-split-note").textContent = note;
-  // 첫 구간(10줄)에 닿기 전에 끝났으면 머리줄뿐인 빈 표 대신 안내만 보인다
-  /** @type {HTMLTableElement} */ ($("results-splits").querySelector("table")).hidden = rows.length === 0;
-  // 너무 일찍 끝난 판(연타 등)에서 고른 "추천 연습"은 뜻이 없다
-  if (replay && mode.id === "sprint40" && !isShortGame(game.state)) {
-    let target = null;
-    if (!slowest && rows.every(row => row.delta === null)) {
-      target = replayView.analyze(replay).finesseScene;
-    }
-    if (slowest || target) {
-      practice.hidden = false;
-      practice.querySelector(".btn-label").textContent = slowest
-        ? t("추천 연습 · {from}–{to}줄", slowest)
-        : t("추천 연습 · {piece} 피네스", { piece: target.piece });
-      practice.onclick = () => {
-        replayView.start(replay, "results", "", true);
-        if (target) {
-          replayView.seek(target.spawnFrame, true);
-          sceneView.enter(null, target);
-          return;
-        }
-        const index = mode.splits.indexOf(slowest.to);
-        const endFrame = splits[index];
-        replayView.seek(splits[index - 1] ?? 0, true);
-        // 구간 경계에 등장 대기가 있으면 다음 피스를 먼저 보여 준다.
-        if (replayView.player && !replayView.player.game.state.active) {
-          while (!replayView.player.done && !replayView.player.game.state.active) replayView.player.step();
-          replayView.updateBar();
-        }
-        sceneView.enter({ from: slowest.from, to: slowest.to, endFrame });
-      };
-    }
-  }
-  details.querySelector("summary").textContent = slowest
-    ? t("구간 기록 · {from}–{to}줄 {delta}초", {
-        from: slowest.from,
-        to: slowest.to,
-        delta: formatDelta(slowest.lost / 60),
-      })
-    : rows.length === 0
-      ? // 첫 구간(10줄) 전에 끝났으면 펼쳐도 표가 없다 → 안에 있는 "같은 순서로 재시작"을 이름으로(U44)
-        t("같은 순서로 다시 하기")
-      : t("구간 기록");
-};
-
 /** 결과 표: [이름, 값] 줄들을 dt·dd로 @param {ReadonlyArray<ReadonlyArray<string>>} rows */
 const renderResultStats = rows =>
   $("results-stats").replaceChildren(...rows.flatMap(([k, v]) => [el("dt", { text: k }), el("dd", { text: v })]));
@@ -1275,7 +1178,14 @@ const finish = () => {
   });
   if (mode.lesson && !opponent) say(`${summary.title}. ${rows[0][1]}. ${t("추천 입력")} ${rows[1][1]}`);
   renderResultStats(rows);
-  renderResultSplits();
+  renderResultSplits({
+    milestones: mode.splits,
+    splits,
+    bestSplits: resultPbSplits,
+    replay: lastReplay,
+    canRace: Boolean(mode.splits && raceTargetFor(mode, rules)),
+    recommendPractice: mode.id === "sprint40" && !tooShort,
+  });
   showPanel("results");
 };
 
@@ -1379,10 +1289,6 @@ $("active-rules").addEventListener("click", e => {
 });
 $("edit-rules").addEventListener("click", () => rulesUI.open());
 
-const hasLessonHints = m => Boolean(m.downstack || m.buildLesson);
-/** 힌트 단추를 보이는 판: 파내기·빌드 연습, 퍼즐(첫 수 보기) */
-const hasHintControls = m => hasLessonHints(m) || Boolean(m.puzzle);
-const lessonHintState = state => state.downstack ?? state.buildLesson;
 const isGuidedPractice = (m = mode) => m.lesson || hasLessonHints(m) || m.intro || m.battleLesson;
 const nextPracticeLesson = () =>
   mode.buildLesson
@@ -1396,110 +1302,18 @@ const nextPracticeLesson = () =>
           : mode.lesson
             ? FINESSE_LESSONS[mode.lesson.index + 1]
             : null;
-const downstackHint = $("downstack-hint");
-// 이름만 바꾼다(단추 안의 단축키 표시는 그대로)
-const hintLabel = /** @type {HTMLElement} */ (downstackHint.querySelector(".btn-label"));
-const resetLessonHint = () => {
-  cancelPuzzleHint();
-  // "규칙대로" 떨어지는 만든 퍼즐은 손 빠르기에 따라 달라 첫 수를 찾을 수 없다(자리는 남기고 끈다)
-  /** @type {HTMLButtonElement} */ (downstackHint).disabled = mode.puzzle?.gravity === "rules";
-  hintLabel.textContent = mode.puzzle ? t("첫 수 보기") : t("힌트");
-  $("downstack-status").textContent = "";
-  if (game?.state.puzzle) game.state.puzzle.hintCells = [];
-};
-
-/**
- * 퍼즐 첫 수 보기: 지금 피스를 놓을 자리(점선 칸)와 누를 순서. 한 번 더 누르면 숨긴다.
- * 지금 판에서 더 풀 수 없으면(이미 다른 자리에 놓았으면) 다시 하라고 알려 준다.
- */
-/** 퍼즐 풀이 탐색(첫 수 보기·퍼즐 만들기의 자동 확인)을 화면 밖에서 */
 const solver = createSolver();
-/** 찾는 중인 첫 수 탐색(Worker). 판이 바뀌거나 다시 누르면 취소한다 */
-let puzzleHintSearch = /** @type {null | { cancel: () => void }} */ (null);
-const cancelPuzzleHint = () => {
-  puzzleHintSearch?.cancel();
-  puzzleHintSearch = null;
-};
-const togglePuzzleHint = () => {
-  const p = game.state.puzzle;
-  if (p.hintCells?.length || puzzleHintSearch) return resetLessonHint();
-  const { active, hold, holdUsed } = game.state;
-  // 아직 나오지 않은 목록 피스: 지금까지 목록에서 나온 피스 = 놓은 것 + 움직이는 것 + 홀드 칸 - 처음 홀드 피스
-  const drawn = p.placed + 1 + (hold ? 1 : 0) - (mode.puzzle.holdStart ? 1 : 0);
-  const rest = mode.puzzle.pieces.slice(drawn);
-  const asked = { game, placed: p.placed, x: active.x, y: active.y, rot: active.rot, type: active.type, hold };
-  const search = solver.run({
-    type: "first",
-    kind: mode.puzzle.kind,
-    count: p.need,
-    lines: mode.puzzle.lines ?? 0,
-    rotation: rules.rotation,
-    board: game.state.board.cells.slice(),
-    active: { type: active.type, x: active.x, y: active.y, rot: active.rot },
-    combo: game.state.combo ?? -1,
-    total: p.lines ?? 0,
-    hold,
-    holdUsed,
-    rest,
-    opts: mode.puzzle.custom ? searchOptions(mode.puzzle.custom) : {},
-  });
-  puzzleHintSearch = search;
-  $("downstack-status").textContent = t("첫 수를 찾는 중…");
-  hintLabel.textContent = t("찾기 멈추기");
-  search.promise.then(move => {
-    if (puzzleHintSearch !== search) return;
-    puzzleHintSearch = null;
-    const now = game?.state.active;
-    // 찾는 사이에 피스를 움직였거나 놓았으면 그 판의 답이 아니다
-    const same =
-      game === asked.game &&
-      game.state.puzzle?.placed === asked.placed &&
-      now?.x === asked.x &&
-      now?.y === asked.y &&
-      now?.rot === asked.rot &&
-      now?.type === asked.type &&
-      game.state.hold === asked.hold;
-    if (move === undefined || !same) return resetLessonHint();
-    hintLabel.textContent = t("첫 수 보기");
-    if (!move) {
-      $("downstack-status").textContent = t("이 판에서는 더 풀 수 없어요. 다시 시작해 보세요");
-      return;
-    }
-    if ("exhausted" in move) {
-      $("downstack-status").textContent = t("피스가 많아 첫 수를 다 찾아보지 못했어요");
-      return;
-    }
-    if (!("cells" in move)) return;
-    game.state.puzzle.hintCells = move.cells;
-    game.state.puzzle.hinted = true;
-    const spinLast = ["mini", "tsd", "tst"].includes(mode.puzzle.kind);
-    const steps = describeSteps(move.steps, spinLast);
-    $("downstack-status").textContent = move.hold
-      ? t("첫 수 · 홀드한 뒤 {steps}", { steps })
-      : t("첫 수 · {steps}", { steps });
-    hintLabel.textContent = t("힌트 숨기기");
-  });
-};
-const downstackRetry = $("downstack-retry");
-for (const control of [downstackHint, downstackRetry]) {
-  // 버튼에 키보드 포커스가 있으면 Space는 버튼을 실행한다.
-  control.addEventListener("keydown", event => {
-    if (event.code === "Space") event.stopPropagation();
-  });
-}
-const applyLessonHint = () => {
-  $("downstack-status").textContent = mode.hint(game.state);
-  hintLabel.textContent = t(["힌트", "자리 힌트", "힌트 숨기기"][lessonHintState(game.state).hintLevel]);
-};
-downstackHint.addEventListener("click", event => {
-  if (!hasHintControls(mode) || screen !== "play" || !game?.state.active) return;
-  if (mode.puzzle) togglePuzzleHint();
-  else applyLessonHint();
-  runs.journal?.action("hint");
-  if (event.detail > 0) downstackHint.blur();
-});
-downstackRetry.addEventListener("click", () => {
-  if (hasHintControls(mode) && screen === "play") start(mode, rules);
+const gameHints = createGameHints({
+  hintButton: /** @type {HTMLButtonElement} */ ($("downstack-hint")),
+  retryButton: $("downstack-retry"),
+  status: $("downstack-status"),
+  solver,
+  getGame: () => game,
+  getMode: () => mode,
+  getRules: () => rules,
+  isPlaying: () => screen === "play",
+  onHint: () => runs.journal?.action("hint"),
+  onRetry: () => start(mode, rules),
 });
 
 const practiceUI = createPracticeUI({
@@ -1652,7 +1466,7 @@ const handleSystem = (action, code = "", source = "key") => {
   if (action === "undo") return undoPiece();
   // 힌트(퍼즐 첫 수 보기·파내기·빌드 연습)와 결과 화면의 다음 단계
   if (action === "hint") {
-    if (screen === "play" && hasHintControls(mode)) downstackHint.click();
+    gameHints.press();
     return;
   }
   if (action === "next") {
@@ -1965,6 +1779,8 @@ const sceneView = createScenePractice({
   pause,
 });
 
+const renderResultSplits = createResultSplits({ root: panels.results, replayView, sceneView });
+
 // ---- 리플레이 파일·단축키 ----
 // 리플레이·장면 연습 중 단축키: 장면 연습은 Esc로 리플레이로 돌아가고, 리플레이는 재생기가 처리한다
 // (R 처음부터·Esc 닫기는 시스템 키로도 처리한다)
@@ -2078,7 +1894,7 @@ const advanceRun = (held, pressed, reconstructing = false) => {
     versus.cpu.step(cpuInput);
     settleBattleFrame(game, versus.cpu, events);
   }
-  if (hasHintControls(mode) && events.some(event => event.type === "lock")) resetLessonHint();
+  if (hasHintControls(mode) && events.some(event => event.type === "lock")) gameHints.reset();
   const extra = finesse?.frame(held, pressed, hadActive, events) ?? 0;
   if (!reconstructing && extra > 0 && mode.finesse) announceText([t("피네스 +{n}", { n: extra })]);
   if (mode.splits) splits = advanceSplits(mode.splits, splits, game.state.stats.lines, game.state.frame);
