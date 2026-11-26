@@ -1,0 +1,375 @@
+/* 퍼즐 편집기는 버튼이 셋(시험 플레이 · 링크 복사 · 닫기).
+   넓은 창: 한 줄에 [알림 | 시험 | 링크 | 닫기] — 닫기가 둘째 줄 왼쪽으로 떨어지지 않게(5차 검수 U54).
+   그보다 좁으면 알림을 맨 위 한 줄에 두고 [시험 | 링크] 아래 닫기 한 줄 — 알림이 좁은 칸에서 잘리지 않게. */
+@media (min-width: 761px) {
+  .dialog-foot:has(#puzzle-trial) {
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .dialog-foot:has(#puzzle-trial) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dialog-foot:has(#puzzle-trial) > .notice-slot,
+  .dialog-foot:has(#puzzle-trial) > #puzzle-editor-close {
+    grid-column: 1 / -1;
+  }
+
+  .dialog-foot:has(#puzzle-trial) > :not(.notice-slot):first-of-type {
+    grid-column: auto;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 520px) and (min-width: 560px) {
+  .dialog-foot:has(#puzzle-trial) {
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+  }
+
+  .dialog-foot:has(#puzzle-trial) > :is(.notice-slot, #puzzle-editor-close) {
+    grid-column: auto;
+  }
+}
+
+/* 퍼즐 만들기: 이름 칸 + 조작 줄, 판, 판 도구, 피스 순서 */
+#puzzles:has(> .puzzle-editor) {
+  overflow: hidden;
+}
+
+#puzzles > .puzzle-editor {
+  min-block-size: 0;
+  overscroll-behavior: contain;
+}
+
+#puzzles:has(> .puzzle-editor) > :is(.dialog-head, .dialog-foot) {
+  flex: none;
+}
+
+.puzzle-editor {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.puzzle-editor .field-help {
+  margin: 0;
+}
+
+/* 판과 피스를 한 화면에(퍼즐 다시 보기 P2): 좁으면 [판] 아래 [피스·확인], 넓으면 두 칸 */
+.puzzle-editor-work,
+.puzzle-editor-canvas,
+.puzzle-editor-side,
+.puzzle-editor-queue {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+@media (min-width: 700px) {
+  .puzzle-editor-work {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-4);
+  }
+}
+
+.puzzle-editor-row {
+  display: grid;
+  grid-template-columns: 6.5em minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.puzzle-editor-label {
+  color: var(--text-dim);
+  font-size: var(--text-s);
+}
+
+.puzzle-editor-guide {
+  padding: var(--space-2) var(--space-3);
+  border-inline-start: var(--space-1) solid var(--accent);
+  background: var(--accent-soft);
+}
+
+@media (max-width: 420px) {
+  .puzzle-editor-paint {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 힌트는 도구마다 길이가 달라도 두 줄 자리를 남긴다(판이 움직이지 않게) */
+.puzzle-editor-hint {
+  min-height: calc(2 * 1.45em);
+  font-size: var(--text-s);
+  line-height: 1.45;
+}
+
+/* 목표: [이름 | 목표 고르기 | 줄 수] — 줄 수는 "N줄 지우기"에서만 쓰고 자리는 늘 남긴다 */
+.puzzle-editor-goal {
+  display: grid;
+  grid-template-columns: 6.5em minmax(0, 1fr) 7em;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* 좁은 화면: 이름은 위 한 줄, 아래에서는 이름이 긴 목표에 더 넓은 칸을 준다. */
+@media (max-width: 560px) {
+  .puzzle-editor-goal {
+    grid-template-columns: minmax(0, 2fr) minmax(5.5em, 1fr);
+  }
+
+  .puzzle-editor-goal > .puzzle-editor-label {
+    grid-column: 1 / -1;
+  }
+}
+
+/* 고급 설정: 접힌 머리에도 바뀐 규칙 요약 한 줄 */
+.puzzle-editor-advanced {
+  border-block-end: var(--border-w) solid var(--border);
+}
+
+.puzzle-editor-advanced > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  padding-block: var(--space-2);
+}
+
+.puzzle-editor-advanced-summary {
+  color: var(--text-dim);
+  font-size: var(--text-s);
+}
+
+.puzzle-editor-advanced-body > .field-help {
+  margin-block: var(--space-2);
+}
+
+/* 판: 보이는 줄이 적을수록 칸을 크게 */
+.puzzle-editor-board {
+  --editor-width: 220px;
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 2px;
+  width: min(100%, var(--editor-width));
+  margin-inline: auto;
+  touch-action: none;
+  user-select: none;
+}
+
+.puzzle-editor-board[data-rows="8"] {
+  --editor-width: 320px;
+}
+
+.puzzle-editor-board[data-rows="12"] {
+  --editor-width: 280px;
+}
+
+.puzzle-editor-cell {
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.puzzle-editor-cell[aria-pressed="true"] {
+  border-color: var(--accent-ledge);
+  background: var(--accent);
+}
+
+.puzzle-editor-cell:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  z-index: 1;
+}
+
+.puzzle-editor-tools,
+.puzzle-editor-sequence {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-1);
+}
+
+/* 피스 도장 미리보기(퍼즐 다시 보기 P9): 찍힐 네 칸은 점선 테두리 */
+.puzzle-editor-cell[data-stamp] {
+  border: 2px dashed var(--accent);
+}
+
+.puzzle-editor-cell[data-stamp="erase"] {
+  border-color: var(--text-dim);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--surface-3) 0 var(--space-1),
+    var(--text-dim) var(--space-1) calc(var(--space-1) + var(--border-w))
+  );
+}
+
+/* [도장 피스 드롭다운 | 돌리기] */
+.puzzle-editor-stamp {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* 풀이 보기: 놓을 칸은 점선, 판을 누르면 편집으로 돌아온다 */
+.puzzle-editor-cell[data-ghost] {
+  border: 2px dashed var(--accent);
+  background: var(--accent-soft);
+}
+
+.puzzle-editor-board.is-viewing .puzzle-editor-cell[aria-pressed="true"] {
+  opacity: 0.75;
+}
+
+/* 자동 확인: [확인 · 멈추기] / 결과·경고(두 줄 자리) / [풀이 보기 스위치 ← 1 / 3 →] */
+.puzzle-editor-check {
+  padding-block: var(--space-2);
+  border-block: var(--border-w) solid var(--border);
+}
+
+.puzzle-editor-context {
+  display: grid;
+}
+
+.puzzle-editor-context > * {
+  grid-area: 1 / 1;
+}
+
+.puzzle-editor-context > .field-help {
+  align-self: center;
+}
+
+.puzzle-editor-context > [aria-hidden="true"] {
+  visibility: hidden;
+}
+
+.puzzle-editor-check-content {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.puzzle-editor-check-actions,
+.puzzle-editor-solution {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.puzzle-editor-status {
+  min-height: calc(2 * 1.45em);
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--text-s);
+  line-height: 1.45;
+  text-align: center;
+}
+
+.puzzle-editor-status[data-tone="warn"] {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.puzzle-editor-status[data-tone="ok"] {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.puzzle-editor-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-inline-end: var(--space-2);
+}
+
+/* [← 1 / 3 →]은 한 덩어리로 줄을 바꾼다 */
+.puzzle-editor-step-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.puzzle-editor-step {
+  min-width: 5ch;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.puzzle-editor-palette {
+  display: grid;
+  gap: var(--space-1);
+  padding-block: var(--space-2);
+  border-bottom: var(--border-w) solid var(--border);
+  background: var(--surface);
+}
+
+.puzzle-editor-pieces {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.puzzle-editor-queue {
+  container-type: inline-size;
+}
+
+@container (min-width: 340px) {
+  .puzzle-editor-pieces {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
+/* 낮은 창에서는 본문에 피스 팔레트가 차지하는 공간을 남기지 않는다. */
+@media (min-height: 520px) {
+  .puzzle-editor-palette {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 2;
+  }
+
+  .puzzle-editor-queue :is(.puzzle-editor-seq-actions, .puzzle-editor-sequence) > button {
+    scroll-margin-block-start: calc(2 * max(var(--control-h), var(--touch-min, 0px)) + 2 * var(--space-5));
+  }
+}
+
+/* [피스 순서  4 / 50 ........ ← → 빼기] */
+.puzzle-editor-seq-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.puzzle-editor-seq-actions {
+  display: flex;
+  gap: var(--space-1);
+  margin-inline-start: auto;
+}
+
+.puzzle-editor-seq-head > .puzzle-editor-label,
+.puzzle-editor-count {
+  white-space: nowrap;
+}
+
+.puzzle-editor-count {
+  color: var(--text-dim);
+  font-size: var(--text-s);
+}
+
+/* 피스 순서: 칩 줄. 비어 있어도 한 줄 자리를 남긴다 */
+.puzzle-editor-sequence {
+  justify-content: flex-start;
+  min-height: var(--control-h-s);
+  align-content: flex-start;
+}
+
+.puzzle-editor-empty {
+  align-self: center;
+  color: var(--text-dim);
+}
