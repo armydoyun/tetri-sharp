@@ -50,9 +50,11 @@ export const setupBackup = ({ store, findMode, fileInput, canImport, confirmImpo
       "\n" +
       t("퍼즐 완료 {puzzles}개 · 훈련 완료 {practice}개 · Sprint 시도 {attempts}개", { puzzles, practice, attempts }) +
       "\n" +
-      t("백업에 포함되지 않은 연습·퍼즐·Sprint 진행도는 유지돼요.") +
+      t("설정·기록·리플레이는 교체돼요. 백업에 없으면 설정은 기본값으로, 기록과 리플레이는 빈 상태로 돌아가요.") +
       "\n" +
-      t("이 브라우저에 저장된 데이터를 백업 내용으로 바꿀까요?");
+      t("내 퍼즐과 받은 퍼즐은 이 기기의 목록과 합쳐요.") +
+      "\n" +
+      t("연습·기본 퍼즐·Sprint 진행도, 달성한 업적과 내 규칙은 백업에 있을 때만 바뀌어요.");
     if (!(await confirmImport(message))) return;
     if (current !== request || !canImport()) return;
     if (!restoreBackup(store, parsed)) {

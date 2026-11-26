@@ -272,6 +272,20 @@ body.touch-on .rule-slot-home {
   margin-top: calc(-1 * var(--space-2));
 }
 
+.menu-notice[data-link-error] {
+  width: 100%;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-inline-start: var(--space-1) solid var(--accent);
+  background: var(--accent-soft);
+  display: block;
+  max-height: none;
+}
+
+.home-tools-link {
+  display: none;
+}
+
 .help-card {
   border-top: 2px solid var(--border);
 }
@@ -1478,7 +1492,9 @@ body.is-versus {
   }
 
   body.is-versus .cpu-board {
-    width: min(var(--cpu-col), max(70px, calc((100dvh - 230px) * 10 / 22)));
+    /* 머리·여백, CPU 머리·숫자, 공격 알림의 예약 높이까지 뺀다. */
+    --cpu-chrome-h: calc(var(--chrome-h) + var(--versus-feedback-h) + 2 * var(--space-6) + var(--space-5) + var(--space-1));
+    width: min(var(--cpu-col), max(70px, calc((100dvh - var(--cpu-chrome-h)) * 10 / 22)));
   }
 }
 
@@ -2174,6 +2190,21 @@ body[data-screen="results"] #action { display: none; }
   .home { display: flex; flex-direction: column; }
   .home-main, .home-side { display: contents; }
   .home-modes, .home .home-block, .home .welcome, .home .help-card { width: 100%; }
+
+  .home-tools-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--control-h-s);
+    padding-inline: var(--space-3);
+    border: var(--border-w) solid var(--border);
+    border-radius: var(--radius-m);
+    color: var(--text);
+    font-weight: 700;
+  }
+
+  @media (pointer: coarse) {
+    .home-tools-link { min-height: 44px; }
+  }
 }
 
 
@@ -2635,6 +2666,17 @@ body[data-battle-replay] .replay-info {
    조작 줄의 실제 높이(--replay-bar-h, js/main.js가 잰다)만큼만 빼고, 그래도 보드는 화면 높이의 28% 아래로 줄지 않는다.
    화면이 아주 작으면(iPhone SE 등) 조작 줄 끝이 조금 아래로 밀려 스크롤로 닿는다. */
 @media (max-width: 720px) and (orientation: portrait) {
+  /* 퍼즐 목표나 힌트가 여러 줄이어도 실제 정보 칸 높이만큼 보드에서 뺀다. */
+  body.has-lesson-hints.touch-on:not(.gestures-mode):not([data-screen="replay"]) {
+    --chrome-h: calc(52px + 3 * var(--space-4) + 2 * var(--space-2) + 2 * var(--border-w) + var(--lesson-hud-h, 110px));
+    --under-h: calc(2 * var(--touch-btn) + var(--space-2));
+  }
+
+  body.has-lesson-hints.touch-on:not(.gestures-mode):not([data-screen="replay"]) :is(.stage, .stage-side) {
+    width: 100%;
+    min-width: 0;
+  }
+
   body[data-screen="replay"]:not([data-battle-replay]) {
     /* 머리(위 여백 포함 68) + 정보 줄(약 40) + 간격들. 실제 보드 위·아래 몫에 맞춘 값 */
     --chrome-h: 162px;

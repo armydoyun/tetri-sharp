@@ -220,6 +220,16 @@
   }
 }
 
+@media (orientation: landscape) and (max-height: 520px) and (min-width: 560px) {
+  .dialog-foot:has(#puzzle-trial) {
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+  }
+
+  .dialog-foot:has(#puzzle-trial) > :is(.notice-slot, #puzzle-editor-close) {
+    grid-column: auto;
+  }
+}
+
 /* 좁은 화면: 알림은 버튼 위 한 줄 전체(좁은 칸에서 두 줄을 넘겨 잘리지 않게), 버튼은 그 아래 오른쪽 */
 @media (max-width: 560px) {
   .dialog-foot {
@@ -1001,6 +1011,7 @@
 
 /* ---- 블록 색 직접 고르기 ---- */
 .color-picker {
+  container: color-picker / inline-size;
   display: grid;
   gap: var(--space-2);
 }
@@ -1041,6 +1052,14 @@
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: var(--space-1);
+}
+
+@media (pointer: coarse) {
+  @container color-picker (width < 380px) {
+    .color-swatches {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
 }
 
 .color-swatch {
@@ -1145,6 +1164,18 @@
   font-size: var(--text-s);
 }
 
+.puzzle-editor-guide {
+  padding: var(--space-2) var(--space-3);
+  border-inline-start: var(--space-1) solid var(--accent);
+  background: var(--accent-soft);
+}
+
+@media (max-width: 420px) {
+  .puzzle-editor-paint {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* 힌트는 도구마다 길이가 달라도 두 줄 자리를 남긴다(판이 움직이지 않게) */
 .puzzle-editor-hint {
   min-height: calc(2 * 1.45em);
@@ -1160,10 +1191,10 @@
   gap: var(--space-2);
 }
 
-/* 좁은 화면: 이름은 위 한 줄, 아래에 [목표 | 줄 수]. 줄 수 칸은 "20 lines"가 넓은 글꼴에서도 들어가게 */
+/* 좁은 화면: 이름은 위 한 줄, 아래에서는 이름이 긴 목표에 더 넓은 칸을 준다. */
 @media (max-width: 560px) {
   .puzzle-editor-goal {
-    grid-template-columns: minmax(0, 1fr) 8.5em;
+    grid-template-columns: minmax(0, 2fr) minmax(5.5em, 1fr);
   }
 
   .puzzle-editor-goal > .puzzle-editor-label {
@@ -1247,6 +1278,15 @@
   border: 2px dashed var(--accent);
 }
 
+.puzzle-editor-cell[data-stamp="erase"] {
+  border-color: var(--text-dim);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--surface-3) 0 var(--space-1),
+    var(--text-dim) var(--space-1) calc(var(--space-1) + var(--border-w))
+  );
+}
+
 /* [도장 피스 드롭다운 | 돌리기] */
 .puzzle-editor-stamp {
   display: grid;
@@ -1267,10 +1307,29 @@
 
 /* 자동 확인: [확인 · 멈추기] / 결과·경고(두 줄 자리) / [풀이 보기 스위치 ← 1 / 3 →] */
 .puzzle-editor-check {
-  display: grid;
-  gap: var(--space-1);
   padding-block: var(--space-2);
   border-block: var(--border-w) solid var(--border);
+}
+
+.puzzle-editor-context {
+  display: grid;
+}
+
+.puzzle-editor-context > * {
+  grid-area: 1 / 1;
+}
+
+.puzzle-editor-context > .field-help {
+  align-self: center;
+}
+
+.puzzle-editor-context > [aria-hidden="true"] {
+  visibility: hidden;
+}
+
+.puzzle-editor-check-content {
+  display: grid;
+  gap: var(--space-1);
 }
 
 .puzzle-editor-check-actions,

@@ -47,10 +47,15 @@ export const stampIndices = (type, rot, index, minRow = 0) => {
   return out;
 };
 
+/** 도장 미리보기와 찍기가 같은 기준으로 채우기·지우기를 고른다.
+ * @param {Uint8Array} cells @param {number[]} indices
+ */
+export const stampErases = (cells, indices) => indices.every(i => cells[i]);
+
 /** 도장 찍기: 네 칸을 채운다. 이미 네 칸이 다 차 있으면 지운다(다른 칠하기 도구처럼 누른 곳이 그 모양이면 지우기) */
 export const stampCells = (cells, indices) => {
   const out = cells.slice();
-  const erase = indices.every(i => cells[i]);
+  const erase = stampErases(cells, indices);
   for (const i of indices) out[i] = erase ? 0 : 1;
   return out;
 };
