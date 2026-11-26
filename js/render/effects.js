@@ -1,8 +1,12 @@
 // 착지와 줄 삭제 이벤트를 화면 시계로 재생한다. 엔진 보드는 그대로 읽는다.
 import { WIDTH } from "../core/board.js";
 import { CELL_ID } from "../core/pieces.js";
+import { drawClearSweep } from "./clear-sweep.js";
 
 const REDUCED_CLEAR_MS = 175;
+export const clearEffectDuration = (motion, percent = 100) => (motion.clearMs * percent) / 100;
+const durationFor = (motion, level, percent) =>
+  level === "full" ? clearEffectDuration(motion, percent) : REDUCED_CLEAR_MS;
 const PRESS_AT = 0.2;
 const REBOUND_AT = 0.62;
 
@@ -115,15 +119,13 @@ export const createEffects = () => {
     }
   };
 
-  const prune = (now, level) => {
+  const prune = (now, level, clearPercent = 100) => {
     for (const [key, impact] of landings) {
       if (level !== "full" || now - impact.start >= impact.duration) landings.delete(key);
     }
     drops = level === "full" ? drops.filter(drop => now - drop.start < drop.duration) : [];
     clears =
-      level === "off"
-        ? []
-        : clears.filter(clear => now - clear.start < (level === "full" ? clear.motion.clearMs : REDUCED_CLEAR_MS));
+      level === "off" ? [] : clears.filter(clear => now - clear.start < durationFor(clear.motion, level, clearPercent));
   };
 
   const landing = (x, y, value, now) => {
@@ -159,16 +161,17 @@ export const createEffects = () => {
     ctx.restore();
   };
 
-  const draw = (ctx, geometry, now, color, level) => {
+  const draw = (ctx, geometry, now, color, level, clearPercent = 100) => {
     const { bx, cell, toY, cols } = geometry;
     if (!clears.length) return;
     const width = cols * cell;
     ctx.save();
-    ctx.fillStyle = color;
     for (const clear of clears) {
+      ctx.fillStyle = color;
       const { rows, start, motion } = clear;
       const full = level === "full";
-      const duration = full ? motion.clearMs : REDUCED_CLEAR_MS;
+      const duration = durationFor(motion, level, clearPercent);
+      if (duration <= 0) continue;
       const t = Math.max(0, (now - start) / duration);
       const remaining = 1 - t;
       ctx.globalAlpha = (full && rows.length >= 4 ? 0.75 : 0.55) * remaining;
@@ -176,6 +179,8 @@ export const createEffects = () => {
         const middle = toY(row) + cell / 2;
         if (!full) {
           ctx.fillRect(bx, middle - cell * 0.06, width, cell * 0.12);
+        } else if (motion.clearSweep) {
+          drawClearSweep(ctx, motion.clearSweep, geometry, middle, t, clear.spinColumn);
         } else if (motion.clear === "spread") {
           const span = width * (1 - (1 - Math.min(1, t * 2.5)) ** 2);
           const height = cell * (0.12 + remaining * 0.5);
@@ -225,7 +230,7 @@ export const createEffects = () => {
           ctx.fillRect(bx, middle + offset - thickness / 2, width, thickness);
         }
       }
-      if (full) drawClearAccents(ctx, clear, geometry, t);
+      if (full && !motion.clearSweep) drawClearAccents(ctx, clear, geometry, t);
     }
     ctx.restore();
   };

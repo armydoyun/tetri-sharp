@@ -14,7 +14,7 @@ const ROWS = VISIBLE_ROWS + MARGIN_TOP;
 const CSS_CELL = 28;
 
 /**
- * @typedef {{ theme: string, effects: "full" | "reduced" | "off", palette: "theme" | "contrast" | "custom", pattern?: "on" | "off", ghost?: string, grid?: "on" | "off", colors?: Record<string, string> }} Visual
+ * @typedef {{ theme: string, effects: "full" | "reduced" | "off", clearEffectLength?: number, palette: "theme" | "contrast" | "custom", pattern?: "on" | "off", ghost?: string, grid?: "on" | "off", colors?: Record<string, string> }} Visual
  * @param {HTMLCanvasElement} canvas
  * @param {{ getVisual: () => Visual, compact?: boolean }} options
  */
@@ -185,7 +185,7 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    effects.prune(now, effectLevel);
+    effects.prune(now, effectLevel, visual.clearEffectLength);
     animating = effects.active;
     pattern = visual.pattern === "on";
     drawGrid(theme, bx, by, visual.grid !== "off");
@@ -211,7 +211,7 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     }
 
     // 다음 피스와 고스트는 줄 삭제 효과보다 위에 그린다.
-    effects.draw(ctx, { bx, cell, toY, cols: COLS }, now, theme.board.ink, effectLevel);
+    effects.draw(ctx, { bx, cell, toY, cols: COLS }, now, theme.board.ink, effectLevel, visual.clearEffectLength);
 
     if (active) {
       const color = palette[CELL_ID[active.type]];

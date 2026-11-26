@@ -3,7 +3,8 @@
 //    지금 화면 설정(색 구성·블록 무늬·고스트 진하기·격자·효과)으로 그린다. 피스 하나가 내려앉아 반동하고,
 //    다음 T가 하드 드롭으로 두 줄을 지우는 장면이 천천히 되풀이된다 → 일곱 피스 색, 쓰레기 줄, 고스트, 효과를 한눈에.
 //  - 견본(drawThemeSwatch): 선택 칩 안의 작은 띠. 테마 보드색 위에 일곱 피스를 한 칸씩.
-import { createEffects } from "./effects.js";
+import { clearEffectDuration, createEffects } from "./effects.js";
+import { clearSections } from "./clear-sweep.js";
 import { boxOrigin, drawMark, gridDots, gridHashes } from "./themes.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
 import { t } from "../i18n/index.js";
@@ -51,19 +52,38 @@ const buildScene = () => {
   return STEPS.map(([type, rot, x, y, fromY]) => {
     const before = board.map(row => [...row]);
     const cells = cellsOf(type, rot).map(([cx, cy]) => [x + cx, y + cy]);
-    const after = before.map(row => [...row]);
-    for (const [cx, cy] of cells) after[cy][cx] = ID[type];
-    const rows = after.flatMap((row, i) => (row.every(Boolean) ? [i] : []));
-    const kept = after.filter((_, i) => !rows.includes(i));
+    const landed = before.map(row => [...row]);
+    for (const [cx, cy] of cells) landed[cy][cx] = ID[type];
+    const rows = landed.flatMap((row, i) => (row.every(Boolean) ? [i] : []));
+    const kept = landed.filter((_, i) => !rows.includes(i));
     board = [...rows.map(() => Array(COLS).fill(0)), ...kept];
-    return { type, before, cells, fromCells: cells.map(([cx, cy]) => [cx, cy - (y - fromY)]), rows, after: board };
+    return {
+      type,
+      before,
+      landed,
+      cells,
+      fromCells: cells.map(([cx, cy]) => [cx, cy - (y - fromY)]),
+      rows,
+      after: board,
+    };
   });
 };
 const SCENE = buildScene();
 
+// 세로 I가 우물을 채운 판과 지운 직후의 판. 바닥의 블록은 자리를 유지한다.
+const CLEAR_SAMPLES = [1, 2, 3, 4].map(lines => {
+  const rows = Array.from({ length: lines }, (_, i) => ROWS - 2 - i);
+  const after = Array.from({ length: ROWS }, (_, row) =>
+    row === ROWS - 1 ? [1, 1, 3, 3, 0, 0, 7, 7, 2, 2] : Array(COLS).fill(0)
+  );
+  const landed = after.map((row, y) => (rows.includes(y) ? [2, 2, 3, 3, 1, 4, 4, 5, 6, 7] : row));
+  return { rows, after, landed };
+});
+
 /**
  * @param {HTMLCanvasElement} canvas
- * @returns {{ play(): void, stop(): void, show(theme: any, palette: readonly string[], visual: import("./canvas.js").Visual): void }}
+ * @returns {{ play(): void, stop(): void, playClear(lines: number, spin?: boolean): void,
+ * show(theme: any, palette: readonly string[], visual: import("./canvas.js").Visual): void }}
  */
 export const createThemeStage = canvas => {
   const dpr = globalThis.devicePixelRatio || 1;
@@ -86,6 +106,8 @@ export const createThemeStage = canvas => {
   let start = 0;
   let lastLoop = -1;
   let emitted = 0;
+  /** @type {{ rows: number[], after: number[][], landed: number[][], pivot: number | null } | null} */
+  let sample = null;
 
   const block = (x, y, size, value) => {
     theme.block(ctx, x, y, size, palette[value]);
@@ -112,12 +134,12 @@ export const createThemeStage = canvas => {
       return Math.max(0, Math.min(full - 2, Math.floor(t / ROW_MS)));
     };
     const waitFrom = i => (i === 0 ? 0 : dropAt(i - 1));
-    const k = SCENE.filter((_, i) => phase >= dropAt(i)).length;
+    const k = sample ? SCENE.length : SCENE.filter((_, i) => phase >= dropAt(i)).length;
     if (loop !== lastLoop) {
       lastLoop = loop;
       emitted = 0;
     }
-    for (; emitted < k; emitted++) {
+    for (; !sample && emitted < k; emitted++) {
       const done = SCENE[emitted];
       effects.add(
         [
@@ -134,7 +156,7 @@ export const createThemeStage = canvas => {
       );
     }
     const step = k < SCENE.length ? SCENE[k] : null;
-    effects.prune(elapsed, visual.effects);
+    effects.prune(elapsed, visual.effects, visual.clearEffectLength);
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -166,11 +188,18 @@ export const createThemeStage = canvas => {
     ctx.strokeRect(bx + 0.5, 0.5, COLS * cell - 1, ROWS * cell - 1);
     effects.drawDrops(ctx, geometry, elapsed, ink);
 
+    const sweep = visual.effects === "full" ? theme.motion.clearSweep : null;
+    const clear = sample ?? SCENE[k - 1];
+    const duration = clearEffectDuration(theme.motion, visual.clearEffectLength);
+    const clearTime = duration > 0 ? (sample ? elapsed : phase - dropAt(k - 1)) / duration : 1;
+    const isErasing = sweep && clear?.rows.length && clearTime < sweep.travel;
+    const sections = isErasing ? clearSections(sweep, clearTime, sample?.pivot ?? null, COLS) : [];
     // 쌓인 블록: 기다리는 피스가 있으면 그 전의 판, 다 떨어졌으면 마지막 판
-    const board = step ? step.before : SCENE[SCENE.length - 1].after;
-    board.forEach((row, y) =>
-      row.forEach((value, x) => {
-        if (!value) return;
+    const board = isErasing ? clear.landed : (sample?.after ?? (step ? step.before : SCENE[SCENE.length - 1].after));
+    const drawRow = (row, y, left = 0, right = COLS) => {
+      for (let x = left; x < right; x++) {
+        const value = row[x];
+        if (!value) continue;
         const impact = effects.landing(x, y, value, elapsed);
         if (impact) {
           const floor = impact.floor * cell;
@@ -181,10 +210,40 @@ export const createThemeStage = canvas => {
         }
         block(bx + x * cell, y * cell, cell, value);
         if (impact) ctx.restore();
-      })
-    );
+      }
+    };
+    board.forEach((row, y) => {
+      if (!isErasing || !clear.rows.includes(y)) {
+        drawRow(row, y);
+        return;
+      }
+      const rowWidth = COLS * cell;
+      for (const { visible, alpha, left, right, sx, sy, dy } of sections) {
+        if (!visible.length) continue;
+        const region = new Path2D();
+        for (const rect of visible)
+          region.rect(
+            bx + rect.left * rowWidth,
+            (y + rect.top) * cell,
+            (rect.right - rect.left) * rowWidth,
+            (rect.bottom - rect.top) * cell
+          );
+        ctx.save();
+        ctx.clip(region);
+        ctx.globalAlpha = alpha;
+        if (sx !== 1 || sy !== 1 || dy !== 0) {
+          const centerX = bx + ((left + right) / 2) * rowWidth;
+          const centerY = (y + 0.5) * cell;
+          ctx.translate(centerX, centerY + dy * cell);
+          ctx.scale(sx, sy);
+          ctx.translate(-centerX, -centerY);
+        }
+        drawRow(row, y, Math.round(left * COLS), Math.round(right * COLS));
+        ctx.restore();
+      }
+    });
     // 줄 삭제 효과는 블록 위, 떨어질 피스·고스트는 그 위
-    effects.draw(ctx, geometry, elapsed, ink, visual.effects);
+    effects.draw(ctx, geometry, elapsed, ink, visual.effects, visual.clearEffectLength);
     if (step) {
       const color = palette[ID[step.type]];
       for (const [x, y] of step.cells) theme.ghost(ctx, bx + x * cell, y * cell, cell, color, visual.ghost);
@@ -210,6 +269,15 @@ export const createThemeStage = canvas => {
     frame = requestAnimationFrame(animate);
   };
 
+  const stop = () => {
+    if (!frame) return;
+    cancelAnimationFrame(frame);
+    frame = 0;
+    sample = null;
+    effects.clear();
+    draw();
+  };
+
   return {
     /** 그릴 테마와 설정을 바꾼다(움직이는 중이면 다음 프레임부터, 멈춰 있으면 바로 다시 그린다) */
     show(nextTheme, nextPalette, nextVisual) {
@@ -225,13 +293,40 @@ export const createThemeStage = canvas => {
       effects.clear();
       frame = requestAnimationFrame(animate);
     },
-    stop() {
-      if (!frame) return;
-      cancelAnimationFrame(frame);
-      frame = 0;
-      effects.clear();
+    playClear(lines, spin = false) {
+      if (!ctx || !theme || !CLEAR_SAMPLES[lines - 1]) return;
+      stop();
+      const cells = spin ? SCENE[1].cells : [];
+      const pivot = spin ? cells.reduce((sum, [x]) => sum + x + 0.5, 0) / cells.length / COLS : null;
+      const { rows, after, landed } = spin ? SCENE[1] : CLEAR_SAMPLES[lines - 1];
+      sample = { rows, after, landed, pivot };
+      effects.add(
+        [
+          {
+            type: "lock",
+            lines: rows.length,
+            rows,
+            tspin: spin ? "full" : "none",
+            cells,
+          },
+        ],
+        visual.effects,
+        0,
+        theme.motion
+      );
+      start = performance.now();
       draw();
+      const until = Math.max(200, clearEffectDuration(theme.motion, visual.clearEffectLength)) + 170;
+      const animateClear = now => {
+        if (now - start >= until) stop();
+        else {
+          draw(now - start);
+          frame = requestAnimationFrame(animateClear);
+        }
+      };
+      frame = requestAnimationFrame(animateClear);
     },
+    stop,
   };
 };
 

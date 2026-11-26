@@ -9,6 +9,7 @@
   "scripts": {
     "build": "node tools/build.mjs",
     "build:pages": "node tools/build.mjs --pages",
+    "build:theme-preview": "node tools/build-theme-preview.mjs",
     "test": "npm run test:unit && npm run test:browser",
     "test:unit": "node --test \"tests/unit/*.test.mjs\"",
     "test:browser": "node --test \"tests/browser/*.test.mjs\"",
