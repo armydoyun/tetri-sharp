@@ -6,10 +6,14 @@ import { dailyPuzzleSeed } from "./daily-puzzle.js";
 import { buildPcExact, buildQuadExact, buildTsd, buildTst } from "./practice.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
 import { analyzeDailyPuzzle, hasStraightClear } from "./daily-puzzle-analysis.js";
+import { comparePuzzleFingerprints, puzzleFingerprint, rateDailyPuzzle } from "./daily-puzzle-variety.js";
 
 const DAY = 86_400_000;
 const EPOCH = Date.UTC(2026, 10, 26);
 const MAX_ATTEMPTS = 24;
+const VARIETY_START = Date.UTC(2026, 10, 27);
+// 같은 유형이 다섯 번 돌아오는 구간만 살펴보므로, 먼 미래의 날짜도 그 기간만 계산하면 된다.
+const VARIETY_WEEKS = 5;
 const pick = (rng, values) => values[rng.int(values.length)];
 
 const complete = (board, pieces, kind, hold = false) => ({
@@ -39,7 +43,7 @@ const quad = rng => {
   return complete(board, [...front, "I"].join(""), "quad");
 };
 
-const combo = rng => {
+const combo = (rng, varied = false) => {
   const board = createBoard();
   const count = 3 + rng.int(2);
   const well = rng.int(WIDTH - 3);
@@ -52,18 +56,26 @@ const combo = rng => {
     }
   }
   if (rng.int(3) !== 0) board.cells[(HEIGHT - 2) * WIDTH + well + notch] = GARBAGE;
+  if (varied) {
+    const variant = rng.int(3);
+    if (variant === 1) {
+      // 아래쪽 개구부가 한 칸 꺾인 콤보. 지우는 순서에 따라 다음 피스가 들어가는 쪽이 달라진다.
+      const side = well === 0 ? 1 : well === WIDTH - 4 ? -1 : rng.int(2) ? 1 : -1;
+      const row = HEIGHT - 3;
+      for (let x = 0; x < WIDTH; x++)
+        board.cells[row * WIDTH + x] = x >= well + side && x < well + side + 4 ? 0 : GARBAGE;
+    } else if (variant === 2) {
+      // 위에 남겨 둔 받침을 어느 줄과 함께 내릴지 결정하는 콤보.
+      const side = rng.int(2) ? well : well + 3;
+      board.cells[(HEIGHT - 3) * WIDTH + side] = GARBAGE;
+      board.cells[(HEIGHT - 4) * WIDTH + side] = GARBAGE;
+    }
+  }
   const order = Array.from({ length: count }, () => pick(rng, PIECE_TYPES));
   return complete(board, order.join(""), "combo");
 };
 
-// 완성된 T스핀 지형에서 다른 피스가 먼저 채울 자리를 뺀다.
-const spinSetup = rng => {
-  const board = createBoard();
-  const triple = rng.int(3) === 0;
-  const side = rng.int(2) === 0;
-  if (triple) buildTst(board, (side ? 1 : 2) + rng.int(7), side);
-  else buildTsd(board, rng.int(WIDTH - 2), side);
-  const type = pick(rng, ["I", "J", "L", "O", "T"]);
+const removePiece = (board, type, rng) => {
   const candidates = [];
   for (let rot = 0; rot < 4; rot++) {
     for (let y = HEIGHT - 6; y < HEIGHT; y++) {
@@ -74,12 +86,24 @@ const spinSetup = rng => {
       }
     }
   }
-  if (!candidates.length) return null;
+  if (!candidates.length) return false;
   for (const [x, y] of pick(rng, candidates)) board.cells[y * WIDTH + x] = 0;
+  return true;
+};
+
+// 완성된 T스핀 지형에서 다른 피스가 먼저 채울 자리를 뺀다.
+const spinSetup = rng => {
+  const board = createBoard();
+  const triple = rng.int(3) === 0;
+  const side = rng.int(2) === 0;
+  if (triple) buildTst(board, (side ? 1 : 2) + rng.int(7), side);
+  else buildTsd(board, rng.int(WIDTH - 2), side);
+  const type = pick(rng, ["I", "J", "L", "O", "T"]);
+  if (!removePiece(board, type, rng)) return null;
   return complete(board, type + "T", triple ? "tst" : "tsd");
 };
 
-const tuck = rng => {
+const tuck = (rng, varied = false) => {
   const board = createBoard();
   const type = pick(rng, ["I", "J", "L", "O", "S", "T", "Z"]);
   const shape = ROTATIONS.srs.cells(type, rng.int(4));
@@ -95,6 +119,10 @@ const tuck = rng => {
   const edge = rng.int(2) === 0 ? column : column + w - 1;
   board.cells[roofY * WIDTH + edge] = GARBAGE;
   board.cells[roofY * WIDTH + (edge > 0 ? edge - 1 : edge + 1)] = GARBAGE;
+  if (varied && rng.int(3) !== 0) {
+    const prep = pick(rng, PIECE_TYPES);
+    if (removePiece(board, prep, rng)) return complete(board, prep + type, "lines");
+  }
   return complete(board, type, "lines");
 };
 
@@ -120,32 +148,72 @@ const FAMILIES = {
   },
   quad: { make: quad, accepts: stats => stats.path.length >= 3 },
   combo: { make: combo, accepts: stats => stats.wins <= 4 },
-  spin: { level: 3, make: spinSetup, accepts: stats => stats.path.length === 2 },
-  tuck: { make: tuck, accepts: (_, puzzle) => !hasStraightClear(puzzle) },
+  spin: { make: spinSetup, accepts: stats => stats.path.length === 2 },
+  tuck: {
+    make: tuck,
+    accepts: (stats, puzzle) => stats.path.at(-1).lines === 2 && !hasStraightClear(puzzle, stats.path),
+  },
 };
 const WEEK = ["fill", "combo", "hold", "tuck", "quad", "spin", "trap"];
 
 export const dayKey = day => new Date(day).toISOString().slice(0, 10);
 
-/** 새 날짜도 손으로 판을 추가할 필요 없이 동일한 생성 경로를 쓴다. */
-export const generateDay = key => {
-  const index = Math.round((Date.parse(key) - EPOCH) / DAY);
+const generateFor = (date, recent, varied) => {
+  const key = dayKey(date);
+  const index = Math.round((date - EPOCH) / DAY);
   const planned = WEEK[((index % WEEK.length) + WEEK.length) % WEEK.length];
   const seed = dailyPuzzleSeed(key);
   const rng = createRng(seed);
   for (const [pass, family] of [planned, "fill"].entries()) {
+    let nearest = null;
+    let bestPenalty = Infinity;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      const puzzle = pass === 1 && attempt === MAX_ATTEMPTS ? fallback(rng) : FAMILIES[family].make(rng);
+      const puzzle = pass === 1 && attempt === MAX_ATTEMPTS ? fallback(rng) : FAMILIES[family].make(rng, varied);
       if (!puzzle) continue;
       const stats = analyzeDailyPuzzle(puzzle);
       if (!stats.complete || !stats.path || !FAMILIES[family].accepts(stats, puzzle)) continue;
       const code = encodePuzzle({ ...puzzle, title: key });
-      if (code) return { key, seed, family, planned, attempt, ...puzzle, stats, code };
+      if (!code) continue;
+      const day = { key, seed, family, planned, attempt, ...puzzle, stats, code };
+      const result = { ...day, level: rateDailyPuzzle(day) };
+      if (!recent.length) return result;
+      const fingerprint = puzzleFingerprint(day);
+      const penalty = recent.reduce((score, other) => {
+        const { sameBoard, nearBoard, sameRoute } = comparePuzzleFingerprints(fingerprint, other);
+        return score + (sameBoard ? 12 : nearBoard ? 4 : 0) + (sameRoute ? 6 : 0);
+      }, 0);
+      if (penalty === 0) return result;
+      if (penalty < bestPenalty) {
+        nearest = result;
+        bestPenalty = penalty;
+      }
     }
+    if (nearest) return nearest;
   }
   throw new Error(`오늘의 퍼즐 생성 실패 (${key})`);
 };
 
+/** 캐시는 같은 구간을 뽑을 때 계산을 줄인다. 선택은 날과 직전 같은 유형으로만 정해진다. */
+const generateWith = (date, cache) => {
+  if (cache.has(date)) return cache.get(date);
+  const varied = date >= VARIETY_START;
+  const recent = [];
+  if (varied) {
+    const week = Math.floor((date - VARIETY_START) / (WEEK.length * DAY));
+    const weeksBack = week % VARIETY_WEEKS;
+    for (let n = weeksBack; n >= 1; n--) {
+      recent.push(puzzleFingerprint(generateWith(date - n * WEEK.length * DAY, cache)));
+    }
+  }
+  const result = generateFor(date, recent, varied);
+  cache.set(date, result);
+  return result;
+};
+
+export const generateDay = key => generateWith(Date.parse(key), new Map());
+
 export const SAMPLE_START = "2026-11-26";
-export const generateSample = (start = SAMPLE_START, count = 90) =>
-  Array.from({ length: count }, (_, i) => generateDay(dayKey(Date.parse(start) + i * DAY)));
+export const generateSample = (start = SAMPLE_START, count = 90) => {
+  const cache = new Map();
+  return Array.from({ length: count }, (_, i) => generateWith(Date.parse(start) + i * DAY, cache));
+};

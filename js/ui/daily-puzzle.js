@@ -85,7 +85,7 @@ export const createDailyPuzzleUI = ({ dialog, solver, progress, getVisual, onPla
       const show = day => {
         const info = dailyPuzzleInfo(day.family, day.goal.kind);
         title.textContent = info.title;
-        level.textContent = dailyPuzzleLevel(info.level);
+        level.textContent = dailyPuzzleLevel(day.level);
         objective.textContent = info.description;
         pieces.textContent = [...day.pieces].join(" · ");
         paint(day.cells.map(value => value * GARBAGE));

@@ -1244,8 +1244,8 @@ export const EN = {
   "오늘의 퍼즐 견본": "Daily puzzle preview",
   "날짜별 퍼즐": "Puzzles by date",
   "다양성 확인": "Variety report",
-  "좌우 반전을 같은 판으로 세며, 같은 유형에서 두 칸 이하만 다른 판은 비슷한 판으로 셉니다. 난이도는 생성 기준에 따른 추정값입니다.":
-    "Mirrored boards count as the same. Boards in the same family that differ by up to two cells count as similar. Difficulty is estimated from generation criteria.",
+  "좌우 반전을 같은 판으로 세며, 같은 유형에서 두 칸 이하만 다른 판은 비슷한 판으로 셉니다. 난이도는 대표 풀이의 수, 기술, 첫 배치와 막다른 길을 함께 본 추정값입니다.":
+    "Mirrored boards count as the same. Boards in the same family that differ by up to two cells count as similar. Difficulty is estimated from solution length, techniques, first placements, and dead ends.",
   "첫 수 수치는 각 문제에 표시된 높이 안에서 90° 회전으로 도달할 수 있는 고정 위치를 비교한 값입니다.":
     "First-move counts compare lock positions reachable with quarter turns inside the indicated search height.",
   "짧은 판 비우기": "Quick perfect clear",
@@ -1279,5 +1279,9 @@ export const EN = {
   "반복된 판": "Repeated boards",
   "비슷한 판": "Similar boards",
   "비슷한 판의 날짜": "Similar board date",
+  "같은 대표 풀이 날짜": "Matching sample solution date",
+  "같은 대표 풀이": "Matching sample solutions",
+  "대표 풀이를 비교할 때는 평행 이동과 좌우 반전을 같게 보면서 피스, 배치, 홀드, 지운 줄, 스핀을 비교합니다.":
+    "Sample solutions compare pieces, placements, holds, line clears, and spins, treating translations and reflections as equivalent.",
   "계획과 달라진 유형": "Fallback days",
 };

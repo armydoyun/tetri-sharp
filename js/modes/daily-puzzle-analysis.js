@@ -1,5 +1,6 @@
-// 견본용 탐색. 같은 고정 칸으로 이어지는 입력은 하나의 선택으로 센다.
-import { HEIGHT, WIDTH, createBoard } from "../core/board.js";
+// 오늘의 퍼즐 후보 탐색. 같은 고정 칸으로 이어지는 입력은 하나의 선택으로 센다.
+import { HEIGHT, WIDTH, clearLines, createBoard } from "../core/board.js";
+import { GARBAGE } from "../core/pieces.js";
 import { searchOptions, solverBoard, usedHeight } from "./custom-puzzle.js";
 import { goalOf } from "./puzzle-goals.js";
 import { placeOn, reachable, spawnOf } from "./puzzle-solver.js";
@@ -115,10 +116,14 @@ export const analyzeDailyPuzzle = puzzle => {
   };
 };
 
-export const hasStraightClear = puzzle => {
+export const hasStraightClear = (puzzle, path) => {
   const board = createBoard();
   board.cells = solverBoard(puzzle.cells);
-  const type = puzzle.pieces[0];
+  for (const move of path.slice(0, -1)) {
+    for (const [x, y] of move.cells) board.cells[y * WIDTH + x] = GARBAGE;
+    clearLines(board);
+  }
+  const type = path.at(-1).type;
   const start = spawnOf(board, rotation, type);
   const floor = placements(board, type, { left: 4000 });
   return floor.some(p => {
