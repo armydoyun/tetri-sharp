@@ -8,6 +8,7 @@ import { SPRINT_HISTORY_KEY, sanitizeSprintHistory } from "./sprint-history.js";
 import { ACHIEVEMENTS_KEY, ACHIEVEMENT_TOTALS_KEY, sanitizeAchievements, sanitizeTotals } from "./achievements.js";
 import { RULE_SLOTS_KEY, sanitizeRuleSlots } from "./rule-slots.js";
 import { CUSTOM_PUZZLES_KEY, mergeCustomPuzzles, sanitizeCustomPuzzles } from "./custom-puzzles.js";
+import { DAILY_PUZZLE_CLEARED, sanitizeDailyPuzzleCleared } from "./daily-puzzle.js";
 import { isEntry } from "./records.js";
 import { sanitizeRuleBody } from "../rules/sanitize.js";
 import { sanitizeReplay } from "../replay/replay.js";
@@ -29,6 +30,7 @@ const BACKUP_KEYS = Object.freeze([
   "versus:stats",
   "versus:style",
   "puzzle:cleared",
+  DAILY_PUZZLE_CLEARED,
   PRACTICE_PROGRESS_KEY,
   SPRINT_HISTORY_KEY,
   ACHIEVEMENTS_KEY,
@@ -71,6 +73,9 @@ export const parseBackup = (raw, findMode) => {
     data["puzzle:cleared"] = [
       ...new Set(src["puzzle:cleared"].filter(n => Number.isInteger(n) && n >= 1 && n <= PUZZLES.length)),
     ];
+  }
+  if (Array.isArray(src[DAILY_PUZZLE_CLEARED])) {
+    data[DAILY_PUZZLE_CLEARED] = sanitizeDailyPuzzleCleared(src[DAILY_PUZZLE_CLEARED]);
   }
   if (src[PRACTICE_PROGRESS_KEY] !== undefined) {
     data[PRACTICE_PROGRESS_KEY] = sanitizePracticeProgress(src[PRACTICE_PROGRESS_KEY]);
@@ -153,6 +158,15 @@ export const restoreBackup = (store, parsed) => {
     if (key === CUSTOM_PUZZLES_KEY) {
       if (key in parsed.data)
         values[key] = mergeCustomPuzzles(sanitizeCustomPuzzles(store.get(key, null)), parsed.data[key]);
+      continue;
+    }
+    if (key === DAILY_PUZZLE_CLEARED) {
+      if (key in parsed.data) {
+        values[key] = sanitizeDailyPuzzleCleared([
+          ...sanitizeDailyPuzzleCleared(store.get(key, [])),
+          ...parsed.data[key],
+        ]);
+      }
       continue;
     }
     // 이전 버전의 백업에는 이 진행도 항목이 없으므로 기존 값을 보존한다.

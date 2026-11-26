@@ -52,7 +52,7 @@ test("코드의 한국어 문장은 모두 영어 사전에 있다", () => {
 });
 
 test("HTML의 한국어 글자도 모두 영어 사전에 있다", () => {
-  for (const file of ["index.html", "theme-preview.html"])
+  for (const file of ["index.html", "theme-preview.html", "daily-puzzle-preview.html"])
     assert.deepEqual(
       [...htmlStrings(file)].filter(text => !(text in EN)),
       [],

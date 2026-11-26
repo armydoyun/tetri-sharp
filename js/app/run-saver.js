@@ -5,6 +5,7 @@
 import { createRunJournal, readSuspendedRun, replayRunJournal, SUSPENDED_RUN_KEY } from "../storage/suspended-run.js";
 import { sanitizeSettings } from "../storage/settings.js";
 import { customPuzzleMode, decodePuzzle } from "../modes/custom-puzzle.js";
+import { dailyPuzzleMode } from "../modes/daily-puzzle.js";
 import { formatTime } from "../modes/format.js";
 import { t } from "../i18n/index.js";
 
@@ -49,6 +50,7 @@ export const createRunSaver = ({ store, findMode, lessons, ask, saveInterval, li
   /** 저장된 판의 모드(연습 단계·만든 퍼즐 포함). 지금 버전에 없는 모드면 null */
   const runMode = entry => {
     if (entry.mode === "custom-puzzle") {
+      if (entry.dailyPuzzle) return dailyPuzzleMode(entry.puzzle, entry.dailyPuzzle);
       const puzzle = decodePuzzle(entry.puzzle);
       return puzzle
         ? { ...customPuzzleMode(puzzle), puzzleCode: entry.puzzle, trialCode: entry.trial ? entry.puzzle : null }
@@ -86,6 +88,7 @@ export const createRunSaver = ({ store, findMode, lessons, ask, saveInterval, li
       name,
       target,
       puzzle: mode.puzzleCode,
+      dailyPuzzle: mode.dailyPuzzle,
       trial: Boolean(mode.trialCode),
       scene,
       resultPbSplits,

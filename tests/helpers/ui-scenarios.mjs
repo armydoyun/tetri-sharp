@@ -141,6 +141,10 @@ const scenarios = async (page, quick) => {
   await page.click("#open-practice");
   await check("연습");
   await esc();
+  await page.click("#open-daily-puzzle");
+  await page.locator("#daily-puzzle-play:enabled").waitFor();
+  await check("오늘의 퍼즐");
+  await esc();
   await page.click("#open-puzzles");
   await page.click("#puzzle-create");
   await check("퍼즐 만들기");

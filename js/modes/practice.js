@@ -137,13 +137,14 @@ export const buildPcRound = (board, queue, rng) => {
 /**
  * 주어진 피스를 모두 써야 하는 판 비우기 자리(퍼즐용). 만들 수 없으면 false(판은 비운다).
  * @param {string[]} pieces  놓는 순서
+ * @param {number} [rows] 채울 줄 수
  */
-export const buildPcExact = (board, pieces, rng) => {
-  const holes = findPcHoles(pieces, rng);
+export const buildPcExact = (board, pieces, rng, rows = PC_ROWS) => {
+  const holes = findPcHoles(pieces, rng, rows);
   clear(board);
   if (!holes) return false;
   const empty = new Set(holes.flat().map(([x, y]) => y * WIDTH + x));
-  for (let y = HEIGHT - PC_ROWS; y < HEIGHT; y++)
+  for (let y = HEIGHT - rows; y < HEIGHT; y++)
     for (let x = 0; x < WIDTH; x++) if (!empty.has(y * WIDTH + x)) set(board, x, y, GARBAGE);
   return true;
 };
