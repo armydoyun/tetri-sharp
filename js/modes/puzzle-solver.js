@@ -32,7 +32,7 @@ const BUDGET = 1500000;
  * @param {Array<{ x: number, y: number, rot: number, first?: string }>} starts  시작 자리(first: 그 자리로 오는 첫 동작, 예: 미리 회전)
  * @param {{ half?: boolean, withPath?: boolean, budget?: { left: number }, sonic?: boolean, lockNone?: boolean }} [options]
  */
-const reachable = (
+export const reachable = (
   board,
   rotation,
   type,
@@ -194,7 +194,7 @@ const topRow = board => {
  * @param {{ cells: Uint8Array, width: number, height: number }} board
  * @param {SearchOptions} opts
  */
-const placeOn = (board, rotation, type, p, combo, total, opts) => {
+export const placeOn = (board, rotation, type, p, combo, total, opts) => {
   const cells = rotation.cells(type, p.rot);
   const next = { ...board, cells: board.cells.slice() };
   place(next, cells, p.x, p.y, 8);
