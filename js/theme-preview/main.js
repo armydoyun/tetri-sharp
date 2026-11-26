@@ -251,7 +251,13 @@ for (const { title, sounds, target = "sound-groups" } of groups) {
         "div",
         { class: "audition-event-grid" },
         ...sounds.map(([sound, label]) =>
-          button({ label, wrap: true, size: "s", "data-sound": sound, onClick: () => listen([[0, sound]], label) })
+          button({
+            label,
+            wrap: true,
+            size: "s",
+            "data-sound": sound,
+            onClick: () => listen([[0, sound]], label, sound === "tspin" ? "spinClear" : undefined),
+          })
         )
       )
     )

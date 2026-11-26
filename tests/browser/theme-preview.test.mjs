@@ -245,6 +245,16 @@ test("테마 21종에서 무음으로 재생해도 다섯 연출과 연속 장�
   }
   assert.equal(tested.size, 21);
 
+  // 인접한 줄 삭제 메뉴에서도 회전 후의 같은 장면을 즉시 재생한다.
+  const spin = page.locator('[data-motion="spin"]');
+  await spin.evaluate(button => button.click());
+  const setup = await stamp();
+  await page.locator('[data-sound="tspin"]').evaluate(button => button.click());
+  const impact = await stamp();
+  assert.notEqual(impact, setup, "줄 삭제 메뉴는 회전 준비를 건너뛰고 바로 T스핀을 표시한다");
+  await page.clock.fastForward(120);
+  assert.notEqual(await stamp(), impact, "T스핀 확정 후에도 테마의 연출이 진행된다");
+
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.getByRole("button", { name: "A/B 비교" }).click();
   await page.locator('[data-motion="hold"]').click();

@@ -13,6 +13,9 @@ const SPIN_AT = 1560;
 const NEXT_AT = 2090;
 const DROP_AT = 2660;
 const FINISH_AT = 3840;
+const SPIN_X = 4;
+const SPIN_Y = 6;
+const spinPivot = { x: SPIN_X + 1.5, y: SPIN_Y + 1.5, direction: /** @type {const} */ (-1) };
 
 const pieceCells = (/** @type {PieceType} */ type, rot, x, y) =>
   srs.cells(type, rot).map(([dx, dy]) => [x + dx, y + dy]);
@@ -34,7 +37,7 @@ const finishPiece = (board, /** @type {PieceType} */ type, cells, tspin) => {
     event: { type: "lock", piece: type, rows, cells, lines: rows.length, tspin },
   };
 };
-const spinCells = pieceCells("T", 2, 4, 6);
+const spinCells = pieceCells("T", 2, SPIN_X, SPIN_Y);
 const spin = finishPiece(startBoard, "T", spinCells, "full");
 const dropCells = pieceCells("I", 0, 2, 7);
 const drop = finishPiece(spin.after, "I", dropCells, "none");
@@ -46,17 +49,21 @@ const shiftedQueue = ["O", "S", "J"];
 /** @param {PieceType} type */
 const active = (type, cells, ghost = []) => ({ type, cells, ghost, down: 0 });
 
-const sceneAt = time => {
+const sceneAt = (time, reduced) => {
   const scene = { ...idle, piece: null, clear: null, queue: initialQueue, board: startBoard };
   if (time < HOLD_AT) return { ...scene, piece: active("Z", pieceCells("Z", 0, 4, 0)) };
   if (time < SPIN_AT) {
     const turned = time >= TURN_AT;
-    const y = Math.min(6, Math.floor(Math.max(0, time - TURN_AT) / 112));
-    const rot = time >= ROTATE_AT ? 2 : turned ? 3 : 0;
-    return { ...scene, piece: active("T", pieceCells("T", rot, 4, y)) };
+    const y = Math.min(SPIN_Y, Math.floor(Math.max(0, time - TURN_AT) / 112));
+    if (time < ROTATE_AT) return { ...scene, piece: active("T", pieceCells("T", turned ? 3 : 0, SPIN_X, y)) };
+    const remaining = (SPIN_AT - time) / (SPIN_AT - ROTATE_AT);
+    const turn = reduced
+      ? undefined
+      : { x: spinPivot.x, y: spinPivot.y, angle: (-spinPivot.direction * Math.PI * remaining ** 2) / 2 };
+    return { ...scene, piece: { ...active("T", spinCells), turn } };
   }
   if (time < NEXT_AT) {
-    return { ...scene, clear: spin, clearAge: time - SPIN_AT, board: spin.after, pivot: 0.55 };
+    return { ...scene, clear: spin, clearAge: time - SPIN_AT, board: spin.after, pivot: spinPivot.x / COLS };
   }
   if (time < DROP_AT) {
     const x = time < NEXT_AT + 300 ? 3 : 2;
@@ -92,6 +99,7 @@ export const MOTION_SAMPLES = {
   next: { start: NEXT_AT - 230, end: NEXT_AT + 525 },
   hold: { start: 0, end: 1050 },
   spin: { start: ROTATE_AT - 340, end: NEXT_AT },
+  spinClear: { start: SPIN_AT, end: NEXT_AT },
   perfect: { start: DROP_AT - 340, end: FINISH_AT },
   combo: { start: DROP_AT - 340, end: FINISH_AT },
 };
@@ -104,7 +112,7 @@ export const playMotionSample = (stage, id, themeId, theme, reduced) => {
     : visuals.filter(({ at }) => at >= start && at < end).map(cue => ({ ...cue, at: cue.at - start }));
   stage.playSample(
     end - start,
-    elapsed => sceneAt(start + elapsed),
+    elapsed => sceneAt(start + elapsed, reduced),
     cues,
     (elapsed, scene) => {
       const time = start + elapsed;
@@ -124,7 +132,7 @@ export const playMotionSample = (stage, id, themeId, theme, reduced) => {
             holdAge: show("hold") ? holdAge : -1,
             holdUsed: HOLD_AT <= time && time < SPIN_AT,
             nextAge: show("next") ? time - NEXT_AT : null,
-            spinAge: show("spin") ? time - SPIN_AT : -1,
+            spin: show("spin") || id === "spinClear" ? { ...spinPivot, age: time - SPIN_AT } : null,
             // 테두리 여운은 줄 삭제가 충분히 진행된 뒤 빈 보드에 그린다.
             perfectAge: show("perfect") ? time - DROP_AT - Math.round(theme.motion.clearMs * 0.82) : -1,
             combo: show("combo") ? Number(time >= SPIN_AT) + Number(time >= DROP_AT) : null,

@@ -1,6 +1,7 @@
 import { CELL_ID } from "../core/pieces.js";
 import { t } from "../i18n/index.js";
 import { ROWS } from "../render/preview-scene.js";
+import { drawTSpin } from "./tspin-effects.js";
 
 /** @typedef {readonly [finish: string, weight: number, ms: number]} Material */
 // 보드와 삭제 연출에서 가져온 잉크색 위에 테마별로 굵기·획·감쇠를 더한다.
@@ -126,22 +127,7 @@ const drawCombo = (ctx, material, theme, color, right, slot, combo, accent) => {
 /** @param {CanvasRenderingContext2D} ctx */
 export const drawMotionAccents = (
   ctx,
-  {
-    left,
-    right,
-    slot,
-    themeId,
-    theme,
-    reduced,
-    holdAge,
-    holdUsed,
-    nextAge,
-    spinAge,
-    perfectAge,
-    combo,
-    comboAge,
-    piece,
-  }
+  { left, right, slot, themeId, theme, reduced, holdAge, holdUsed, nextAge, spin, perfectAge, combo, comboAge, piece }
 ) => {
   const material = MATERIALS[themeId] ?? MATERIALS.modern;
   const [finish, , duration] = material;
@@ -160,16 +146,7 @@ export const drawMotionAccents = (
     }
   }
 
-  const spinLength = duration + 105;
-  const spin = opacity(spinAge, spinLength, reduced, 0.8);
-  if (spin) {
-    const p = reduced ? 1 : easeOut(progress(spinAge, spinLength * 0.64));
-    const radius = 0.65 + p * (finish === "wave" ? 0.82 : 0.66);
-    stroke(ctx, material, ink, spin, path => {
-      const span = Math.PI * (0.36 + p * 0.84);
-      path.arc(left + 5.5, 7.5, radius, -0.25, -0.25 - span, true);
-    });
-  }
+  if (spin) drawTSpin(ctx, { ...spin, themeId, color: ink, left, right, rows: ROWS, reduced });
 
   const perfectLength = duration + 290;
   const perfect = opacity(perfectAge, perfectLength, reduced, 1.1);
