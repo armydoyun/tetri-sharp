@@ -5,7 +5,7 @@ import { DEFAULT_RULES, encodePuzzle, PUZZLE_CELLS } from "./custom-puzzle.js";
 import { dailyPuzzleSeed } from "./daily-puzzle.js";
 import { buildPcExact, buildQuadExact, buildTsd, buildTst } from "./practice.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
-import { analyzeDailyPuzzle, hasStraightClear } from "./daily-puzzle-analysis.js";
+import { analyzeDailyControls, analyzeDailyPuzzle, hasStraightClear } from "./daily-puzzle-analysis.js";
 import { comparePuzzleFingerprints, puzzleFingerprint, rateDailyPuzzle } from "./daily-puzzle-variety.js";
 
 const DAY = 86_400_000;
@@ -174,10 +174,9 @@ const generateFor = (date, recent, varied) => {
       if (!stats.complete || !stats.path || !FAMILIES[family].accepts(stats, puzzle)) continue;
       const code = encodePuzzle({ ...puzzle, title: key });
       if (!code) continue;
-      const day = { key, seed, family, planned, attempt, ...puzzle, stats, code };
-      const result = { ...day, level: rateDailyPuzzle(day) };
+      const result = { key, seed, family, planned, attempt, ...puzzle, stats, code };
       if (!recent.length) return result;
-      const fingerprint = puzzleFingerprint(day);
+      const fingerprint = puzzleFingerprint(result);
       const penalty = recent.reduce((score, other) => {
         const { sameBoard, nearBoard, sameRoute } = comparePuzzleFingerprints(fingerprint, other);
         return score + (sameBoard ? 12 : nearBoard ? 4 : 0) + (sameRoute ? 6 : 0);
@@ -205,7 +204,10 @@ const generateWith = (date, cache) => {
       recent.push(puzzleFingerprint(generateWith(date - n * WEEK.length * DAY, cache)));
     }
   }
-  const result = generateFor(date, recent, varied);
+  const selected = generateFor(date, recent, varied);
+  const controls = analyzeDailyControls(selected, selected.stats.path);
+  const { level, planning, execution } = rateDailyPuzzle({ stats: selected.stats, controls });
+  const result = { ...selected, level, planning, execution, controls };
   cache.set(date, result);
   return result;
 };

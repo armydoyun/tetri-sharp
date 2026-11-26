@@ -53,17 +53,17 @@ export const comparePuzzleFingerprints = (a, b) => ({
   sameRoute: a.route === b.route,
 });
 
-/** 표시 난이도는 대표 풀이와 제한된 첫 수 탐색에 따른 추정값이다. */
-export const rateDailyPuzzle = ({ family, stats }) => {
+/** 제한된 첫 수 탐색에서 본 판단 부담과 대표 입력의 조작 부담을 따로 평가한다. */
+export const rateDailyPuzzle = ({ stats, controls = null }) => {
   const { firstChoices, wins, holdWins, deepestDeadEnd, path } = stats;
   const moves = path.length;
   const wrong = firstChoices - wins;
   const needsHold = holdWins === wins;
-  const needsSpin = path.some(move => move.tspin !== "none");
-  const technical = needsHold || needsSpin || family === "tuck";
   const narrow = wrong >= 2 && wins * 2 <= firstChoices;
   const lateTrap = narrow && deepestDeadEnd >= 3;
-  if ((moves >= 4 && lateTrap) || (needsSpin && narrow && wrong >= 8) || (needsHold && lateTrap)) return 3;
-  if (!technical && moves <= 2 && wrong <= 1) return 1;
-  return 2;
+  const planning = (moves >= 4 || needsHold) && lateTrap ? 3 : moves >= 3 || needsHold || wrong >= 2 ? 2 : 1;
+  const maneuvers = controls?.maxManeuvers ?? 0;
+  const spin = path.some(move => move.tspin !== "none");
+  const execution = maneuvers >= 3 ? 3 : maneuvers > 0 || spin ? 2 : 1;
+  return { level: Math.max(planning, execution), planning, execution };
 };

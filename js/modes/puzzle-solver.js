@@ -162,6 +162,31 @@ export const spawnOf = (board, rotation, type) => {
   return s;
 };
 
+/** 선택한 고정 위치로 가는 90° 입력 경로. 위에서 바로 떨어뜨릴 수 있으면 그 경로를 쓴다. */
+export const inputsForPlacement = (board, rotation, { type, cells, tspin }) => {
+  const start = spawnOf(board, rotation, type);
+  const id = cells
+    .map(([x, y]) => y * WIDTH + x)
+    .sort((a, b) => a - b)
+    .join(",");
+  const { placements, pathTo } = reachable(board, rotation, type, [start], { withPath: true });
+  let best = null;
+  for (const placement of placements) {
+    if (placement.tspin !== tspin) continue;
+    const position = rotation
+      .cells(type, placement.rot)
+      .map(([x, y]) => (y + placement.y) * WIDTH + x + placement.x)
+      .sort((a, b) => a - b)
+      .join(",");
+    if (position !== id) continue;
+    const direct = tspin === "none" && straightPath(board, rotation, type, start, placement, false);
+    if (direct) return direct;
+    const path = pathTo(placement);
+    if (!best || pressCost(path) < pressCost(best)) best = path;
+  }
+  return best;
+};
+
 /**
  * 새로 나오는 피스의 시작 자리들: 보통은 나오는 자리 하나, 20G에 미리 회전이 되면 돌린 채로 나오는 자리도(엔진의 IRS와 같다)
  * @param {SearchOptions} opts

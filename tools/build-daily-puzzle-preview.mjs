@@ -6,31 +6,20 @@ import { build, CSS_OPTIONS, JS_OPTIONS, inlineCssUrls } from "./build.mjs";
 import { cssHrefs, inlineHtml } from "./inline-html.mjs";
 import { dayKey, generateSample, SAMPLE_START } from "../js/modes/daily-puzzle-generation.js";
 import { WIDTH } from "../js/core/board.js";
-import { comparePuzzleFingerprints, puzzleFingerprint } from "../js/modes/daily-puzzle-variety.js";
+import { auditPuzzleVariety } from "./audit-daily-puzzles.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const ENTRY = "js/daily-puzzle-preview/main.js";
 
 const previewData = start => {
-  const seen = [];
-  let duplicates = 0;
-  let similar = 0;
-  let similarRoutes = 0;
-  const days = generateSample(start).map(day => {
-    const { key, family, planned, pieces, stats, code, cells, seed, goal, level } = day;
-    const fingerprint = puzzleFingerprint(day);
-    const matches = seen.map(previous => ({
-      key: previous.key,
-      sameFamily: previous.family === family,
-      ...comparePuzzleFingerprints(fingerprint, previous.fingerprint),
-    }));
-    const repeat = matches.find(match => match.sameBoard);
-    const nearby = matches.find(match => match.sameFamily && match.nearBoard);
-    const sameRoute = matches.find(match => match.sameRoute);
-    if (repeat) duplicates += 1;
-    else if (nearby) similar += 1;
-    if (sameRoute) similarRoutes += 1;
-    seen.push({ key, family, fingerprint });
+  const sample = generateSample(start);
+  const matches = auditPuzzleVariety(sample);
+  const duplicates = matches.filter(match => match.repeat).length;
+  const similar = matches.filter(match => !match.repeat && match.nearby).length;
+  const similarRoutes = matches.filter(match => match.sameRoute).length;
+  const days = sample.map((day, i) => {
+    const { key, family, planned, pieces, stats, code, cells, seed, goal, level, planning, execution } = day;
+    const match = matches[i];
     return {
       key,
       family,
@@ -40,10 +29,12 @@ const previewData = start => {
       code,
       seed,
       level,
+      planning,
+      execution,
       goal: goal.kind,
       rows: Array.from({ length: cells.length / WIDTH }, (_, i) => cells.slice(i * WIDTH, (i + 1) * WIDTH).join("")),
-      similarDate: (repeat ?? nearby)?.key ?? null,
-      similarRouteDate: sameRoute?.key ?? null,
+      similarDate: match.repeat ?? match.nearby,
+      similarRouteDate: match.sameRoute,
     };
   });
   return { days, duplicates, similar, similarRoutes };

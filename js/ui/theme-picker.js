@@ -21,25 +21,9 @@ export const createThemePicker = ({ visual, ids, getVolume, onSelect, onPreviewT
   const desc = el("small", { class: "theme-stage-desc" });
   const soundNotice = el("small", { id: "theme-sound-notice", class: "theme-stage-notice", role: "status" });
   const stage = createThemeStage(canvas);
-  // 지금 미리보기에 보이는 테마(칩에 올리면 바뀐다) → "소리 들어 보기"가 그 테마의 소리를 낸다
-  let shown = visual.theme;
-  let hovered = null;
-  let keyboardPreview = null;
-  const listen = button({
-    label: t("소리 들어 보기"),
-    icon: "sound",
-    size: "s",
-    id: "theme-listen",
-    onClick: () => {
-      if (getVolume() === 0) {
-        soundNotice.textContent = t("소리가 꺼져 있어요.");
-        return;
-      }
-      soundNotice.textContent = "";
-      onPreviewTheme?.(shown);
-    },
-  });
+  let shown = null;
   const showTheme = id => {
+    if (id === shown) return;
     shown = id;
     const theme = findTheme(id);
     stage.show(theme, paletteFor(visual, theme), visual);
@@ -49,7 +33,24 @@ export const createThemePicker = ({ visual, ids, getVolume, onSelect, onPreviewT
     state.textContent = current ? t("사용 중") : t("미리보기");
     state.classList.toggle("is-preview", !current);
   };
-  showTheme(visual.theme);
+  const restoreSelection = () => showTheme(visual.theme);
+  restoreSelection();
+  const listen = button({
+    label: t("소리 들어 보기"),
+    icon: "sound",
+    size: "s",
+    id: "theme-listen",
+    onClick: () => {
+      restoreSelection();
+      if (getVolume() === 0) {
+        soundNotice.textContent = t("소리가 꺼져 있어요.");
+        return;
+      }
+      soundNotice.textContent = "";
+      onPreviewTheme?.(visual.theme);
+    },
+  });
+  listen.addEventListener("focus", restoreSelection);
   const cards = choiceCards({
     id: "set-theme",
     label: t("게임 테마"),
@@ -65,15 +66,17 @@ export const createThemePicker = ({ visual, ids, getVolume, onSelect, onPreviewT
   cards.querySelectorAll("button").forEach((card, index) => {
     const id = ids[index];
     card.addEventListener("pointerenter", e => {
-      if (e.pointerType !== "mouse") return;
-      hovered = id;
-      showTheme(id);
+      if (e.pointerType === "mouse") showTheme(id);
     });
     card.addEventListener("focus", () => {
-      if (!card.matches(":focus-visible")) return;
-      keyboardPreview = id;
-      showTheme(id);
+      if (card.matches(":focus-visible")) showTheme(id);
     });
+  });
+  cards.addEventListener("pointerleave", e => {
+    if (e.pointerType === "mouse") restoreSelection();
+  });
+  cards.addEventListener("focusout", e => {
+    if (!(e.relatedTarget instanceof Node && cards.contains(e.relatedTarget))) restoreSelection();
   });
   const picker = el(
     "div",
@@ -99,15 +102,5 @@ export const createThemePicker = ({ visual, ids, getVolume, onSelect, onPreviewT
     ),
     cards
   );
-  picker.addEventListener("pointerleave", e => {
-    if (e.pointerType !== "mouse") return;
-    hovered = null;
-    showTheme(keyboardPreview ?? visual.theme);
-  });
-  picker.addEventListener("focusout", e => {
-    if (e.relatedTarget instanceof Node && picker.contains(e.relatedTarget)) return;
-    keyboardPreview = null;
-    showTheme(hovered ?? visual.theme);
-  });
   return { element: picker, stage };
 };
