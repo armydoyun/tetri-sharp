@@ -193,10 +193,24 @@
 
 .audition-sound-groups {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
   padding-block-start: var(--space-3);
   border-top: var(--border-w) solid var(--border);
+}
+
+.audition-clear-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  margin-block-start: var(--space-3);
+  gap: var(--space-2) var(--space-4);
+}
+
+.audition-clear-controls .audition-event-grid {
+  display: flex;
+  flex-wrap: wrap;
 }
 
 .audition-sound-group {
@@ -259,10 +273,6 @@
 
   .audition-board-grid {
     gap: var(--space-2);
-  }
-
-  .audition-transport > :first-child {
-    width: 100%;
   }
 }
 

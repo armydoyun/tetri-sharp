@@ -39,7 +39,7 @@ node("volume-control").append(
 );
 
 const status = node("play-status");
-const ready = t("동작을 누르면 선택한 테마의 소리가 재생돼요.");
+const ready = t("동작을 눌러 선택한 테마를 미리 보세요.");
 status.textContent = ready;
 
 /** @type {number[]} */
@@ -66,6 +66,7 @@ const stop = (message = ready) => {
   for (const timer of timers) clearTimeout(timer);
   timers = [];
   sfx.stop();
+  if (!boardsPlaying) for (const stage of stages) stage.stop();
   stopButton.disabled = true;
   showPlayback(message);
 };
@@ -91,6 +92,14 @@ const PLAY_SEQUENCE = [
   [2.08, "combo2"],
 ];
 
+const CLEAR_SOUNDS = { clear1: 1, clear2: 2, clear3: 3, quad: 4, tspin: 2 };
+
+/** @param {number} delay @param {() => void} action */
+const schedule = (delay, action) => {
+  if (delay === 0) action();
+  else timers.push(window.setTimeout(action, delay * 1000));
+};
+
 /** @param {string} set @param {readonly Cue[]} cues */
 const durationOf = (set, cues) =>
   Math.max(
@@ -102,26 +111,31 @@ const durationOf = (set, cues) =>
 /** @param {readonly Cue[]} cues @param {string} label */
 const listen = (cues, label) => {
   stop();
-  if (volume.value === "0") {
+  const visuals = cues.filter(([, sound]) => Object.hasOwn(CLEAR_SOUNDS, sound));
+  const muted = volume.value === "0";
+  if (muted && !visuals.length) {
     showPlayback(t("음량이 0이에요."));
     return;
   }
+  if (visuals.length && boardsPlaying) setBoardsPlaying(false);
   const sources = mode === "compare" ? [0, 1] : [mode === "reference" ? 1 : 0];
   const sets = [candidate, reference];
   let start = 0;
   for (const source of sources) {
     const set = sets[source];
+    const theme = source === 0 ? CANDIDATES[candidate].theme : THEMES[reference];
     for (const [at, sound, mix] of cues) {
-      if (!sfx.play(sound, mix, { set, delay: start + at })) {
+      if (!muted && !sfx.play(sound, mix, { set, delay: start + at }) && !visuals.length) {
         stop(t("이 브라우저에서 효과음을 재생할 수 없어요."));
         return;
       }
     }
-    const theme = source === 0 ? CANDIDATES[candidate].theme : THEMES[reference];
     const message = t("{theme} · {sound} 재생 중", { theme: theme.name, sound: label });
-    if (start === 0) showPlayback(message, source);
-    else timers.push(window.setTimeout(() => showPlayback(message, source), start * 1000));
-    start += durationOf(set, cues) + (source === sources.at(-1) ? 0.14 : 0.28);
+    schedule(start, () => showPlayback(message, source));
+    for (const [at, sound] of visuals)
+      schedule(start + at, () => stages[source].playClear(CLEAR_SOUNDS[sound], sound === "tspin"));
+    const visualEnd = visuals.length ? visuals.at(-1)[0] + (Math.max(200, theme.motion.clearMs) + 170) / 1000 : 0;
+    start += Math.max(visualEnd, durationOf(set, cues)) + (source === sources.at(-1) ? 0.14 : 0.28);
   }
   stopButton.disabled = false;
   timers.push(window.setTimeout(() => stop(t("재생 완료")), start * 1000));
@@ -167,26 +181,27 @@ const groups = [
     ],
   },
   {
-    title: t("줄 삭제"),
+    title: t("줄 삭제 연출"),
+    target: "clear-actions",
     sounds: [
       ["clear1", t("1줄")],
       ["clear2", t("2줄")],
       ["clear3", t("3줄")],
       ["quad", t("4줄")],
+      ["tspin", t("T스핀")],
     ],
   },
   {
     title: t("특수 효과음"),
     sounds: [
-      ["tspin", t("T스핀")],
       ["combo3", t("콤보 3")],
       ["garbage", t("가비지")],
       ["gameOver", t("게임 오버")],
     ],
   },
 ];
-for (const { title, sounds } of groups) {
-  node("sound-groups").append(
+for (const { title, sounds, target = "sound-groups" } of groups) {
+  node(target).append(
     el(
       "div",
       { class: "audition-sound-group" },
@@ -218,7 +233,10 @@ const boardControl = button({
   icon: "play",
   size: "s",
   "aria-pressed": "false",
-  onClick: () => setBoardsPlaying(!boardsPlaying),
+  onClick: () => {
+    stop();
+    setBoardsPlaying(!boardsPlaying);
+  },
 });
 node("board-controls").append(boardControl);
 

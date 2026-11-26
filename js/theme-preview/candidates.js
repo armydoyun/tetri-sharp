@@ -1,5 +1,6 @@
 import { t } from "../i18n/index.js";
 import { makeTheme, THEMES } from "../render/themes.js";
+import { CLEAR_MARKS } from "./clear-marks.js";
 
 export const CANDIDATES = Object.freeze({
   porcelain: {
@@ -14,7 +15,14 @@ export const CANDIDATES = Object.freeze({
       finish: "inset",
       gap: 0.06,
       radius: 0.11,
-      motion: { ...THEMES.modern.motion, clear: "rails", clearMs: 174, landMs: 118, rebound: 0, trailCells: 1.4 },
+      motion: {
+        ...THEMES.modern.motion,
+        clearMark: CLEAR_MARKS.porcelain,
+        clearMs: 174,
+        landMs: 118,
+        rebound: 0,
+        trailCells: 1.4,
+      },
     }),
   },
   relay: {
@@ -29,7 +37,7 @@ export const CANDIDATES = Object.freeze({
       finish: "frame",
       gap: 0.065,
       radius: 0.035,
-      motion: { ...THEMES.modern.motion, clear: "pop", clearMs: 205, accent: "chip", landMs: 140, trailCells: 1.8 },
+      motion: { ...THEMES.modern.motion, clearMark: CLEAR_MARKS.relay, clearMs: 205, landMs: 140, trailCells: 1.8 },
     }),
   },
   tide: {
@@ -44,7 +52,14 @@ export const CANDIDATES = Object.freeze({
       finish: "frame",
       gap: 0.05,
       radius: 0.16,
-      motion: { ...THEMES.modern.motion, clear: "spread", clearMs: 226, landMs: 158, depth: 0.1, trailCells: 1.7 },
+      motion: {
+        ...THEMES.modern.motion,
+        clearMark: CLEAR_MARKS.tide,
+        clearMs: 226,
+        landMs: 158,
+        depth: 0.1,
+        trailCells: 1.7,
+      },
     }),
   },
   velvet: {
@@ -59,7 +74,14 @@ export const CANDIDATES = Object.freeze({
       finish: "inset",
       gap: 0.07,
       radius: 0.2,
-      motion: { ...THEMES.modern.motion, clear: "fade", clearMs: 195, landMs: 130, rebound: 0, trailCells: 1 },
+      motion: {
+        ...THEMES.modern.motion,
+        clearMark: CLEAR_MARKS.velvet,
+        clearMs: 195,
+        landMs: 130,
+        rebound: 0,
+        trailCells: 1,
+      },
     }),
   },
   press: {
@@ -76,7 +98,8 @@ export const CANDIDATES = Object.freeze({
       radius: 0.018,
       motion: {
         ...THEMES.modern.motion,
-        clear: "sink",
+        clearMark: CLEAR_MARKS.press,
+
         clearMs: 168,
         landMs: 150,
         depth: 0.2,
@@ -97,7 +120,14 @@ export const CANDIDATES = Object.freeze({
       finish: "inset",
       gap: 0.08,
       radius: 0.035,
-      motion: { ...THEMES.modern.motion, clear: "scan", clearMs: 185, landMs: 118, depth: 0.08, trailCells: 1.2 },
+      motion: {
+        ...THEMES.modern.motion,
+        clearMark: CLEAR_MARKS.film,
+        clearMs: 185,
+        landMs: 118,
+        depth: 0.08,
+        trailCells: 1.2,
+      },
     }),
   },
   post: {
@@ -112,7 +142,14 @@ export const CANDIDATES = Object.freeze({
       finish: "inset",
       gap: 0.06,
       radius: 0.09,
-      motion: { ...THEMES.modern.motion, clear: "wipe", clearMs: 164, landMs: 125, depth: 0.16, rebound: 0 },
+      motion: {
+        ...THEMES.modern.motion,
+        clearMark: CLEAR_MARKS.post,
+        clearMs: 164,
+        landMs: 125,
+        depth: 0.16,
+        rebound: 0,
+      },
     }),
   },
   carbon: {
@@ -127,7 +164,14 @@ export const CANDIDATES = Object.freeze({
       finish: "frame",
       gap: 0.06,
       radius: 0.025,
-      motion: { ...THEMES.modern.motion, clear: "rails", clearMs: 190, landMs: 112, depth: 0.09, trailCells: 1.6 },
+      motion: {
+        ...THEMES.modern.motion,
+        clearMark: CLEAR_MARKS.carbon,
+        clearMs: 190,
+        landMs: 112,
+        depth: 0.09,
+        trailCells: 1.6,
+      },
     }),
   },
   chestnut: {
@@ -142,7 +186,14 @@ export const CANDIDATES = Object.freeze({
       finish: "flat",
       gap: 0.075,
       radius: 0.22,
-      motion: { ...THEMES.modern.motion, clear: "pop", clearMs: 216, landMs: 148, rebound: 0.035, trailCells: 1.5 },
+      motion: {
+        ...THEMES.modern.motion,
+        clearMark: CLEAR_MARKS.chestnut,
+        clearMs: 216,
+        landMs: 148,
+        rebound: 0.035,
+        trailCells: 1.5,
+      },
     }),
   },
   whiteNight: {
@@ -157,7 +208,14 @@ export const CANDIDATES = Object.freeze({
       finish: "flat",
       gap: 0.07,
       radius: 0.15,
-      motion: { ...THEMES.modern.motion, clear: "converge", clearMs: 230, landMs: 150, depth: 0.08, trailCells: 1.3 },
+      motion: {
+        ...THEMES.modern.motion,
+        clearMark: CLEAR_MARKS.whiteNight,
+        clearMs: 230,
+        landMs: 150,
+        depth: 0.08,
+        trailCells: 1.3,
+      },
     }),
   },
   ink: {
@@ -172,7 +230,14 @@ export const CANDIDATES = Object.freeze({
       finish: "flat",
       gap: 0.107,
       radius: 0.075,
-      motion: { ...THEMES.modern.motion, clear: "fade", clearMs: 240, landMs: 166, depth: 0.12, rebound: 0 },
+      motion: {
+        ...THEMES.modern.motion,
+        clearMark: CLEAR_MARKS.ink,
+        clearMs: 240,
+        landMs: 166,
+        depth: 0.12,
+        rebound: 0,
+      },
     }),
   },
 });

@@ -37,6 +37,28 @@ const fakeCtx = (calls = []) =>
     }
   );
 
+test("견본 테마마다 다른 삭제 문양을 그리고, T스핀은 회전 위치에만 표시한다", () => {
+  const geometry = { bx: 0, cell: 16, cols: 10, toY: y => y * 16 };
+  const signatures = new Set();
+  for (const { motion } of previewThemes) {
+    const render = (lines, tspin, level) => {
+      const calls = [];
+      const fx = createEffects();
+      fx.add([{ ...lockEvent, lines, rows: Array.from({ length: lines }, (_, i) => 39 - i), tspin }], level, 0, motion);
+      fx.draw(fakeCtx(calls), geometry, 50, "#fff", level);
+      return calls;
+    };
+    for (let n = 1; n <= 4; n++)
+      assert.equal(render(n, "none", "full").filter(([name]) => name === "stroke").length, n * 5);
+    const spin = render(2, "full", "full");
+    assert.equal(spin.filter(([name]) => name === "stroke").length, 2);
+    assert.equal(spin.filter(([name]) => name === "rotate").length, 2);
+    assert.equal(render(2, "full", "reduced").filter(([name]) => name === "stroke").length, 0);
+    signatures.add(JSON.stringify(render(1, "none", "full").filter(([name]) => /To$/.test(name))));
+  }
+  assert.equal(signatures.size, previewThemes.length);
+});
+
 test("테마 아홉 가지, 기본은 모던", () => {
   assert.deepEqual([...THEME_IDS].sort(), [
     "forest",

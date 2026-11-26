@@ -106,6 +106,14 @@ test("독립 테마 견본에서 보드를 비교하고 효과음을 재생·정
   await page.getByRole("button", { name: "하드 드롭" }).click();
   assert.equal(await status.textContent(), "음량이 0이에요.");
   assert.equal(await page.evaluate(() => window.auditionAudio.connections), 2);
+  const clearStage = page.locator("#candidate-board");
+  const baseline = await clearStage.evaluate(el => el.toDataURL());
+  await page.getByRole("button", { name: "4줄", exact: true }).click();
+  assert.notEqual(await clearStage.evaluate(el => el.toDataURL()), baseline);
+  await status.filter({ hasText: "스튜디오 · 4줄 재생 중" }).waitFor();
+  await status.filter({ hasText: "재생 완료" }).waitFor();
+  assert.equal(await clearStage.evaluate(el => el.toDataURL()), baseline);
+  assert.equal(await page.evaluate(() => window.auditionAudio.connections), 2);
   const choices = page.locator("#audition-candidates button");
   assert.equal(await choices.count(), 11);
   for (const name of ["프레스", "필름", "우편", "카본", "체스넛", "백야", "먹빛"]) {

@@ -61,9 +61,18 @@ const buildScene = () => {
 };
 const SCENE = buildScene();
 
+// 한 줄 우물의 각 높이를 지운 직후. 아래쪽 한 줄은 남겨 비교할 기준으로 삼는다.
+const CLEAR_SAMPLES = [1, 2, 3, 4].map(lines => ({
+  rows: Array.from({ length: lines }, (_, i) => ROWS - 2 - i),
+  after: Array.from({ length: ROWS }, (_, row) =>
+    row === ROWS - 1 ? [1, 1, 3, 3, 0, 0, 7, 7, 2, 2] : Array(COLS).fill(0)
+  ),
+}));
+
 /**
  * @param {HTMLCanvasElement} canvas
- * @returns {{ play(): void, stop(): void, show(theme: any, palette: readonly string[], visual: import("./canvas.js").Visual): void }}
+ * @returns {{ play(): void, stop(): void, playClear(lines: number, spin?: boolean): void,
+ * show(theme: any, palette: readonly string[], visual: import("./canvas.js").Visual): void }}
  */
 export const createThemeStage = canvas => {
   const dpr = globalThis.devicePixelRatio || 1;
@@ -86,6 +95,8 @@ export const createThemeStage = canvas => {
   let start = 0;
   let lastLoop = -1;
   let emitted = 0;
+  /** @type {{ rows: number[], after: number[][] } | null} */
+  let sample = null;
 
   const block = (x, y, size, value) => {
     theme.block(ctx, x, y, size, palette[value]);
@@ -112,12 +123,12 @@ export const createThemeStage = canvas => {
       return Math.max(0, Math.min(full - 2, Math.floor(t / ROW_MS)));
     };
     const waitFrom = i => (i === 0 ? 0 : dropAt(i - 1));
-    const k = SCENE.filter((_, i) => phase >= dropAt(i)).length;
+    const k = sample ? SCENE.length : SCENE.filter((_, i) => phase >= dropAt(i)).length;
     if (loop !== lastLoop) {
       lastLoop = loop;
       emitted = 0;
     }
-    for (; emitted < k; emitted++) {
+    for (; !sample && emitted < k; emitted++) {
       const done = SCENE[emitted];
       effects.add(
         [
@@ -167,7 +178,7 @@ export const createThemeStage = canvas => {
     effects.drawDrops(ctx, geometry, elapsed, ink);
 
     // 쌓인 블록: 기다리는 피스가 있으면 그 전의 판, 다 떨어졌으면 마지막 판
-    const board = step ? step.before : SCENE[SCENE.length - 1].after;
+    const board = sample?.after ?? (step ? step.before : SCENE[SCENE.length - 1].after);
     board.forEach((row, y) =>
       row.forEach((value, x) => {
         if (!value) return;
@@ -210,6 +221,15 @@ export const createThemeStage = canvas => {
     frame = requestAnimationFrame(animate);
   };
 
+  const stop = () => {
+    if (!frame) return;
+    cancelAnimationFrame(frame);
+    frame = 0;
+    sample = null;
+    effects.clear();
+    draw();
+  };
+
   return {
     /** 그릴 테마와 설정을 바꾼다(움직이는 중이면 다음 프레임부터, 멈춰 있으면 바로 다시 그린다) */
     show(nextTheme, nextPalette, nextVisual) {
@@ -225,13 +245,38 @@ export const createThemeStage = canvas => {
       effects.clear();
       frame = requestAnimationFrame(animate);
     },
-    stop() {
-      if (!frame) return;
-      cancelAnimationFrame(frame);
-      frame = 0;
-      effects.clear();
+    playClear(lines, spin = false) {
+      if (!ctx || !theme || !CLEAR_SAMPLES[lines - 1]) return;
+      stop();
+      const { rows, after } = spin ? SCENE[1] : CLEAR_SAMPLES[lines - 1];
+      sample = { rows, after };
+      effects.add(
+        [
+          {
+            type: "lock",
+            lines: rows.length,
+            rows,
+            tspin: spin ? "full" : "none",
+            cells: spin ? SCENE[1].cells : [],
+          },
+        ],
+        visual.effects,
+        0,
+        theme.motion
+      );
+      start = performance.now();
       draw();
+      const until = Math.max(200, theme.motion.clearMs) + 170;
+      const animateClear = now => {
+        if (now - start >= until) stop();
+        else {
+          draw(now - start);
+          frame = requestAnimationFrame(animateClear);
+        }
+      };
+      frame = requestAnimationFrame(animateClear);
     },
+    stop,
   };
 };
 
