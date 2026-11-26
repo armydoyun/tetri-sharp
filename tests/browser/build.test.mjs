@@ -1086,7 +1086,8 @@ test("게임 테마: 미리보기는 움직이고, 칩에 올리면 미리보기
     await page.mouse.move((a.x + a.width + b.x) / 2, a.y + a.height / 2);
     assert.equal(await name.textContent(), "페이퍼", "칩 사이 여백에서 직전 미리보기 유지");
     await page.locator("#theme-listen").hover();
-    assert.equal(await name.textContent(), "페이퍼", "소리 버튼으로 이동해도 미리보기 유지");
+    assert.equal(await name.textContent(), "스튜디오", "소리 버튼으로 이동하면 사용 중인 테마로 복귀");
+    assert.equal(await state.textContent(), "사용 중");
     const heights = await stage.evaluate(canvas => {
       const panel = canvas.closest(".theme-stage");
       return Array.from(document.querySelectorAll("#set-theme button"), item => {
@@ -1098,13 +1099,27 @@ test("게임 테마: 미리보기는 움직이고, 칩에 올리면 미리보기
       heights.every(height => height === size.stageHeight),
       "모든 설명의 줄바꿈에서 높이 유지"
     );
-    await page.locator("#settings-close").hover();
-    assert.equal(await name.textContent(), "스튜디오", "벗어나면 사용 중 테마로");
-
     // 누르면 적용되고 미리보기도 그 테마(사용 중)
     await card.click();
     assert.equal(await page.locator('#set-theme [data-value="retro"]').getAttribute("aria-pressed"), "true");
     assert.equal(await name.textContent(), "페이퍼");
+    assert.equal(await state.textContent(), "사용 중");
+
+    const studio = page.locator('#set-theme [data-value="modern"]');
+    await studio.hover();
+    assert.equal(await name.textContent(), "스튜디오");
+    assert.equal(await state.textContent(), "미리보기");
+    await page.locator(".theme-stage-title").hover();
+    assert.equal(await name.textContent(), "페이퍼", "미리보기 화면으로 이동하면 적용된 테마로 복귀");
+
+    const listen = page.locator("#theme-listen");
+    await listen.focus();
+    await page.keyboard.press("Tab");
+    assert.equal(await studio.evaluate(el => el === document.activeElement), true);
+    assert.equal(await name.textContent(), "스튜디오", "키보드로 칩에 포커스하면 미리보기");
+    await page.keyboard.press("Shift+Tab");
+    assert.equal(await listen.evaluate(el => el === document.activeElement), true);
+    assert.equal(await name.textContent(), "페이퍼", "키보드로 칩 영역을 벗어나면 적용된 테마로 복귀");
     assert.equal(await state.textContent(), "사용 중");
 
     // 모션 줄이기: 바로 멈추고, 다시 그려도 움직이지 않는다
@@ -1120,10 +1135,10 @@ test("게임 테마: 미리보기는 움직이고, 칩에 올리면 미리보기
   }
 });
 
-test("게임 테마: 소리 미리보기는 0%에서 안내만 하고 설정 음량으로 재생한다", async () => {
+test("게임 테마: 소리 미리보기는 0%에서 안내하고 선택된 테마를 설정 음량으로 재생한다", async () => {
   const { context, page, errors } = await openPage(() => {
-    localStorage.setItem("tetrisharp:settings", JSON.stringify({ volume: 0 }));
-    window.themeAudio = { contexts: 0, tones: 0, gain: null };
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ volume: 0, sound: "theme" }));
+    window.themeAudio = { contexts: 0, oscillators: [], gain: null };
     const Real = window.AudioContext;
     window.AudioContext = class extends Real {
       constructor() {
@@ -1136,8 +1151,9 @@ test("게임 테마: 소리 미리보기는 0%에서 안내만 하고 설정 음
         return node;
       }
       createOscillator() {
-        window.themeAudio.tones++;
-        return super.createOscillator();
+        const oscillator = super.createOscillator();
+        window.themeAudio.oscillators.push(oscillator);
+        return oscillator;
       }
     };
   });
@@ -1153,16 +1169,27 @@ test("게임 테마: 소리 미리보기는 0%에서 안내만 하고 설정 음
     const volume = page.locator("#set-volume");
     await volume.fill("30");
     assert.equal(await notice.textContent(), "");
-    const tones = await page.evaluate(() => window.themeAudio.tones);
+    const tones = () => page.evaluate(() => window.themeAudio.oscillators.map(oscillator => oscillator.type));
+    const volumeTones = (await tones()).length;
     await listen.click();
-    assert.ok((await page.evaluate(() => window.themeAudio.tones)) > tones);
+    const studioTones = (await tones()).slice(volumeTones);
+    assert.ok(studioTones.length > 0);
     assert.ok(Math.abs((await page.evaluate(() => window.themeAudio.gain.value)) - 0.3 ** 2) < 1e-6);
+
+    const name = page.locator(".theme-stage-name");
+    await page.locator('#set-theme [data-value="retro"]').hover();
+    assert.equal(await name.textContent(), "페이퍼");
+    // 버튼에 포커스를 둔 채 마우스만 옮긴 뒤 Enter를 누를 수도 있다.
+    await page.keyboard.press("Enter");
+    assert.equal(await name.textContent(), "스튜디오");
+    assert.deepEqual((await tones()).slice(volumeTones + studioTones.length), studioTones);
+
     await volume.fill("0");
     assert.equal(await page.evaluate(() => window.themeAudio.gain.value), 0);
-    const last = await page.evaluate(() => window.themeAudio.tones);
+    const last = await tones();
     await listen.click();
     assert.equal(await notice.textContent(), "소리가 꺼져 있어요.");
-    assert.equal(await page.evaluate(() => window.themeAudio.tones), last);
+    assert.deepEqual(await tones(), last);
     assert.deepEqual(errors, []);
   } finally {
     await context.close();
