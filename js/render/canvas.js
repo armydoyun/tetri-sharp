@@ -7,7 +7,8 @@ import { CELL_ID } from "../core/pieces.js";
 import { VISIBLE_TOP } from "../core/engine.js";
 import { createEffects } from "./effects.js";
 import { createSlide } from "./motion.js";
-import { boxOrigin, drawMark, findTheme, gridDots, gridHashes, paletteFor } from "./themes.js";
+import { boxOrigin, drawMark, findTheme, paletteFor } from "./themes.js";
+import { createBoardGrid } from "./board-grid.js";
 
 const MARGIN_TOP = 2; // 보드 위 여유 줄
 const ROWS = VISIBLE_ROWS + MARGIN_TOP;
@@ -34,10 +35,8 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
   const lowLandscape = window.matchMedia("(orientation: landscape) and (max-height: 520px) and (pointer: coarse)");
   let cell = 0;
   let side = 0;
-  let gridPath = new Path2D();
-  /** 점 격자(테마 gridStyle "dots"): 칸 모서리가 만나는 곳마다 작은 네모 */
-  let dotPath = new Path2D();
-  let hashPath = new Path2D();
+  /** @type {ReturnType<typeof createBoardGrid>} */
+  let drawGrid;
   /**
    * devicePixelRatio를 반영해 캔버스 해상도를 정하고 셀 크기를 정수로 맞춘다(번짐 방지).
    * 넓은 화면에서 캔버스가 기본 셀(28px)보다 크게 보이면 보이는 크기에 맞춰 그린다 — 늘려 보이면 흐려진다.
@@ -59,21 +58,7 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       labels.height = 2 * cell;
       labelCtx.textBaseline = "top";
     }
-    const bx = side * cell;
-    const by = MARGIN_TOP * cell;
-    const width = COLS * cell;
-    const height = VISIBLE_ROWS * cell;
-    gridPath = new Path2D();
-    for (let x = 1; x < COLS; x++) {
-      gridPath.moveTo(bx + x * cell + 0.5, by);
-      gridPath.lineTo(bx + x * cell + 0.5, by + height);
-    }
-    for (let y = 1; y < VISIBLE_ROWS; y++) {
-      gridPath.moveTo(bx, by + y * cell + 0.5);
-      gridPath.lineTo(bx + width, by + y * cell + 0.5);
-    }
-    dotPath = gridDots(bx, by, COLS, VISIBLE_ROWS, cell);
-    hashPath = gridHashes(bx, by, COLS, VISIBLE_ROWS, cell);
+    drawGrid = createBoardGrid(side * cell, MARGIN_TOP * cell, COLS, VISIBLE_ROWS, cell);
     return true;
   };
 
@@ -91,26 +76,6 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
 
   /** 이번 그리기에서 블록 무늬를 그릴지(접근성 설정) */
   let pattern = false;
-
-  const drawGrid = ({ board: { bg, grid, edge }, gridStyle }, bx, by, lines = true) => {
-    const width = COLS * cell;
-    const height = VISIBLE_ROWS * cell;
-    ctx.fillStyle = bg;
-    ctx.fillRect(bx, by, width, height);
-    ctx.lineWidth = 1;
-    if (lines && gridStyle === "dots") {
-      ctx.fillStyle = grid;
-      ctx.fill(dotPath);
-    } else if (lines && gridStyle === "hash") {
-      ctx.strokeStyle = grid;
-      ctx.stroke(hashPath);
-    } else if (lines && gridStyle !== "none") {
-      ctx.strokeStyle = grid;
-      ctx.stroke(gridPath);
-    }
-    ctx.strokeStyle = edge;
-    ctx.strokeRect(bx + 0.5, by + 0.5, width - 1, height - 1);
-  };
 
   const previousCells = new Uint8Array(emptyBoard.cells.length);
   const emptyQueue = [];
@@ -188,7 +153,7 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     effects.prune(now, effectLevel, visual.clearEffectLength);
     animating = effects.active;
     pattern = visual.pattern === "on";
-    drawGrid(theme, bx, by, visual.grid !== "off");
+    drawGrid(ctx, theme, visual.grid !== "off");
     effects.drawDrops(ctx, { bx, by, cell, toY }, now, theme.board.ink);
     const drawBlock = (x, y, size, value) => {
       theme.block(ctx, x, y, size, palette[value]);

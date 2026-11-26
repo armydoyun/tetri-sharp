@@ -159,40 +159,6 @@ export const drawMark = (ctx, x, y, size, value, color) => {
   ctx.restore();
 };
 
-/**
- * 점 격자 경로: 안쪽 칸 모서리가 만나는 곳마다 작은 네모(선 격자보다 조용하고 종이·도면 느낌)
- * @returns {Path2D}
- */
-export const gridDots = (bx, by, cols, rows, cell) => {
-  const path = new Path2D();
-  const d = Math.max(1, Math.round(cell * 0.09));
-  for (let x = 1; x < cols; x++)
-    for (let y = 1; y < rows; y++) path.rect(bx + x * cell - d / 2, by + y * cell - d / 2, d, d);
-  return path;
-};
-
-/**
- * '#' 격자 경로: 두 칸마다 칸 모서리에 작은 '#'(가로 둘·세로 둘)
- * @returns {Path2D}
- */
-export const gridHashes = (bx, by, cols, rows, cell) => {
-  const path = new Path2D();
-  const r = cell * 0.13;
-  const g = cell * 0.05;
-  for (let x = 2; x < cols; x += 2)
-    for (let y = 2; y < rows; y += 2) {
-      const cx = Math.round(bx + x * cell) + 0.5;
-      const cy = Math.round(by + y * cell) + 0.5;
-      for (const d of [-g, g]) {
-        path.moveTo(cx - r, cy + d);
-        path.lineTo(cx + r, cy + d);
-        path.moveTo(cx + d, cy - r);
-        path.lineTo(cx + d, cy + r);
-      }
-    }
-  return path;
-};
-
 /** 고스트 진하기 → [윤곽 투명도, 채움 투명도] */
 const GHOST_LEVEL = { faint: [0.32, 0], normal: [0.58, 0], strong: [0.95, 0.22] };
 
