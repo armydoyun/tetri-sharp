@@ -147,8 +147,10 @@ export const EN = {
   "찾기 멈추기": "Stop search",
   "{row}행 {col}열": "Row {row}, column {col}",
   "퍼즐 링크를 복사했어요.": "Puzzle link copied.",
-  "판을 칠하고 피스와 목표를 고르세요. 규칙과 중력은 아래 고급 설정에서 바꿀 수 있어요.":
-    "Paint the board, then pick the pieces and the goal. Rules and gravity are under Advanced settings.",
+  "시작 틀을 고르거나 판을 칠하세요. 피스를 추가하면 시험 플레이로 확인할 수 있어요.":
+    "Choose a template or paint the board. Add pieces to try it in Test play.",
+  "판을 채우고 피스를 추가하면 풀이를 확인할 수 있어요.": "Fill the board and add pieces to check for a solution.",
+  "도장을 고르면 피스 모양을 찍을 수 있어요.": "Select Stamp to paint a piece shape.",
   "예: 첫 T-spin": "e.g. My first T-spin",
   "받는 사람에게 한 줄 힌트": "A one-line hint for players",
   "내 퍼즐에 저장했어요. 고치면 저절로 저장돼요.": "Saved to My puzzles. Changes save automatically.",
@@ -223,7 +225,7 @@ export const EN = {
   "칠하기 도구": "Paint tool",
   칸: "Cell",
   "한 줄": "Row",
-  "구멍 줄": "Hole",
+  "구멍 줄": "Gap row",
   "보이는 높이": "Visible height",
   "누르거나 끌어서 칸을 채우고 지워요.": "Tap or drag to fill and clear cells.",
   "누르거나 끌어서 줄 전체를 채우고 지워요.": "Tap or drag to fill and clear whole rows.",
@@ -277,6 +279,8 @@ export const EN = {
   "목표 · T 하나로 {kind} 만들기": "Goal · Make a {kind} with one T piece",
   "목표 · 주어진 피스로 판 비우기": "Goal · Clear the board with the given pieces",
   "최고 기록 대비": "vs Best",
+  "{delta}초": "{delta}s",
+  "연습·퍼즐·기록": "Practice, puzzles & records",
   "초당 피스": "Pieces/sec",
   "보조 키": "Secondary",
   "기본 키": "Primary",
@@ -380,7 +384,6 @@ export const EN = {
   레벨: "Level",
   줄: "Lines",
   피스: "Pieces",
-  "PB 대비": "vs PB",
   "연속 / 최고": "Streak / best",
   "피네스 실수": "Finesse faults",
   "피네스 +{n}": "Finesse +{n}",
@@ -449,7 +452,7 @@ export const EN = {
   "홀드 안 씀": "no hold",
   균형: "Balanced",
   "4줄을 노리다가 판이 높아지면 무엇이든 지워요": "Goes for quads, clears anything once the stack is high",
-  "4줄 노림": "Quad hunter",
+  "4줄 노림": "Quads",
   "한 칸 빈 줄을 쌓아 4줄로 크게 공격하지만, 쌓는 동안 공격에 약해요":
     "Stacks nearly full rows for big quads, but is exposed while stacking",
   안정: "Safe",
@@ -476,7 +479,7 @@ export const EN = {
   "{mode} · 날마다 바뀌는 같은 블록 순서 · 결과를 공유해 겨루기":
     "{mode} with a piece order that changes every day · share your result to compete",
   "{mode} · 모두 같은 블록 순서": "{mode}, same pieces for everyone",
-  도전하기: "Play today's challenge",
+  "선택한 날 도전하기": "Play selected date",
   "{mode} · Modern · 모두 같은 블록 순서": "{mode} · Modern · same pieces for everyone",
   "내 결과 공유": "Share my result",
   "결과 코드": "Result code",
@@ -775,10 +778,13 @@ export const EN = {
     "The backup{when} has {records} records and {replays} replays.",
   "퍼즐 완료 {puzzles}개 · 훈련 완료 {practice}개 · Sprint 시도 {attempts}개":
     "Puzzles cleared {puzzles} · Practice stages cleared {practice} · Sprint runs {attempts}",
-  "백업에 포함되지 않은 연습·퍼즐·Sprint 진행도는 유지돼요.":
-    "Practice, puzzle and Sprint progress missing from the backup will be kept.",
+  "설정·기록·리플레이는 교체돼요. 백업에 없으면 설정은 기본값으로, 기록과 리플레이는 빈 상태로 돌아가요.":
+    "Settings, records and replays are replaced. If missing from the backup, settings reset to defaults and records and replays are cleared.",
+  "내 퍼즐과 받은 퍼즐은 이 기기의 목록과 합쳐요.":
+    "Created and received puzzles are merged with those on this device.",
+  "연습·기본 퍼즐·Sprint 진행도, 달성한 업적과 내 규칙은 백업에 있을 때만 바뀌어요.":
+    "Practice, built-in puzzle and Sprint progress, unlocked achievements, and saved rules change only if present in the backup.",
   "백업을 저장하지 못했어요. 기존 데이터는 그대로예요.": "Could not save the backup. Your existing data is intact.",
-  "이 브라우저에 저장된 데이터를 백업 내용으로 바꿀까요?": "Replace the data stored in this browser with the backup?",
   "백업을 불러왔어요 · 기록 {records}개, 리플레이 {replays}개": "Backup loaded · {records} records, {replays} replays",
 
   // ---- 기록 화면 ----
@@ -890,7 +896,7 @@ export const EN = {
   "첫 화면과 메뉴를 어둡게 써요": "Uses a dark home screen and menus",
   "게임 중 화면": "While playing",
   "늘 어둡게": "Always dark",
-  "화면 색 따르기": "Match appearance",
+  "화면 색 따르기": "Use app colors",
   "게임 중 보드 둘레는 화면 색과 상관없이 어두워요. 보드 색은 게임 테마가 정하고, 아래 미리보기에 그대로 보여요":
     "Around the board stays dark while playing, whatever the appearance. The board itself follows the game theme, as the preview below shows",
   "게임 중 보드 둘레도 위의 화면 색을 따라요. 보드 색은 게임 테마가 정하고, 아래 미리보기에 그대로 보여요":
@@ -974,7 +980,7 @@ export const EN = {
   "움직이면 리셋 (횟수 제한)": "Move reset (limited)",
   "더 내려갔을 때만 리셋": "Step reset",
   "무제한 리셋 (인피니티)": "Infinite reset",
-  "닿으면 다음 낙하 때 즉시 고정": "Lock on the next fall after contact",
+  "닿으면 다음 낙하 때 즉시 고정": "Lock on next fall after contact",
   "고정 지연": "Lock delay",
   "고정 방식이 ‘즉시 고정’이라 쓰지 않아요": "Not used with instant lock",
   "리셋 한도": "Reset limit",

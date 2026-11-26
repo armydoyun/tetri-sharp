@@ -47,6 +47,7 @@
             </div>
           </section>
 
+          <a class="home-tools-link" href="#training-tools-title">연습·퍼즐·기록</a>
           <section class="home-block home-modes" aria-labelledby="mode-title">
             <div class="block-head">
               <h2 id="mode-title" class="section-title">플레이 모드</h2>
@@ -76,7 +77,7 @@
         <aside class="home-side" aria-label="플레이 도구">
           <section class="home-block" aria-labelledby="training-tools-title">
             <div class="block-head">
-              <h2 id="training-tools-title" class="section-title">연습과 기록</h2>
+              <h2 id="training-tools-title" class="section-title" tabindex="-1">연습과 기록</h2>
             </div>
             <div class="tool-list">
               <button id="open-practice" class="tool-row" type="button"><span class="tool-label">연습</span><span data-icon="chevron-right"></span></button>
@@ -101,7 +102,6 @@
           <input id="backup-file" type="file" accept=".json,application/json" hidden />
 
           <p id="menu-notice" class="notice-slot menu-notice" role="status"></p>
-
           <details class="help-card">
             <summary id="help-title">조작법</summary>
             <p id="key-help" class="keys" aria-label="조작 안내"></p>
@@ -261,7 +261,7 @@
                 <details id="results-splits" class="results-splits">
                   <summary>구간 기록</summary>
                   <table>
-                    <thead><tr><th scope="col">구간</th><th scope="col">구간 시간</th><th scope="col">PB 대비</th></tr></thead>
+                    <thead><tr><th scope="col">구간</th><th scope="col">구간 시간</th><th scope="col">최고 기록 대비</th></tr></thead>
                     <tbody id="results-split-rows"></tbody>
                   </table>
                   <p id="results-split-note" role="status"></p>

@@ -85,7 +85,7 @@ export const createDailyUI = ({ dialog, dates, getEntry, makeCode, makeLink, onS
     const best = el("span", { class: "daily-best num", id: "daily-best", "aria-live": "polite" });
     // 고른 날짜의 모드(날마다 바뀐다)
     const modeLine = el("small", { id: "daily-mode" });
-    const play = button({ label: t("도전하기"), icon: "play", variant: "primary", id: "daily-start" });
+    const play = button({ label: t("선택한 날 도전하기"), icon: "play", variant: "primary", id: "daily-start" });
     const watch = button({
       label: t("최고 기록 다시 보기"),
       icon: "play",

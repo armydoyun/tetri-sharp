@@ -316,9 +316,26 @@ const runs = createRunSaver({
 // ---- 표시 도우미 ----
 
 const menuNotice = $("menu-notice");
-/** 메뉴 알림 칸은 늘 자리를 차지한다(빈 글이면 비어 보일 뿐). */
+const menuNoticeAfter = menuNotice.nextElementSibling;
+const linkNoticeHost = document.querySelector(".home-main");
 const showMenuNotice = text => {
+  if (menuNotice.hasAttribute("data-link-error")) {
+    menuNotice.removeAttribute("data-link-error");
+    menuNoticeAfter?.before(menuNotice);
+  }
   menuNotice.textContent = text;
+};
+const showLinkError = text => {
+  linkNoticeHost?.prepend(menuNotice);
+  menuNotice.setAttribute("data-link-error", "");
+  menuNotice.textContent = text;
+  // 이미 열려 있던 페이지에서는 새로고침이 이전 스크롤 위치를 복원할 수 있다.
+  const reveal = () =>
+    requestAnimationFrame(() => {
+      if (menuNotice.hasAttribute("data-link-error")) menuNotice.scrollIntoView({ block: "nearest" });
+    });
+  if (document.readyState === "complete") reveal();
+  else window.addEventListener("pageshow", reveal, { once: true });
 };
 /** 데이터 작업(백업·리플레이 파일) 결과: 설정이 열려 있으면 설정의 알림 칸, 아니면 첫 화면 알림 줄 */
 const notifyData = text => {
@@ -610,7 +627,7 @@ const updateHud = () => {
   setText(hud.finesse, fin ? `${fin.faults} / ${fin.judged}` : "0 / 0");
   setText(hud.pps, frame ? (stats.pieces / (frame / 60)).toFixed(2) : "0.00");
   const delta = game && mode.splits ? splitDelta(splits, pbSplits) : null;
-  setText(hud.split, formatDelta(delta));
+  setText(hud.split, formatSplitComparison(delta));
   const ahead = delta === null ? undefined : String(delta < 0);
   if (hud.split.dataset.ahead !== ahead) {
     if (ahead === undefined) delete hud.split.dataset.ahead;
@@ -619,6 +636,19 @@ const updateHud = () => {
 };
 
 // ---- 화면 흐름 ----
+
+/** @param {number | null} delta */
+const formatSplitComparison = delta =>
+  delta === null ? formatDelta(delta) : t("{delta}초", { delta: formatDelta(delta) });
+
+const lessonHud = document.querySelector(".stage-side");
+if (lessonHud) {
+  new ResizeObserver(() => {
+    if (screen !== "play" || !hasHintControls(mode)) return;
+    const height = Math.ceil(lessonHud.getBoundingClientRect().height);
+    document.body.style.setProperty("--lesson-hud-h", `${height}px`);
+  }).observe(lessonHud);
+}
 
 const setScreen = next => {
   screen = next;
@@ -1076,7 +1106,7 @@ const renderResultSplits = () => {
       } else segment.textContent = label;
       const priorDelta = index === 0 ? 0 : rows[index - 1].delta;
       row.insertCell().textContent = formatTime(frames - startFrame);
-      row.insertCell().textContent = formatDelta(
+      row.insertCell().textContent = formatSplitComparison(
         delta === null || priorDelta === null ? null : (delta - priorDelta) / 60
       );
       return row;
@@ -1326,7 +1356,7 @@ const finish = () => {
   }
   if (mode.splits) {
     const delta = splitDelta(splits, resultPbSplits);
-    if (delta !== null) rows.push([t("PB 대비"), formatDelta(delta)]);
+    if (delta !== null) rows.push([t("최고 기록 대비"), formatSplitComparison(delta)]);
     if (state.over === "clear") rows.splice(0, 1);
   }
   if (mode.battleLesson) {
@@ -1604,7 +1634,7 @@ const puzzleDialog = /** @type {HTMLDialogElement} */ ($("puzzles"));
 const playCustomPuzzle = (code, trial = false) => {
   const puzzle = decodePuzzle(code);
   if (!puzzle) {
-    showMenuNotice(t("링크의 퍼즐을 읽을 수 없었어요."));
+    showLinkError(t("링크의 퍼즐을 읽을 수 없었어요."));
     return;
   }
   const custom = customPuzzleMode(puzzle);
@@ -2274,7 +2304,7 @@ const importReplayFromLink = async () => {
   const raw = await decodeReplayCode(hash);
   const replay = raw && sanitizeReplay(raw, findMode);
   if (!replay) {
-    showMenuNotice(t("링크의 리플레이를 읽을 수 없었어요."));
+    showLinkError(t("링크의 리플레이를 읽을 수 없었어요."));
     return;
   }
   const check = verifyReplay(replay, findMode);
@@ -2295,7 +2325,7 @@ const importDailyFromLink = async () => {
   if (!pasted) return;
   const raw = await decodeReplayCode(pasted);
   if (!(raw && sanitizeReplay(raw, findMode))) {
-    showMenuNotice(t("링크의 결과 코드를 읽을 수 없었어요."));
+    showLinkError(t("링크의 결과 코드를 읽을 수 없었어요."));
     return;
   }
   dailyUI.open({
@@ -2310,12 +2340,12 @@ const importRulesFromLink = () => {
   if (!hash) return false;
   const body = decodeRules(hash);
   if (!body) {
-    showMenuNotice(t("링크의 규칙 코드를 읽을 수 없었어요."));
+    showLinkError(t("링크의 규칙 코드를 읽을 수 없었어요."));
     return false;
   }
   // 지금 규칙을 덮어쓰지 않고 내 규칙에 새 칸으로
   if (!ruleSlots.add(t("받은 규칙"), body)) {
-    showMenuNotice(t("내 규칙이 가득 찼어요({n}개). 하나를 지우고 링크를 다시 열어 주세요", { n: MAX_RULE_SLOTS }));
+    showLinkError(t("내 규칙이 가득 찼어요({n}개). 하나를 지우고 링크를 다시 열어 주세요", { n: MAX_RULE_SLOTS }));
     return false;
   }
   customBody = ruleSlots.active().body;

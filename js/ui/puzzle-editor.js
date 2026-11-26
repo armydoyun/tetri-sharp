@@ -63,6 +63,18 @@ import {
 /** 저절로 확인하는 퍼즐의 피스 수 한도(이보다 많으면 확인 버튼으로만) */
 const AUTO_CHECK_PIECES = 12;
 
+/** @param {HTMLElement} controls @param {string} help */
+const editorContext = (controls, help) => {
+  const hint = el("p", { class: "field-help", text: help });
+  return {
+    root: el("div", { class: "puzzle-editor-context" }, controls, hint),
+    show(active) {
+      controls.setAttribute("aria-hidden", String(!active));
+      hint.setAttribute("aria-hidden", String(active));
+    },
+  };
+};
+
 /** @typedef {"cell" | "row" | "garbage" | "piece"} Tool */
 /**
  * 판·피스 말고 퍼즐에 담기는 것: 목표·중력·바탕 규칙·규칙 내용·처음 홀드 피스·제목·설명
@@ -390,6 +402,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         "aria-keyshortcuts": "Shift+ArrowRight Alt+ArrowRight",
       });
       const remove = button({ label: t("빼기"), size: "s", id: "puzzle-piece-remove" });
+      const sequenceActions = el("span", { class: "puzzle-editor-seq-actions" }, moveBack, moveForward, remove);
 
       // ---- 판 도구 ----
       const undo = iconButton({ icon: "undo", label: t("되돌리기"), id: "puzzle-undo" });
@@ -447,6 +460,17 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       const prevStep = iconButton({ icon: "arrow-left", label: t("이전 수"), id: "puzzle-solution-prev" });
       const nextStep = iconButton({ icon: "arrow-right", label: t("다음 수"), id: "puzzle-solution-next" });
       const stepOut = el("output", { class: "puzzle-editor-step num", id: "puzzle-solution-step" });
+      const checkActions = el("div", { class: "puzzle-editor-check-actions" }, check, stop);
+      const solutionActions = el(
+        "div",
+        { class: "puzzle-editor-solution" },
+        el("label", { class: "puzzle-editor-switch" }, view, el("span", { text: t("풀이 보기") })),
+        el("span", { class: "puzzle-editor-step-nav" }, prevStep, stepOut, nextStep)
+      );
+      const verification = editorContext(
+        el("div", { class: "puzzle-editor-check-content" }, checkActions, status, solutionActions),
+        t("판을 채우고 피스를 추가하면 풀이를 확인할 수 있어요.")
+      );
 
       // ---- 피스 도장(퍼즐 다시 보기 P9): 칠하기 도구 "피스"일 때 누른 칸에 고른 피스 모양을 찍는다 ----
       /** @type {import("../core/pieces.js").PieceType} */
@@ -475,6 +499,15 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         "aria-keyshortcuts": "R",
         onClick: rotateStamp,
       });
+      const stampOptions = editorContext(
+        el(
+          "div",
+          { class: "puzzle-editor-row" },
+          el("span", { class: "puzzle-editor-label", text: t("도장 피스") }),
+          el("span", { class: "puzzle-editor-stamp" }, stampPick, stampRotate)
+        ),
+        t("도장을 고르면 피스 모양을 찍을 수 있어요.")
+      );
       const doStamp = index => {
         const at = stampIndices(stampType, stampRot, index, firstVisible() / WIDTH);
         if (!at) {
@@ -864,6 +897,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
             : toolHint[tool];
         stampPick.disabled = tool !== "piece";
         stampRotate.disabled = tool !== "piece";
+        stampOptions.show(tool === "piece");
         // 자동 확인
         const moves = solution();
         if (!moves) viewStep = null;
@@ -880,6 +914,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
             : `${(viewStep ?? 0) + 1} / ${moves.length}`
           : "- / -";
         status.textContent = statusText(code);
+        verification.show(Boolean(code));
         scheduleAutoCheck();
         status.dataset.tone = verified?.state === "solvable" ? "ok" : verified || warnings().length ? "warn" : "";
         paintTiles();
@@ -1238,8 +1273,8 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
           "div",
           { class: "puzzle-editor" },
           el("p", {
-            class: "field-help",
-            text: t("판을 칠하고 피스와 목표를 고르세요. 규칙과 중력은 아래 고급 설정에서 바꿀 수 있어요."),
+            class: "field-help puzzle-editor-guide",
+            text: t("시작 틀을 고르거나 판을 칠하세요. 피스를 추가하면 시험 플레이로 확인할 수 있어요."),
           }),
           el(
             "div",
@@ -1270,16 +1305,11 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
               { class: "puzzle-editor-canvas", "aria-label": t("판") },
               el(
                 "div",
-                { class: "puzzle-editor-row" },
+                { class: "puzzle-editor-row puzzle-editor-paint" },
                 el("span", { class: "puzzle-editor-label", text: t("칠하기") }),
                 tools
               ),
-              el(
-                "div",
-                { class: "puzzle-editor-row" },
-                el("span", { class: "puzzle-editor-label", text: t("도장 피스") }),
-                el("span", { class: "puzzle-editor-stamp" }, stampPick, stampRotate)
-              ),
+              stampOptions.root,
               el(
                 "div",
                 { class: "puzzle-editor-row" },
@@ -1323,7 +1353,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
                   { class: "puzzle-editor-seq-head" },
                   el("span", { class: "puzzle-editor-label", text: t("피스 순서") }),
                   count,
-                  el("span", { class: "puzzle-editor-seq-actions" }, moveBack, moveForward, remove)
+                  sequenceActions
                 ),
                 sequence
               ),
@@ -1334,18 +1364,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
                   '고른 피스 뒤에 넣어요. Shift+좌우 화살표로 옮기고, 순서 칸에서 Delete로 빼요. 글자 키(I J L O S T Z)로 넣거나 "TSZ"처럼 붙여 넣을 수 있어요.'
                 )
               ),
-              el(
-                "div",
-                { class: "puzzle-editor-check" },
-                el("div", { class: "puzzle-editor-check-actions" }, check, stop),
-                status,
-                el(
-                  "div",
-                  { class: "puzzle-editor-solution" },
-                  el("label", { class: "puzzle-editor-switch" }, view, el("span", { text: t("풀이 보기") })),
-                  el("span", { class: "puzzle-editor-step-nav" }, prevStep, stepOut, nextStep)
-                )
-              )
+              el("div", { class: "puzzle-editor-check" }, verification.root)
             )
           ),
           advanced,

@@ -33,6 +33,8 @@ export const el = (tag, attrs = {}, ...children) => {
 export const fillDialog = (dialog, { title, body, notice, actions, closeId, tabs = null, closeLabel }) => {
   const close = iconButton({ icon: "close", label: t("닫기"), onClick: () => dialog.close() });
   const done = button({ label: closeLabel ?? t("닫기"), id: closeId, onClick: () => dialog.close() });
+  const heading = el("h2", { id: `${dialog.id}-heading`, class: "dialog-title", text: title });
+  dialog.setAttribute("aria-labelledby", heading.id);
   body.classList.add("dialog-body");
   dialog.classList.toggle("dialog-tabbed", Boolean(tabs));
   // 같은 구역의 슬라이더는 값 칸 폭을 가장 긴 것에 맞춘다 → 막대 끝이 줄마다 나란하다
@@ -43,7 +45,7 @@ export const fillDialog = (dialog, { title, body, notice, actions, closeId, tabs
     for (const o of outs) o.style.minWidth = `${widest}ch`;
   }
   dialog.replaceChildren(
-    el("header", { class: "dialog-head" }, el("h2", { class: "dialog-title", text: title }), close),
+    el("header", { class: "dialog-head" }, heading, close),
     ...(tabs ? [el("div", { class: "dialog-tabs" }, tabs)] : []),
     body,
     el("footer", { class: "dialog-foot" }, notice, ...actions, done)

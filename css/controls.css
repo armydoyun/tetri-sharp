@@ -129,6 +129,10 @@
   color: var(--accent);
 }
 
+.replay-bar .replay-refine > [data-replay^="step"] {
+  min-inline-size: var(--touch-min, 0px);
+}
+
 /* 이름이 길면 줄을 바꾸고 버튼이 그만큼 높아진다(높이는 크기의 기본값이 바닥) */
 .btn-wrap {
   --btn-size: auto;
