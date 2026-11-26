@@ -1247,6 +1247,15 @@
   border: 2px dashed var(--accent);
 }
 
+.puzzle-editor-cell[data-stamp="erase"] {
+  border-color: var(--text-dim);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--surface-3) 0 var(--space-1),
+    var(--text-dim) var(--space-1) calc(var(--space-1) + var(--border-w))
+  );
+}
+
 /* [도장 피스 드롭다운 | 돌리기] */
 .puzzle-editor-stamp {
   display: grid;

@@ -3195,6 +3195,66 @@ test("퍼즐 만들기: 도장과 피스 순서 단축키는 조작 버튼에 �
   }
 });
 
+test("퍼즐 만들기: 도장에서 피스 글자 키로 모양을 바로 바꾼다", async () => {
+  const { context, page } = await openPage();
+  try {
+    await openList(page, "#open-puzzles");
+    await page.click("#puzzle-create");
+    await page.click('#puzzle-tool [data-value="piece"]');
+    const picker = page.locator("#puzzle-stamp");
+    const cell = page.locator('[data-cell="175"]');
+    const preview = () => page.$$eval("[data-stamp]", cells => cells.map(tile => Number(tile.dataset.cell)));
+    await cell.focus();
+    for (const piece of "IJLOSTZ") {
+      await page.keyboard.press(piece.toLowerCase());
+      assert.equal(await picker.getAttribute("data-value"), piece);
+      assert.equal((await preview()).length, 4);
+    }
+
+    await page.keyboard.press("i");
+    await page.keyboard.press("r");
+    assert.deepEqual(await preview(), [165, 175, 185, 195]);
+    await page.keyboard.press("i");
+    assert.deepEqual(await preview(), [165, 175, 185, 195], "같은 모양은 현재 방향을 유지한다");
+    await cell.dispatchEvent("keydown", { key: "ㅐ", code: "KeyO" });
+    assert.equal(await picker.textContent(), "O");
+    await page.keyboard.press("i");
+    assert.deepEqual(await preview(), [174, 175, 176, 177], "모양을 바꾸면 기본 방향으로 돌아간다");
+    await picker.click();
+    assert.equal(await page.locator('#puzzle-stamp-list [aria-selected="true"]').getAttribute("data-value"), "I");
+    await page.keyboard.press("Escape");
+    await cell.click();
+    assert.deepEqual(
+      await page.$$eval('[data-cell][aria-pressed="true"]', cells => cells.map(tile => Number(tile.dataset.cell))),
+      [174, 175, 176, 177]
+    );
+    const erasePreview = page.locator('[data-stamp="erase"]');
+    assert.equal(await erasePreview.count(), 4);
+    assert.match(
+      await erasePreview.first().evaluate(tile => getComputedStyle(tile).backgroundImage),
+      /linear-gradient/
+    );
+    await page.keyboard.press("ArrowRight");
+    assert.equal(await erasePreview.count(), 0);
+    assert.equal(await page.locator('[data-stamp="place"]').count(), 4, "일부만 차 있으면 채우기");
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("Enter");
+    assert.equal(await page.locator('[data-cell][aria-pressed="true"]').count(), 0);
+    assert.match(await page.locator("#puzzles .dialog-foot .notice-slot").textContent(), /도장으로 4칸을 지웠어요/);
+
+    await page.focus('.puzzle-editor-pieces [data-piece="T"]');
+    await page.keyboard.press("z");
+    assert.equal(await page.locator(".puzzle-seq-chip").textContent(), "01 Z");
+    assert.equal(await picker.getAttribute("data-value"), "I");
+    await page.focus("#puzzle-title");
+    await page.keyboard.type("ost");
+    assert.equal(await page.locator("#puzzle-title").inputValue(), "ost");
+    assert.equal(await picker.getAttribute("data-value"), "I");
+  } finally {
+    await context.close();
+  }
+});
+
 test("퍼즐 만들기: 피스 50개를 넣어도 추가 버튼은 같은 자리에 있고 본문만 스크롤한다", async () => {
   for (const viewport of [
     { width: 1280, height: 900 },

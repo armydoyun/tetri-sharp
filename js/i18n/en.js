@@ -1148,6 +1148,7 @@ export const EN = {
   "도장 돌리기 (R)": "Rotate stamp (R)",
   "판 밖으로 나가 찍을 수 없어요. 다른 칸이나 방향을 골라 보세요.":
     "It would go off the board. Try another cell or rotation.",
-  "누른 칸에 {piece} 모양을 찍어요. 네 칸이 다 찬 자리를 누르면 지워요. R로 돌려요.":
-    "Stamps a {piece} where you press. Press where all four cells are filled to erase. R rotates.",
+  "도장으로 {n}칸을 지웠어요.": "Erased {n} cells with the stamp.",
+  "눌러 찍고, 네 칸이 찬 곳은 눌러 지워요. I J L O S T Z로 모양을 바꾸고 R로 돌려요.":
+    "Press to stamp or erase where all four cells are filled. I J L O S T Z change the shape. R rotates.",
 };

@@ -41,6 +41,7 @@ import {
   removePiece,
   shiftCells,
   stampCells,
+  stampErases,
   stampIndices,
   strokeValue,
   template,
@@ -338,11 +339,11 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       const paintTiles = () => {
         const move = viewStep !== null ? solution()?.[viewStep] : null;
         // 피스 도장 미리보기: 올린(또는 포커스한) 칸에 찍힐 네 칸
-        const stamp = new Set(
+        const stamp =
           tool === "piece" && stampAt !== null && !move
-            ? (stampIndices(stampType, stampRot, stampAt, firstVisible() / WIDTH) ?? [])
-            : []
-        );
+            ? stampIndices(stampType, stampRot, stampAt, firstVisible() / WIDTH)
+            : null;
+        const eraseStamp = stamp && stampErases(cells, stamp);
         // 풀이를 볼 때는 그 수를 놓기 전 판(40줄 중 보이는 20줄)과 놓을 칸
         const shown = move ? move.board.subarray(move.board.length - PUZZLE_CELLS) : cells;
         const ghost = new Set(
@@ -352,7 +353,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
           tile.setAttribute("aria-pressed", String(Boolean(shown[i])));
           if (ghost.has(i)) tile.dataset.ghost = "1";
           else delete tile.dataset.ghost;
-          if (stamp.has(i)) tile.dataset.stamp = "1";
+          if (stamp?.includes(i)) tile.dataset.stamp = eraseStamp ? "erase" : "place";
           else delete tile.dataset.stamp;
         });
         board.classList.toggle("is-viewing", Boolean(move));
@@ -483,6 +484,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         history.record(snapshot());
         cells = stampCells(cells, at);
         changed();
+        if (!cells[at[0]]) notice.textContent = t("도장으로 {n}칸을 지웠어요.", { n: at.length });
       };
       const tools = segmented({
         id: "puzzle-tool",
@@ -858,9 +860,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         setSegmented(heights, String(height));
         hint.textContent =
           tool === "piece"
-            ? t("누른 칸에 {piece} 모양을 찍어요. 네 칸이 다 찬 자리를 누르면 지워요. R로 돌려요.", {
-                piece: stampType,
-              })
+            ? t("눌러 찍고, 네 칸이 찬 곳은 눌러 지워요. I J L O S T Z로 모양을 바꾸고 R로 돌려요.")
             : toolHint[tool];
         stampPick.disabled = tool !== "piece";
         stampRotate.disabled = tool !== "piece";
@@ -1138,11 +1138,20 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         if (event.defaultPrevented || event.ctrlKey || event.metaKey) return;
         const target = /** @type {HTMLElement} */ (event.target);
         if (target.matches('input:not([type="checkbox"]), textarea, select') || target.isContentEditable) return;
-        // 도장 설정 단추에 포커스가 남아 있어도, 한글 배열의 R 자리에서도 돌린다.
-        if (tool === "piece" && !event.altKey && (event.code === "KeyR" || event.key.toLowerCase() === "r")) {
-          event.preventDefault();
-          rotateStamp();
-          return;
+        if (tool === "piece" && !event.altKey) {
+          // 한글 배열에서는 영문 글자 대신 물리 키 위치를 사용한다.
+          const key = /^[a-z]$/i.test(event.key) ? event.key.toUpperCase() : event.code.replace(/^Key/, "");
+          if (key === "R") {
+            event.preventDefault();
+            rotateStamp();
+            return;
+          }
+          const piece = PIECE_TYPES.find(type => type === key);
+          if (piece) {
+            event.preventDefault();
+            stampPick.setValue(piece);
+            return;
+          }
         }
         // 브라우저가 Alt+화살표를 탐색 키로 잡는 경우에는 Shift+화살표를 쓴다.
         if (event.shiftKey === event.altKey || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
