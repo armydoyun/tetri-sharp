@@ -232,9 +232,9 @@ const draw = (stage, theme) => {
 };
 
 const drawBoards = () => {
-  const { theme } = CANDIDATES[candidate];
+  const { theme, sound } = CANDIDATES[candidate];
   node("candidate-name").textContent = theme.name;
-  node("candidate-desc").textContent = theme.description;
+  node("candidate-desc").textContent = `${theme.description} · ${sound}`;
   node("reference-desc").textContent = THEMES[reference].description;
   draw(stages[0], theme);
   draw(stages[1], THEMES[reference]);
@@ -258,10 +258,11 @@ node("reference-picker").append(referencePicker);
 const choices = choiceCards({
   id: "audition-candidates",
   label: t("새 테마"),
-  options: Object.entries(CANDIDATES).map(([value, { theme, sound }]) => {
+  compact: true,
+  options: Object.entries(CANDIDATES).map(([value, { theme }]) => {
     const preview = el("canvas", { class: "audition-swatch", "aria-hidden": "true" });
     drawThemeSwatch(preview, theme, theme.palette);
-    return { value, title: theme.name, desc: sound, preview };
+    return { value, title: theme.name, preview };
   }),
   value: candidate,
   onChange: value => {

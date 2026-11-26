@@ -60,14 +60,13 @@
   margin-block-end: var(--space-3);
 }
 
-.audition-picker .choice-cards {
-  grid-template-columns: 1fr;
+.audition-picker .choice-cards.is-compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .audition-swatch {
   display: block;
   width: min(100%, calc(var(--hud-width) * 0.7));
-  margin-block-end: var(--space-1);
 }
 
 .audition-section-head {
@@ -232,8 +231,8 @@
     grid-row: auto;
   }
 
-  .audition-picker .choice-cards {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .audition-picker .choice-cards.is-compact {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
 
@@ -250,7 +249,10 @@
     margin-block-end: var(--space-5);
   }
 
-  .audition-picker .choice-cards,
+  .audition-picker .choice-cards.is-compact {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
   .audition-sound-groups {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -265,6 +267,10 @@
 }
 
 @media (max-width: 380px) {
+  .audition-picker .choice-cards.is-compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .audition-sound-groups {
     grid-template-columns: minmax(0, 1fr);
   }

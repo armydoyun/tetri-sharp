@@ -106,6 +106,18 @@ test("독립 테마 견본에서 보드를 비교하고 효과음을 재생·정
   await page.getByRole("button", { name: "하드 드롭" }).click();
   assert.equal(await status.textContent(), "음량이 0이에요.");
   assert.equal(await page.evaluate(() => window.auditionAudio.connections), 2);
+  const choices = page.locator("#audition-candidates button");
+  assert.equal(await choices.count(), 11);
+  for (const name of ["프레스", "필름", "우편", "카본", "체스넛", "백야", "먹빛"]) {
+    await choices.getByText(name, { exact: true }).click();
+    assert.equal(await page.locator("#candidate-name").textContent(), name);
+  }
+  await page.getByRole("slider", { name: "음량" }).focus();
+  await page.keyboard.press("End");
+  await page.getByRole("button", { name: "게임 오버" }).click();
+  await status.filter({ hasText: "먹빛 · 게임 오버 재생 중" }).waitFor();
+  await status.filter({ hasText: "재생 완료" }).waitFor();
+  assert.ok((await page.evaluate(() => window.auditionAudio.connections)) > 2);
   assert.deepEqual(errors, []);
   assert.deepEqual(requests, [url]);
 
@@ -125,7 +137,7 @@ test("독립 테마 견본에서 보드를 비교하고 효과음을 재생·정
       width: document.documentElement.scrollWidth,
       viewport: document.documentElement.clientWidth,
       sounds: document.querySelectorAll("[data-sound]").length,
-      clipped: [...document.querySelectorAll(".select-value, .btn-label")].filter(
+      clipped: [...document.querySelectorAll(".select-value, .btn-label, .choice-card strong")].filter(
         label => label.scrollWidth > label.clientWidth + 1
       ).length,
     }));
