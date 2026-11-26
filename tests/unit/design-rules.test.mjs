@@ -231,7 +231,7 @@ test("컴포넌트: 화면 코드는 버튼·입력을 직접 만들지 않는�
     "js/ui/settings.js:color-swatch",
     "js/ui/settings.js:color-piece",
     "js/ui/puzzles.js:puzzle-tile",
-    "js/ui/settings.js:key-slot",
+    "js/ui/binding-settings.js:key-slot",
     "js/ui/puzzle-editor.js:puzzle-editor-cell",
     "js/app/replay-player.js:replay-mark",
   ]);
