@@ -57,6 +57,7 @@ export const msToFrames = ms => (ms * 60) / 1000;
  * @property {number} y
  * @property {"move" | "rotate" | "drop" | null} lastAction  T-spin 판정용
  * @property {number} kick  마지막 회전에서 쓴 킥 번호
+ * @property {number} [turn] 마지막 회전 방향(화면 효과용)
  */
 
 /**
@@ -179,7 +180,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
   };
 
   /** @param {import("./pieces.js").PieceType} type */
-  const spawn = type => {
+  const spawn = (type, fromHold = false) => {
     const size = PIECES[type].size;
     /** @type {Active} */
     const a = {
@@ -217,13 +218,14 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
     state.gravityAcc = 0;
     resetLock(a.y);
     cutDas();
-    events.push({ type: "spawn", piece: type });
+    events.push({ type: "spawn", piece: type, fromHold });
     onSpawn?.(state);
   };
 
   /** 다음 피스를 꺼내 생성한다. IHS: 생성 순간 홀드를 누르고 있으면 바로 홀드한 피스와 바꾼다. */
   const spawnNext = () => {
     let type = takeNext();
+    let fromHold = false;
     if (rules.ihs && rules.hold.enabled && currentHeld & BTN.HOLD && !state.holdUsed && canHold()) {
       const held = state.hold;
       state.hold = type;
@@ -231,8 +233,9 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
       events.push({ type: "hold", piece: type, initial: true });
       state.tally.holds += 1;
       type = held ?? takeNext();
+      fromHold = Boolean(held);
     }
-    spawn(type);
+    spawn(type, fromHold);
   };
 
   const lockPiece = () => {
@@ -267,6 +270,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
       rows: cleared,
       ...(lines > 0 ? { clearedCells } : {}),
       tspin,
+      ...(tspin !== "none" ? { spinPivot: { x: a.x + 1.5, y: a.y + 1.5, direction: a.turn > 0 ? 1 : -1 } } : {}),
       perfect,
       points: scored.points,
       b2b: scored.b2bApplied,
@@ -350,6 +354,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
         a.rot = to;
         a.lastAction = "rotate";
         a.kick = i;
+        a.turn = delta;
         cutDas();
         onShifted();
         onDescended(a);
@@ -489,12 +494,13 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
 
     if (pressed & BTN.HOLD && rules.hold.enabled && !state.holdUsed && canHold()) {
       const current = state.active.type;
-      const next = state.hold ?? takeNext();
+      const held = state.hold;
+      const next = held ?? takeNext();
       state.hold = current;
       state.holdUsed = true;
       events.push({ type: "hold", piece: current });
       state.tally.holds += 1;
-      spawn(next);
+      spawn(next, Boolean(held));
       if (!state.active) return events;
     }
 

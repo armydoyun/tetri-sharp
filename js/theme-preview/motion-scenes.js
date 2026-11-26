@@ -1,7 +1,7 @@
 import { CELL_ID } from "../core/pieces.js";
 import { COLS, ROWS, getPreviewFrame } from "../render/preview-scene.js";
 import srs from "../rules/rotation/srs.js";
-import { drawMotionAccents } from "./motion-accents.js";
+import { drawMotionAccents } from "../render/motion-accents.js";
 
 /** @typedef {import("../core/pieces.js").PieceType} PieceType */
 /** @typedef {readonly [number, string, number?]} SoundCue */

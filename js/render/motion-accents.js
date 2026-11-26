@@ -1,6 +1,6 @@
 import { CELL_ID } from "../core/pieces.js";
 import { t } from "../i18n/index.js";
-import { ROWS } from "../render/preview-scene.js";
+import { ROWS } from "./preview-scene.js";
 import { drawTSpin } from "./tspin-effects.js";
 
 /** @typedef {readonly [finish: string, weight: number, ms: number]} Material */
@@ -39,7 +39,7 @@ const DASHES = {
 
 const easeOut = value => 1 - (1 - value) ** 2;
 const progress = (age, duration) => Math.min(1, Math.max(0, age / duration));
-const opacity = (age, duration, reduced, pace = 1) => {
+export const accentOpacity = (age, duration, reduced, pace = 1) => {
   if (age < 0 || age >= duration) return 0;
   return reduced ? 0.76 : (1 - progress(age, duration)) ** pace;
 };
@@ -91,13 +91,38 @@ const slotPath =
     }
   };
 
-const drawCombo = (ctx, material, theme, color, right, slot, combo, accent) => {
-  const left = right + 0.4;
-  const top = 6.94;
-  const panelWidth = slot - 0.8;
-  const inset = 0.3;
+export const accentMaterial = id => MATERIALS[id] ?? MATERIALS.modern;
+export const accentInk = theme => theme.motion.clearSweep?.edge ?? theme.board.ink;
+
+export const drawSlotAccent = (ctx, material, color, alpha, x, y, width, height) =>
+  stroke(ctx, material, color, alpha, slotPath(x, y, width, height, material[0]));
+
+export const drawPieceAccent = (ctx, material, color, alpha, cells) => {
+  if (!alpha) return;
+  for (const [x, y] of cells) drawSlotAccent(ctx, material, color, alpha, x + 0.08, y + 0.08, 0.84, 0.84);
+};
+
+export const drawPerfectAccent = (ctx, material, ink, left, right, rows, age, reduced) => {
+  const length = material[2] + 290;
+  const alpha = accentOpacity(age, length, reduced, 1.1);
+  if (!alpha) return;
+  const inset = 0.16 + (reduced ? 0 : 0.24 * (1 - easeOut(progress(age, length * 0.63))));
+  stroke(
+    ctx,
+    material,
+    ink,
+    alpha * 0.94,
+    slotPath(left + inset, inset, right - left - 2 * inset, rows - 2 * inset, material[0], 3)
+  );
+};
+
+export const drawSpinAccent = (ctx, material, options) =>
+  drawTSpin(ctx, { ...options, duration: material[2] + 105, growth: material[0] === "wave" ? 0.82 : 0.66 });
+
+export const drawCombo = (ctx, material, theme, color, left, top, panelWidth, combo, accent) => {
+  const inset = Math.min(0.3, panelWidth * 0.12);
   const count = 4;
-  const gap = 0.14;
+  const gap = Math.min(0.14, panelWidth * 0.06);
   const width = (panelWidth - 2 * inset - (count - 1) * gap) / count;
   const trackTop = top + 1.16;
   const trackHeight = 0.3;
@@ -113,13 +138,15 @@ const drawCombo = (ctx, material, theme, color, right, slot, combo, accent) => {
 
   ctx.fillStyle = color;
   ctx.font = "600 0.62px system-ui, sans-serif";
+  ctx.textBaseline = "top";
   ctx.globalAlpha = 0.9;
-  ctx.fillText(t("콤보"), left + inset, top + 0.24);
+  ctx.fillText(t("콤보"), left + inset, top + 0.24, panelWidth - 2 * inset);
   for (let index = 0; index < count; index++) {
     const x = left + inset + index * (width + gap);
     ctx.globalAlpha = index < combo ? 0.74 : 0.2;
     ctx.fillRect(x, trackTop, width, trackHeight);
-    if (index === combo - 1) stroke(ctx, material, color, accent, path => path.rect(x, trackTop, width, trackHeight));
+    if (index === Math.min(combo, count) - 1)
+      stroke(ctx, material, color, accent, path => path.rect(x, trackTop, width, trackHeight));
   }
   ctx.restore();
 };
@@ -129,49 +156,55 @@ export const drawMotionAccents = (
   ctx,
   { left, right, slot, themeId, theme, reduced, holdAge, holdUsed, nextAge, spin, perfectAge, combo, comboAge, piece }
 ) => {
-  const material = MATERIALS[themeId] ?? MATERIALS.modern;
-  const [finish, , duration] = material;
-  const ink = theme.motion.clearSweep?.edge ?? theme.board.ink;
-  const holdBox = slotPath(0.4, 0.93, left - 0.8, 1.9, finish);
-  stroke(ctx, material, ink, holdUsed ? 0.2 : 0.52, holdBox);
-  stroke(ctx, material, theme.palette[CELL_ID.Z], opacity(holdAge, duration + 130, reduced, 1.6), holdBox);
+  const material = accentMaterial(themeId);
+  const [, , duration] = material;
+  const ink = accentInk(theme);
+  drawSlotAccent(ctx, material, ink, holdUsed ? 0.2 : 0.52, 0.4, 0.93, left - 0.8, 1.9);
+  drawSlotAccent(
+    ctx,
+    material,
+    theme.palette[CELL_ID.Z],
+    accentOpacity(holdAge, duration + 130, reduced, 1.6),
+    0.4,
+    0.93,
+    left - 0.8,
+    1.9
+  );
 
   if (nextAge !== null) {
-    const queued = nextAge < 0 ? progress(nextAge + 115, 115) : opacity(nextAge, duration + 95, reduced, 1.5);
-    const nextBox = slotPath(right + 0.4, 0.93, slot - 0.8, 1.9, finish);
-    stroke(ctx, material, theme.palette[CELL_ID.I], reduced && nextAge < 0 ? 0 : queued, nextBox);
-    if (nextAge >= 0 && queued && piece) {
-      for (const [x, y] of piece.cells)
-        stroke(ctx, material, ink, queued * 0.88, slotPath(left + x + 0.08, y + 0.08, 0.84, 0.84, finish));
-    }
-  }
-
-  if (spin)
-    drawTSpin(ctx, {
-      ...spin,
-      themeId,
-      theme,
-      left,
-      right,
-      rows: ROWS,
-      reduced,
-      duration: duration + 105,
-      growth: finish === "wave" ? 0.82 : 0.66,
-    });
-
-  const perfectLength = duration + 290;
-  const perfect = opacity(perfectAge, perfectLength, reduced, 1.1);
-  if (perfect) {
-    const inset = 0.16 + (reduced ? 0 : 0.24 * (1 - easeOut(progress(perfectAge, perfectLength * 0.63))));
-    stroke(
+    const queued = nextAge < 0 ? progress(nextAge + 115, 115) : accentOpacity(nextAge, duration + 95, reduced, 1.5);
+    drawSlotAccent(
       ctx,
       material,
-      ink,
-      perfect * 0.94,
-      slotPath(left + inset, inset, right - left - 2 * inset, ROWS - 2 * inset, finish, 3)
+      theme.palette[CELL_ID.I],
+      reduced && nextAge < 0 ? 0 : queued,
+      right + 0.4,
+      0.93,
+      slot - 0.8,
+      1.9
     );
+    if (nextAge >= 0 && piece)
+      drawPieceAccent(
+        ctx,
+        material,
+        ink,
+        queued * 0.88,
+        piece.cells.map(([x, y]) => [left + x, y])
+      );
   }
 
+  if (spin) drawSpinAccent(ctx, material, { ...spin, themeId, theme, left, right, rows: ROWS, reduced });
+  drawPerfectAccent(ctx, material, ink, left, right, ROWS, perfectAge, reduced);
   if (combo !== null)
-    drawCombo(ctx, material, theme, ink, right, slot, combo, opacity(comboAge, duration + 110, reduced));
+    drawCombo(
+      ctx,
+      material,
+      theme,
+      ink,
+      right + 0.4,
+      6.94,
+      slot - 0.8,
+      combo,
+      accentOpacity(comboAge, duration + 110, reduced)
+    );
 };

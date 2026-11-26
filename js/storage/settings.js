@@ -8,6 +8,13 @@ import { LANG_OPTIONS } from "../i18n/index.js";
 const SETTINGS_VERSION = 1;
 export const SDF_INFINITE = 41; // 슬라이더 맨 끝 = 즉시 바닥까지
 export const CLEAR_EFFECT_LENGTH_LIMITS = Object.freeze({ min: 0, max: 150, step: 5, default: 100 });
+const DEFAULT_GAMEPLAY_EFFECTS = Object.freeze({
+  next: true,
+  hold: true,
+  spin: true,
+  perfect: true,
+  combo: true,
+});
 
 /** [최소, 최대, 기본] */
 export const HANDLING_LIMITS = Object.freeze({
@@ -87,6 +94,7 @@ export const defaultVisual = () => ({
   theme: DEFAULT_THEME,
   effects: prefersReducedMotion() ? "reduced" : "full",
   clearEffectLength: CLEAR_EFFECT_LENGTH_LIMITS.default,
+  gameplayEffects: { ...DEFAULT_GAMEPLAY_EFFECTS },
   palette: "theme",
   pattern: "off",
   ghost: "normal",
@@ -140,6 +148,12 @@ export const sanitizeVisual = raw => {
   const length = typeof r.clearEffectLength === "number" ? r.clearEffectLength : d.clearEffectLength;
   const { step } = CLEAR_EFFECT_LENGTH_LIMITS;
   out.clearEffectLength = Math.round(clampNum(length, CLEAR_EFFECT_LENGTH_LIMITS) / step) * step;
+  out.gameplayEffects = Object.fromEntries(
+    Object.entries(DEFAULT_GAMEPLAY_EFFECTS).map(([key, enabled]) => [
+      key,
+      typeof r.gameplayEffects?.[key] === "boolean" ? r.gameplayEffects[key] : enabled,
+    ])
+  );
   out.colors = sanitizeColors(r.colors);
   return out;
 };

@@ -9,19 +9,29 @@ import { createEffects } from "./effects.js";
 import { createSlide } from "./motion.js";
 import { boxOrigin, drawMark, findTheme, paletteFor } from "./themes.js";
 import { createBoardGrid } from "./board-grid.js";
+import { createGameplayAccents } from "./gameplay-accents.js";
+import {
+  accentInk,
+  drawCombo,
+  drawPerfectAccent,
+  drawPieceAccent,
+  drawSlotAccent,
+  drawSpinAccent,
+} from "./motion-accents.js";
 
 const MARGIN_TOP = 2; // 보드 위 여유 줄
 const ROWS = VISIBLE_ROWS + MARGIN_TOP;
 const CSS_CELL = 28;
 
 /**
- * @typedef {{ theme: string, effects: "full" | "reduced" | "off", clearEffectLength?: number, palette: "theme" | "contrast" | "custom", pattern?: "on" | "off", ghost?: string, grid?: "on" | "off", colors?: Record<string, string> }} Visual
+ * @typedef {{ theme: string, effects: "full" | "reduced" | "off", clearEffectLength?: number, palette: "theme" | "contrast" | "custom", pattern?: "on" | "off", ghost?: string, grid?: "on" | "off", colors?: Record<string, string>, gameplayEffects?: Partial<Record<import("./gameplay-accents.js").Accent, boolean>> }} Visual
  * @param {HTMLCanvasElement} canvas
  * @param {{ getVisual: () => Visual, compact?: boolean }} options
  */
 export const createRenderer = (canvas, { getVisual, compact = false }) => {
   const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext("2d"));
   const effects = createEffects();
+  const accents = createGameplayAccents();
   const slide = createSlide();
   const emptyBoard = createBoard();
   const labels = compact ? null : document.createElement("canvas");
@@ -116,6 +126,7 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       active?.y,
       active?.rot,
       state?.pieceId,
+      state?.combo,
       lockTimer,
       hold,
       holdUsed,
@@ -147,11 +158,13 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     const bx = side * cell;
     const by = MARGIN_TOP * cell;
     const toY = y => by + (y - VISIBLE_TOP) * cell;
+    const feedback = game && motion ? accents.frame(now, visual, theme) : null;
+    const ink = accentInk(theme);
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     effects.prune(now, effectLevel, visual.clearEffectLength);
-    animating = effects.active;
+    animating = effects.active || Boolean(feedback?.animating);
     pattern = visual.pattern === "on";
     drawGrid(ctx, theme, visual.grid !== "off");
     effects.drawDrops(ctx, { bx, by, cell, toY }, now, theme.board.ink);
@@ -189,6 +202,25 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
 
     // 다음 피스와 고스트는 줄 삭제 효과보다 위에 그린다.
     effects.draw(ctx, { bx, cell, toY, cols: COLS }, now, theme.board.ink, effectLevel, visual.clearEffectLength);
+    if (feedback) {
+      ctx.save();
+      ctx.scale(cell, cell);
+      if (feedback.spin) {
+        drawSpinAccent(ctx, feedback.material, {
+          ...feedback.spin,
+          y: toY(feedback.spin.y) / cell,
+          themeId: visual.theme,
+          theme,
+          left: side,
+          right: side + COLS,
+          rows: ROWS,
+          reduced: false,
+        });
+      }
+      ctx.translate(0, MARGIN_TOP);
+      drawPerfectAccent(ctx, feedback.material, ink, side, side + COLS, VISIBLE_ROWS, feedback.perfectAge, false);
+      ctx.restore();
+    }
 
     if (active) {
       const color = palette[CELL_ID[active.type]];
@@ -228,6 +260,18 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
         }
       }
       ctx.globalAlpha = 1;
+      if (feedback?.nextAlpha && feedback.nextPiece === active.type) {
+        ctx.save();
+        ctx.scale(cell, cell);
+        drawPieceAccent(
+          ctx,
+          feedback.material,
+          ink,
+          feedback.nextAlpha * 0.88,
+          cells.filter(([, y]) => y >= VISIBLE_TOP - MARGIN_TOP).map(([x, y]) => [side + x + ox / cell, toY(y) / cell])
+        );
+        ctx.restore();
+      }
     }
 
     if (hintCells?.length && active) {
@@ -278,16 +322,50 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       if (game.rules.previewCount > 0) label(big ? t("다음") : t("다음 피스"), nx);
     }
     ctx.drawImage(labels, 0, by - cell);
+    const slotInset = 0.2;
+    const slotWidth = side - slotInset * 2;
+    const slotTop = MARGIN_TOP + 0.92;
+    const slotHeight = (small / cell) * 2 + 0.2;
+    const drawSlot = (left, type, alpha) => {
+      ctx.save();
+      ctx.scale(cell, cell);
+      ctx.fillStyle = theme.board.bg;
+      ctx.globalAlpha = alpha * 0.85;
+      ctx.fillRect(left, slotTop, slotWidth, slotHeight);
+      ctx.globalAlpha = 1;
+      drawSlotAccent(ctx, feedback.material, palette[CELL_ID[type]], alpha, left, slotTop, slotWidth, slotHeight);
+      ctx.restore();
+    };
     if (game.rules.hold.enabled) {
-      if (hold) preview(theme, palette, game, hold, sidePad, by + cell, small, holdUsed);
+      if (hold) {
+        if (feedback?.holdAlpha) drawSlot(slotInset, hold, feedback.holdAlpha);
+        preview(theme, palette, game, hold, sidePad, by + cell + (feedback?.holdOffset ?? 0) * cell, small, holdUsed);
+      }
     }
 
     // 넥스트
     if (game.rules.previewCount > 0) {
+      if (shown > 0 && feedback?.nextAlpha) drawSlot(side + COLS + slotInset, feedback.nextPiece, feedback.nextAlpha);
       // 퍼즐은 주어진 피스만(돌아오는 피스는 보이지 않게): 지금 피스를 뺀 남은 수까지
       queue.slice(0, Math.min(game.rules.previewCount, shown)).forEach((type, i) => {
         preview(theme, palette, game, type, nx, by + cell + i * small * 3, small);
       });
+    }
+    if (feedback?.combo && state.combo >= 0) {
+      ctx.save();
+      ctx.scale(cell, cell);
+      drawCombo(
+        ctx,
+        feedback.material,
+        theme,
+        ink,
+        slotInset,
+        MARGIN_TOP + 3.6,
+        slotWidth,
+        state.combo + 1,
+        feedback.comboAlpha
+      );
+      ctx.restore();
     }
   };
 
@@ -301,9 +379,12 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       if (compact || !events.length) return;
       const visual = getVisual();
       effects.add(events, visual.effects, now, findTheme(visual.theme).motion);
+      if (visual.effects === "full") accents.add(events, now);
+      else accents.clear();
     },
     clearEffects() {
       effects.clear();
+      accents.clear();
       slide.reset();
       invalidated = true;
     },
