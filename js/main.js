@@ -1416,6 +1416,7 @@ const settingsUI = createSettingsUI({
   onChange: next => {
     // 저장소가 막혀 있어도 이번 실행 동안은 반영되도록 메모리 값을 먼저 바꾼다.
     settings = sanitizeSettings(next);
+    sfx.setVolume();
     saveSettings(store, settings);
     bindings = compileKeymap(settings.keymap);
     padBindings = compilePadmap(settings.padmap);
@@ -1429,8 +1430,7 @@ const settingsUI = createSettingsUI({
     renderKeyHelp();
   },
   onPreviewSound: () => sfx.play("clear2"),
-  // 테마 미리보기의 "소리 들어 보기": 이 테마로 게임하면 들릴 묶음. 소리를 꺼 뒀어도 눌렀을 때는 들려준다
-  onPreviewTheme: themeId => sfx.preview(soundSetFor(themeId), settings.volume || 50),
+  onPreviewTheme: themeId => sfx.preview(soundSetFor(themeId), settings.volume),
   openedThemes: () => (achievements.unlocked()["secret-sharp"] ? ["sharp"] : []),
   // 모드 이름처럼 시작할 때 만든 글자까지 바꾸려면 다시 불러오는 게 가장 확실하다.
   onLanguage: () => location.reload(),
