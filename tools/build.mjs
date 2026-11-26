@@ -8,10 +8,11 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { cssHrefs, inlineHtml } from "./inline-html.mjs";
+import { cssHrefs, inlineHtml, replaceOnce } from "./inline-html.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DEPLOY = path.join(ROOT, "deploy");
+const TAB_ICON = "assets/brand/t-mark.svg";
 
 export const JS_OPTIONS = Object.freeze({
   bundle: true,
@@ -26,18 +27,25 @@ export const CSS_OPTIONS = Object.freeze({ loader: "css", minify: true, charset:
 
 const MIME = { ".svg": "image/svg+xml", ".png": "image/png" };
 
+const assetDataUrl = file => {
+  const mime = MIME[path.extname(file)];
+  if (!mime) throw new Error(`인라인할 수 없는 형식: ${file}`);
+  return `data:${mime};base64,${fs.readFileSync(file).toString("base64")}`;
+};
+
+export const inlineTabIcon = html =>
+  replaceOnce(html, `href="./${TAB_ICON}"`, `href="${assetDataUrl(path.join(ROOT, TAB_ICON))}"`, "탭 아이콘");
+
 /**
  * CSS 안의 url("../assets/…")를 data: URI로 바꾼다(한 파일 배포본이 바깥 파일을 찾지 않게).
  * 그 밖의 상대 경로 url()이 남아 있으면 빌드를 멈춘다.
  * @param {string} css  css/ 폴더 기준 경로가 들어 있는 CSS
  */
 export const inlineCssUrls = (css, root = ROOT) => {
-  const out = css.replace(/url\(\s*["']?\.\.\/(assets\/[\w./-]+)["']?\s*\)/g, (_, rel) => {
-    const file = path.join(root, rel);
-    const mime = MIME[path.extname(file)];
-    if (!mime) throw new Error(`인라인할 수 없는 형식: ${rel}`);
-    return `url("data:${mime};base64,${fs.readFileSync(file).toString("base64")}")`;
-  });
+  const out = css.replace(
+    /url\(\s*["']?\.\.\/(assets\/[\w./-]+)["']?\s*\)/g,
+    (_, rel) => `url("${assetDataUrl(path.join(root, rel))}")`
+  );
   const left = /url\(\s*["']?(?!data:|#)[^)"']+/.exec(out);
   if (left) throw new Error(`CSS가 아직 바깥 파일을 참조합니다: ${left[0]}`);
   return out;
@@ -79,7 +87,8 @@ export const build = async ({ outFile = path.join(DEPLOY, "index.html") } = {}) 
   });
   const js = bundle.outputFiles[0].text;
   const css = (await transform(readCss(), CSS_OPTIONS)).code;
-  const html = inlineHtml({ html: fs.readFileSync(path.join(ROOT, "index.html"), "utf8"), css, js });
+  const source = inlineTabIcon(fs.readFileSync(path.join(ROOT, "index.html"), "utf8"));
+  const html = inlineHtml({ html: source, css, js });
   fs.mkdirSync(path.dirname(outFile), { recursive: true });
   fs.writeFileSync(outFile, html, "utf8");
   return {
@@ -103,9 +112,8 @@ export const MANIFEST = Object.freeze({
   icons: [{ src: "icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }],
 });
 
-/** 설치형 앱 연결: 매니페스트·아이콘 링크를 <head>에 넣는다(바깥 파일 검사는 이미 끝난 뒤). */
-export const PWA_HEAD =
-  '    <link rel="manifest" href="./manifest.webmanifest">\n    <link rel="icon" href="./icon.svg" type="image/svg+xml">\n';
+/** 설치형 앱 연결: 매니페스트 링크를 <head>에 넣는다(바깥 파일 검사는 이미 끝난 뒤). */
+export const PWA_HEAD = '    <link rel="manifest" href="./manifest.webmanifest">\n';
 
 /** 배포 주소(링크 배너는 이미지 주소가 절대 경로여야 메신저가 읽는다) */
 export const SITE_URL = "https://armydoyun.github.io/tetri-sharp/";

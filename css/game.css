@@ -150,9 +150,8 @@ body:not([data-screen="play"], [data-screen="countdown"]) #pause-game {
 .logo-mark {
   width: 21px;
   height: 14px;
-  background:
-    linear-gradient(var(--accent), var(--accent)) 0 0 / 100% 50% no-repeat,
-    linear-gradient(var(--accent), var(--accent)) 50% 100% / 33.4% 50% no-repeat;
+  background: var(--accent);
+  mask: url("../assets/brand/t-mark.svg") center / 28px 28px no-repeat;
 }
 
 /* 화면 전환: 첫 화면에서는 게임 화면을 통째로 숨긴다 */
