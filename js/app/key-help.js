@@ -1,18 +1,8 @@
 // 첫 화면의 키 안내 줄과, 버튼 안 단축키 표시(kbd[data-key])를 지금 키 배치로 채운다.
 import { ACTIONS } from "../input/keymap.js";
-import { PAD_ICONS, padButtonName } from "../input/gamepad.js";
 import { icon } from "../ui/icons.js";
-import { keycap } from "../ui/keycap.js";
+import { keycap, padKeycap } from "../ui/keycap.js";
 import { t } from "../i18n/index.js";
-
-/** 게임패드 버튼 키캡(십자키는 화살표 아이콘) */
-const padCap = i => {
-  const kbd = document.createElement("kbd");
-  kbd.className = "keycap";
-  if (PAD_ICONS[i]) kbd.append(icon(PAD_ICONS[i], { label: padButtonName(i) }));
-  else kbd.textContent = padButtonName(i);
-  return kbd;
-};
 
 /** 안내 한 칸: 동작 이름 + 키캡들 */
 const helpItem = (label, caps) => {
@@ -22,13 +12,6 @@ const helpItem = (label, caps) => {
   name.textContent = label;
   span.append(name, ...caps);
   return span;
-};
-
-const textCap = text => {
-  const kbd = document.createElement("kbd");
-  kbd.className = "keycap";
-  kbd.textContent = text;
-  return kbd;
 };
 
 /**
@@ -52,7 +35,7 @@ export const createKeyHelp = ({ target, getSettings, getRules, padConnected }) =
       if (unavailable.has(a.id) || !keysOf(a.id).length) continue;
       items.push(helpItem(a.label, keysOf(a.id).map(keycap)));
     }
-    items.push(helpItem(t("메뉴·일시정지"), [textCap("Esc")]));
+    items.push(helpItem(t("메뉴·일시정지"), [keycap("Escape")]));
     if (padConnected()) {
       const br = document.createElement("span");
       br.className = "keys-break";
@@ -60,7 +43,7 @@ export const createKeyHelp = ({ target, getSettings, getRules, padConnected }) =
       for (const a of ACTIONS) {
         const buttons = getSettings().padmap[a.id] ?? [];
         if (unavailable.has(a.id) || !buttons.length) continue;
-        items.push(helpItem(a.label, buttons.map(padCap)));
+        items.push(helpItem(a.label, buttons.map(padKeycap)));
       }
     }
     target.replaceChildren(...items);

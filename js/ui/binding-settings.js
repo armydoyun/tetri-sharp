@@ -1,29 +1,13 @@
 import { ACTIONS, SLOTS, assignKey, clearKey, keyLabel } from "../input/keymap.js";
-import {
-  PAD_ICONS,
-  assignPadButton,
-  clearPadButton,
-  connectedPads,
-  padButtonName,
-  pressedButtons,
-} from "../input/gamepad.js";
+import { assignPadButton, clearPadButton, connectedPads, padButtonName, pressedButtons } from "../input/gamepad.js";
 import { t } from "../i18n/index.js";
 import { el } from "./dom.js";
-import { icon } from "./icons.js";
-import { keycap } from "./keycap.js";
+import { keycap, padKeycap } from "./keycap.js";
 
 /** 키 배치 표와 입력을 기다리는 칸의 수명주기를 관리한다. */
 export const createBindingSettings = ({ dialog, getSettings, update, notice, render }) => {
   /** @type {{ kind: "key" | "pad", action: string, slot: number } | null} */
   let capture = null;
-
-  /** 게임패드 버튼 하나를 키캡 모양으로(십자키는 화살표 아이콘) */
-  const padCap = i => {
-    const kbd = el("kbd", { class: "keycap" });
-    if (PAD_ICONS[i]) kbd.append(icon(PAD_ICONS[i], { label: padButtonName(i) }));
-    else kbd.textContent = padButtonName(i);
-    return kbd;
-  };
 
   /**
    * 키보드·게임패드 배치 표. kind에 따라 저장 위치와 표시만 다르다.
@@ -68,7 +52,7 @@ export const createBindingSettings = ({ dialog, getSettings, update, notice, ren
           });
           // 좁은 칸에도 들어가게 짧게. 무엇을 기다리는지는 aria-label과 아래 안내에 있다.
           if (waiting) btn.textContent = t("누르세요");
-          else if (has) btn.append(kind === "key" ? keycap(value) : padCap(value));
+          else if (has) btn.append(kind === "key" ? keycap(value) : padKeycap(value));
           else btn.textContent = t("없음");
           btn.addEventListener("click", () => startCapture(kind, action.id, slot));
           return btn;
