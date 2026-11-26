@@ -1130,8 +1130,8 @@ export const EN = {
   "좌우 뒤집기 (피스도 S와 Z, J와 L을 바꿔요)": "Mirror (also swaps S with Z and J with L)",
   "피스와 확인": "Pieces and check",
   판: "Board",
-  '피스를 눌러 고르면 그 뒤에 넣고, 앞뒤로 옮기거나 뺄 수 있어요(Alt+화살표·Delete). 글자 키(I J L O S T Z)로 넣거나 "TSZ" 같은 순서를 붙여 넣어도 돼요.':
-    'Select a piece to insert after it, move it, or remove it (Alt+arrows, Delete). You can also type I J L O S T Z or paste an order like "TSZ".',
+  '고른 피스 뒤에 넣어요. Shift+좌우 화살표로 옮기고, 순서 칸에서 Delete로 빼요. 글자 키(I J L O S T Z)로 넣거나 "TSZ"처럼 붙여 넣을 수 있어요.':
+    'Insert after the selected piece. Move it with Shift+Left/Right, or remove it with Delete while focused. Type I J L O S T Z or paste an order like "TSZ".',
   "피스 글자(I J L O S T Z)만 붙여 넣을 수 있어요.": "Only piece letters (I J L O S T Z) can be pasted.",
   "피스 {n}개를 넣었어요.": "Added {n} pieces.",
   사본: "copy",
