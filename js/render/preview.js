@@ -3,7 +3,7 @@
 //    지금 화면 설정(색 구성·블록 무늬·고스트 진하기·격자·효과)으로 그린다. 피스 하나가 내려앉아 반동하고,
 //    다음 T가 하드 드롭으로 두 줄을 지우는 장면이 천천히 되풀이된다 → 일곱 피스 색, 쓰레기 줄, 고스트, 효과를 한눈에.
 //  - 견본(drawThemeSwatch): 선택 칩 안의 작은 띠. 테마 보드색 위에 일곱 피스를 한 칸씩.
-import { createEffects } from "./effects.js";
+import { clearEffectDuration, createEffects } from "./effects.js";
 import { clearSections } from "./clear-sweep.js";
 import { boxOrigin, drawMark, gridDots, gridHashes } from "./themes.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
@@ -156,7 +156,7 @@ export const createThemeStage = canvas => {
       );
     }
     const step = k < SCENE.length ? SCENE[k] : null;
-    effects.prune(elapsed, visual.effects);
+    effects.prune(elapsed, visual.effects, visual.clearEffectLength);
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -190,7 +190,8 @@ export const createThemeStage = canvas => {
 
     const sweep = visual.effects === "full" ? theme.motion.clearSweep : null;
     const clear = sample ?? SCENE[k - 1];
-    const clearTime = (sample ? elapsed : phase - dropAt(k - 1)) / theme.motion.clearMs;
+    const duration = clearEffectDuration(theme.motion, visual.clearEffectLength);
+    const clearTime = duration > 0 ? (sample ? elapsed : phase - dropAt(k - 1)) / duration : 1;
     const isErasing = sweep && clear?.rows.length && clearTime < sweep.travel;
     const sections = isErasing ? clearSections(sweep, clearTime, sample?.pivot ?? null, COLS) : [];
     // 쌓인 블록: 기다리는 피스가 있으면 그 전의 판, 다 떨어졌으면 마지막 판
@@ -242,7 +243,7 @@ export const createThemeStage = canvas => {
       }
     });
     // 줄 삭제 효과는 블록 위, 떨어질 피스·고스트는 그 위
-    effects.draw(ctx, geometry, elapsed, ink, visual.effects);
+    effects.draw(ctx, geometry, elapsed, ink, visual.effects, visual.clearEffectLength);
     if (step) {
       const color = palette[ID[step.type]];
       for (const [x, y] of step.cells) theme.ghost(ctx, bx + x * cell, y * cell, cell, color, visual.ghost);
@@ -315,7 +316,7 @@ export const createThemeStage = canvas => {
       );
       start = performance.now();
       draw();
-      const until = Math.max(200, theme.motion.clearMs) + 170;
+      const until = Math.max(200, clearEffectDuration(theme.motion, visual.clearEffectLength)) + 170;
       const animateClear = now => {
         if (now - start >= until) stop();
         else {

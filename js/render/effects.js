@@ -4,6 +4,9 @@ import { CELL_ID } from "../core/pieces.js";
 import { drawClearSweep } from "./clear-sweep.js";
 
 const REDUCED_CLEAR_MS = 175;
+export const clearEffectDuration = (motion, percent = 100) => (motion.clearMs * percent) / 100;
+const durationFor = (motion, level, percent) =>
+  level === "full" ? clearEffectDuration(motion, percent) : REDUCED_CLEAR_MS;
 const PRESS_AT = 0.2;
 const REBOUND_AT = 0.62;
 
@@ -116,15 +119,13 @@ export const createEffects = () => {
     }
   };
 
-  const prune = (now, level) => {
+  const prune = (now, level, clearPercent = 100) => {
     for (const [key, impact] of landings) {
       if (level !== "full" || now - impact.start >= impact.duration) landings.delete(key);
     }
     drops = level === "full" ? drops.filter(drop => now - drop.start < drop.duration) : [];
     clears =
-      level === "off"
-        ? []
-        : clears.filter(clear => now - clear.start < (level === "full" ? clear.motion.clearMs : REDUCED_CLEAR_MS));
+      level === "off" ? [] : clears.filter(clear => now - clear.start < durationFor(clear.motion, level, clearPercent));
   };
 
   const landing = (x, y, value, now) => {
@@ -160,7 +161,7 @@ export const createEffects = () => {
     ctx.restore();
   };
 
-  const draw = (ctx, geometry, now, color, level) => {
+  const draw = (ctx, geometry, now, color, level, clearPercent = 100) => {
     const { bx, cell, toY, cols } = geometry;
     if (!clears.length) return;
     const width = cols * cell;
@@ -169,7 +170,8 @@ export const createEffects = () => {
       ctx.fillStyle = color;
       const { rows, start, motion } = clear;
       const full = level === "full";
-      const duration = full ? motion.clearMs : REDUCED_CLEAR_MS;
+      const duration = durationFor(motion, level, clearPercent);
+      if (duration <= 0) continue;
       const t = Math.max(0, (now - start) / duration);
       const remaining = 1 - t;
       ctx.globalAlpha = (full && rows.length >= 4 ? 0.75 : 0.55) * remaining;

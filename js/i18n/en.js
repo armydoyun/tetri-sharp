@@ -955,6 +955,8 @@ export const EN = {
   "사용 중": "In use",
   미리보기: "Preview",
   "화면 효과": "Effects",
+  "줄 삭제 효과 길이": "Line clear effect length",
+  "테마 기본 시간 기준 · 0%는 끄기": "Relative to the theme default · 0% is off",
   "블록 색": "Block colors",
   "색을 구분하기 쉬운 색 조합을 써요": "Uses colors that are easier to tell apart",
   "고른 테마의 색을 써요": "Uses the theme's colors",

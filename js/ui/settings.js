@@ -12,6 +12,7 @@ import {
 } from "../input/gamepad.js";
 import { icon } from "./icons.js";
 import {
+  CLEAR_EFFECT_LENGTH_LIMITS,
   DEFAULT_SETTINGS,
   HANDLING_LIMITS,
   HANDLING_PRESETS,
@@ -434,6 +435,29 @@ export const createSettingsUI = ({
     render();
   };
 
+  const clearEffectLengthRow = visual => {
+    const id = "set-clear-effect-length";
+    const { min, max, step } = CLEAR_EFFECT_LENGTH_LIMITS;
+    const format = value => `${value}%`;
+    const input = slider({ id, min, max, step, value: visual.clearEffectLength });
+    const output = el("output", { text: format(visual.clearEffectLength) });
+    output.htmlFor.add(id);
+    input.addEventListener("input", () => {
+      const length = Number(input.value);
+      output.textContent = format(length);
+      update({ visual: { ...getSettings().visual, clearEffectLength: length } });
+    });
+    // 드래그하는 동안 슬라이더 포인터를 유지하고, 손을 뗀 뒤 테마 미리보기를 갱신한다.
+    input.addEventListener("change", () => render());
+    return fieldRow({
+      id,
+      label: t("줄 삭제 효과 길이"),
+      hint: t("테마 기본 시간 기준 · 0%는 끄기"),
+      className: visual.effects === "full" ? undefined : "is-invisible",
+      control: rangeRow(input, output, format),
+    });
+  };
+
   const visualAccessRows = visual => [
     fieldRow({
       id: "set-effects",
@@ -448,6 +472,7 @@ export const createSettingsUI = ({
         onChange: v => setVisual("effects", v),
       }),
     }),
+    clearEffectLengthRow(visual),
     fieldRow({
       id: "set-palette",
       label: t("블록 색"),

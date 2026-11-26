@@ -254,18 +254,31 @@ test("줄 삭제·연습 보드 교체·효과 줄임은 낡은 착지 좌표를
 });
 
 test("줄 삭제 표시가 차지하는 범위와 수명은 효과 수준에 따른다", () => {
-  const marks = (level, now) => {
+  const marks = (level, now, percent = 100, motion = studio) => {
     const fx = createEffects();
     const calls = [];
-    fx.add([clearEvent], level, 0, studio);
-    fx.prune(now, level);
-    fx.draw(fakeCtx(calls), { bx: 0, cell: 10, toY: y => y * 10, cols: 10 }, now, "#fff", level);
+    fx.add([clearEvent], level, 0, motion);
+    fx.prune(now, level, percent);
+    fx.draw(fakeCtx(calls), { bx: 0, cell: 10, toY: y => y * 10, cols: 10 }, now, "#fff", level, percent);
     return calls.filter(([name]) => name === "fillRect");
   };
   assert.ok(marks("full", 30)[0][4] > marks("reduced", 30)[0][4]);
   assert.equal(marks("reduced", 30)[0][4], 1.2);
   assert.deepEqual(marks("off", 30), []);
   assert.deepEqual(marks("full", studio.clearMs), []);
+  assert.deepEqual(marks("full", 0, 0), []);
+  for (const { motion } of [THEMES.retro, THEMES.minimal]) {
+    assert.deepEqual(
+      marks("full", motion.clearMs / 2, 100, motion),
+      marks("full", motion.clearMs * 0.625, 125, motion)
+    );
+    assert.ok(marks("full", motion.clearMs * 1.25 - 1, 125, motion).length);
+    assert.deepEqual(marks("full", motion.clearMs * 1.25, 125, motion), []);
+    assert.deepEqual(marks("full", motion.clearMs * 0.75, 75, motion), []);
+  }
+  assert.deepEqual(marks("reduced", 174, 0), marks("reduced", 174, 150));
+  assert.ok(marks("reduced", 174, 0).length);
+  assert.deepEqual(marks("reduced", 175, 150), []);
 });
 
 test("하드 드롭은 테마마다 다른 압축과 짧은 잔상을 만들고 줄임·끄기에서는 생략한다", () => {
@@ -387,6 +400,7 @@ test("시각 설정 보정과 예전 형식 옮기기", () => {
     {
       theme: "modern",
       effects: "off",
+      clearEffectLength: 100,
       palette: "theme",
       pattern: "off",
       ghost: "normal",
@@ -398,6 +412,7 @@ test("시각 설정 보정과 예전 형식 옮기기", () => {
   );
   assert.equal(sanitizeVisual({ palette: "contrast", theme: "retro" }).theme, "retro");
   assert.deepEqual(Object.keys(sanitizeSettings({}).visual).sort(), [
+    "clearEffectLength",
     "colors",
     "effects",
     "ghost",
@@ -407,6 +422,10 @@ test("시각 설정 보정과 예전 형식 옮기기", () => {
     "pattern",
     "theme",
   ]);
+  assert.equal(sanitizeVisual({ clearEffectLength: 0 }).clearEffectLength, 0);
+  assert.equal(sanitizeVisual({ clearEffectLength: 200 }).clearEffectLength, 150);
+  assert.equal(sanitizeVisual({ clearEffectLength: 73 }).clearEffectLength, 75);
+  assert.equal(sanitizeVisual({ clearEffectLength: "invalid" }).clearEffectLength, 100);
   assert.equal(sanitizeVisual({ ghost: "huge", grid: 0, pattern: "on" }).ghost, "normal");
   assert.equal(sanitizeVisual({ pattern: "on" }).pattern, "on");
   assert.deepEqual(sanitizeVisual({ colors: { T: "#AABBCC", I: "red", Q: "#000000" } }).colors, { T: "#aabbcc" });

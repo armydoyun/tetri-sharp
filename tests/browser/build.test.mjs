@@ -961,6 +961,42 @@ test("접근성: 모든 버튼에 읽을 수 있는 이름이 있고, 화면 글
   await context.close();
 });
 
+test("줄 삭제 효과 길이: 전체에서만 배율을 바꾸고 0%와 이전 선택을 저장한다", async () => {
+  const { context, page, errors } = await openPage();
+  const openVisual = async () => {
+    await page.click("#open-settings");
+    await page.click('.dialog-tabs [data-value="visual"]');
+  };
+  const slider = page.locator("#set-clear-effect-length");
+  const select = mode => page.click(`#set-effects [data-value="${mode}"]`);
+  try {
+    await openVisual();
+    await select("full");
+    assert.equal(await slider.inputValue(), "100");
+    assert.equal(await page.getByRole("slider", { name: "줄 삭제 효과 길이" }).count(), 1);
+    await slider.press("End");
+    assert.equal(await slider.inputValue(), "150");
+    await slider.press("ArrowLeft");
+    assert.equal(await slider.inputValue(), "145");
+    for (const mode of ["reduced", "off"]) {
+      await select(mode);
+      assert.equal(await slider.isVisible(), false);
+    }
+    await select("full");
+    assert.equal(await slider.inputValue(), "145");
+    await slider.press("Home");
+    assert.equal(await slider.inputValue(), "0");
+    await page.reload();
+    await openVisual();
+    assert.equal(await slider.inputValue(), "0");
+    await page.click('.dialog-tabs [data-value="access"]');
+    assert.equal(await slider.inputValue(), "0");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test("게임 테마: 아홉 테마가 서로 다르게 그려지고, 설정에서 바꾸면 바로 반영된다", async () => {
   const { context, page, errors } = await openPage();
   await startMode(page, "dig");
