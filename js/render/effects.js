@@ -1,30 +1,11 @@
 // 착지와 줄 삭제 이벤트를 화면 시계로 재생한다. 엔진 보드는 그대로 읽는다.
 import { WIDTH } from "../core/board.js";
 import { CELL_ID } from "../core/pieces.js";
+import { drawClearSweep } from "./clear-sweep.js";
 
 const REDUCED_CLEAR_MS = 175;
 const PRESS_AT = 0.2;
 const REBOUND_AT = 0.62;
-
-const drawClearMarks = (ctx, mark, { bx, cols, cell }, middle, t, spinColumn) => {
-  const spin = spinColumn !== null;
-  const size = cell * ((spin ? 1.03 : 0.86) - 0.22 * t);
-  const columns = spin ? [Math.max(0.55, Math.min(cols - 0.55, spinColumn))] : [];
-  if (!spin) for (let column = 1; column < cols; column += 2) columns.push(column);
-  ctx.strokeStyle = ctx.fillStyle;
-  ctx.globalAlpha = 0.76 * (1 - t);
-  for (const column of columns) {
-    ctx.save();
-    ctx.translate(bx + column * cell, middle);
-    ctx.scale(size, size);
-    if (spin) ctx.rotate((1 - t) * -0.34);
-    ctx.beginPath();
-    mark(ctx);
-    ctx.lineWidth = Math.max(1 / size, 0.072);
-    ctx.stroke();
-    ctx.restore();
-  }
-};
 
 const drawAccentMark = (ctx, shape, x, y, size) => {
   if (shape === "dash") {
@@ -184,8 +165,8 @@ export const createEffects = () => {
     if (!clears.length) return;
     const width = cols * cell;
     ctx.save();
-    ctx.fillStyle = color;
     for (const clear of clears) {
+      ctx.fillStyle = color;
       const { rows, start, motion } = clear;
       const full = level === "full";
       const duration = full ? motion.clearMs : REDUCED_CLEAR_MS;
@@ -196,8 +177,8 @@ export const createEffects = () => {
         const middle = toY(row) + cell / 2;
         if (!full) {
           ctx.fillRect(bx, middle - cell * 0.06, width, cell * 0.12);
-        } else if (motion.clearMark) {
-          drawClearMarks(ctx, motion.clearMark, geometry, middle, t, clear.spinColumn);
+        } else if (motion.clearSweep) {
+          drawClearSweep(ctx, motion.clearSweep, geometry, middle, t, clear.spinColumn);
         } else if (motion.clear === "spread") {
           const span = width * (1 - (1 - Math.min(1, t * 2.5)) ** 2);
           const height = cell * (0.12 + remaining * 0.5);
@@ -247,7 +228,7 @@ export const createEffects = () => {
           ctx.fillRect(bx, middle + offset - thickness / 2, width, thickness);
         }
       }
-      if (full && !motion.clearMark) drawClearAccents(ctx, clear, geometry, t);
+      if (full && !motion.clearSweep) drawClearAccents(ctx, clear, geometry, t);
     }
     ctx.restore();
   };

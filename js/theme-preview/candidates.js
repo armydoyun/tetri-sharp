@@ -1,6 +1,6 @@
 import { t } from "../i18n/index.js";
 import { makeTheme, THEMES } from "../render/themes.js";
-import { CLEAR_MARKS } from "./clear-marks.js";
+import { CLEAR_SWEEPS } from "./clear-sweeps.js";
 
 export const CANDIDATES = Object.freeze({
   porcelain: {
@@ -17,8 +17,8 @@ export const CANDIDATES = Object.freeze({
       radius: 0.11,
       motion: {
         ...THEMES.modern.motion,
-        clearMark: CLEAR_MARKS.porcelain,
-        clearMs: 174,
+        clearSweep: CLEAR_SWEEPS.porcelain,
+        clearMs: 274,
         landMs: 118,
         rebound: 0,
         trailCells: 1.4,
@@ -37,7 +37,7 @@ export const CANDIDATES = Object.freeze({
       finish: "frame",
       gap: 0.065,
       radius: 0.035,
-      motion: { ...THEMES.modern.motion, clearMark: CLEAR_MARKS.relay, clearMs: 205, landMs: 140, trailCells: 1.8 },
+      motion: { ...THEMES.modern.motion, clearSweep: CLEAR_SWEEPS.relay, clearMs: 305, landMs: 140, trailCells: 1.8 },
     }),
   },
   tide: {
@@ -54,8 +54,8 @@ export const CANDIDATES = Object.freeze({
       radius: 0.16,
       motion: {
         ...THEMES.modern.motion,
-        clearMark: CLEAR_MARKS.tide,
-        clearMs: 226,
+        clearSweep: CLEAR_SWEEPS.tide,
+        clearMs: 326,
         landMs: 158,
         depth: 0.1,
         trailCells: 1.7,
@@ -76,8 +76,8 @@ export const CANDIDATES = Object.freeze({
       radius: 0.2,
       motion: {
         ...THEMES.modern.motion,
-        clearMark: CLEAR_MARKS.velvet,
-        clearMs: 195,
+        clearSweep: CLEAR_SWEEPS.velvet,
+        clearMs: 295,
         landMs: 130,
         rebound: 0,
         trailCells: 1,
@@ -98,9 +98,9 @@ export const CANDIDATES = Object.freeze({
       radius: 0.018,
       motion: {
         ...THEMES.modern.motion,
-        clearMark: CLEAR_MARKS.press,
+        clearSweep: CLEAR_SWEEPS.press,
 
-        clearMs: 168,
+        clearMs: 268,
         landMs: 150,
         depth: 0.2,
         rebound: 0,
@@ -122,8 +122,8 @@ export const CANDIDATES = Object.freeze({
       radius: 0.035,
       motion: {
         ...THEMES.modern.motion,
-        clearMark: CLEAR_MARKS.film,
-        clearMs: 185,
+        clearSweep: CLEAR_SWEEPS.film,
+        clearMs: 285,
         landMs: 118,
         depth: 0.08,
         trailCells: 1.2,
@@ -144,8 +144,8 @@ export const CANDIDATES = Object.freeze({
       radius: 0.09,
       motion: {
         ...THEMES.modern.motion,
-        clearMark: CLEAR_MARKS.post,
-        clearMs: 164,
+        clearSweep: CLEAR_SWEEPS.post,
+        clearMs: 264,
         landMs: 125,
         depth: 0.16,
         rebound: 0,
@@ -166,8 +166,8 @@ export const CANDIDATES = Object.freeze({
       radius: 0.025,
       motion: {
         ...THEMES.modern.motion,
-        clearMark: CLEAR_MARKS.carbon,
-        clearMs: 190,
+        clearSweep: CLEAR_SWEEPS.carbon,
+        clearMs: 290,
         landMs: 112,
         depth: 0.09,
         trailCells: 1.6,
@@ -188,8 +188,8 @@ export const CANDIDATES = Object.freeze({
       radius: 0.22,
       motion: {
         ...THEMES.modern.motion,
-        clearMark: CLEAR_MARKS.chestnut,
-        clearMs: 216,
+        clearSweep: CLEAR_SWEEPS.chestnut,
+        clearMs: 316,
         landMs: 148,
         rebound: 0.035,
         trailCells: 1.5,
@@ -210,8 +210,8 @@ export const CANDIDATES = Object.freeze({
       radius: 0.15,
       motion: {
         ...THEMES.modern.motion,
-        clearMark: CLEAR_MARKS.whiteNight,
-        clearMs: 230,
+        clearSweep: CLEAR_SWEEPS.whiteNight,
+        clearMs: 330,
         landMs: 150,
         depth: 0.08,
         trailCells: 1.3,
@@ -232,8 +232,8 @@ export const CANDIDATES = Object.freeze({
       radius: 0.075,
       motion: {
         ...THEMES.modern.motion,
-        clearMark: CLEAR_MARKS.ink,
-        clearMs: 240,
+        clearSweep: CLEAR_SWEEPS.ink,
+        clearMs: 340,
         landMs: 166,
         depth: 0.12,
         rebound: 0,

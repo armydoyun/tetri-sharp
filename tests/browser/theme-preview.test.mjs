@@ -108,6 +108,35 @@ test("독립 테마 견본에서 보드를 비교하고 효과음을 재생·정
   assert.equal(await page.evaluate(() => window.auditionAudio.connections), 2);
   const clearStage = page.locator("#candidate-board");
   const baseline = await clearStage.evaluate(el => el.toDataURL());
+  // 릴레이의 왼쪽부터 진행하는 선 앞에는 블록이 남고, 뒤에는 보드색이 드러난다.
+  const sweep = await clearStage.evaluate(canvas => {
+    const ctx = canvas.getContext("2d");
+    const cell = canvas.height / 9;
+    const bx = Math.round(4.4 * cell);
+    const pixel = x => Array.from(ctx.getImageData(bx + (x + 0.5) * cell, 4.25 * cell, 1, 1).data);
+    const read = () => [pixel(0), pixel(9)];
+    const raf = window.requestAnimationFrame;
+    let step;
+    try {
+      window.requestAnimationFrame = callback => {
+        step = callback;
+        return 0x7fffffff;
+      };
+      document.querySelector('[data-sound="quad"]').click();
+      const start = performance.now();
+      const initial = read();
+      step(start + 100);
+      const middle = read();
+      step(start + 320);
+      return { initial, middle, end: read() };
+    } finally {
+      window.requestAnimationFrame = raf;
+    }
+  });
+  assert.notDeepEqual(sweep.initial[0], sweep.middle[0]);
+  assert.deepEqual(sweep.middle[0], sweep.end[0]);
+  assert.deepEqual(sweep.initial[1], sweep.middle[1]);
+  assert.notDeepEqual(sweep.middle[1], sweep.end[1]);
   await page.getByRole("button", { name: "4줄", exact: true }).click();
   assert.notEqual(await clearStage.evaluate(el => el.toDataURL()), baseline);
   await status.filter({ hasText: "스튜디오 · 4줄 재생 중" }).waitFor();

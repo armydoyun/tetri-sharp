@@ -4,6 +4,7 @@
 //    다음 T가 하드 드롭으로 두 줄을 지우는 장면이 천천히 되풀이된다 → 일곱 피스 색, 쓰레기 줄, 고스트, 효과를 한눈에.
 //  - 견본(drawThemeSwatch): 선택 칩 안의 작은 띠. 테마 보드색 위에 일곱 피스를 한 칸씩.
 import { createEffects } from "./effects.js";
+import { clearedSpans } from "./clear-sweep.js";
 import { boxOrigin, drawMark, gridDots, gridHashes } from "./themes.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
 import { t } from "../i18n/index.js";
@@ -51,23 +52,33 @@ const buildScene = () => {
   return STEPS.map(([type, rot, x, y, fromY]) => {
     const before = board.map(row => [...row]);
     const cells = cellsOf(type, rot).map(([cx, cy]) => [x + cx, y + cy]);
-    const after = before.map(row => [...row]);
-    for (const [cx, cy] of cells) after[cy][cx] = ID[type];
-    const rows = after.flatMap((row, i) => (row.every(Boolean) ? [i] : []));
-    const kept = after.filter((_, i) => !rows.includes(i));
+    const landed = before.map(row => [...row]);
+    for (const [cx, cy] of cells) landed[cy][cx] = ID[type];
+    const rows = landed.flatMap((row, i) => (row.every(Boolean) ? [i] : []));
+    const kept = landed.filter((_, i) => !rows.includes(i));
     board = [...rows.map(() => Array(COLS).fill(0)), ...kept];
-    return { type, before, cells, fromCells: cells.map(([cx, cy]) => [cx, cy - (y - fromY)]), rows, after: board };
+    return {
+      type,
+      before,
+      landed,
+      cells,
+      fromCells: cells.map(([cx, cy]) => [cx, cy - (y - fromY)]),
+      rows,
+      after: board,
+    };
   });
 };
 const SCENE = buildScene();
 
-// 한 줄 우물의 각 높이를 지운 직후. 아래쪽 한 줄은 남겨 비교할 기준으로 삼는다.
-const CLEAR_SAMPLES = [1, 2, 3, 4].map(lines => ({
-  rows: Array.from({ length: lines }, (_, i) => ROWS - 2 - i),
-  after: Array.from({ length: ROWS }, (_, row) =>
+// 세로 I가 우물을 채운 판과 지운 직후의 판. 바닥의 블록은 자리를 유지한다.
+const CLEAR_SAMPLES = [1, 2, 3, 4].map(lines => {
+  const rows = Array.from({ length: lines }, (_, i) => ROWS - 2 - i);
+  const after = Array.from({ length: ROWS }, (_, row) =>
     row === ROWS - 1 ? [1, 1, 3, 3, 0, 0, 7, 7, 2, 2] : Array(COLS).fill(0)
-  ),
-}));
+  );
+  const landed = after.map((row, y) => (rows.includes(y) ? [2, 2, 3, 3, 1, 4, 4, 5, 6, 7] : row));
+  return { rows, after, landed };
+});
 
 /**
  * @param {HTMLCanvasElement} canvas
@@ -95,7 +106,7 @@ export const createThemeStage = canvas => {
   let start = 0;
   let lastLoop = -1;
   let emitted = 0;
-  /** @type {{ rows: number[], after: number[][] } | null} */
+  /** @type {{ rows: number[], after: number[][], landed: number[][], pivot: number | null } | null} */
   let sample = null;
 
   const block = (x, y, size, value) => {
@@ -177,9 +188,27 @@ export const createThemeStage = canvas => {
     ctx.strokeRect(bx + 0.5, 0.5, COLS * cell - 1, ROWS * cell - 1);
     effects.drawDrops(ctx, geometry, elapsed, ink);
 
+    const sweep = visual.effects === "full" ? theme.motion.clearSweep : null;
+    const clear = sample ?? SCENE[k - 1];
+    const clearTime = (sample ? elapsed : phase - dropAt(k - 1)) / theme.motion.clearMs;
+    const isErasing = sweep && clear?.rows.length && clearTime < sweep.travel;
+    const erased = isErasing ? clearedSpans(sweep, clearTime, sample?.pivot ?? null) : [];
     // 쌓인 블록: 기다리는 피스가 있으면 그 전의 판, 다 떨어졌으면 마지막 판
-    const board = sample?.after ?? (step ? step.before : SCENE[SCENE.length - 1].after);
-    board.forEach((row, y) =>
+    const board = isErasing ? clear.landed : (sample?.after ?? (step ? step.before : SCENE[SCENE.length - 1].after));
+    board.forEach((row, y) => {
+      const clip = erased.length && clear.rows.includes(y);
+      if (clip) {
+        ctx.save();
+        const visible = new Path2D();
+        const rowWidth = COLS * cell;
+        let start = 0;
+        for (const [left, right] of erased) {
+          if (left > start) visible.rect(bx + start * rowWidth, y * cell, (left - start) * rowWidth, cell);
+          start = right;
+        }
+        if (start < 1) visible.rect(bx + start * rowWidth, y * cell, (1 - start) * rowWidth, cell);
+        ctx.clip(visible);
+      }
       row.forEach((value, x) => {
         if (!value) return;
         const impact = effects.landing(x, y, value, elapsed);
@@ -192,8 +221,9 @@ export const createThemeStage = canvas => {
         }
         block(bx + x * cell, y * cell, cell, value);
         if (impact) ctx.restore();
-      })
-    );
+      });
+      if (clip) ctx.restore();
+    });
     // 줄 삭제 효과는 블록 위, 떨어질 피스·고스트는 그 위
     effects.draw(ctx, geometry, elapsed, ink, visual.effects);
     if (step) {
@@ -248,8 +278,10 @@ export const createThemeStage = canvas => {
     playClear(lines, spin = false) {
       if (!ctx || !theme || !CLEAR_SAMPLES[lines - 1]) return;
       stop();
-      const { rows, after } = spin ? SCENE[1] : CLEAR_SAMPLES[lines - 1];
-      sample = { rows, after };
+      const cells = spin ? SCENE[1].cells : [];
+      const pivot = spin ? cells.reduce((sum, [x]) => sum + x + 0.5, 0) / cells.length / COLS : null;
+      const { rows, after, landed } = spin ? SCENE[1] : CLEAR_SAMPLES[lines - 1];
+      sample = { rows, after, landed, pivot };
       effects.add(
         [
           {
@@ -257,7 +289,7 @@ export const createThemeStage = canvas => {
             lines: rows.length,
             rows,
             tspin: spin ? "full" : "none",
-            cells: spin ? SCENE[1].cells : [],
+            cells,
           },
         ],
         visual.effects,

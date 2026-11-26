@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CELL_ID } from "../../js/core/pieces.js";
 import { createEffects } from "../../js/render/effects.js";
+import { clearedSpans } from "../../js/render/clear-sweep.js";
 import { createSlide } from "../../js/render/motion.js";
 import { CONTRAST_PALETTE, DEFAULT_THEME, THEMES, THEME_IDS, findTheme } from "../../js/render/themes.js";
 import { sanitizeSettings, sanitizeVisual } from "../../js/storage/settings.js";
@@ -37,24 +38,30 @@ const fakeCtx = (calls = []) =>
     }
   );
 
-test("견본 테마마다 다른 삭제 문양을 그리고, T스핀은 회전 위치에만 표시한다", () => {
-  const geometry = { bx: 0, cell: 16, cols: 10, toY: y => y * 16 };
+test("견본 삭제 선은 행 안에서 퍼지고 회전 중심에서 시작할 수도 있다", () => {
   const signatures = new Set();
   for (const { motion } of previewThemes) {
-    const render = (lines, tspin, level) => {
-      const calls = [];
-      const fx = createEffects();
-      fx.add([{ ...lockEvent, lines, rows: Array.from({ length: lines }, (_, i) => 39 - i), tspin }], level, 0, motion);
-      fx.draw(fakeCtx(calls), geometry, 50, "#fff", level);
-      return calls;
-    };
-    for (let n = 1; n <= 4; n++)
-      assert.equal(render(n, "none", "full").filter(([name]) => name === "stroke").length, n * 5);
-    const spin = render(2, "full", "full");
-    assert.equal(spin.filter(([name]) => name === "stroke").length, 2);
-    assert.equal(spin.filter(([name]) => name === "rotate").length, 2);
-    assert.equal(render(2, "full", "reduced").filter(([name]) => name === "stroke").length, 0);
-    signatures.add(JSON.stringify(render(1, "none", "full").filter(([name]) => /To$/.test(name))));
+    const sweep = motion.clearSweep;
+    const early = clearedSpans(sweep, sweep.travel * 0.25, null);
+    const late = clearedSpans(sweep, sweep.travel * 0.75, null);
+    const width = spans => spans.reduce((sum, [left, right]) => sum + right - left, 0);
+    assert.deepEqual(clearedSpans(sweep, 0, null), []);
+    assert.ok(width(early) < width(late));
+    assert.deepEqual(clearedSpans(sweep, sweep.travel, null), [[0, 1]]);
+    const [[left, right]] = clearedSpans(sweep, sweep.travel * 0.25, 0.3);
+    assert.ok(left > 0 && left < 0.3 && right > 0.3 && right < 1);
+
+    const calls = [];
+    const fx = createEffects();
+    fx.add([clearEvent], "full", 0, motion);
+    fx.draw(fakeCtx(calls), { bx: 0, cell: 16, cols: 10, toY: y => y * 16 }, 70, "#fff", "full");
+    const bands = calls.filter(([name]) => name === "fillRect");
+    assert.ok(bands.length);
+    for (const [, x, y, w, h] of bands) {
+      assert.ok(x >= 0 && x + w <= 160.000001);
+      assert.ok(y >= 39 * 16 && y + h <= 40 * 16);
+    }
+    signatures.add(JSON.stringify(bands));
   }
   assert.equal(signatures.size, previewThemes.length);
 });
