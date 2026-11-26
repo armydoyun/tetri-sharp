@@ -5,7 +5,8 @@
 //  - 견본(drawThemeSwatch): 선택 칩 안의 작은 띠. 테마 보드색 위에 일곱 피스를 한 칸씩.
 import { clearEffectDuration, createEffects } from "./effects.js";
 import { clearSections, drawClearCells } from "./clear-sweep.js";
-import { boxOrigin, drawMark, gridDots, gridHashes } from "./themes.js";
+import { boxOrigin, drawMark } from "./themes.js";
+import { createBoardGrid } from "./board-grid.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
 import { t } from "../i18n/index.js";
 
@@ -95,6 +96,7 @@ export const createThemeStage = canvas => {
   const ctx = canvas.getContext("2d");
   const effects = createEffects();
   const bx = Math.round(SIDE * cell);
+  const drawGrid = createBoardGrid(bx, 0, COLS, ROWS, cell);
   const geometry = { bx, by: 0, cell, cols: COLS, toY: y => y * cell };
   /** @type {any} */
   let theme = null;
@@ -160,32 +162,8 @@ export const createThemeStage = canvas => {
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    // 보드
-    const { bg, grid, edge, ink } = theme.board;
-    ctx.fillStyle = bg;
-    ctx.fillRect(bx, 0, COLS * cell, ROWS * cell);
-    ctx.lineWidth = 1;
-    if (visual.grid !== "off" && theme.gridStyle === "dots") {
-      ctx.fillStyle = grid;
-      ctx.fill(gridDots(bx, 0, COLS, ROWS, cell));
-    } else if (visual.grid !== "off" && theme.gridStyle === "hash") {
-      ctx.strokeStyle = grid;
-      ctx.stroke(gridHashes(bx, 0, COLS, ROWS, cell));
-    } else if (visual.grid !== "off" && theme.gridStyle !== "none") {
-      ctx.strokeStyle = grid;
-      ctx.beginPath();
-      for (let x = 1; x < COLS; x++) {
-        ctx.moveTo(bx + x * cell + 0.5, 0);
-        ctx.lineTo(bx + x * cell + 0.5, ROWS * cell);
-      }
-      for (let y = 1; y < ROWS; y++) {
-        ctx.moveTo(bx, y * cell + 0.5);
-        ctx.lineTo(bx + COLS * cell, y * cell + 0.5);
-      }
-      ctx.stroke();
-    }
-    ctx.strokeStyle = edge;
-    ctx.strokeRect(bx + 0.5, 0.5, COLS * cell - 1, ROWS * cell - 1);
+    const { ink } = theme.board;
+    drawGrid(ctx, theme, visual.grid !== "off");
     effects.drawDrops(ctx, geometry, elapsed, ink);
 
     const sweep = visual.effects === "full" ? theme.motion.clearSweep : null;
