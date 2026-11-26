@@ -108,13 +108,13 @@ test("독립 테마 견본에서 보드를 비교하고 효과음을 재생·정
   assert.equal(await page.evaluate(() => window.auditionAudio.connections), 2);
   const clearStage = page.locator("#candidate-board");
   const baseline = await clearStage.evaluate(el => el.toDataURL());
-  // 릴레이의 왼쪽부터 진행하는 선 앞에는 블록이 남고, 뒤에는 보드색이 드러난다.
+  // 릴레이는 두 칸 묶음이 교대로 접힌다. 첫 묶음의 바깥이 먼저 지워진다.
   const sweep = await clearStage.evaluate(canvas => {
     const ctx = canvas.getContext("2d");
     const cell = canvas.height / 9;
     const bx = Math.round(4.4 * cell);
-    const pixel = x => Array.from(ctx.getImageData(bx + (x + 0.5) * cell, 4.25 * cell, 1, 1).data);
-    const read = () => [pixel(0), pixel(9)];
+    const pixel = x => Array.from(ctx.getImageData(bx + (x + 0.375) * cell, 4.25 * cell, 1, 1).data);
+    const read = () => [pixel(0), pixel(2)];
     const raf = window.requestAnimationFrame;
     let step;
     try {

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CELL_ID } from "../../js/core/pieces.js";
 import { createEffects } from "../../js/render/effects.js";
-import { clearedSpans } from "../../js/render/clear-sweep.js";
+import { clearSections } from "../../js/render/clear-sweep.js";
 import { createSlide } from "../../js/render/motion.js";
 import { CONTRAST_PALETTE, DEFAULT_THEME, THEMES, THEME_IDS, findTheme } from "../../js/render/themes.js";
 import { sanitizeSettings, sanitizeVisual } from "../../js/storage/settings.js";
@@ -39,19 +39,24 @@ const fakeCtx = (calls = []) =>
     }
   );
 
-test("견본 삭제 선은 행 안에서 퍼지고 회전 중심에서 시작할 수도 있다", () => {
+test("견본 줄 삭제는 테마별로 다른 형태로 블록을 지우고 행 안에 머문다", () => {
   const signatures = new Set();
   const variants = [...previewThemes, ...Object.values(EXISTING_PREVIEWS).map(({ theme }) => theme)];
+  const remaining = sections =>
+    sections.reduce(
+      (sum, { visible, alpha }) =>
+        sum + visible.reduce((area, rect) => area + (rect.right - rect.left) * (rect.bottom - rect.top) * alpha, 0),
+      0
+    );
+  assert.equal(new Set(variants.map(({ motion }) => motion.clearSweep.shape)).size, 7);
   for (const { motion } of variants) {
     const sweep = motion.clearSweep;
-    const early = clearedSpans(sweep, sweep.travel * 0.25, null);
-    const late = clearedSpans(sweep, sweep.travel * 0.75, null);
-    const width = spans => spans.reduce((sum, [left, right]) => sum + right - left, 0);
-    assert.deepEqual(clearedSpans(sweep, 0, null), []);
-    assert.ok(width(early) < width(late));
-    assert.deepEqual(clearedSpans(sweep, sweep.travel, null), [[0, 1]]);
-    const [[left, right]] = clearedSpans(sweep, sweep.travel * 0.25, 0.3);
-    assert.ok(left > 0 && left < 0.3 && right > 0.3 && right < 1);
+    for (const pivot of [null, 0.3]) {
+      const area = t => remaining(clearSections(sweep, t * sweep.travel, pivot, 10));
+      assert.ok(Math.abs(area(0) - 1) < 1e-8);
+      assert.ok(area(0.25) > area(0.75));
+      assert.equal(area(1), 0);
+    }
 
     const calls = [];
     const fx = createEffects();
@@ -63,7 +68,7 @@ test("견본 삭제 선은 행 안에서 퍼지고 회전 중심에서 시작할
       assert.ok(x >= 0 && x + w <= 160.000001);
       assert.ok(y >= 39 * 16 && y + h <= 40 * 16);
     }
-    signatures.add(JSON.stringify(bands));
+    signatures.add(JSON.stringify([sweep.shape, sweep.ink, bands]));
   }
   assert.equal(signatures.size, variants.length);
 });

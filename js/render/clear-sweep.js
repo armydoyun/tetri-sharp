@@ -1,73 +1,124 @@
-// 줄 안에서 움직이는 선과 지나간 범위를 같은 좌표로 계산한다.
+// 블록에 남는 영역과 그 위에 사라지는 선을 같은 좌표로 계산한다.
 /**
  * @typedef {{
- *   from: "left" | "right" | "middle" | "edges",
+ *   shape: "fold" | "split" | "lift" | "sink" | "retract" | "fade" | "shutter",
  *   pace: "even" | "easeOut" | "easeIn",
  *   travel: number,
  *   ink: string,
  *   edge: string,
  *   bands: Array<[offset: number, height: number, opacity: number]>,
- *   tip: number,
+ *   groups?: number,
+ *   beat?: "alternating" | "paired" | "scatter",
  *   settle?: number,
+ *   wash?: boolean,
  *   crossbars?: boolean
  * }} ClearSweep
+ * @typedef {{left: number, right: number, top: number, bottom: number}} Rect
  */
 
-/**
- * @param {ClearSweep} sweep @param {number} t @param {number | null} pivot
- * @returns {Array<[left: number, right: number]>} 행 너비를 1로 본 지워진 구간
- */
-export const clearedSpans = ({ from, pace, travel }, t, pivot) => {
-  const u = Math.min(1, Math.max(0, t / travel));
-  if (u >= 1) return [[0, 1]];
-  if (u === 0) return [];
-  const p = pace === "easeOut" ? 1 - (1 - u) ** 2 : pace === "easeIn" ? u ** 1.6 : u;
-  if (pivot !== null || from === "middle") {
-    const center = pivot ?? 0.5;
-    return [[center * (1 - p), center + (1 - center) * p]];
+const delayFor = (beat, index, count) => {
+  if (beat === "alternating") return (index % 2) * 0.29;
+  if (beat === "paired") return Math.min(index, count - 1 - index) * (0.28 / Math.max(1, (count - 1) / 2));
+  if (beat === "scatter") return ((index * 2) % 3) * 0.14;
+  return 0;
+};
+
+/** @param {Exclude<ClearSweep["shape"], "shutter">} shape @param {number} p */
+const cut = (shape, p) => {
+  switch (shape) {
+    case "fold":
+      return { regions: [[0, 1, p / 2, 1 - p / 2]], edges: [0.5] };
+    case "split":
+      return {
+        regions: [
+          [0, 1, 0, (1 - p) / 2],
+          [0, 1, (1 + p) / 2, 1],
+        ],
+        edges: [(1 - p) / 2, (1 + p) / 2],
+      };
+    case "lift":
+      return { regions: [[0, 1, 0, 1 - p]], edges: [1 - p] };
+    case "sink":
+      return { regions: [[0, 1, p, 1]], edges: [p] };
+    case "retract":
+      return { regions: [[p / 2, 1 - p / 2, 0, 1]], edges: [0.5] };
+    case "fade":
+      return { regions: [[0, 1, 0, 1]], edges: [0.5] };
   }
-  if (from === "edges")
-    return [
-      [0, p / 2],
-      [1 - p / 2, 1],
-    ];
-  return from === "left" ? [[0, p]] : [[1 - p, 1]];
+};
+
+/**
+ * @param {ClearSweep} sweep
+ * @param {number} t
+ * @param {number | null} pivot
+ * @param {number} cols
+ */
+export const clearSections = (sweep, t, pivot, cols) => {
+  const count = Math.min(cols, sweep.groups ?? 1);
+  return Array.from({ length: count }, (_, index) => {
+    const left = Math.round((index * cols) / count) / cols;
+    const right = Math.round(((index + 1) * cols) / count) / cols;
+    const width = right - left;
+    const wait =
+      pivot !== null && count > 1 ? 0.36 * Math.abs(pivot - (left + right) / 2) : delayFor(sweep.beat, index, count);
+    const u = Math.min(1, Math.max(0, (t / sweep.travel - wait) / (1 - wait)));
+    const p = sweep.pace === "easeOut" ? 1 - (1 - u) ** 2 : sweep.pace === "easeIn" ? u ** 1.6 : u;
+    const shape = sweep.shape === "shutter" ? (index % 2 ? "sink" : "lift") : sweep.shape;
+    const { regions, edges } = cut(shape, p);
+    /** @type {Rect[]} */
+    const visible =
+      p >= 1
+        ? []
+        : regions.map(([x, toX, top, bottom]) => ({
+            left: left + x * width,
+            right: left + toX * width,
+            top,
+            bottom,
+          }));
+    return {
+      left,
+      right,
+      visible,
+      edges,
+      alpha: sweep.wash ? (1 - p) ** 1.7 : sweep.shape === "fade" ? 1 - p : 1,
+      progress: p,
+    };
+  });
 };
 
 /** @param {CanvasRenderingContext2D} ctx @param {ClearSweep} sweep */
 export const drawClearSweep = (ctx, sweep, { bx, cell, cols }, middle, t, spinColumn) => {
   const width = cols * cell;
-  const spans = clearedSpans(sweep, t, spinColumn === null ? null : spinColumn / cols);
+  const rowTop = middle - cell / 2;
   const fade = 1 - t;
-  const squeeze = 0.35 + 0.65 * fade;
-  middle += cell * (sweep.settle ?? 0) * t;
-  ctx.fillStyle = sweep.ink;
-  for (const [left, right] of spans) {
-    for (const [offset, height, opacity] of sweep.bands) {
-      const h = Math.max(1, cell * height * squeeze);
-      ctx.globalAlpha = opacity * fade;
-      ctx.fillRect(bx + width * left, middle + cell * offset * squeeze - h / 2, width * (right - left), h);
-    }
-    if (sweep.crossbars) {
-      const height = cell * 0.48 * squeeze;
-      const thickness = Math.max(1, cell * 0.055 * squeeze);
-      ctx.globalAlpha = 0.66 * fade;
-      for (let column = 1; column < cols; column += 2) {
-        const x = column / cols;
-        if (x > left && x < right)
-          ctx.fillRect(bx + column * cell - thickness / 2, middle - height / 2, thickness, height);
+  const squeeze = 0.3 + 0.7 * fade;
+  const pivot = spinColumn === null ? null : spinColumn / cols;
+  const sections = clearSections(sweep, t, pivot, cols);
+
+  for (const { left, right, edges, progress } of sections) {
+    if (progress <= 0) continue;
+    const gap = sweep.shape === "retract" ? Math.min((right - left) * 0.42, (right - left) * 0.48 * progress) : 0;
+    const x = bx + width * (left + gap);
+    const w = width * (right - left - 2 * gap);
+    for (const edge of edges) {
+      const line = edge + (sweep.settle ?? 0) * t;
+      for (const [offset, height, opacity] of sweep.bands) {
+        const h = Math.max(1, cell * height * squeeze);
+        const y = Math.max(rowTop, Math.min(rowTop + cell - h, rowTop + cell * (line + offset * squeeze) - h / 2));
+        ctx.fillStyle = progress < 1 && offset === 0 ? sweep.edge : sweep.ink;
+        ctx.globalAlpha = (opacity * fade * Math.min(1, progress * 5)) / edges.length ** 0.5;
+        ctx.fillRect(x, y, w, h);
       }
     }
-  }
-  if (t >= sweep.travel) return;
-
-  // 진행하는 끝만 조금 진하게 해 선 뒤로 블록이 사라지는 위치를 보여 준다.
-  ctx.fillStyle = sweep.edge;
-  ctx.globalAlpha = 0.88 * fade;
-  const h = Math.max(1, cell * sweep.bands[0][1] * squeeze);
-  for (const [left, right] of spans) {
-    const length = Math.min((right - left) / 2, (sweep.tip * cell) / width);
-    if (left > 0) ctx.fillRect(bx + width * left, middle - h / 2, width * length, h);
-    if (right < 1) ctx.fillRect(bx + width * (right - length), middle - h / 2, width * length, h);
+    if (sweep.crossbars) {
+      const h = cell * 0.46 * squeeze;
+      const thickness = Math.max(1, cell * 0.055 * squeeze);
+      ctx.fillStyle = sweep.ink;
+      ctx.globalAlpha = 0.63 * fade * Math.min(1, progress * 4);
+      for (let column = 1; column < cols; column += 2) {
+        const x = column / cols;
+        if (x > left && x < right) ctx.fillRect(bx + column * cell - thickness / 2, middle - h / 2, thickness, h);
+      }
+    }
   }
 };

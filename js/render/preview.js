@@ -4,7 +4,7 @@
 //    다음 T가 하드 드롭으로 두 줄을 지우는 장면이 천천히 되풀이된다 → 일곱 피스 색, 쓰레기 줄, 고스트, 효과를 한눈에.
 //  - 견본(drawThemeSwatch): 선택 칩 안의 작은 띠. 테마 보드색 위에 일곱 피스를 한 칸씩.
 import { createEffects } from "./effects.js";
-import { clearedSpans } from "./clear-sweep.js";
+import { clearSections } from "./clear-sweep.js";
 import { boxOrigin, drawMark, gridDots, gridHashes } from "./themes.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
 import { t } from "../i18n/index.js";
@@ -192,25 +192,13 @@ export const createThemeStage = canvas => {
     const clear = sample ?? SCENE[k - 1];
     const clearTime = (sample ? elapsed : phase - dropAt(k - 1)) / theme.motion.clearMs;
     const isErasing = sweep && clear?.rows.length && clearTime < sweep.travel;
-    const erased = isErasing ? clearedSpans(sweep, clearTime, sample?.pivot ?? null) : [];
+    const sections = isErasing ? clearSections(sweep, clearTime, sample?.pivot ?? null, COLS) : [];
     // 쌓인 블록: 기다리는 피스가 있으면 그 전의 판, 다 떨어졌으면 마지막 판
     const board = isErasing ? clear.landed : (sample?.after ?? (step ? step.before : SCENE[SCENE.length - 1].after));
-    board.forEach((row, y) => {
-      const clip = erased.length && clear.rows.includes(y);
-      if (clip) {
-        ctx.save();
-        const visible = new Path2D();
-        const rowWidth = COLS * cell;
-        let start = 0;
-        for (const [left, right] of erased) {
-          if (left > start) visible.rect(bx + start * rowWidth, y * cell, (left - start) * rowWidth, cell);
-          start = right;
-        }
-        if (start < 1) visible.rect(bx + start * rowWidth, y * cell, (1 - start) * rowWidth, cell);
-        ctx.clip(visible);
-      }
-      row.forEach((value, x) => {
-        if (!value) return;
+    const drawRow = (row, y, left = 0, right = COLS) => {
+      for (let x = left; x < right; x++) {
+        const value = row[x];
+        if (!value) continue;
         const impact = effects.landing(x, y, value, elapsed);
         if (impact) {
           const floor = impact.floor * cell;
@@ -221,8 +209,30 @@ export const createThemeStage = canvas => {
         }
         block(bx + x * cell, y * cell, cell, value);
         if (impact) ctx.restore();
-      });
-      if (clip) ctx.restore();
+      }
+    };
+    board.forEach((row, y) => {
+      if (!isErasing || !clear.rows.includes(y)) {
+        drawRow(row, y);
+        return;
+      }
+      const rowWidth = COLS * cell;
+      for (const { visible, alpha, left, right } of sections) {
+        if (!visible.length) continue;
+        const region = new Path2D();
+        for (const rect of visible)
+          region.rect(
+            bx + rect.left * rowWidth,
+            (y + rect.top) * cell,
+            (rect.right - rect.left) * rowWidth,
+            (rect.bottom - rect.top) * cell
+          );
+        ctx.save();
+        ctx.clip(region);
+        ctx.globalAlpha = alpha;
+        drawRow(row, y, Math.round(left * COLS), Math.round(right * COLS));
+        ctx.restore();
+      }
     });
     // 줄 삭제 효과는 블록 위, 떨어질 피스·고스트는 그 위
     effects.draw(ctx, geometry, elapsed, ink, visual.effects);
