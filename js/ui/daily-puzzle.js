@@ -1,4 +1,5 @@
 import { PUZZLE_CELLS } from "../modes/custom-puzzle.js";
+import { SOLVER_UNAVAILABLE } from "../app/solver.js";
 import { GARBAGE } from "../core/pieces.js";
 import { t } from "../i18n/index.js";
 import { recentDailyKeys } from "../modes/daily.js";
@@ -38,7 +39,7 @@ export const createDailyPuzzleUI = ({ dialog, solver, progress, getVisual, onPla
     const day = await job.promise;
     if (pending !== job) return;
     pending = null;
-    if (day) cache.set(date, day);
+    if (day && day !== SOLVER_UNAVAILABLE) cache.set(date, day);
     return day;
   };
 
@@ -159,7 +160,7 @@ export const createDailyPuzzleUI = ({ dialog, solver, progress, getVisual, onPla
       status.textContent = t("퍼즐을 만드는 중이에요…");
       const day = await fetchDay(date);
       if (!dialog.open || !title.isConnected || selected !== date || day === undefined) return;
-      if (!day) {
+      if (!day || day === SOLVER_UNAVAILABLE) {
         status.textContent = t("퍼즐을 만들지 못했어요. 창을 닫고 다시 열어 주세요.");
         return;
       }

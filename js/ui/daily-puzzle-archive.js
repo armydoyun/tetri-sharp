@@ -127,6 +127,10 @@ export const createDailyPuzzleArchive = ({ dialog, fetchDay, progress, onPick, o
       for (const date of dates) {
         const day = await fetchDay(date);
         if (!dialog.open || !list.isConnected) return;
+        if (day === SOLVER_UNAVAILABLE) {
+          missing = true;
+          break;
+        }
         if (day) results.push(day);
         else missing = true;
       }
@@ -138,3 +142,4 @@ export const createDailyPuzzleArchive = ({ dialog, fetchDay, progress, onPick, o
 
   return { open };
 };
+import { SOLVER_UNAVAILABLE } from "../app/solver.js";

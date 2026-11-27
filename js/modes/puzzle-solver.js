@@ -433,7 +433,7 @@ const findSolution = (puzzle, board, pieces, rotation, opts = {}, control = {}) 
  * @typedef {SolverBase & { type: "first", active: { type: string, x: number, y: number, rot: number, lastAction?: string, kick?: number, spinMoved?: boolean }, combo: number, rest: string[], total?: number, hold?: string | null, holdUsed?: boolean }
  *   | SolutionTask
  *   | Omit<SolutionTask, "type"> & { type: "comparison", excludeFirst: string }} SolverTask
- * @typedef {SolverBase & { type: "solution", pieces: string[], holdStart?: string | null }} SolutionTask
+ * @typedef {SolverBase & { type: "solution", pieces: string[], holdStart?: string | null, maxStates?: number }} SolutionTask
  */
 
 /**
@@ -447,7 +447,14 @@ export const runSolverTask = task => {
   const board = { width: WIDTH, height: HEIGHT, cells: task.board };
   const opts = task.opts ?? {};
   if (task.type === "solution")
-    return findSolution(puzzle, board, task.pieces, rotation, { ...opts, holdStart: task.holdStart ?? null });
+    return findSolution(
+      puzzle,
+      board,
+      task.pieces,
+      rotation,
+      { ...opts, holdStart: task.holdStart ?? null },
+      task.maxStates === undefined ? {} : { budget: { left: task.maxStates } }
+    );
   if (task.type === "comparison") {
     const { looseRows, ...bounds } = opts;
     const alternative = findSolution(

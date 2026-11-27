@@ -1,4 +1,5 @@
 import { HEIGHT, VISIBLE_ROWS, WIDTH, clearLines, place } from "../core/board.js";
+import { SOLVER_UNAVAILABLE } from "../app/solver.js";
 import { CELL_ID } from "../core/pieces.js";
 import { t } from "../i18n/index.js";
 import { placementKey } from "../modes/puzzle-solver.js";
@@ -118,10 +119,16 @@ export const openPuzzleComparison = ({ dialog, solver, task, baseline, visual })
   const body = el(
     "div",
     { class: "puzzle-comparison" },
-    el("div", { class: "daily-puzzle-layout" }, ...cards.map(card => card.root)),
-    el("div", { class: "puzzle-comparison-nav" }, previous, nav, next)
+    el("div", { class: "daily-puzzle-layout" }, ...cards.map(card => card.root))
   );
-  fillDialog(dialog, { title: t("풀이 비교"), body, notice, actions: [], closeId: "puzzle-comparison-close" });
+  const navigation = el("div", { class: "puzzle-comparison-nav" }, previous, nav, next);
+  fillDialog(dialog, {
+    title: t("풀이 비교"),
+    body,
+    notice,
+    actions: [navigation],
+    closeId: "puzzle-comparison-close",
+  });
   render();
   const cancelOnClose = () => {
     if (dialog.open && body.isConnected) return;
@@ -131,7 +138,12 @@ export const openPuzzleComparison = ({ dialog, solver, task, baseline, visual })
   dialog.addEventListener("close", cancelOnClose);
   dialog.showModal();
   job.promise.then(result => {
-    if (!dialog.open || !body.isConnected || !result || !("comparison" in result)) return;
+    if (!dialog.open || !body.isConnected || !result) return;
+    if (result === SOLVER_UNAVAILABLE) {
+      notice.textContent = t("백그라운드 풀이기를 열 수 없어요. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+    if (!("comparison" in result)) return;
     if (result.comparison === "found") {
       paths[1] = result.alternative;
       ends[1] = completedBoard(paths[1]);

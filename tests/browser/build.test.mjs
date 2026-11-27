@@ -4131,6 +4131,133 @@ test("퍼즐 만들기 자동 확인: 고치기를 멈추면 저절로 확인하
   await context.close();
 });
 
+test("퍼즐 편집기: Worker 차단 시 상태를 알리고 편집을 계속한다", async () => {
+  const { context, page, errors } = await openPage(() => {
+    window.Worker = class {
+      constructor() {
+        throw new DOMException("Worker blocked", "SecurityError");
+      }
+    };
+  });
+  try {
+    await openList(page, "#open-puzzles");
+    await page.click("#puzzle-create");
+    await pickTemplate(page, "well");
+    await page.getByText(/백그라운드 풀이기를 열 수 없어요/).waitFor();
+    assert.ok(await page.locator("#puzzle-check").isEnabled());
+    assert.ok(await page.locator("#puzzle-trial").isEnabled());
+    await page.click('#puzzles [data-piece="O"]');
+    assert.equal(await page.locator("#puzzles .puzzle-editor-count").textContent(), "2 / 50");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("퍼즐 자동 풀이: 시간이 긴 자동 검색을 멈추고 수동 확인으로 계속한다", async () => {
+  const { context, page, errors } = await openPage(() => {
+    const RealWorker = window.Worker;
+    window.Worker = class extends RealWorker {
+      postMessage(message) {
+        if (!message.task.maxStates) super.postMessage(message);
+      }
+    };
+  });
+  try {
+    await openList(page, "#open-puzzles");
+    await page.click("#puzzle-create");
+    await pickTemplate(page, "well");
+    await page.getByText(/이 퍼즐은 더 살펴봐야 해요/).waitFor();
+    assert.ok(await page.locator("#puzzle-check-stop").isDisabled());
+    await page.click("#puzzle-check");
+    await page.getByText(/풀 수 있어요 · 1수/).waitFor();
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("모바일 퍼즐 풀이: 긴 편집판에서 열어도 보드를 보면서 스크롤 없이 단계 이동", async () => {
+  const { context, page, errors } = await openPage(null, undefined, {
+    viewport: { width: 320, height: 568 },
+    hasTouch: true,
+  });
+  try {
+    await openList(page, "#open-puzzles");
+    await page.click("#puzzle-create");
+    const worker = page.waitForEvent("worker");
+    const stage = PUZZLES.find(p => p.kind === "pc" && p.pieces.length === 3);
+    await pickTemplate(page, `stage-${stage.number}`);
+    assert.ok((await worker).url().startsWith("blob:"));
+    await page.click('#puzzle-height [data-value="20"]');
+    await page.click("label.puzzle-editor-switch");
+    const scroll = () => page.locator("#puzzles .dialog-body").evaluate(el => el.scrollTop);
+    const before = await scroll();
+    const board = page.locator(".puzzle-editor-board");
+    const nav = page.locator(".puzzle-editor-preview-nav");
+    const box = await board.boundingBox();
+    const controls = await nav.boundingBox();
+    const body = await page.locator("#puzzles .dialog-body").boundingBox();
+    assert.ok(controls.y >= body.y - 1 && box.y + box.height <= body.y + body.height + 1);
+    await page.click("#puzzle-solution-next");
+    assert.equal(await text(page, "puzzle-solution-step"), "2 / 3");
+    await page.click("#puzzle-solution-next");
+    assert.equal(await text(page, "puzzle-solution-step"), "3 / 3");
+    await page.click("#puzzle-solution-prev");
+    assert.equal(await text(page, "puzzle-solution-step"), "2 / 3");
+    assert.equal(await scroll(), before);
+    await page.click("#puzzle-solution-exit");
+    assert.equal(await board.getAttribute("data-rows"), "20");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("모바일 슬라이더: 세로 스와이프는 설정을 스크롤하고 가로 드래그는 값을 바꾼다", async () => {
+  const { context, page, errors } = await openPage(null, undefined, {
+    viewport: { width: 390, height: 650 },
+    hasTouch: true,
+  });
+  const cdp = await context.newCDPSession(page);
+  try {
+    await page.click("#open-settings");
+    const body = page.locator("#settings .dialog-body");
+    const slider = page.locator("#set-arr");
+    const swipe = async (dx, dy, at) => {
+      await slider.scrollIntoViewIfNeeded();
+      const box = await slider.boundingBox();
+      const x = box.x + box.width * at;
+      const y = box.y + box.height / 2;
+      const touch = (type, touchPoints) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints });
+      await touch("touchStart", [{ x, y }]);
+      for (let t = 1; t <= 8; t++) await touch("touchMove", [{ x: x + (dx * t) / 8, y: y + (dy * t) / 8 }]);
+      await touch("touchEnd", []);
+    };
+    await slider.scrollIntoViewIfNeeded();
+    const beforeScroll = await body.evaluate(el => el.scrollTop);
+    const beforeValue = await slider.inputValue();
+    await swipe(4, -140, 0.8);
+    await page.waitForFunction(
+      before => document.querySelector("#settings .dialog-body").scrollTop > before,
+      beforeScroll
+    );
+    assert.equal(await slider.inputValue(), beforeValue);
+    await swipe(85, 3, 0.2);
+    assert.notEqual(await slider.inputValue(), beforeValue);
+    const dragged = Number(await slider.inputValue());
+    await swipe(0, 0, 0.1);
+    const tapped = Number(await slider.inputValue());
+    assert.ok(tapped < dragged);
+    await slider.focus();
+    await page.keyboard.press("ArrowRight");
+    assert.ok(Number(await slider.inputValue()) > tapped);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test("퍼즐 편집기 풀이 비교: 다른 첫 배치를 나란히 보고 T스핀 한 경로의 탐색 범위를 읽는다", async () => {
   const { context, page, errors } = await openPage(null, undefined, {
     viewport: { width: 390, height: 844 },

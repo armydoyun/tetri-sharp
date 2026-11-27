@@ -286,6 +286,68 @@ export const slider = attrs => {
   return input;
 };
 
+/** 세로 드래그는 브라우저 스크롤에 맡기고, 탭과 의도적인 가로 드래그만 슬라이더에 전달한다. */
+export const guardRangeTouch = (/** @type {HTMLInputElement} */ input) => {
+  // 네이티브 막대는 터치가 시작되는 순간 값이 바뀔 수 있어 투명한 표면에서 방향을 먼저 알아낸다.
+  const gesture = el("span", { class: "range-gesture", "aria-hidden": "true" });
+  const wrapper = el("span", { class: "touch-range" }, gesture);
+  input.before(wrapper);
+  wrapper.prepend(input);
+  let touch = null;
+  const setValue = value => {
+    const before = input.value;
+    input.value = String(value);
+    if (input.value !== before) input.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  const move = event => {
+    const dx = Math.abs(event.clientX - touch.x);
+    const dy = Math.abs(event.clientY - touch.y);
+    if (!touch.axis && Math.max(dx, dy) >= 8) touch.axis = dx > dy ? "x" : "y";
+  };
+  const seek = x => {
+    const box = input.getBoundingClientRect();
+    const min = Number(input.min || 0);
+    const max = Number(input.max || 100);
+    const fraction = (x - box.left) / box.width;
+    const rtl = getComputedStyle(input).direction === "rtl";
+    setValue(min + (max - min) * (rtl ? 1 - fraction : fraction));
+  };
+  gesture.addEventListener("pointerdown", event => {
+    if (event.button !== 0 || !event.isPrimary || input.disabled) return;
+    event.preventDefault();
+    touch = { id: event.pointerId, x: event.clientX, y: event.clientY, start: input.value, axis: null };
+    if (event.pointerType !== "touch") {
+      touch.axis = "x";
+      gesture.setPointerCapture(event.pointerId);
+      input.focus({ preventScroll: true });
+      seek(event.clientX);
+    }
+  });
+  gesture.addEventListener("pointermove", event => {
+    if (touch?.id !== event.pointerId) return;
+    move(event);
+    if (touch.axis === "x") seek(event.clientX);
+  });
+  gesture.addEventListener("pointerup", event => {
+    if (touch?.id !== event.pointerId) return;
+    move(event);
+    const { axis, start } = touch;
+    touch = null;
+    if (axis === "y") return;
+    seek(event.clientX);
+    if (input.value !== start) input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  const cancel = event => {
+    if (touch?.id !== event.pointerId) return;
+    const { axis, start } = touch;
+    touch = null;
+    if (axis === "x") setValue(start);
+  };
+  gesture.addEventListener("pointercancel", cancel);
+  gesture.addEventListener("lostpointercapture", cancel);
+  return wrapper;
+};
+
 /**
  * 슬라이더 + 값 한 줄. 값 칸 폭은 이 슬라이더가 보일 수 있는 가장 긴 값(최솟값·최댓값·중간값)에 맞춘다
  * → 값이 바뀌어도 막대 길이가 흔들리지 않고, 긴 값("120F · 2000ms")도 잘리지 않는다.
@@ -302,7 +364,7 @@ export const rangeRow = (input, output, format) => {
   for (let v = min; v <= max + 1e-9; v += step) longest = Math.max(longest, [...format(v)].length);
   output.dataset.ch = String(longest + 0.5);
   output.style.minWidth = `${longest + 0.5}ch`;
-  return el("span", { class: "range" }, input, output);
+  return el("span", { class: "range" }, guardRangeTouch(input), output);
 };
 
 /**
