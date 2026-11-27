@@ -1,6 +1,6 @@
 export const PRACTICE_PROGRESS_KEY = "practice:progress";
 const STAGE_ID =
-  /^(?:downstack-[1-6]|finesse-lesson-(?:[1-9]|10)|intro-[1-4]|gesture-lesson-[1-2]|battle-lesson-[1-3]|build-lesson-[1-2])$/;
+  /^(?:downstack-[1-6]|finesse-lesson-(?:[1-9]|10)|intro-[1-4]|gesture-lesson-[1-2]|battle-lesson-[1-3]|build-lesson-[1-2]|spin-lesson-(?:[1-9]|10))$/;
 
 export const sanitizePracticeProgress = raw => {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};

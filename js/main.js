@@ -52,6 +52,7 @@ import { decodeRules } from "./rules/share.js";
 import { createSfx } from "./audio/sfx.js";
 import { DOWNSTACK_LESSONS } from "./modes/downstack.js";
 import { BUILD_LESSONS } from "./modes/build-lessons.js";
+import { SPIN_LESSONS } from "./modes/spin-lessons.js";
 import { BATTLE_LESSONS } from "./modes/battle-lessons.js";
 import { GESTURE_LESSONS } from "./modes/gesture-lessons.js";
 import { INTRO_LESSONS } from "./modes/intro-lessons.js";
@@ -244,7 +245,15 @@ let restoredSteps = 0;
 const runs = createRunSaver({
   store,
   findMode,
-  lessons: [INTRO_LESSONS, GESTURE_LESSONS, BATTLE_LESSONS, BUILD_LESSONS, DOWNSTACK_LESSONS, FINESSE_LESSONS],
+  lessons: [
+    INTRO_LESSONS,
+    GESTURE_LESSONS,
+    BATTLE_LESSONS,
+    BUILD_LESSONS,
+    DOWNSTACK_LESSONS,
+    FINESSE_LESSONS,
+    SPIN_LESSONS,
+  ],
   // ask는 아래에서 정의된다: 부를 때 찾는다
   ask: options => ask(options),
   saveInterval: SAVE_INTERVAL,
@@ -728,6 +737,7 @@ const setScreen = next => {
     next === "results" && Boolean(mode.trialCode) && Boolean(game?.state.over) && game?.state.over !== "clear"
   );
   document.body.classList.toggle("has-lesson-hints", hasHintControls(mode) && next !== "menu");
+  document.body.classList.toggle("is-spin-lesson", Boolean(mode.spinLesson) && next === "play");
   document.body.classList.toggle("is-finesse-lesson", Boolean(mode.lesson) && next !== "menu");
   // 기록이 남는 판(기본 모드·오늘의 도전·CPU 대전): 일시정지 중에는 보드와 다음 피스를 가린다(css/game.css, 5차 검수 G4)
   document.body.classList.toggle("is-ranked", next !== "menu" && playCounts());
@@ -947,19 +957,21 @@ const backList = () => {
       label: t("퍼즐 목록"),
       open: () => puzzleUI.open(undefined, mode.trialCode || customs.findByCode(mode.puzzleCode) ? "mine" : "received"),
     };
-  const group = mode.gestureLesson
-    ? "gesture-training"
-    : mode.intro
-      ? "intro"
-      : mode.lesson
-        ? "finesse-lesson"
-        : mode.downstack
-          ? "downstack"
-          : mode.buildLesson
-            ? "build-training"
-            : mode.battleLesson
-              ? "battle-training"
-              : null;
+  const group = mode.spinLesson
+    ? "spin-training"
+    : mode.gestureLesson
+      ? "gesture-training"
+      : mode.intro
+        ? "intro"
+        : mode.lesson
+          ? "finesse-lesson"
+          : mode.downstack
+            ? "downstack"
+            : mode.buildLesson
+              ? "build-training"
+              : mode.battleLesson
+                ? "battle-training"
+                : null;
   const stageId = mode.id;
   if (group) return { label: t("연습 목록"), open: () => practiceUI.open(group, stageId) };
   if (mode.practice) return { label: t("연습 목록"), open: () => practiceUI.open(stageId.replace(/^practice-/, "")) };
@@ -1387,24 +1399,29 @@ const finish = () => {
   const summary = mode.summary(state);
   $("results-title").textContent = summary.title;
   $("results-main").textContent = reviewPractice ? t("마지막 수 연습") : summary.main;
-  if (!mode.lesson && !survival && !mode.battleLesson) say(`${summary.title} ${summary.main}`);
+  if (!mode.lesson && !survival && !mode.battleLesson)
+    say(`${summary.title} ${summary.main}${summary.note ? `. ${summary.note}` : ""}`);
   fb.clearAction();
   countdownEl.hidden = true;
   $("results-badge").classList.toggle("is-invisible", !outcome?.isBest);
 
-  const resultNote = mode.battleLesson
-    ? t("공격 {attack}줄 · 상쇄 {blocked}줄 · 상대에게 {sent}줄", {
-        attack: state.garbage.blocked + state.garbage.sent,
-        blocked: state.garbage.blocked,
-        sent: state.garbage.sent,
-      })
-    : survival
-      ? survivalResultText(state.frame, outcome ? outcome.previousBest : best)
-      : race
-        ? raceResultText(state, race.target.best, race.target.friend)
-        : "";
+  const resultNote = mode.spinLesson
+    ? summary.note
+    : mode.battleLesson
+      ? t("공격 {attack}줄 · 상쇄 {blocked}줄 · 상대에게 {sent}줄", {
+          attack: state.garbage.blocked + state.garbage.sent,
+          blocked: state.garbage.blocked,
+          sent: state.garbage.sent,
+        })
+      : survival
+        ? survivalResultText(state.frame, outcome ? outcome.previousBest : best)
+        : race
+          ? raceResultText(state, race.target.best, race.target.friend)
+          : "";
   const shortNote =
-    tooShort && !mode.trialCode ? t("너무 일찍 끝난 판이라 공유하지 않고 마지막 판으로 남기지 않아요") : "";
+    tooShort && !mode.trialCode && !mode.spinLesson
+      ? t("너무 일찍 끝난 판이라 공유하지 않고 마지막 판으로 남기지 않아요")
+      : "";
   $("race-result").textContent = [resultNote, shortNote].filter(Boolean).join(" · ");
   if (survival || mode.battleLesson) say(`${summary.title} ${summary.main}. ${resultNote}`);
 
@@ -1452,6 +1469,10 @@ const finish = () => {
   }
   if (mode.battleLesson) {
     rows.splice(0, rows.length, [t("받은 쓰레기"), String(state.garbage.received)]);
+  }
+  if (mode.spinLesson) {
+    const lines = mode.hudLines(state);
+    rows.splice(0, rows.length, [lines.label, lines.value], [t("시간"), formatTime(state.frame)]);
   }
   // 퍼즐: 점수·레벨·최고 기록·순위는 뜻이 없다 → 쓴 피스, 지운 줄, 깬 단계(4차 평가 F37)
   if (mode.puzzle) {
@@ -1605,25 +1626,27 @@ $("active-rules").addEventListener("click", e => {
 });
 $("edit-rules").addEventListener("click", () => rulesUI.open());
 
-const hasLessonHints = m => Boolean(m.downstack || m.buildLesson);
-/** 힌트 단추를 보이는 판: 파내기·빌드 연습, 퍼즐(첫 수 보기) */
+const hasLessonHints = m => Boolean(m.downstack || m.buildLesson || m.spinLesson);
+/** 힌트 단추를 보이는 판: 파내기·빌드·스핀 연습, 퍼즐(첫 수 보기) */
 const hasHintControls = m => hasLessonHints(m) || Boolean(m.puzzle);
-const lessonHintState = state => state.downstack ?? state.buildLesson;
+const lessonHintState = state => state.downstack ?? state.buildLesson ?? state.spinLesson;
 const isGuidedPractice = (m = mode) => m.lesson || hasLessonHints(m) || m.intro || m.battleLesson || m.gestureLesson;
 const nextPracticeLesson = () =>
-  mode.gestureLesson
-    ? GESTURE_LESSONS[mode.gestureLesson]
-    : mode.buildLesson
-      ? BUILD_LESSONS[mode.buildLesson]
-      : mode.battleLesson
-        ? BATTLE_LESSONS[mode.battleLesson]
-        : mode.intro
-          ? INTRO_LESSONS[mode.intro]
-          : mode.downstack
-            ? DOWNSTACK_LESSONS[mode.downstack.index + 1]
-            : mode.lesson
-              ? FINESSE_LESSONS[mode.lesson.index + 1]
-              : null;
+  mode.spinLesson
+    ? SPIN_LESSONS[mode.spinLesson]
+    : mode.gestureLesson
+      ? GESTURE_LESSONS[mode.gestureLesson]
+      : mode.buildLesson
+        ? BUILD_LESSONS[mode.buildLesson]
+        : mode.battleLesson
+          ? BATTLE_LESSONS[mode.battleLesson]
+          : mode.intro
+            ? INTRO_LESSONS[mode.intro]
+            : mode.downstack
+              ? DOWNSTACK_LESSONS[mode.downstack.index + 1]
+              : mode.lesson
+                ? FINESSE_LESSONS[mode.lesson.index + 1]
+                : null;
 const downstackHint = $("downstack-hint");
 // 이름만 바꾼다(단추 안의 단축키 표시는 그대로)
 const hintLabel = /** @type {HTMLElement} */ (downstackHint.querySelector(".btn-label"));

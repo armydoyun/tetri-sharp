@@ -14,6 +14,8 @@ test("힌트 없이 완료한 훈련과 퍼즐 진행도, 규칙별 Sprint 시�
   progress.mark("downstack-1");
   progress.mark("downstack-1", true);
   progress.mark("finesse-lesson-1");
+  progress.mark("spin-lesson-10", true);
+  progress.mark("spin-lesson-11");
   store.set("puzzle:cleared", [1, 3, 3, 99]);
   const history = createSprintHistory(store);
   for (let frames = 1; frames <= 25; frames++) history.add("modern", frames, frames % 2 === 0);
@@ -21,7 +23,11 @@ test("힌트 없이 완료한 훈련과 퍼즐 진행도, 규칙별 Sprint 시�
 
   const fresh = createStore(memoryBackend());
   assert.ok(restoreBackup(fresh, parseBackup(createBackup(store), findMode)));
-  assert.deepEqual(createPracticeProgress(fresh).read(), { "downstack-1": "no-hints", "finesse-lesson-1": "no-hints" });
+  assert.deepEqual(createPracticeProgress(fresh).read(), {
+    "downstack-1": "no-hints",
+    "finesse-lesson-1": "no-hints",
+    "spin-lesson-10": "clear",
+  });
   assert.deepEqual(fresh.get("puzzle:cleared", null), [1, 3]);
   const runs = createSprintHistory(fresh).list("modern");
   assert.equal(runs.length, 20);

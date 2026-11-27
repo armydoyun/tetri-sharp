@@ -11,6 +11,7 @@ import { chromium } from "playwright";
 import { build } from "../../tools/build.mjs";
 import { launchOptions } from "../helpers/browser.mjs";
 import { runScenarios } from "../helpers/ui-scenarios.mjs";
+import { auditInPage } from "../helpers/ui-audit.mjs";
 import { keysFor, solvePuzzle } from "../helpers/puzzle-solve.mjs";
 import { PUZZLES } from "../../js/modes/puzzles.js";
 import { DEFAULT_RULES, encodePuzzle, PUZZLE_CELLS } from "../../js/modes/custom-puzzle.js";
@@ -1685,7 +1686,7 @@ test("내 규칙: 첫 화면에서 고르고 공유 탭을 열며, 편집기에�
 test("연습: 메뉴에서 고르면 시작하고, 놓을 때마다 성공/시도를 센다", async () => {
   const { context, page, errors } = await openPage();
   await openList(page, "#open-practice");
-  assert.equal(await page.locator("#practice .menu-row").count(), 12);
+  assert.equal(await page.locator("#practice .menu-row").count(), 13);
   assert.equal(await page.locator('[data-drill="double"]').isVisible(), true);
   await page.click('[data-drill="tsd"]');
   await page.waitForFunction(() => document.body.dataset.screen === "play", null, {
@@ -1699,6 +1700,83 @@ test("연습: 메뉴에서 고르면 시작하고, 놓을 때마다 성공/시�
   });
   assert.deepEqual(errors, []);
   await context.close();
+});
+
+test("미노별 스핀 연습: O 양방향, 실패 안내, 힌트 복원과 힌트 없이 다시 하기", async () => {
+  const { context, page, errors } = await openPage(
+    () =>
+      localStorage.setItem(
+        "tetrisharp:settings",
+        JSON.stringify({ access: { countdown: "off" }, handling: { sdf: 41 } })
+      ),
+    undefined,
+    { frameClock: true, viewport: { width: 320, height: 568 }, hasTouch: true }
+  );
+  const right = [
+    ["ArrowLeft", 1],
+    ["ArrowDown", 1],
+    ["ArrowUp", 1],
+    ["Space", 1],
+  ];
+  const left = [
+    ["ArrowRight", 1],
+    ["ArrowDown", 1],
+    ["KeyZ", 1],
+    ["Space", 1],
+  ];
+  try {
+    await openList(page, "#open-practice");
+    await page.click('[data-drill="spin-training"]');
+    assert.equal(await page.locator("[data-practice-stage]").count(), 10);
+    await page.click('[data-practice-stage="spin-lesson-9"]');
+    await runKeys(page, [
+      ["ArrowLeft", 1],
+      ["ArrowDown", 1],
+      ["KeyZ", 1],
+      ["Space", 1],
+    ]);
+    assert.equal(await text(page, "results-title"), "실패");
+    assert.match(await text(page, "race-result"), /O가 제자리에서 돌았어요/);
+
+    await page.click('#results [data-action="retry"]');
+    await page.evaluate(() => window.advanceFrame());
+    await page.click("#downstack-hint");
+    assert.match(await text(page, "downstack-status"), /왼쪽 1칸.*소프트 드롭.*시계 회전/);
+    await page.keyboard.press("Escape");
+    await page.reload();
+    await page.click("#continue-run");
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    assert.match(await text(page, "downstack-status"), /왼쪽 1칸.*소프트 드롭.*시계 회전/);
+    await runKeys(page, right);
+    assert.equal(await text(page, "results-title"), "성공!");
+    assert.equal(await text(page, "race-result"), "힌트와 함께 완료");
+    await page.click('#results [data-action="retry"]');
+    await runKeys(page, right);
+    assert.equal(await text(page, "race-result"), "힌트 없이 완료");
+    await page.click('#results [data-action="next-puzzle"]');
+    assert.match(await text(page, "session-title"), /O스핀 · 왼쪽/);
+    await runKeys(page, left);
+    assert.equal(await text(page, "results-title"), "성공!");
+    await page.click('#results [data-action="menu"]');
+    const stage = page.locator('[data-practice-stage="spin-lesson-10"]');
+    await stage.waitFor();
+    assert.equal(await stage.evaluate(el => document.activeElement === el), true);
+    assert.match(await stage.textContent(), /힌트 없이 완료/);
+
+    await page.setViewportSize({ width: 740, height: 360 });
+    await page.click('[data-practice-stage="spin-lesson-3"]');
+    await page.evaluate(() => window.advanceFrame());
+    await page.click("#downstack-hint");
+    await page.evaluate(() => window.advanceFrame());
+    assert.match(await text(page, "downstack-status"), /반시계 회전.*소프트 드롭.*반시계 회전/);
+    assert.deepEqual(await page.evaluate(auditInPage), []);
+    await page.setViewportSize({ width: 568, height: 320 });
+    await page.evaluate(() => window.advanceFrame());
+    assert.deepEqual(await page.evaluate(auditInPage), []);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
 });
 
 test("파내기 훈련: 단계 선택, 두 가지 힌트, 같은 판 재시작 후 힌트 없이 클리어", async () => {

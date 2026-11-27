@@ -109,7 +109,11 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     const queue = state?.queue ?? emptyQueue;
     const pending = Math.min(VISIBLE_ROWS, state?.garbage?.pending ?? 0);
     const hintCells =
-      state?.downstack?.hintCells ?? state?.buildLesson?.hintCells ?? state?.puzzle?.hintCells ?? state?.finesseTarget;
+      state?.downstack?.hintCells ??
+      state?.buildLesson?.hintCells ??
+      state?.spinLesson?.hintCells ??
+      state?.puzzle?.hintCells ??
+      state?.finesseTarget;
     const lockTimer = active ? state.lock.timer : 0;
     // 퍼즐은 남은 피스만(움직이는 피스·홀드 칸 제외), 규칙의 미리보기 개수까지
     const shown = state?.puzzle

@@ -2,12 +2,13 @@ import { collides } from "./board.js";
 import { detectTSpin } from "./tspin.js";
 import { spinBit } from "../rules/spins.js";
 
-/** 벽과 놓인 블록으로 상하좌우가 모두 막힌 자리. */
-const trapped = (board, cells, x, y) =>
-  collides(board, cells, x, y + 1) &&
-  collides(board, cells, x - 1, y) &&
-  collides(board, cells, x + 1, y) &&
-  collides(board, cells, x, y - 1);
+/** 움직일 수 있는 첫 방향. 모두 막혀 있으면 undefined. */
+export const openSpinSide = (board, cells, x, y) => {
+  if (!collides(board, cells, x, y + 1)) return "down";
+  if (!collides(board, cells, x - 1, y)) return "left";
+  if (!collides(board, cells, x + 1, y)) return "right";
+  if (!collides(board, cells, x, y - 1)) return "up";
+};
 
 /**
  * O는 회전 방향으로 한 칸 옆·한 칸 아래에 있는 막힌 포켓에만 들어갈 수 있다.
@@ -24,7 +25,7 @@ export const spinKicks = (board, rotation, a, to, mask, blocked) => {
   if (a.type === "O" && mask & spinBit("O") && (a.rot + 2) % 4 !== to) {
     const dx = (a.rot + 1) % 4 === to ? 1 : -1;
     const cells = rotation.cells("O", to);
-    if (!collides(board, cells, a.x + dx, a.y + 1) && trapped(board, cells, a.x + dx, a.y + 1)) return [[dx, 1]];
+    if (!collides(board, cells, a.x + dx, a.y + 1) && !openSpinSide(board, cells, a.x + dx, a.y + 1)) return [[dx, 1]];
   }
   return rotation.kicks(a.type, a.rot, to, blocked);
 };
@@ -48,7 +49,7 @@ const NO_SPIN = Object.freeze({ tspin: /** @type {const} */ ("none") });
 export const detectSpin = (board, rotation, a, mask, legacyArsSpin = false) => {
   if (a.lastAction !== "rotate" || !(mask & spinBit(a.type))) return NO_SPIN;
   if (a.type === "T") return { tspin: detectTSpin(board, a, legacyArsSpin ? undefined : rotation.id) };
-  return a.spinMoved && trapped(board, rotation.cells(a.type, a.rot), a.x, a.y)
+  return a.spinMoved && !openSpinSide(board, rotation.cells(a.type, a.rot), a.x, a.y)
     ? { tspin: "none", spinPiece: a.type }
     : NO_SPIN;
 };

@@ -76,6 +76,7 @@ export const msToFrames = ms => (ms * 60) / 1000;
  * @property {(state: any, rng: import("./rng.js").Rng) => void} [setup]  시작 전에 보드를 꾸민다(Dig의 쓰레기 줄 등)
  * @property {(state: any) => boolean} [canHold]  홀드할 수 있는지(없으면 늘 된다)
  * @property {readonly string[]} [sequence]  정해진 피스 순서를 반복(연습 모드). 있으면 규칙의 생성기 대신 쓴다
+ * @property {(state: any, active: Active, spin: ReturnType<typeof detectSpin>) => void} [beforeLock]  판에 새기기 전 고정 상태를 관찰한다
  * @property {(state: any, lockEvent: any, events: any[]) => boolean | void} [onLock]  고정·줄 삭제 직후, 다음 피스 전에 불린다. 보드를 되돌렸으면 true
  * @property {(state: any, events: any[]) => void} [onFrame]  매 프레임 끝에 불린다(Survival의 쓰레기 줄 타이머 등)
  */
@@ -253,6 +254,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
     const a = /** @type {Active} */ (state.active);
     const shape = cells(a);
     const { tspin, spinPiece } = detectSpin(board, rotation, a, enabledSpins, legacyArsSpin);
+    mode?.beforeLock?.(state, a, { tspin, spinPiece });
     place(board, shape, a.x, a.y, CELL_ID[a.type]);
     state.active = null;
     state.holdUsed = false;

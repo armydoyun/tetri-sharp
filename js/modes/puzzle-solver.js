@@ -31,7 +31,7 @@ const BUDGET = 1500000;
  * @param {any} rotation  js/rules/rotation 의 회전 시스템
  * @param {string} type
  * @param {Array<{ x: number, y: number, rot: number, first?: string, lastAction?: string, kick?: number, spinMoved?: boolean }>} starts
- * @param {{ half?: boolean, withPath?: boolean, budget?: { left: number }, sonic?: boolean, lockNone?: boolean, legacyArsSpin?: boolean, spins?: number }} [options]
+ * @param {{ half?: boolean, withPath?: boolean, budget?: { left: number }, sonic?: boolean, softToFloor?: boolean, lockNone?: boolean, legacyArsSpin?: boolean, spins?: number }} [options]
  */
 export const reachable = (
   board,
@@ -43,6 +43,7 @@ export const reachable = (
     withPath = false,
     budget = { left: BUDGET },
     sonic = false,
+    softToFloor = false,
     lockNone = false,
     legacyArsSpin = false,
     spins = T_SPIN,
@@ -53,12 +54,12 @@ export const reachable = (
   const canSpin = type !== "T" && spins & spinBit(piece);
   const key = s => `${s.x},${s.y},${s.rot},${s.last === "rotate" ? (s.spinMoved ? "s" : s.kick) : "m"}`;
   /** 20G: 바닥까지 떨어뜨린다(떨어졌으면 마지막 동작은 내려가기) */
-  const fall = s => {
-    if (!sonic) return s;
+  const descend = s => {
     let y = s.y;
     while (fits(s.x, y + 1, s.rot)) y++;
     return y === s.y ? s : { ...s, y, last: "drop" };
   };
+  const fall = s => (sonic ? descend(s) : s);
   /** @type {Map<string, any>} */
   const prev = new Map();
   const queue = [];
@@ -103,7 +104,10 @@ export const reachable = (
     };
     for (const dx of [-1, 1])
       if (fits(s.x + dx, s.y, s.rot)) push({ ...s, x: s.x + dx, last: "move" }, dx < 0 ? "L" : "R");
-    if (!sonic && fits(s.x, s.y + 1, s.rot)) push({ ...s, y: s.y + 1, last: "drop" }, "D");
+    if (!sonic && fits(s.x, s.y + 1, s.rot)) {
+      const down = { ...s, y: s.y + 1, last: "drop" };
+      push(softToFloor ? descend(down) : down, "D");
+    }
     for (const d of half ? [1, 3, 2] : [1, 3]) {
       const to = (s.rot + d) % 4;
       const blocked = (cx, cy) => !inBounds(board, s.x + cx, s.y + cy) || get(board, s.x + cx, s.y + cy) !== 0;

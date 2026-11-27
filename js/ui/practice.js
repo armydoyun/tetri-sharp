@@ -1,5 +1,6 @@
 // 연습 고르기 대화상자: 종류를 누르면 바로 시작한다.
 import { BUILD_LESSONS } from "../modes/build-lessons.js";
+import { SPIN_LESSONS } from "../modes/spin-lessons.js";
 import { BATTLE_LESSONS } from "../modes/battle-lessons.js";
 import { FINESSE_LESSONS } from "../modes/finesse-lessons.js";
 import { GESTURE_LESSONS } from "../modes/gesture-lessons.js";
@@ -24,7 +25,7 @@ export const createPracticeUI = ({ dialog, onPick, progress, onStage, isTouch })
         "data-downstack": mode.downstack && mode.id,
         title: mode.downstack?.title ?? mode.name,
         desc:
-          result === "no-hints" && (mode.downstack || mode.buildLesson)
+          result === "no-hints" && (mode.downstack || mode.buildLesson || mode.spinLesson)
             ? t("힌트 없이 완료")
             : result
               ? t("완료")
@@ -90,6 +91,12 @@ export const createPracticeUI = ({ dialog, onPick, progress, onStage, isTouch })
         description: t("4줄 우물과 T-spin 자리를 직접 만들기"),
         lessons: BUILD_LESSONS,
       };
+      const spins = {
+        id: "spin-training",
+        name: t("미노별 스핀 연습"),
+        description: t("7종 스핀 · O 양방향과 좌우 반전 배치"),
+        lessons: SPIN_LESSONS,
+      };
       // 쉬운 것부터(2차 평가 F28): 조작 → 피네스 → 우물·파내기 → 빌드 → T-spin → 퍼펙트 클리어 → CPU 대전
       const ORDER = [
         "free",
@@ -101,6 +108,7 @@ export const createPracticeUI = ({ dialog, onPick, progress, onStage, isTouch })
         "double",
         "downstack",
         "build-training",
+        "spin-training",
         "tsd",
         "tst",
         "pc",
@@ -111,6 +119,7 @@ export const createPracticeUI = ({ dialog, onPick, progress, onStage, isTouch })
         ...(isTouch() || from === gestures.id ? [gestures] : []),
         battle,
         build,
+        spins,
         downstack,
         lesson,
         ...DRILLS,

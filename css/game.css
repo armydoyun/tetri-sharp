@@ -1684,6 +1684,27 @@ body.has-lesson-hints[data-screen="play"] .downstack-controls {
   display: none;
 }
 
+@media (orientation: landscape) and (max-height: 520px) and (pointer: coarse) {
+  body.is-spin-lesson .downstack-controls .actions-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body.is-spin-lesson .downstack-controls .btn {
+    --btn-px: var(--space-1);
+    --btn-gap: var(--space-1);
+  }
+}
+
+@media (orientation: landscape) and (max-height: 360px) and (pointer: coarse) {
+  body.is-spin-lesson .stage-side {
+    gap: var(--space-1);
+  }
+
+  body.is-spin-lesson :is(.stage-side > .hud, #downstack-hint > kbd) {
+    display: none;
+  }
+}
+
 .undo-piece {
   display: none;
   width: 100%;

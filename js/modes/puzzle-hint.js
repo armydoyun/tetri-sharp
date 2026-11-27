@@ -7,8 +7,9 @@ export { findFirstMove } from "./puzzle-solver.js";
  * 누를 순서를 짧은 글로: "오른쪽 4칸, 아래로 18칸, 반시계 회전, 그대로 두기"
  * @param {string[]} steps  L R D CW CCW 180
  * @param {boolean} spinLast  마지막이 회전이어야 하는 수(T-spin 등) → 하드 드롭 대신 그대로 두기
+ * @param {boolean} [softToFloor] D 한 번은 피스가 멈출 때까지 소프트 드롭
  */
-export const describeSteps = (steps, spinLast) => {
+export const describeSteps = (steps, spinLast, softToFloor = false) => {
   // 끝에 곧장 내려가는 칸은 하드 드롭 하나로 갈음한다
   let end = steps.length;
   while (end > 0 && steps[end - 1] === "D") end--;
@@ -22,7 +23,7 @@ export const describeSteps = (steps, spinLast) => {
     const s = steps[i];
     if (s === "L") parts.push(t("왼쪽 {n}칸", { n }));
     else if (s === "R") parts.push(t("오른쪽 {n}칸", { n }));
-    else if (s === "D") parts.push(t("아래로 {n}칸", { n }));
+    else if (s === "D") parts.push(softToFloor ? t("멈출 때까지 소프트 드롭") : t("아래로 {n}칸", { n }));
     else if (s === "CW") parts.push(n > 1 ? t("시계 회전 {n}번", { n }) : t("시계 회전"));
     else if (s === "CCW") parts.push(n > 1 ? t("반시계 회전 {n}번", { n }) : t("반시계 회전"));
     else parts.push(t("180° 회전"));
