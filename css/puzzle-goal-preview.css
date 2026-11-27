@@ -1,0 +1,172 @@
+.goal-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  margin-block-end: var(--space-4);
+}
+
+#goal-transport {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.goal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.goal-card {
+  min-width: 0;
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+}
+
+.goal-card h2 {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-2xl);
+  line-height: 1.25;
+  min-height: calc(var(--text-2xl) * 1.25 + var(--space-3) * 2);
+  display: grid;
+  align-items: center;
+}
+
+.goal-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 3fr);
+  align-items: stretch;
+  padding: var(--space-3);
+  gap: var(--space-2);
+  background: var(--bg);
+  border-block: var(--border-w) solid var(--border);
+}
+
+.goal-board {
+  display: block;
+  align-self: center;
+  width: 100%;
+  height: auto;
+}
+
+.goal-hud {
+  display: grid;
+  grid-template-rows: auto minmax(var(--control-h), 1fr) auto;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  min-width: 0;
+  border: var(--border-w) solid var(--border-strong);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+}
+
+.goal-hud[data-complete="true"] {
+  border-color: var(--accent-ledge);
+  background: var(--accent-soft);
+}
+
+.goal-hud p {
+  margin: 0;
+  min-width: 0;
+}
+
+.goal-status {
+  color: var(--text-dim);
+  font-size: var(--text-s);
+  font-weight: 750;
+}
+
+.goal-hud[data-complete="true"] .goal-status {
+  color: var(--accent);
+}
+
+.goal-value {
+  font: 750 var(--text-m) / 1.45 var(--font-num);
+}
+
+.goal-marks {
+  align-self: center;
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.goal-mark {
+  display: block;
+  height: var(--space-1);
+  border-radius: var(--radius-s);
+  border: var(--border-w) solid var(--border-strong);
+  background: var(--surface-3);
+}
+
+.goal-mark[data-filled="true"] {
+  background: var(--accent);
+  border-color: var(--accent-ledge);
+}
+
+.goal-marks[data-kind="lines"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.goal-marks[data-kind="lines"] .goal-mark {
+  height: var(--space-3);
+}
+
+.goal-marks[data-kind="pc"] .goal-mark[data-filled="true"] {
+  background: var(--text-faint);
+  border-color: var(--text-faint);
+}
+
+.goal-t {
+  width: min(100%, calc(var(--space-3) * 3 + var(--space-1) * 2));
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.goal-t > .goal-mark {
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.goal-t > .goal-mark[data-filled="false"] {
+  background: var(--surface-2);
+  border-color: var(--text-dim);
+}
+
+.goal-t > .goal-mark:last-child {
+  grid-column: 2;
+}
+
+.goal-card > p {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  color: var(--text-dim);
+  font-size: var(--text-m);
+}
+
+@media (max-width: 920px) {
+  .goal-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .goal-card h2 {
+    min-height: 0;
+  }
+
+  .goal-stage {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .goal-board {
+    max-width: calc(var(--hud-width) * 2);
+  }
+}
