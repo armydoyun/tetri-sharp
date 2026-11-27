@@ -48,6 +48,7 @@ import {
   usedHeight,
 } from "../modes/puzzle-edit.js";
 import { el, fieldRow, fillDialog, focusKey, restoreFocus } from "./dom.js";
+import { openPuzzleComparison } from "./puzzle-comparison.js";
 import { copyText, revealForCopy } from "./clipboard.js";
 import {
   button,
@@ -104,7 +105,7 @@ const settingsOf = p => ({
   desc: p.desc,
 });
 
-/** @typedef {{ type: string, hold: boolean, board: Uint8Array, cells: Array<[number, number]> }} SolutionMove */
+/** @typedef {import("../modes/puzzle-solver.js").SolutionMove} SolutionMove */
 /**
  * 자동 확인 결과(그 퍼즐 코드에 대해). checking: 찾는 중
  * @typedef {{ code: string, state: "checking" | "solvable" | "unsolvable" | "exhausted", moves?: SolutionMove[] }} Verified
@@ -113,12 +114,14 @@ const settingsOf = p => ({
 /**
  * @param {{
  *   dialog: HTMLDialogElement,
+ *   comparisonDialog: HTMLDialogElement,
+ *   getVisual: () => import("../render/canvas.js").Visual,
  *   solver: ReturnType<typeof import("../app/solver.js").createSolver>,
  *   customs: ReturnType<typeof import("../storage/custom-puzzles.js").createCustomPuzzles>,
  *   onTry: (code: string) => void,
  * }} options
  */
-export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
+export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver, customs, onTry }) => {
   let cells = new Uint8Array(PUZZLE_CELLS);
   let pieces = "";
   let settings = defaultSettings();
@@ -455,12 +458,13 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       // ---- 자동 확인 · 풀이 보기 ----
       const check = button({ id: "puzzle-check", label: t("풀 수 있는지 확인"), icon: "check", size: "s" });
       const stop = button({ id: "puzzle-check-stop", label: t("멈추기"), size: "s" });
+      const compare = button({ id: "puzzle-compare", label: t("풀이 비교"), size: "s" });
       const status = el("p", { class: "puzzle-editor-status", id: "puzzle-status", role: "status" });
       const view = toggle({ id: "puzzle-solution-view" });
       const prevStep = iconButton({ icon: "arrow-left", label: t("이전 수"), id: "puzzle-solution-prev" });
       const nextStep = iconButton({ icon: "arrow-right", label: t("다음 수"), id: "puzzle-solution-next" });
       const stepOut = el("output", { class: "puzzle-editor-step num", id: "puzzle-solution-step" });
-      const checkActions = el("div", { class: "puzzle-editor-check-actions" }, check, stop);
+      const checkActions = el("div", { class: "puzzle-editor-check-actions" }, check, stop, compare);
       const solutionActions = el(
         "div",
         { class: "puzzle-editor-solution" },
@@ -904,6 +908,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         check.disabled = !code || !canSearch(current()) || Boolean(checking) || Boolean(verified);
         stop.disabled = !checking;
         view.disabled = !moves;
+        compare.disabled = !moves;
         view.checked = viewStep !== null;
         prevStep.disabled = viewStep === null || viewStep === 0;
         nextStep.disabled = viewStep === null || !moves || viewStep >= moves.length - 1;
@@ -1228,6 +1233,17 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         stopChecking();
         refresh();
         check.focus();
+      });
+      compare.addEventListener("click", () => {
+        const baseline = solution();
+        if (!baseline || comparisonDialog.open) return;
+        openPuzzleComparison({
+          dialog: comparisonDialog,
+          task: solutionTask(current()),
+          solver,
+          baseline,
+          visual: getVisual(),
+        });
       });
       view.addEventListener("change", () => {
         viewStep = view.checked && solution() ? 0 : null;

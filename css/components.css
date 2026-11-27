@@ -1778,3 +1778,38 @@
   font-size: var(--text-s);
   font-weight: 750;
 }
+
+.puzzle-comparison,
+.puzzle-comparison-card {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.puzzle-comparison-card {
+  min-width: 0;
+  grid-template-rows: auto auto 1fr;
+}
+
+.puzzle-comparison-card :is(h3, p) {
+  margin: 0;
+}
+
+.puzzle-comparison-card h3 {
+  font-size: var(--text-l);
+}
+
+.puzzle-comparison-card p {
+  min-block-size: 2lh;
+}
+
+.puzzle-comparison-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.puzzle-comparison-nav output {
+  min-inline-size: 7ch;
+  text-align: center;
+}

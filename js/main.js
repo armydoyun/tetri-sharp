@@ -1698,6 +1698,8 @@ const playCustomPuzzle = (code, trial = false) => {
 const customs = createCustomPuzzles(store);
 const puzzleEditor = createPuzzleEditor({
   dialog: puzzleDialog,
+  comparisonDialog: /** @type {HTMLDialogElement} */ ($("puzzle-comparison")),
+  getVisual: () => settings.visual,
   solver,
   customs,
   onTry: code => playCustomPuzzle(code, true),

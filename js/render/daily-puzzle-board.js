@@ -8,7 +8,8 @@ export const createDailyPuzzleBoard = (/** @type {HTMLCanvasElement} */ canvas, 
   canvas.height = rows * cell;
   const ctx = canvas.getContext("2d");
   const grid = createBoardGrid(0, 0, WIDTH, rows, cell);
-  return (cells, theme, palette = theme.palette, showGrid = true) => {
+  /** @param {{ cells: [number, number][], color: string }} [landing] */
+  return (cells, theme, palette = theme.palette, showGrid = true, landing) => {
     if (!ctx) return;
     grid(ctx, theme, showGrid);
     const start = cells.length - WIDTH * rows;
@@ -17,6 +18,11 @@ export const createDailyPuzzleBoard = (/** @type {HTMLCanvasElement} */ canvas, 
         const value = cells[start + y * WIDTH + x];
         if (value) theme.block(ctx, x * cell, y * cell, cell, palette[value]);
       }
+    }
+    if (landing) {
+      const top = start / WIDTH;
+      for (const [x, y] of landing.cells)
+        if (y >= top && y < top + rows) theme.ghost(ctx, x * cell, (y - top) * cell, cell, landing.color, "strong");
     }
   };
 };
