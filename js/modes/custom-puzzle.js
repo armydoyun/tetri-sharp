@@ -300,7 +300,7 @@ export const canSearch = puzzle => normalizePuzzle(puzzle).gravity !== "rules";
 /**
  * 처음부터 끝까지 풀이를 찾는 탐색 한 건
  * @param {CustomPuzzle} puzzle
- * @returns {import("./puzzle-solver.js").SolverTask}
+ * @returns {import("./puzzle-solver.js").SolutionTask}
  */
 export const solutionTask = puzzle => {
   const p = normalizePuzzle(puzzle);

@@ -2,6 +2,16 @@
 // tests/unit/i18n.test.mjs가 코드와 index.html의 한국어 문장이 모두 여기 있는지 확인한다.
 /** @type {Record<string, string>} */
 export const EN = {
+  "풀이 비교": "Compare solutions",
+  "풀이 A": "Solution A",
+  "풀이 B": "Solution B",
+  "다른 첫 배치를 찾는 중이에요…": "Looking for a different opening placement…",
+  "서로 다른 첫 배치 2가지를 확인했어요.": "Found 2 distinct opening placements.",
+  "탐색 제한에 도달했어요. 다른 첫 배치는 확인하지 못했어요.":
+    "Search limit reached before another opening could be confirmed.",
+  "탐색 범위에서 다른 첫 배치를 찾지 못했어요.": "No other opening placement found within the search range.",
+  "목표 달성 · {n}수": "Complete in {n} moves",
+  "홀드 먼저": "Hold first",
   "지난 퍼즐": "Puzzle archive",
   "지난 퍼즐을 불러오는 중…": "Loading past puzzles…",
   "일부 날짜의 퍼즐을 불러오지 못했어요.": "Some puzzles could not be loaded.",

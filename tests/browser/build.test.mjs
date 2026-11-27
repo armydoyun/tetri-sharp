@@ -3950,6 +3950,47 @@ test("퍼즐 만들기 자동 확인: 고치기를 멈추면 저절로 확인하
   await context.close();
 });
 
+test("퍼즐 편집기 풀이 비교: 다른 첫 배치를 나란히 보고 T스핀 한 경로의 탐색 범위를 읽는다", async () => {
+  const { context, page, errors } = await openPage(null, undefined, {
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+  });
+  try {
+    await openList(page, "#open-puzzles");
+    await page.click("#puzzle-create");
+    await pickTemplate(page, "empty");
+    for (const row of [18, 19]) {
+      for (const col of [0, 1, 4, 5, 8, 9]) await page.click(`[data-cell="${row * 10 + col}"]`);
+    }
+    await page.click('#puzzles [data-piece="O"]');
+    await page.click('#puzzles [data-piece="O"]');
+    const compare = page.locator("#puzzle-compare");
+    await compare.click();
+    const dialog = page.locator("#puzzle-comparison");
+    await dialog.getByText("서로 다른 첫 배치 2가지를 확인했어요.").waitFor();
+    const boards = dialog.getByRole("img");
+    assert.equal(await boards.count(), 2);
+    const [a, b] = await boards.evaluateAll(canvases => canvases.map(canvas => canvas.toDataURL()));
+    assert.notEqual(a, b, "첫 O가 놓이는 위치가 다른 두 보드");
+    assert.ok(await dialog.evaluate(root => root.scrollWidth <= root.clientWidth));
+    await dialog.getByRole("button", { name: "다음 수" }).click();
+    assert.equal(await dialog.getByText("O 피스 · 2줄 삭제", { exact: true }).count(), 2);
+    await page.keyboard.press("Escape");
+    assert.ok(await compare.evaluate(control => control === document.activeElement));
+
+    await pickTemplate(page, "tsd");
+    await compare.click();
+    await dialog.getByText("탐색 범위에서 다른 첫 배치를 찾지 못했어요.").waitFor();
+    assert.equal(await dialog.getByText("T 피스 · 2줄 삭제 · T스핀").count(), 1);
+    assert.ok(await dialog.getByRole("button", { name: "다음 수" }).isDisabled());
+    await dialog.locator("#puzzle-comparison-close").click();
+    assert.ok(await page.locator("#puzzle-copy").isEnabled(), "비교는 편집 내용과 공유 확인을 유지한다");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test("퍼즐 만들기 목표·고급 설정: 목표와 규칙이 링크로 가고, 받는 쪽은 목표·규칙·확인 표시를 보고, '규칙대로'는 확인·첫 수 보기를 끈다", async () => {
   const { context, page, errors } = await openPage(() => {
     localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
