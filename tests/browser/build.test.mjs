@@ -690,7 +690,7 @@ test("Custom 옵션: 고정 중력의 적용값이 메뉴에 보이고 180도·D
   try {
     await page.click('[data-rules="custom"]');
     const marathon = page.locator('[data-mode="marathon"]');
-    assert.match(await marathon.textContent(), /모드별 중력/);
+    assert.equal(await marathon.getAttribute("aria-description"), "모드별 중력");
     await page.click("#edit-rules");
     await page.locator("#rule-allow180").uncheck();
     await page.click('#rules-editor [data-value="고정·낙하"]');
@@ -709,7 +709,8 @@ test("Custom 옵션: 고정 중력의 적용값이 메뉴에 보이고 180도·D
     assert.equal(exported.fixedHandling.dcd, 3);
     assert.equal(exported.fixedHandling.instantSoftDrop, true);
     await page.click("#rules-close");
-    assert.match(await marathon.textContent(), /0G/);
+    await page.waitForFunction(() => document.getElementById("active-rules")?.textContent.includes("0G"));
+    assert.match(await marathon.getAttribute("aria-description"), /0G/);
     await marathon.click();
     await page.waitForFunction(() => document.body.dataset.screen === "play");
     assert.ok(await page.locator('[data-touch="R180"]').isDisabled());

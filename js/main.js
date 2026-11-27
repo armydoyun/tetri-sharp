@@ -509,24 +509,33 @@ const renderMenu = () => {
   renderPuzzleProgress();
   renderAchievementProgress();
   const ruleSet = currentRules();
-  $("active-rules").textContent = t("규칙 · {name}", { name: ruleSet.name });
+  const custom = ruleChoice === "custom";
+  const gravity = gravityLabel(ruleSet.gravity, t);
+  const gravitySetting = ruleSet.gravityMode === "fixed" ? gravity : t("모드별 중력");
+  const active = t("규칙 · {name}", { name: ruleSet.name });
+  $("active-rules").textContent = custom ? `${active} · ${gravitySetting}` : active;
   const list = $("mode-list");
   list.replaceChildren(
     ...MODES.map(m => {
       const best = records.best(m, ruleSet);
       const rank = rankOf(m, best, ruleSet);
-      return menuRow({
+      const appliedGravity = custom
+        ? m.gravityFor && ruleSet.gravityMode !== "fixed"
+          ? t("모드별 중력")
+          : gravity
+        : null;
+      const row = menuRow({
         "data-mode": m.id,
+        "aria-description": appliedGravity,
         title: m.name,
-        desc:
-          ruleChoice === "custom"
-            ? `${m.description} · ${m.gravityFor && ruleSet.gravityMode !== "fixed" ? t("모드별 중력") : gravityLabel(ruleSet.gravity, t)}`
-            : m.description,
+        desc: m.description,
         meta: best
           ? t("최고 기록 {record}", { record: m.formatRecord(best) }) + (rank ? ` · ${rankLabel(rank)}` : "")
           : "",
         onClick: () => start(m),
       });
+      if (appliedGravity) row.title = appliedGravity;
+      return row;
     }),
     versusRow(),
     dailyRow()
