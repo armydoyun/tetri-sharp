@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko" data-scheme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tetri# · 퍼즐 목표 견본</title>
+    <link rel="stylesheet" href="./css/tokens.css" />
+    <link rel="stylesheet" href="./css/base.css" />
+    <link rel="stylesheet" href="./css/controls.css" />
+    <link rel="stylesheet" href="./css/components.css" />
+    <link rel="stylesheet" href="./css/theme-preview.css" />
+    <link rel="stylesheet" href="./css/puzzle-goal.css" />
+    <link rel="stylesheet" href="./css/puzzle-goal-preview.css" />
+  </head>
+  <body>
+    <header class="audition-header">
+      <div class="audition-shell audition-brand">
+        <span class="audition-brand-name">Tetri<span>#</span></span>
+      </div>
+    </header>
+    <main class="audition-shell audition-main">
+      <header class="audition-intro">
+        <h1>퍼즐 목표 견본</h1>
+        <p>단계를 바꿔 보드와 목표 표시가 어떻게 달라지는지 비교해 보세요.</p>
+      </header>
+      <div class="goal-toolbar">
+        <div id="goal-transport"></div>
+        <div id="goal-theme"></div>
+      </div>
+      <section class="goal-grid" id="goal-boards" aria-label="퍼즐 목표 비교"></section>
+    </main>
+    <!-- ES Modules: 개발용 실행은 http://localhost를 사용한다. -->
+    <script type="module" src="./js/puzzle-goal-preview/main.js"></script>
+  </body>
+</html>

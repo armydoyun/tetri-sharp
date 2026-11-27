@@ -75,7 +75,6 @@ import {
   CHECKED_TRIED,
   customPuzzleMode,
   decodePuzzle,
-  goalLabel,
   ruleSummary,
   searchOptions,
 } from "./modes/custom-puzzle.js";
@@ -87,6 +86,7 @@ import { createShareUI } from "./ui/share.js";
 import { createVersusUI } from "./ui/versus.js";
 import { lang, t, translateDom } from "./i18n/index.js";
 import { createFeedback } from "./app/feedback.js";
+import { createPuzzleGoalHud } from "./app/puzzle-goal-hud.js";
 import { createInputDisplay } from "./app/input-display.js";
 import { createKeyHelp } from "./app/key-help.js";
 import { setupBackup } from "./app/backup.js";
@@ -600,11 +600,17 @@ $("daily").addEventListener("close", () => {
 });
 const formatSurvivalGoal = frames => formatTime(frames).split(".")[0];
 
+const puzzleGoalHud = createPuzzleGoalHud($("puzzle-goal-hud"));
 let lastHud;
 const updateHud = () => {
   const frame = game?.state.frame ?? 0;
   if (lastHud?.game === game && lastHud.frame === frame && lastHud.mode === mode && lastHud.screen === screen) return;
   lastHud = { game, frame, mode, screen };
+  puzzleGoalHud.update(
+    game,
+    screen === "menu" || screen === "replay" ? null : mode.puzzle,
+    settings.visual.effects === "full"
+  );
   if (sceneView.current?.split && game) sceneView.updateSplitProgress(game.state);
   const stats = game?.state.stats ?? { pieces: 0, lines: 0 };
   const lines = game ? mode.hudLines(game.state) : { label: t("줄"), value: "0" };
@@ -674,35 +680,28 @@ const setScreen = next => {
   const modeTitle = mode.versus ? versusTitle(mode.versus) : mode.name;
   $("session-title").textContent = next === "menu" ? "" : sceneView.current ? sceneView.title() : modeTitle;
   $("session-title").classList.remove("is-secret");
-  $("mode-objective").textContent =
-    next === "menu" || next === "replay"
-      ? ""
-      : mode.puzzle?.custom
-        ? customObjective(mode.puzzle.custom)
-        : mode.puzzle
-          ? mode.puzzle.kind === "pc"
-            ? t("목표 · 주어진 피스로 판 비우기")
-            : mode.puzzle.kind === "quad"
-              ? t("목표 · 우물을 남기고 채운 뒤 마지막 I로 4줄 지우기")
-              : mode.puzzle.kind === "tuck"
-                ? t("목표 · 소프트 드롭으로 내린 뒤 처마 아래로 밀어 넣어 2줄 지우기")
-                : mode.puzzle.kind === "combo"
-                  ? t("목표 · 피스마다 한 줄 이상 지워 콤보 끊지 않기")
-                  : mode.puzzle.kind === "spin"
-                    ? t("목표 · 틈 근처까지 내린 뒤 돌려 끼워 넣어 2줄 지우기")
-                    : mode.puzzle.kind === "mini"
-                      ? t("목표 · T를 마지막에 돌려 넣어 T-spin Mini로 줄 지우기")
-                      : t("목표 · T 하나로 {kind} 만들기", { kind: mode.description })
-          : mode.practice
-            ? mode.description
-            : "";
+  $("mode-objective").textContent = next === "menu" || next === "replay" ? "" : modeObjective(mode);
 };
 
-/**
- * 만든 퍼즐의 목표 줄: 목표 · 바뀐 규칙 · 만든 사람이 확인한 것
- * @param {import("./modes/custom-puzzle.js").FullPuzzle} p
- */
-function customObjective(p) {
+const puzzleInstructions = {
+  pc: "주어진 피스로 판 비우기",
+  quad: "우물을 남기고 채운 뒤 마지막 I로 4줄 지우기",
+  tuck: "소프트 드롭으로 내린 뒤 처마 아래로 밀어 넣어 2줄 지우기",
+  combo: "피스마다 한 줄 이상 지워 콤보 끊지 않기",
+  spin: "틈 근처까지 내린 뒤 돌려 끼워 넣어 2줄 지우기",
+  mini: "T를 마지막에 돌려 넣어 T-spin Mini로 줄 지우기",
+};
+
+function modeObjective(m) {
+  if (m.dailyPuzzle || m.practice) return m.description;
+  if (m.puzzle?.custom) return customPuzzleDetails(m.puzzle.custom);
+  if (!m.puzzle) return "";
+  const instruction = puzzleInstructions[m.puzzle.kind];
+  return instruction ? t(instruction) : t("T 하나로 {kind} 만들기", { kind: m.description });
+}
+
+/** @param {import("./modes/custom-puzzle.js").FullPuzzle} p */
+function customPuzzleDetails(p) {
   const summary = ruleSummary(p);
   const checked =
     p.checked & CHECKED_TRIED
@@ -710,7 +709,7 @@ function customObjective(p) {
       : p.checked & CHECKED_AUTO
         ? t("자동 확인으로 풀 수 있는 퍼즐")
         : "";
-  return [t("목표 · {goal}", { goal: goalLabel(p.goal) }), summary, checked, p.desc].filter(Boolean).join(" · ");
+  return [summary, checked, p.desc].filter(Boolean).join(" · ");
 }
 
 /** @param {boolean} [initial] 처음 열 때 @param {boolean} [keepFocus] 포커스는 옮기지 않는다(대화상자를 닫고 다시 그릴 때) */

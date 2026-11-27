@@ -1646,6 +1646,12 @@ body.has-lesson-hints[data-screen="play"] .downstack-controls {
   }
 }
 
+@container downstack (min-width: 264px) {
+  #puzzle-goal-hud:not([hidden]) ~ .downstack-controls .actions-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .downstack-controls .btn {
   --btn-size: auto;
   --btn-min: var(--btn-base);
@@ -2168,6 +2174,68 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
    한 칸으로 쌓이는 좁은 화면에서만 규칙 블록으로 가는 링크 */
 @media (min-width: 681px) {
   .active-rules { text-decoration: none; pointer-events: none; }
+}
+
+#puzzle-goal-hud .goal-hud {
+  grid-template: repeat(4, auto) / minmax(0, 1fr);
+  row-gap: var(--space-1);
+}
+
+#puzzle-goal-hud .goal-title {
+  margin: 0;
+  font-size: var(--text-l);
+  line-height: 1.25;
+}
+
+#puzzle-goal-hud .goal-marks:has(.goal-t) {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+}
+
+#puzzle-goal-hud .goal-mark {
+  min-height: var(--space-1);
+}
+
+#puzzle-goal-hud .goal-t {
+  width: calc(var(--space-2) * 3 + var(--space-1) * 2);
+}
+
+#puzzle-goal-hud .goal-status,
+#puzzle-goal-hud .goal-value {
+  font-size: var(--text-s);
+  line-height: 1.25;
+}
+
+@media (max-width: 720px) and (orientation: portrait) {
+  body:has(#puzzle-goal-hud:not([hidden])) {
+    --chrome-h: calc(52px + 3 * var(--space-4) + 2 * var(--space-2) + 2 * var(--border-w) + var(--lesson-hud-h, 110px));
+  }
+
+  .stage-side:has(#puzzle-goal-hud:not([hidden])) {
+    width: 100%;
+    min-width: 0;
+  }
+
+  #puzzle-goal-hud .goal-hud {
+    grid-template: repeat(2, auto) / repeat(2, minmax(0, 1fr));
+  }
+
+  #puzzle-goal-hud .goal-title,
+  #puzzle-goal-hud .goal-marks {
+    grid-column: 1;
+  }
+
+  #puzzle-goal-hud .goal-status {
+    grid-row: 1;
+    grid-column: 2;
+    text-align: end;
+  }
+
+  #puzzle-goal-hud .goal-value {
+    align-self: center;
+    text-align: end;
+  }
 }
 
 .mode-objective:empty { display: none; }

@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="./css/base.css">
     <link rel="stylesheet" href="./css/controls.css">
     <link rel="stylesheet" href="./css/components.css">
+    <link rel="stylesheet" href="./css/puzzle-goal.css">
     <link rel="stylesheet" href="./css/game.css">
   </head>
   <body>
@@ -115,6 +116,7 @@
       <section class="stage" aria-label="게임 화면">
         <!-- 정보 칸: 모드마다 필요한 칸만(게임 시작 때 정해지고 게임 중에는 그대로) -->
         <div class="stage-side">
+          <div id="puzzle-goal-hud" hidden></div>
           <p id="mode-objective" class="mode-objective"></p>
           <div class="downstack-controls">
             <div class="actions-row">
