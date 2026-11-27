@@ -1910,6 +1910,20 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
   .stage-side > #puzzle-goal-hud { order: -2; }
   .stage-side > .downstack-controls { order: -1; }
 
+  .downstack-controls .actions-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .downstack-controls .btn {
+    --btn-px: var(--space-1);
+    white-space: normal;
+    word-break: keep-all;
+  }
+
+  .downstack-controls kbd {
+    display: none;
+  }
+
   /* 정보 칸: 두 칸 격자(시간은 한 줄 전체), 작게 */
   .hud {
     width: auto;
