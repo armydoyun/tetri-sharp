@@ -293,7 +293,7 @@ body.touch-on .rule-slot-home {
   max-height: none;
 }
 
-.home-tools-link {
+.home-shortcuts {
   display: none;
 }
 
@@ -830,6 +830,12 @@ body.is-finesse-lesson .results-stats :is(dt, dd) {
   gap: var(--space-2);
 }
 
+.replay-fixed {
+  display: grid;
+  gap: inherit;
+  min-width: 0;
+}
+
 /* 장면 목록: 조작 아래가 크게 비는 넓고 높은 화면(데스크톱)에서만. 길면 이 칸만 스크롤(U42) */
 .replay-scenes {
   display: none;
@@ -1014,6 +1020,20 @@ body.is-finesse-lesson .results-stats :is(dt, dd) {
 .replay-refine,
 .replay-actions {
   flex-wrap: wrap;
+}
+
+#replay-more {
+  display: none;
+}
+
+@media (orientation: landscape) and (max-height: 340px) and (pointer: coarse) {
+  #replay-more {
+    display: inline-flex;
+  }
+
+  .replay-utilities:has(#replay-more[aria-expanded="false"]) .replay-actions {
+    display: none;
+  }
 }
 
 /* ---- 정보 칸(HUD) ---- */
@@ -1873,6 +1893,23 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
     grid-area: hud;
   }
 
+  /* 긴 목표·힌트는 정보 칸 안에서 스크롤하고, 엄지 조작은 화면 아래에 고정한다. */
+  body.touch-on:not(.gestures-mode):is([data-screen="play"], [data-screen="countdown"]) .stage {
+    block-size: calc(100dvh - 36px - 3 * var(--space-2));
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  body.touch-on:not(.gestures-mode):is([data-screen="play"], [data-screen="countdown"]) .stage-side {
+    align-self: stretch;
+    align-content: start;
+    min-block-size: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  .stage-side > #puzzle-goal-hud { order: -2; }
+  .stage-side > .downstack-controls { order: -1; }
+
   /* 정보 칸: 두 칸 격자(시간은 한 줄 전체), 작게 */
   .hud {
     width: auto;
@@ -1977,11 +2014,16 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
     overscroll-behavior: contain;
   }
 
-  .replay-info {
+  .replay-fixed {
     position: sticky;
     top: 0;
     z-index: 1;
     background: var(--bg);
+  }
+
+  .countdown > span {
+    font-size: var(--text-3xl);
+    padding-inline: var(--space-3);
   }
 
   .input-display,
@@ -2274,7 +2316,14 @@ body[data-screen="results"] #action { display: none; }
   .home-main, .home-side { display: contents; }
   .home-modes, .home .home-block, .home .welcome, .home .help-card { width: 100%; }
 
+  .home-shortcuts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
   .home-tools-link {
+    grid-column: 1 / -1;
     display: inline-flex;
     align-items: center;
     min-height: var(--control-h-s);
@@ -2287,6 +2336,11 @@ body[data-screen="results"] #action { display: none; }
 
   @media (pointer: coarse) {
     .home-tools-link { min-height: 44px; }
+  }
+
+  @media (orientation: landscape) {
+    .home-shortcuts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .home-tools-link { grid-column: auto; }
   }
 }
 
@@ -2407,14 +2461,24 @@ body[data-scene-practice] .race-panel {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .replay-actions:has([data-replay="practice"]:not([hidden])) {
-    display: grid;
+  .replay-actions {
     flex: 1 1 100%;
-    grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
   }
 
-  .replay-actions:has([data-replay="practice"]:not([hidden])) .btn {
+  .replay-actions .btn {
     --btn-px: var(--space-1);
+  }
+}
+
+@media (orientation: landscape) and (max-height: 340px) and (pointer: coarse) {
+  .replay-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .replay-actions [data-replay="race"] {
+    grid-column: 1 / -1;
+    justify-self: start;
   }
 }
 
@@ -2749,6 +2813,11 @@ body[data-battle-replay] .replay-info {
    조작 줄의 실제 높이(--replay-bar-h, js/main.js가 잰다)만큼만 빼고, 그래도 보드는 화면 높이의 28% 아래로 줄지 않는다.
    화면이 아주 작으면(iPhone SE 등) 조작 줄 끝이 조금 아래로 밀려 스크롤로 닿는다. */
 @media (max-width: 720px) and (orientation: portrait) {
+  .countdown > span {
+    font-size: var(--text-3xl);
+    padding-inline: var(--space-3);
+  }
+
   /* 퍼즐 목표나 힌트가 여러 줄이어도 실제 정보 칸 높이만큼 보드에서 뺀다. */
   body.has-lesson-hints.touch-on:not(.gestures-mode):not([data-screen="replay"]) {
     --chrome-h: calc(52px + 3 * var(--space-4) + 2 * var(--space-2) + 2 * var(--border-w) + var(--lesson-hud-h, 110px));

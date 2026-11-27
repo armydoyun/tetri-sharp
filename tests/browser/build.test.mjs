@@ -5790,3 +5790,133 @@ test("결과에서 Esc는 퍼즐 목록: 같은 Esc 입력이 방금 연 목록�
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("모바일 퍼즐 편집판: 스와이프는 스크롤하고 탭과 끌어 칠하기는 편집한다", async () => {
+  const context = await browser.newContext({
+    locale: "ko-KR",
+    viewport: { width: 320, height: 568 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  try {
+    const page = await context.newPage();
+    await page.goto(url);
+    const shortcut = page.locator("#quick-puzzles");
+    assert.ok((await shortcut.boundingBox()).y + (await shortcut.boundingBox()).height <= 568);
+    await shortcut.tap();
+    await page.locator("#puzzle-close").tap();
+    await page.waitForFunction(() => document.activeElement?.id === "quick-puzzles");
+    await shortcut.tap();
+    await page.tap("#puzzle-create");
+    await page.tap('#puzzle-height [data-value="20"]');
+    const tile = page.locator('[data-cell="85"]');
+    await tile.scrollIntoViewIfNeeded();
+    const box = await tile.boundingBox();
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    const body = page.locator("#puzzles .dialog-body");
+    const cells = () => page.locator('[data-cell][aria-pressed="true"]').count();
+    const cdp = await context.newCDPSession(page);
+    const scroll = await body.evaluate(el => el.scrollTop);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+    for (let i = 1; i <= 8; i++) {
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: y - i * 8 }] });
+    }
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await page.waitForFunction(before => document.querySelector("#puzzles .dialog-body").scrollTop > before, scroll);
+    assert.equal(await cells(), 0);
+    await tile.tap();
+    assert.equal(await cells(), 1);
+    await page.locator(".puzzle-touch-paint").tap();
+    assert.equal(await page.locator("#puzzle-drag-paint").isChecked(), true);
+    const nextTile = page.locator('[data-cell="96"]');
+    await nextTile.scrollIntoViewIfNeeded();
+    const next = await nextTile.boundingBox();
+    const nextX = next.x + next.width / 2;
+    const nextY = next.y + next.height / 2;
+    const paintScroll = await body.evaluate(el => el.scrollTop);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: nextX, y: nextY }] });
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: nextX, y: nextY - 22 }] });
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    assert.ok((await cells()) >= 3);
+    assert.equal(await body.evaluate(el => el.scrollTop), paintScroll);
+  } finally {
+    await context.close();
+  }
+});
+
+test("낮은 가로 휴대폰: 퍼즐 보드와 조작을 함께 보고 리플레이 도구를 열어도 타임라인이 보인다", async () => {
+  const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
+  const context = await browser.newContext({
+    locale: "ko-KR",
+    viewport: { width: 568, height: 320 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  await context.addInitScript(({ replay, record }) => {
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
+    localStorage.setItem("tetrisharp:replay:last", JSON.stringify(replay));
+    localStorage.setItem("tetrisharp:records", JSON.stringify({ "sprint40|modern": [record] }));
+  }, fixture);
+  try {
+    const page = await context.newPage();
+    await page.goto(url);
+    const inside = selector =>
+      page.locator(selector).evaluate(el => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && r.top >= 0 && r.bottom <= innerHeight;
+      });
+    await page.tap("#quick-daily-puzzle");
+    await page.tap("#daily-puzzle-play");
+    await page.waitForSelector('body[data-screen="play"]');
+    for (const selector of ["#board", '#touchpad [data-touch="HARD"]', '#touchpad [data-touch="CW"]']) {
+      assert.ok(await inside(selector), selector);
+    }
+    assert.equal(await page.evaluate(() => document.documentElement.scrollHeight), 320);
+    await page.tap('#touchpad [data-touch="CW"]');
+    await page.goto(url);
+    await page.tap("#watch-last");
+    await page.tap('[data-replay="toggle"]');
+    const timeline = page.locator("#replay-progress");
+    const before = await timeline.boundingBox();
+    assert.equal(await page.locator('[data-replay="share"]').isVisible(), false);
+    await page.tap("#replay-more");
+    assert.ok(await inside('[data-replay="share"]'));
+    assert.ok(await inside('[data-replay="race"]'));
+    assert.deepEqual(await timeline.boundingBox(), before);
+  } finally {
+    await context.close();
+  }
+});
+
+test("모바일 테마: 목록 끝을 골라도 미리보기와 소리 버튼이 화면에 남는다", async () => {
+  for (const viewport of [
+    { width: 320, height: 568 },
+    { width: 568, height: 320 },
+  ]) {
+    const context = await browser.newContext({ locale: "ko-KR", viewport, isMobile: true, hasTouch: true });
+    try {
+      const page = await context.newPage();
+      await page.goto(url);
+      await page.tap("#open-settings");
+      await page.tap('#settings [data-value="visual"]');
+      const choice = page.locator("#theme-choice");
+      await choice.tap();
+      const last = page.locator("#theme-choice-list [role=option]").last();
+      const name = await last.innerText();
+      await last.tap();
+      assert.equal(await choice.innerText(), name);
+      assert.equal(await page.locator(".theme-stage-name").textContent(), name);
+      const visible = await page.locator(".theme-stage-canvas, #theme-listen").evaluateAll(nodes =>
+        nodes.every(el => {
+          const body = el.closest(".dialog-body").getBoundingClientRect();
+          const target = el.getBoundingClientRect();
+          return target.top >= body.top && target.bottom <= body.bottom;
+        })
+      );
+      assert.ok(visible, JSON.stringify(viewport));
+    } finally {
+      await context.close();
+    }
+  }
+});

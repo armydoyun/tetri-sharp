@@ -1760,11 +1760,21 @@ const dailyPuzzleUI = createDailyPuzzleUI({
     if (m) start(m, m.rules);
   },
 });
-const openDailyPuzzle = $("open-daily-puzzle");
-openDailyPuzzle.addEventListener("click", () => dailyPuzzleUI.open());
-dailyPuzzleDialog.addEventListener("close", () => {
-  if (!dailyPuzzleDialog.open && screen === "menu") returnFocus(openDailyPuzzle);
-});
+/** @param {HTMLDialogElement} dialog @param {string[]} ids @param {() => void} open */
+const bindPuzzleOpeners = (dialog, ids, open) => {
+  const openers = ids.map(id => $(id));
+  let opener = openers[0];
+  for (const button of openers) {
+    button.addEventListener("click", () => {
+      opener = button;
+      open();
+    });
+  }
+  dialog.addEventListener("close", () => {
+    if (!dialog.open && screen === "menu") returnFocus(opener.getClientRects().length ? opener : openers[0]);
+  });
+};
+bindPuzzleOpeners(dailyPuzzleDialog, ["open-daily-puzzle", "quick-daily-puzzle"], () => dailyPuzzleUI.open());
 
 const puzzleDialog = /** @type {HTMLDialogElement} */ ($("puzzles"));
 const playCustomPuzzle = (code, trial = false) => {
@@ -1798,9 +1808,8 @@ const puzzleUI = createPuzzleUI({
   onPlayReceived: code => playCustomPuzzle(code),
   onCopyReceived: code => puzzleEditor.openCopy(code),
 });
-$("open-puzzles").addEventListener("click", () => puzzleUI.open());
-$("puzzles").addEventListener("close", () => {
-  if (!puzzleDialog.open && screen === "menu") returnFocus($("open-puzzles"));
+bindPuzzleOpeners(puzzleDialog, ["open-puzzles", "quick-puzzles"], () => puzzleUI.open());
+puzzleDialog.addEventListener("close", () => {
   if (!puzzleDialog.open && screen === "results" && mode.trialCode)
     /** @type {HTMLElement | null} */ (panels.results.querySelector('[data-action="export"]'))?.focus();
 });

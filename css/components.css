@@ -1513,7 +1513,7 @@
   font-weight: 700;
 }
 
-.puzzle-editor-switch {
+:is(.puzzle-editor-switch, .puzzle-touch-paint) {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -1932,4 +1932,79 @@
 .puzzle-comparison-nav output {
   min-inline-size: 7ch;
   text-align: center;
+}
+
+/* 터치로 위아래를 쓸 때는 편집판에서 시작해도 본문을 스크롤한다. */
+.puzzle-touch-paint {
+  display: none;
+}
+
+@media (any-pointer: coarse) {
+  .puzzle-touch-paint {
+    display: flex;
+  }
+
+  .puzzle-editor-board:not(.is-touch-painting) {
+    touch-action: pan-y pinch-zoom;
+  }
+}
+
+@container color-picker (width < 332px) {
+  .color-pieces {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* 좁은 터치 화면에서는 목록을 겹쳐 열고 선택 후 바로 미리보기로 돌아온다. */
+.theme-touch-choice {
+  display: none;
+}
+
+@media (pointer: coarse) and (max-width: 899px) {
+  .theme-picker {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .theme-picker .theme-stage {
+    padding: var(--space-2);
+    gap: var(--space-1);
+  }
+
+  .theme-picker .theme-stage-canvas {
+    max-width: 128px;
+  }
+
+  .theme-picker > .choice-cards.is-compact {
+    display: none;
+  }
+
+  .theme-touch-choice {
+    display: block;
+  }
+
+  .theme-touch-choice > .select {
+    width: 100%;
+  }
+}
+
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 520px) and (max-width: 899px) {
+  .theme-picker {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .theme-picker .theme-stage-canvas {
+    max-width: 112px;
+  }
+
+  .theme-picker .theme-stage-actions {
+    flex-wrap: wrap;
+    gap: var(--space-1);
+  }
+
+  .theme-picker .theme-stage-notice {
+    min-height: 1.45em;
+  }
+
 }

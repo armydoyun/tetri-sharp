@@ -41,7 +41,7 @@ const scenarios = async (page, quick) => {
   };
   /** 세그먼트·카드 선택지를 하나씩 눌러 본다 */
   const choices = async (where, dialogSel) => {
-    const groups = await page.$$eval(`${dialogSel} .dialog-body :is(.choice, .choice-cards)`, els =>
+    const groups = await page.$$eval(`${dialogSel} .dialog-body :is(.choice, .choice-cards):visible`, els =>
       els.map(e => e.id).filter(Boolean)
     );
     for (const g of groups) {
@@ -102,6 +102,9 @@ const scenarios = async (page, quick) => {
     await check(`설정/${tab}`);
     await sliders(`설정/${tab}`, "#settings");
     await choices(`설정/${tab}`, "#settings");
+    if (tab === "visual" && (await page.locator("#theme-choice").isVisible())) {
+      await dropdowns(`설정/${tab}`, "#settings");
+    }
     if (tab === "keys") {
       await page.click('.key-slot[data-action="HOLD"][data-slot="1"]');
       await check("설정/keys 키 기다림");

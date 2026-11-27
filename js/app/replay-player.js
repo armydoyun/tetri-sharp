@@ -64,6 +64,13 @@ export const createReplayPlayer = deps => {
   let analysis = null;
 
   const replayBar = $("replay-bar");
+  const replayMore = $("replay-more");
+  const replayActions = $("replay-actions");
+  replayMore.addEventListener("click", () => {
+    const open = replayMore.getAttribute("aria-expanded") === "false";
+    replayMore.setAttribute("aria-expanded", String(open));
+    if (open) replayActions.scrollIntoView({ block: "nearest" });
+  });
   const replayStatus = $("replay-status");
   const replayNote = $("replay-note");
   const replayProgress = /** @type {HTMLInputElement} */ ($("replay-progress"));
@@ -345,6 +352,10 @@ export const createReplayPlayer = deps => {
     setScreen("replay");
     showModeHud(session.mode, true);
     replayBar.hidden = false;
+    if (entering) {
+      replayMore.setAttribute("aria-expanded", "false");
+      replayBar.scrollTop = 0;
+    }
     replayPractice.hidden = !ownReplay || replay.mode !== "sprint40";
     replayNote.textContent = note;
     $("replay-title").textContent = `${session.mode.name} · ${session.rules.name}`;
