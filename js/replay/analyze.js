@@ -1,7 +1,7 @@
 // 리플레이 분석: 끝까지 한 번 돌려 보며 진행 막대에 표시할 장면을 모은다.
 //  - 피네스 실수: 하드 드롭한 피스 중 최소 입력보다 더 누른 것(js/modes/finesse.js)
 //  - 오래 고민한 피스: 나와서 놓일 때까지 걸린 시간이 이 판의 보통(중앙값)보다 훨씬 긴 것
-//  - 주요 장면: T-spin 줄 삭제, 4줄 삭제, 퍼펙트 클리어
+//  - 주요 장면: 스핀, 4줄 삭제, 퍼펙트 클리어
 import { createPlayer } from "./replay.js";
 import { createFinesseTracker } from "../modes/finesse.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
@@ -20,7 +20,9 @@ const addBattleMarkers = (markers, frame, ownEvents, cpuEvents) => {
   const notes = { sent: [], blocked: [], received: [] };
   const collect = (side, events) => {
     for (const e of events) {
-      if (e.type === "attack") {
+      if (e.type === "lock" && e.spinPiece) {
+        markers.push({ frame, kind: "highlight", label: `${side} · ${clearName(e)}` });
+      } else if (e.type === "attack") {
         if (e.lines) notes.sent.push(`${side} · ${t("{n}줄 보냄", { n: e.lines })}`);
         if (e.blocked) notes.blocked.push(`${side} · ${t("{n}줄 상쇄", { n: e.blocked })}`);
       } else if (e.type === "garbage") {
@@ -72,7 +74,7 @@ export const analyzeReplay = (replay, findMode) => {
           finesseScene = { spawnFrame, cells: e.cells, inputs: tracker.lastInputs, piece: e.piece };
         }
       }
-      if ((e.lines > 0 && e.tspin !== "none") || e.lines >= 4 || e.perfect)
+      if (e.spinPiece || (e.lines > 0 && e.tspin !== "none") || e.lines >= 4 || e.perfect)
         markers.push({ frame: before, kind: "highlight", label: e.perfect ? "PERFECT CLEAR" : clearName(e) });
       spawnedAt = -1;
     }

@@ -4,9 +4,9 @@ import { MODERN } from "./presets.js";
 import { ROTATIONS } from "./rotation/index.js";
 import { RANDOMIZERS } from "./randomizer/index.js";
 import { SCORINGS } from "./scoring/index.js";
+import { spinMask, spinSettings } from "./spins.js";
 
 export const LOCK_TYPES = Object.freeze(["moveReset", "stepReset", "infinite", "none"]);
-const TSPIN_TYPES = Object.freeze(["threeCorner", "none"]);
 /** 고를 수 있는 기본 중력(프레임당 칸) */
 export const GRAVITY_OPTIONS = Object.freeze([1 / 60, 1 / 48, 2 / 60, 6 / 60, 1, 20, 0]);
 
@@ -46,6 +46,7 @@ export const sanitizeRuleBody = raw => {
   const are = r.are && typeof r.are === "object" ? r.are : {};
   const fixed = r.fixedHandling && typeof r.fixedHandling === "object" ? r.fixedHandling : null;
   const lockType = pick(lock.type, LOCK_TYPES, MODERN.lock.type);
+  const { tspin, spinPieces } = spinSettings(spinMask(r));
   return {
     rotation: pick(r.rotation, Object.keys(ROTATIONS), MODERN.rotation),
     randomizer: pick(r.randomizer, Object.keys(RANDOMIZERS), MODERN.randomizer),
@@ -65,7 +66,8 @@ export const sanitizeRuleBody = raw => {
     },
     gravity: nearestGravity(r.gravity),
     ...(r.gravityMode === "fixed" ? { gravityMode: /** @type {const} */ ("fixed") } : {}),
-    tspin: pick(r.tspin, TSPIN_TYPES, MODERN.tspin),
+    tspin,
+    ...(spinPieces === undefined ? {} : { spinPieces }),
     scoring: pick(r.scoring, Object.keys(SCORINGS), MODERN.scoring),
     irs: bool(r.irs, MODERN.irs),
     ihs: bool(r.ihs, MODERN.ihs),

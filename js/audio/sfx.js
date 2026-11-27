@@ -27,11 +27,12 @@ export const soundsFor = events => {
       dropped = true;
       add("hardDrop");
     } else if (e.type === "lock") {
+      const spin = e.spinPiece || e.tspin !== "none";
       if (e.perfect) add("perfect");
-      else if (e.tspin !== "none" && e.lines > 0) add("tspin");
+      else if (spin && e.lines > 0) add("tspin");
       else if (e.lines >= 4) add("quad");
       else if (e.lines > 0) add(`clear${e.lines}`);
-      else if (e.tspin !== "none") add("tspinZero");
+      else if (spin) add("tspinZero");
       else if (!dropped) add("lock");
       if (e.b2b) add("b2b");
       if (e.combo >= 1) add(`combo${Math.min(e.combo, 12)}`);

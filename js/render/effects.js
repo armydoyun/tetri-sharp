@@ -98,7 +98,7 @@ export const createEffects = () => {
           const rows = clear.rows.filter(row => !e.rows.includes(row));
           return rows.length ? [{ ...clear, rows }] : [];
         });
-        const spin = (e.tspin === "full" || e.tspin === "mini") && e.cells?.length;
+        const spin = (e.spinPiece || e.tspin === "full" || e.tspin === "mini") && e.cells?.length;
         const spinColumn = spin ? e.cells.reduce((sum, [x]) => sum + x + 0.5, 0) / e.cells.length : null;
         const cellsByRow = e.clearedCells && new Map(e.rows.map((y, i) => [y, e.clearedCells[i]]));
         clears.push({ rows: e.rows, cellsByRow, start: now, motion, spinColumn, b2b: Boolean(e.b2b) });

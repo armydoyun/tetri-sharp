@@ -9,6 +9,8 @@ import { decodeRules, encodeRules, rulesLink } from "../rules/share.js";
 import { MAX_RULE_NAME, MAX_RULE_SLOTS } from "../storage/rule-slots.js";
 import { t } from "../i18n/index.js";
 import { copyText } from "./clipboard.js";
+import { spinMask, spinSettings, T_SPIN } from "../rules/spins.js";
+import { spinChoiceLabel, spinControls } from "./spin-settings.js";
 
 const ms = frames => `${Math.round((frames * 1000) / 60)}ms`;
 
@@ -112,15 +114,7 @@ const FIELDS = [
   { path: "are.lineClear", label: t("줄 삭제 지연"), type: "number", range: LIMITS.are, unit: v => `${v}F · ${ms(v)}` },
 
   { section: t("점수") },
-  {
-    path: "tspin",
-    label: t("T-spin 판정"),
-    type: "select",
-    options: [
-      ["threeCorner", t("3-corner (Mini 포함)")],
-      ["none", t("없음")],
-    ],
-  },
+  { path: "spin", label: t("스핀 판정") },
   {
     path: "scoring",
     label: t("점수표"),
@@ -243,6 +237,10 @@ const defaultRules = sanitizeRuleBody(MODERN);
 export const ruleChanges = rules =>
   FIELDS.flatMap(field => {
     if (!field.path || field.path === "gravityMode" || (field.when && !field.when(rules))) return [];
+    if (field.path === "spin") {
+      const mask = spinMask(rules);
+      return mask === T_SPIN ? [] : [`${field.label} · ${spinChoiceLabel(mask)}`];
+    }
     const value = getPath(rules, field.path) ?? field.fallback;
     const base = getPath(defaultRules, field.path) ?? field.fallback;
     const fixedGravity = field.path === "gravity" && rules.gravityMode === "fixed";
@@ -418,6 +416,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, onTrial, pr
   };
 
   let tab = TABS[0][0];
+  let spinDetails = null;
   let lastField = null;
   let trialScroll = 0;
   dialog.addEventListener("focusin", e => {
@@ -543,6 +542,21 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, onTrial, pr
           continue;
         }
         if (current !== tab) continue;
+        if (field.path === "spin") {
+          const { preset, details } = spinControls({
+            prefix: "rule",
+            rules,
+            expanded: spinDetails?.open,
+            onChange: (mask, focusId) => {
+              undo = null;
+              onChange(sanitizeRuleBody({ ...rules, ...spinSettings(mask) }));
+              render(focusId);
+            },
+          });
+          spinDetails = details;
+          section.append(preset, details);
+          continue;
+        }
         const disabled = Boolean(field.when && !field.when(rules));
         const id = `rule-${field.path.replace(/\./g, "-")}`;
         const hint = disabled

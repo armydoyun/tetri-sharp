@@ -95,7 +95,13 @@ export const openPuzzleComparison = ({ dialog, solver, task, baseline, visual })
                 t("{piece} 피스", { piece: move.type }),
                 move.hold ? t("홀드 먼저") : "",
                 t("{n}줄 삭제", { n: move.lines }),
-                move.tspin === "full" ? t("T스핀") : move.tspin === "mini" ? "T-spin Mini" : "",
+                move.spinPiece
+                  ? `${move.spinPiece}-SPIN`
+                  : move.tspin === "full"
+                    ? t("T스핀")
+                    : move.tspin === "mini"
+                      ? "T-spin Mini"
+                      : "",
               ]
                 .filter(Boolean)
                 .join(" · ");

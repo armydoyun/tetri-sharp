@@ -1655,7 +1655,7 @@ const togglePuzzleHint = () => {
   // 아직 나오지 않은 목록 피스: 지금까지 목록에서 나온 피스 = 놓은 것 + 움직이는 것 + 홀드 칸 - 처음 홀드 피스
   const drawn = p.placed + 1 + (hold ? 1 : 0) - (mode.puzzle.holdStart ? 1 : 0);
   const rest = mode.puzzle.pieces.slice(drawn);
-  const asked = { game, placed: p.placed, x: active.x, y: active.y, rot: active.rot, type: active.type, hold };
+  const asked = { game, placed: p.placed, active: { ...active }, hold };
   const search = solver.run({
     type: "first",
     kind: mode.puzzle.kind,
@@ -1663,7 +1663,7 @@ const togglePuzzleHint = () => {
     lines: mode.puzzle.lines ?? 0,
     rotation: rules.rotation,
     board: game.state.board.cells.slice(),
-    active: { type: active.type, x: active.x, y: active.y, rot: active.rot },
+    active: asked.active,
     combo: p.combo,
     total: p.lines ?? 0,
     hold,
@@ -1682,10 +1682,13 @@ const togglePuzzleHint = () => {
     const same =
       game === asked.game &&
       game.state.puzzle?.placed === asked.placed &&
-      now?.x === asked.x &&
-      now?.y === asked.y &&
-      now?.rot === asked.rot &&
-      now?.type === asked.type &&
+      now?.x === asked.active.x &&
+      now?.y === asked.active.y &&
+      now?.rot === asked.active.rot &&
+      now?.type === asked.active.type &&
+      now?.lastAction === asked.active.lastAction &&
+      now?.kick === asked.active.kick &&
+      now?.spinMoved === asked.active.spinMoved &&
       game.state.hold === asked.hold;
     if (move === undefined || !same) return resetLessonHint();
     hintLabel.textContent = t("첫 수 보기");
