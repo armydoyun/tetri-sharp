@@ -46,7 +46,11 @@ export const createRuleSlots = store => {
   const uniqueName = (slots, name) => {
     const taken = new Set(slots.map(s => s.name));
     if (!taken.has(name)) return name;
-    for (let n = 2; ; n++) if (!taken.has(`${name} ${n}`)) return `${name} ${n}`;
+    for (let n = 2; ; n++) {
+      const suffix = ` ${n}`;
+      const candidate = name.slice(0, MAX_RULE_NAME - suffix.length).trimEnd() + suffix;
+      if (!taken.has(candidate)) return candidate;
+    }
   };
   return {
     /** @returns {{ slots: { name: string, body: any }[], active: number }} */
@@ -72,6 +76,7 @@ export const createRuleSlots = store => {
       const others = s.slots.filter((_, i) => i !== s.active);
       s.slots[s.active] = { ...current, name: uniqueName(others, cleanName(name, current.name)) };
       write(s);
+      return s.slots[s.active].name;
     },
     /**
      * 새 칸을 만들어 고른다. 가득 찼으면(10개) 만들지 않고 false.
