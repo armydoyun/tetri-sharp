@@ -3243,7 +3243,7 @@ test("편의: 카운트다운 '없음'이면 바로 시작하고, 연습에서�
   await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "1");
   await page.keyboard.press("KeyU");
   await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "0");
-  assert.equal(await text(page, "puzzle-goal-hud .goal-status"), "시작 전");
+  assert.equal(await visible(page, "puzzle-goal-hud"), false, "자유 연습에는 퍼즐 목표가 없다");
   await page.keyboard.press("Escape");
   await page.click('#pause [data-action="menu"]');
   await page.click('[data-confirm="ok"]');
