@@ -982,11 +982,20 @@ test("레이아웃 고정: 규칙 편집에서 조건 항목이 비활성이 돼
   await choose(page, "rule-lock-type", "none");
   assert.equal(await page.locator("#rule-lock-delay").isDisabled(), true, "고정 지연은 비활성");
   assert.deepEqual(await rows(), lockRows);
-  assert.match(await page.locator('label[for="rule-lock-delay"] small').textContent(), /즉시 고정/, "이유가 보인다");
+  assert.match(
+    await page.locator('label[for="rule-lock-delay"] small:visible').textContent(),
+    /즉시 고정/,
+    "이유가 보인다"
+  );
 
+  // 한글 글꼴의 폭에 따라 활성 상태의 설명이 두 줄이 되는 경우도 검사한다.
+  await page.addStyleTag({ content: 'label[for="rule-fixedHandling-instantSoftDrop"] small { font-size: 14px; }' });
   await page.click('.dialog-tabs [data-value="조작"]');
   const controlRows = await rows();
   await page.locator("#rule-fixedHandlingOn").check();
+  assert.deepEqual(await rows(), controlRows);
+  await page.locator("#rule-fixedHandling-instantSoftDrop").check();
+  assert.ok(await page.locator("#rule-fixedHandling-sdf").isDisabled());
   assert.deepEqual(await rows(), controlRows);
   for (const t of ["피스", "점수", "공유", "고정·낙하"]) {
     await page.click(`.dialog-tabs [data-value="${t}"]`);

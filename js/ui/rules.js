@@ -13,12 +13,14 @@ import { spinMask, spinSettings, T_SPIN } from "../rules/spins.js";
 import { spinChoiceLabel, spinControls } from "./spin-settings.js";
 
 const ms = frames => `${Math.round((frames * 1000) / 60)}ms`;
+const HANDLING_OFF = t("‘조작감 고정’을 켜면 쓸 수 있어요");
+const SDF_INSTANT_OFF = t("즉시 소프트 드롭을 켜서 배율을 쓰지 않아요.");
 
 /**
  * 편집 항목. path는 규칙 객체 안의 위치.
  * when이 거짓이면 항목을 숨기지 않고 같은 자리에서 비활성으로 두며, 설명 줄에 off(쓸 수 없는 이유)를 보여 준다(원칙 2).
  * @type {ReadonlyArray<{ section?: string, path?: string, label?: string, hint?: string, type?: "select" | "toggle" | "number",
- *   options?: ReadonlyArray<[any, string]>, range?: readonly number[], unit?: (v: number) => string, when?: (r: any) => boolean, off?: string | ((r: any) => string), fallback?: any }>}
+ *   options?: ReadonlyArray<[any, string]>, range?: readonly number[], unit?: (v: number) => string, when?: (r: any) => boolean, off?: string | ((r: any) => string), reserveHints?: string[], fallback?: any }>}
  */
 const FIELDS = [
   { section: t("피스") },
@@ -148,7 +150,7 @@ const FIELDS = [
     range: LIMITS.das,
     unit: v => `${v}F · ${ms(v)}`,
     when: r => r.fixedHandling,
-    off: t("‘조작감 고정’을 켜면 쓸 수 있어요"),
+    off: HANDLING_OFF,
     fallback: 16,
   },
   {
@@ -158,7 +160,7 @@ const FIELDS = [
     range: LIMITS.arr,
     unit: v => `${v}F · ${ms(v)}`,
     when: r => r.fixedHandling,
-    off: t("‘조작감 고정’을 켜면 쓸 수 있어요"),
+    off: HANDLING_OFF,
     fallback: 6,
   },
   {
@@ -168,8 +170,8 @@ const FIELDS = [
     range: LIMITS.sdf,
     unit: v => t("{n}배", { n: v }),
     when: r => r.fixedHandling && !r.fixedHandling.instantSoftDrop,
-    off: r =>
-      r.fixedHandling ? t("즉시 소프트 드롭을 켜서 배율을 쓰지 않아요.") : t("‘조작감 고정’을 켜면 쓸 수 있어요"),
+    off: r => (r.fixedHandling ? SDF_INSTANT_OFF : HANDLING_OFF),
+    reserveHints: [HANDLING_OFF, SDF_INSTANT_OFF],
     fallback: 30,
   },
   {
@@ -178,7 +180,7 @@ const FIELDS = [
     type: "toggle",
     hint: t("소프트 드롭을 누르면 즉시 바닥까지 내려요."),
     when: r => r.fixedHandling,
-    off: t("‘조작감 고정’을 켜면 쓸 수 있어요"),
+    off: HANDLING_OFF,
   },
   {
     path: "fixedHandling.dcd",
@@ -194,7 +196,7 @@ const FIELDS = [
       ),
     ],
     when: r => r.fixedHandling,
-    off: t("‘조작감 고정’을 켜면 쓸 수 있어요"),
+    off: HANDLING_OFF,
     fallback: -1,
   },
 ];
@@ -558,7 +560,14 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, onTrial, pr
             ? field.off(rules)
             : field.off
           : selectedDescription(field, rules) || field.hint || "";
-        section.append(fieldRow({ id, label: field.label, hint, control: control(field, rules, disabled), disabled }));
+        const reserveHints = [
+          ...(field.reserveHints ?? []),
+          ...(field.when && field.hint ? [field.hint] : []),
+          ...(typeof field.off === "string" ? [field.off] : []),
+        ];
+        section.append(
+          fieldRow({ id, label: field.label, hint, reserveHints, control: control(field, rules, disabled), disabled })
+        );
       }
       body.append(section);
     }
