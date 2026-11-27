@@ -4206,8 +4206,17 @@ test("모바일 퍼즐 풀이: 긴 편집판에서 열어도 보드를 보면서
     await page.click("#puzzle-solution-prev");
     assert.equal(await text(page, "puzzle-solution-step"), "2 / 3");
     assert.equal(await scroll(), before);
+    const cdp = await context.newCDPSession(page);
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+    for (let i = 1; i <= 5; i++)
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: y - i * 11 }] });
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    assert.ok(await board.evaluate(el => el.classList.contains("is-viewing")));
     await page.click("#puzzle-solution-exit");
     assert.equal(await board.getAttribute("data-rows"), "20");
+    assert.ok(await board.evaluate(el => el.contains(document.activeElement)));
     assert.deepEqual(errors, []);
   } finally {
     await context.close();
@@ -4276,6 +4285,7 @@ test("퍼즐 편집기 풀이 비교: 다른 첫 배치를 나란히 보고 T스
     await compare.click();
     const dialog = page.locator("#puzzle-comparison");
     await dialog.getByText("서로 다른 첫 배치 2가지를 확인했어요.").waitFor();
+    assert.ok(await dialog.locator(".dialog-foot .puzzle-comparison-nav").isVisible());
     const boards = dialog.getByRole("img");
     assert.equal(await boards.count(), 2);
     const [a, b] = await boards.evaluateAll(canvases => canvases.map(canvas => canvas.toDataURL()));

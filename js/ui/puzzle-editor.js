@@ -1109,6 +1109,8 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
       board.addEventListener("pointerdown", event => {
         const cell = cellAt(event.target);
         if (!cell || event.button > 0) return;
+        // 풀이 판 위에서 시작한 터치 스크롤은 편집으로 돌아가는 탭과 구별한다.
+        if (viewStep !== null && event.pointerType === "touch") return;
         event.preventDefault();
         // 풀이를 보는 중에 판을 누르면 편집으로 돌아온다
         if (viewStep !== null) {
@@ -1150,8 +1152,9 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
       // 키보드(Enter·Space)로 누른 칸: 칸 하나에 도구를 한 번
       board.addEventListener("click", event => {
         const cell = cellAt(event.target);
-        if (!cell || event.detail > 0) return;
+        if (!cell) return;
         if (viewStep !== null) return closeSolution();
+        if (event.detail > 0) return;
         const index = Number(cell.dataset.cell);
         if (tool === "piece") return doStamp(index);
         stroke = {
@@ -1329,7 +1332,8 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
       const closeSolution = () => {
         viewStep = null;
         renderPreview();
-        view.focus();
+        tiles[focusIndex].focus({ preventScroll: true });
+        preview.scrollIntoView({ block: "start", inline: "nearest" });
       };
       closePreview.addEventListener("click", closeSolution);
       view.addEventListener("change", () => {
