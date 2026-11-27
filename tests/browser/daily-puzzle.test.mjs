@@ -91,6 +91,26 @@ test("본편 오늘의 퍼즐: 날짜 시드로 플레이하고 새로고침 뒤
   await play.and(page.locator(":enabled")).waitFor();
   assert.equal(await page.locator("#daily-puzzle-name").textContent(), name);
   assert.equal(await page.locator("#daily-puzzle-status").textContent(), "이 퍼즐을 풀었어요.");
+  await page.click("#daily-puzzle-archive");
+  const archive = page.locator("[data-daily-archive]");
+  await archive.getByRole("button", { name: "더 오래된 날짜" }).click();
+  await archive.getByText("2026-10-31 – 2026-11-13", { exact: true }).waitFor();
+  await archive.getByRole("button", { name: "더 최근 날짜" }).click();
+  await archive.locator('[data-archive-date="2026-11-26"]').waitFor({ timeout: 40_000 });
+  await page.click("#daily-archive-status");
+  await page.getByRole("option", { name: "완료", exact: true }).click();
+  assert.deepEqual(
+    await archive.locator("[data-archive-date]").evaluateAll(rows => rows.map(row => row.dataset.archiveDate)),
+    ["2026-11-26"]
+  );
+  await page.click("#daily-archive-goal");
+  await page.getByRole("option", { name: "콤보 이어 가기", exact: true }).click();
+  await page.getByText("이 기간에 조건에 맞는 퍼즐이 없어요.").waitFor();
+  await page.click("#daily-archive-goal");
+  await page.getByRole("option", { name: "모든 목표", exact: true }).click();
+  await page.click("#daily-archive-level");
+  await page.getByRole("option", { name: "입문", exact: true }).click();
+  await archive.locator('[data-archive-date="2026-11-26"]').click();
   await play.click();
   await page.waitForFunction(() => document.body.dataset.screen === "play");
   const reopened = await page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:run:suspended")));

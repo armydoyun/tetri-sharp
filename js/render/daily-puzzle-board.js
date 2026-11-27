@@ -1,9 +1,8 @@
 import { WIDTH } from "../core/board.js";
 import { createBoardGrid } from "./board-grid.js";
 
-/** 게임 보드의 아래 일곱 줄. 셀 값은 게임의 팔레트 번호를 쓴다. */
-export const createDailyPuzzleBoard = (/** @type {HTMLCanvasElement} */ canvas) => {
-  const rows = 7;
+/** 보드 아래쪽 미리보기. 셀 값은 게임의 팔레트 번호를 쓴다. */
+export const createDailyPuzzleBoard = (/** @type {HTMLCanvasElement} */ canvas, rows = 7) => {
   const cell = Math.round(32 * (globalThis.devicePixelRatio || 1));
   canvas.width = WIDTH * cell;
   canvas.height = rows * cell;

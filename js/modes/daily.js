@@ -12,11 +12,11 @@ export const dateKey = (date = new Date()) => {
   return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`;
 };
 
-/** 오늘부터 최근 7일의 로컬 달력 날짜. */
-export const recentDailyKeys = (date = new Date()) => {
+/** 오늘부터 최근 count일의 로컬 달력 날짜. */
+export const recentDailyKeys = (date = new Date(), count = 7) => {
   const day = new Date(date);
   day.setHours(12, 0, 0, 0);
-  return Array.from({ length: 7 }, () => {
+  return Array.from({ length: count }, () => {
     const key = dateKey(day);
     day.setDate(day.getDate() - 1);
     return key;
