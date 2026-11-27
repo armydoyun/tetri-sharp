@@ -3339,6 +3339,52 @@ test("편의: 제스처 방식이면 보드 아래 버튼 대신 보드를 튕�
   await context.close();
 });
 
+test("휴대폰 제스처: 두 손가락 탭으로 T를 180도 회전해 판을 비운다", async () => {
+  const { page, context, errors } = await openPage(
+    () =>
+      localStorage.setItem(
+        "tetrisharp:settings",
+        JSON.stringify({ touch: "on", touchMode: "gestures", access: { countdown: "off" } })
+      ),
+    undefined,
+    { frameClock: true, viewport: { width: 390, height: 844 }, hasTouch: true }
+  );
+  try {
+    await page.click("#open-help");
+    await page.locator("#help").getByText("두 손가락으로 함께 두드리기", { exact: true }).waitFor();
+    await page.click("#help-close");
+
+    // T가 보는 방향을 뒤집어야 두 줄의 구멍에 맞는다.
+    const cells = new Uint8Array(PUZZLE_CELLS);
+    cells.set(Array.from("11100011111111011111", Number), PUZZLE_CELLS - 20);
+    const code = encodePuzzle({ cells, pieces: "T", goal: { kind: "pc" } });
+    await page.goto(`${url}#puzzle=${code}`);
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    await page.evaluate(() => window.advanceFrame());
+    assert.equal(await visible(page, "touchpad"), false);
+
+    const { x, y, width } = await page.locator(".board-wrap").boundingBox();
+    const session = await context.newCDPSession(page);
+    const touch = (type, touchPoints, timestamp) =>
+      session.send("Input.dispatchTouchEvent", { type, touchPoints, timestamp });
+    const left = { id: 1, x: x + width * 0.25, y: y + 70 };
+    const right = { id: 2, x: x + width * 0.75, y: y + 70 };
+    const now = Date.now() / 1000;
+    await touch("touchStart", [left, right], now);
+    await touch("touchEnd", [], now + 0.06);
+    await page.evaluate(() => window.advanceFrame());
+
+    await touch("touchStart", [left], now + 0.12);
+    for (let i = 1; i <= 4; i++) await touch("touchMove", [{ ...left, y: left.y + i * 36 }], now + 0.12 + i * 0.015);
+    await touch("touchEnd", [], now + 0.19);
+    await page.evaluate(() => window.advanceFrame());
+    assert.equal(await text(page, "results-title"), "성공!");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test("퍼즐: 단계를 풀면 성공·다음 단계로 이어지고, 첫 화면에 진행도가 남는다. 틀리면 실패", async () => {
   const { context, page, errors } = await openPage(() => {
     localStorage.setItem(

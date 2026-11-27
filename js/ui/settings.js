@@ -72,7 +72,8 @@ const PRESET_HINTS = {
 };
 const TOUCH_MODE_HINTS = {
   buttons: "보드 아래 버튼으로 조작해요",
-  gestures: "보드를 좌우로 밀어 이동, 두드려 회전(왼쪽 절반은 반대 방향), 아래로 튕겨 하드 드롭, 위로 밀어 홀드",
+  gestures:
+    "좌우로 밀어 이동, 한 손가락 탭으로 90도·두 손가락 탭으로 180도 회전, 아래로 튕겨 하드 드롭, 위로 밀어 홀드",
 };
 
 const TABS = [
