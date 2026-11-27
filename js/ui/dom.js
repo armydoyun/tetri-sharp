@@ -54,21 +54,33 @@ export const fillDialog = (dialog, { title, body, notice, actions, closeId, tabs
 
 /**
  * 설정 한 줄: [이름 + 설명 줄 | 조작]. 설명 줄은 비어 있어도 자리를 차지한다.
- * @param {{ id: string, label: string, hint?: string, control: HTMLElement, disabled?: boolean, className?: string }} o
+ * @param {{ id: string, label: string, hint?: string, reserveHints?: string[], control: HTMLElement, disabled?: boolean, className?: string }} o
  */
-export const fieldRow = ({ id, label, hint, control, disabled = false, className = "" }) =>
-  el(
+export const fieldRow = ({ id, label, hint, reserveHints = [], control, disabled = false, className = "" }) => {
+  // 줄 높이를 지키려고 빈 설명도 공백 한 칸으로 남긴다.
+  const description = hint === undefined ? [] : [el("small", { text: hint || " " })];
+  const alternatives = reserveHints.filter(text => text && text !== hint);
+  return el(
     "div",
     { class: `field-row${disabled ? " is-disabled" : ""}${className ? ` ${className}` : ""}` },
     el(
       "label",
       { class: "field-label", htmlFor: id },
       el("strong", { text: label }),
-      // 줄 높이를 지키려고 빈 설명도 공백 한 칸으로 남긴다.
-      ...(hint === undefined ? [] : [el("small", { text: hint || " " })])
+      ...(alternatives.length
+        ? [
+            el(
+              "span",
+              { class: "field-hint-stack" },
+              ...description,
+              ...alternatives.map(text => el("small", { text, class: "is-invisible", "aria-hidden": "true" }))
+            ),
+          ]
+        : description)
     ),
     control
   );
+};
 
 /**
  * 다시 그리기 전에 포커스 자리를 기억할 열쇠: id, 없으면 가장 가까운 id 있는 조상 + data-* 속성.

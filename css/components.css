@@ -317,6 +317,16 @@
   font-size: var(--text-s);
 }
 
+/* 상태별 설명을 같은 칸에 겹쳐 두고, 현재 문구만 읽을 수 있게 한다. */
+.field-hint-stack {
+  display: grid;
+  min-width: 0;
+}
+
+.field-hint-stack > small {
+  grid-area: 1 / 1;
+}
+
 /* 카드형 선택은 한 줄을 다 쓴다 */
 .field-row.is-wide {
   grid-template-columns: minmax(0, 1fr);
