@@ -446,6 +446,29 @@
   cursor: default;
 }
 
+.touch-range {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+
+.range-gesture {
+  display: none;
+}
+
+@media (any-pointer: coarse) {
+  .touch-range > input {
+    pointer-events: none;
+  }
+
+  .range-gesture {
+    position: absolute;
+    inset: 0;
+    display: block;
+    touch-action: pan-y;
+  }
+}
+
 .range input::-webkit-slider-runnable-track {
   height: 10px;
   border-radius: var(--radius-s);

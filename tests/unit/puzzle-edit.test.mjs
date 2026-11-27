@@ -40,7 +40,7 @@ import { findFirstMove } from "../../js/modes/puzzle-hint.js";
 import { runSolverTask } from "../../js/modes/puzzle-solver.js";
 import { goalOf } from "../../js/modes/puzzle-goals.js";
 import { PUZZLES } from "../../js/modes/puzzles.js";
-import { createSolver } from "../../js/app/solver.js";
+import { createSolver, SOLVER_UNAVAILABLE } from "../../js/app/solver.js";
 
 const BOTTOM = PUZZLE_CELLS - WIDTH;
 const row = (cells, r) => [...cells.subarray(r * WIDTH, (r + 1) * WIDTH)].join("");
@@ -307,9 +307,8 @@ test("미리 막아 주기: 블록 수, 다 찬 줄, 막힌 나올 자리", () =
   assert.ok(!puzzleWarnings(template("well")).some(w => w.key === "spawn"));
 });
 
-test("풀이 탐색 창구: Worker가 없으면(Node·개발 실행) 잠깐 뒤 화면 쪽에서 돌리고, 취소하면 undefined", async () => {
+test("풀이 탐색 창구: Worker가 없으면 검색을 실행하지 않고 사용할 수 없음을 알린다", async () => {
   const solver = createSolver();
-  assert.equal(solver.usesWorker(), false);
   const start = template("well");
   const task = /** @type {const} */ ({
     type: "solution",
@@ -319,11 +318,7 @@ test("풀이 탐색 창구: Worker가 없으면(Node·개발 실행) 잠깐 뒤 
     board: solverBoard(start.cells),
     pieces: ["I"],
   });
-  const done = await solver.run(task).promise;
-  assert.ok(done && "moves" in done);
-  const cancelled = solver.run(task);
-  cancelled.cancel();
-  assert.equal(await cancelled.promise, undefined);
+  assert.equal(await solver.run(task).promise, SOLVER_UNAVAILABLE);
 });
 
 test("목표: 기본 퍼즐의 목표는 종류·피스 수로 다시 만든 목표와 같다(Worker에 보낼 때 쓰는 것)", () => {

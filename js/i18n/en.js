@@ -43,6 +43,12 @@ export const EN = {
   "탐색 범위에서 다른 첫 배치를 찾지 못했어요.": "No other opening placement found within the search range.",
   "목표 달성 · {n}수": "Complete in {n} moves",
   "홀드 먼저": "Hold first",
+  편집으로: "Back to edit",
+  "풀이 단계": "Solution steps",
+  "백그라운드 풀이기를 열 수 없어요. 잠시 후 다시 시도해 주세요.":
+    "Couldn't start the background solver. Try again shortly.",
+  "이 퍼즐은 더 살펴봐야 해요. 확인을 누르면 자세히 찾아봐요.":
+    "This puzzle needs a longer search. Select Check to keep looking.",
   "지난 퍼즐": "Puzzle archive",
   "지난 퍼즐을 불러오는 중…": "Loading past puzzles…",
   "일부 날짜의 퍼즐을 불러오지 못했어요.": "Some puzzles could not be loaded.",

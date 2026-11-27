@@ -5,7 +5,7 @@ import { analyzeReplay } from "../replay/analyze.js";
 import { createPlayer } from "../replay/replay.js";
 import { formatTime } from "../modes/format.js";
 import { t } from "../i18n/index.js";
-import { button } from "../ui/components.js";
+import { button, guardRangeTouch } from "../ui/components.js";
 import { el } from "../ui/dom.js";
 import { icon } from "../ui/icons.js";
 
@@ -67,6 +67,7 @@ export const createReplayPlayer = deps => {
   const replayStatus = $("replay-status");
   const replayNote = $("replay-note");
   const replayProgress = /** @type {HTMLInputElement} */ ($("replay-progress"));
+  guardRangeTouch(replayProgress);
   const replayMarkers = $("replay-markers");
   const replayTime = $("replay-time");
   const replayBattleView = $("replay-battle-view");

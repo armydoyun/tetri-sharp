@@ -2,6 +2,7 @@
 // 판은 누르거나 끌어서 칠한다(마우스·터치·펜 모두 Pointer Events). 편집 동작 자체는 js/modes/puzzle-edit.js(DOM 없음).
 // 계획: docs/PUZZLE_MAKER.md
 import { WIDTH, VISIBLE_ROWS } from "../core/board.js";
+import { SOLVER_UNAVAILABLE } from "../app/solver.js";
 import { PIECE_TYPES } from "../core/pieces.js";
 import { t } from "../i18n/index.js";
 import {
@@ -66,6 +67,8 @@ import {
 
 /** 저절로 확인하는 퍼즐의 피스 수 한도(이보다 많으면 확인 버튼으로만) */
 const AUTO_CHECK_PIECES = 12;
+const AUTO_CHECK_STATES = 60_000;
+const AUTO_CHECK_MS = 1500;
 
 /** @param {HTMLElement} controls @param {string} help */
 const editorContext = (controls, help) => {
@@ -111,7 +114,7 @@ const settingsOf = p => ({
 /** @typedef {import("../modes/puzzle-solver.js").SolutionMove} SolutionMove */
 /**
  * 자동 확인 결과(그 퍼즐 코드에 대해). checking: 찾는 중
- * @typedef {{ code: string, state: "checking" | "solvable" | "unsolvable" | "exhausted", moves?: SolutionMove[] }} Verified
+ * @typedef {{ code: string, state: "checking" | "solvable" | "unsolvable" | "exhausted" | "deferred" | "unavailable", moves?: SolutionMove[] }} Verified
  */
 
 /**
@@ -172,6 +175,8 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
   };
   /** 편집기가 열려 있을 때만 단축키(Ctrl+Z)를 받는다 */
   let undoKeys = /** @type {null | ((redo: boolean) => void)} */ (null);
+  let previewResize = /** @type {ResizeObserver | null} */ (null);
+  let lastSaved = "";
 
   dialog.addEventListener("keydown", event => {
     if (!undoKeys || !dialog.querySelector(".puzzle-editor") || !(event.ctrlKey || event.metaKey) || event.altKey)
@@ -193,6 +198,7 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
       draft = entryId === null && touched ? { state: snapshot(), history } : null;
     }
     undoKeys = null;
+    previewResize?.disconnect();
     stopChecking();
   });
 
@@ -203,17 +209,17 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
     (loaded?.code === key ? loaded.checked : 0);
   /** 내 퍼즐에 저장한다(고칠 때마다 저절로). 링크로 보낼 수 있는 퍼즐만 */
   const save = () => {
-    const code = encodePuzzle(current());
+    const key = keyNow();
+    const code = key && encodePuzzle({ ...current(), checked: checkedFor(key) }, { checked: true });
     if (!code) {
       saveState = "none";
       return;
     }
-    const id = customs.save(
-      entryId,
-      encodePuzzle({ ...current(), checked: checkedFor(keyNow()) }, { checked: true }) ?? ""
-    );
+    if (entryId && code === lastSaved) return;
+    const id = customs.save(entryId, code);
     if (id) {
       entryId = id;
+      lastSaved = code;
       histories.set(id, history);
     }
     saveState = id ? "saved" : "full";
@@ -232,6 +238,7 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
     history = (id && histories.get(id)) || createHistory();
     stopChecking();
     verified = null;
+    lastSaved = "";
     saveState = puzzle ? "saved" : "none";
   };
   const editor = {
@@ -318,6 +325,7 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
       editor.open();
     },
     open() {
+      previewResize?.disconnect();
       const notice = el("p", { class: "notice-slot", role: "status" });
       let autoTimer = 0;
       /** 사용자가 멈춘 퍼즐(열쇠): 다시 고치기 전까지 저절로 확인하지 않는다 */
@@ -350,7 +358,9 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
       );
       /** 보이는 칸 중 키보드로 들어올 칸(처음은 왼쪽 아래) */
       let focusIndex = PUZZLE_CELLS - WIDTH;
-      const firstVisible = () => (VISIBLE_ROWS - height) * WIDTH;
+      let previewHeight = height;
+      const displayHeight = () => (viewStep === null ? height : previewHeight);
+      const firstVisible = () => (VISIBLE_ROWS - displayHeight()) * WIDTH;
       /** 풀이 보기: 몇 번째 수를 보여 주는지(null이면 편집 중) */
       let viewStep = /** @type {number | null} */ (null);
       const solution = () => (verified?.state === "solvable" && verified.moves) || null;
@@ -368,7 +378,8 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
           (move?.cells ?? []).map(([x, y]) => (y - (move ? move.board.length / WIDTH - VISIBLE_ROWS : 0)) * WIDTH + x)
         );
         tiles.forEach((tile, i) => {
-          tile.setAttribute("aria-pressed", String(Boolean(shown[i])));
+          const pressed = String(Boolean(shown[i]));
+          if (tile.getAttribute("aria-pressed") !== pressed) tile.setAttribute("aria-pressed", pressed);
           if (ghost.has(i)) tile.dataset.ghost = "1";
           else delete tile.dataset.ghost;
           if (stamp?.includes(i)) tile.dataset.stamp = eraseStamp ? "erase" : "place";
@@ -377,7 +388,9 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
         board.classList.toggle("is-viewing", Boolean(move));
       };
       const layoutBoard = () => {
-        board.dataset.rows = String(height);
+        const rows = String(displayHeight());
+        if (board.dataset.rows === rows && board.childElementCount) return;
+        board.dataset.rows = rows;
         board.replaceChildren(...tiles.slice(firstVisible()));
         if (focusIndex < firstVisible()) focusIndex = PUZZLE_CELLS - WIDTH;
         tiles.forEach((tile, i) => (tile.tabIndex = i === focusIndex ? 0 : -1));
@@ -466,13 +479,26 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
       const view = toggle({ id: "puzzle-solution-view" });
       const prevStep = iconButton({ icon: "arrow-left", label: t("이전 수"), id: "puzzle-solution-prev" });
       const nextStep = iconButton({ icon: "arrow-right", label: t("다음 수"), id: "puzzle-solution-next" });
-      const stepOut = el("output", { class: "puzzle-editor-step num", id: "puzzle-solution-step" });
+      const stepOut = el("output", {
+        class: "puzzle-editor-step num",
+        id: "puzzle-solution-step",
+        "aria-live": "polite",
+      });
+      const closePreview = button({ id: "puzzle-solution-exit", label: t("편집으로"), size: "s" });
+      const holdNote = el("small", { class: "puzzle-editor-preview-hold", text: t("홀드 먼저") });
+      const stepNav = el(
+        "div",
+        { class: "puzzle-editor-preview-nav", role: "group", "aria-label": t("풀이 단계"), hidden: true },
+        el("span", { class: "puzzle-editor-step-nav" }, prevStep, stepOut, nextStep),
+        closePreview,
+        holdNote
+      );
+      const preview = el("div", { class: "puzzle-editor-preview" }, stepNav, board);
       const checkActions = el("div", { class: "puzzle-editor-check-actions" }, check, stop, compare);
       const solutionActions = el(
         "div",
         { class: "puzzle-editor-solution" },
-        el("label", { class: "puzzle-editor-switch" }, view, el("span", { text: t("풀이 보기") })),
-        el("span", { class: "puzzle-editor-step-nav" }, prevStep, stepOut, nextStep)
+        el("label", { class: "puzzle-editor-switch" }, view, el("span", { text: t("풀이 보기") }))
       );
       const verification = editorContext(
         el("div", { class: "puzzle-editor-check-content" }, checkActions, status, solutionActions),
@@ -836,7 +862,11 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
       };
       const hint = el("p", { class: "field-help puzzle-editor-hint" });
 
+      let renderedSequence = "";
       const renderSequence = () => {
+        const key = `${pieces}/${selected}`;
+        if (key === renderedSequence) return;
+        renderedSequence = key;
         const focused = sequence.contains(document.activeElement)
           ? Number(/** @type {HTMLElement} */ (document.activeElement).dataset.at)
           : null;
@@ -913,29 +943,45 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
         // 자동 확인
         const moves = solution();
         if (!moves) viewStep = null;
-        check.disabled = !code || !canSearch(current()) || Boolean(checking) || Boolean(verified);
+        check.disabled =
+          !code ||
+          !canSearch(current()) ||
+          Boolean(checking) ||
+          Boolean(verified && verified.state !== "deferred" && verified.state !== "unavailable");
         stop.disabled = !checking;
         view.disabled = !moves;
         compare.disabled = !moves;
-        view.checked = viewStep !== null;
-        prevStep.disabled = viewStep === null || viewStep === 0;
-        nextStep.disabled = viewStep === null || !moves || viewStep >= moves.length - 1;
-        const step = moves && viewStep !== null ? moves[viewStep] : null;
-        stepOut.textContent = moves
-          ? step?.hold
-            ? t("{n} / {total} · 홀드 먼저", { n: (viewStep ?? 0) + 1, total: moves.length })
-            : `${(viewStep ?? 0) + 1} / ${moves.length}`
-          : "- / -";
+        renderPreview();
         status.textContent = statusText(code);
         verification.show(Boolean(code));
         scheduleAutoCheck();
         status.dataset.tone = verified?.state === "solvable" ? "ok" : verified || warnings().length ? "warn" : "";
-        paintTiles();
         notice.textContent = tried
           ? t("직접 풀어 봤어요. 링크를 공유할 수 있어요.")
           : solvable
             ? t("풀 수 있는 퍼즐이에요. 링크를 공유할 수 있어요.")
             : t("풀 수 있는지 확인하거나 시험 플레이에서 풀면 링크를 공유할 수 있어요.");
+      };
+      const renderPreview = () => {
+        const moves = solution();
+        const step = moves && viewStep !== null ? moves[viewStep] : null;
+        view.checked = Boolean(step);
+        stepNav.hidden = !step;
+        prevStep.disabled = viewStep === null || viewStep === 0;
+        nextStep.disabled = viewStep === null || !moves || viewStep >= moves.length - 1;
+        if (step) stepOut.textContent = `${viewStep + 1} / ${moves.length}`;
+        holdNote.hidden = !moves?.some(move => move.hold);
+        holdNote.classList.toggle("is-invisible", !step?.hold);
+        layoutBoard();
+        paintTiles();
+      };
+      const fitPreview = () => {
+        if (viewStep === null) return;
+        const gap = Number.parseFloat(getComputedStyle(preview).rowGap);
+        const room = editorBody.clientHeight - stepNav.offsetHeight - gap - 2;
+        // 각 칸에는 높이 외에 행 사이 간격이 더해진다.
+        const cell = (room - (previewHeight - 1) * 2) / previewHeight;
+        preview.style.setProperty("--preview-width", `${Math.max(10, cell) * WIDTH + (WIDTH - 1) * 2}px`);
       };
       const warnings = () => puzzleWarnings(current());
       /**
@@ -946,6 +992,7 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
         pieces.length <= AUTO_CHECK_PIECES &&
         canSearch(current()) &&
         !warnings().length &&
+        !stroke &&
         !checking &&
         keyNow() !== autoSkip &&
         !(verified && verified.code === keyNow());
@@ -959,6 +1006,9 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
       /** 확인 결과가 있으면 그것, 없으면 미리 알려 줄 것 */
       const statusText = code => {
         if (verified?.state === "checking") return t("풀 수 있는지 찾는 중이에요…");
+        if (verified?.state === "unavailable")
+          return t("백그라운드 풀이기를 열 수 없어요. 잠시 후 다시 시도해 주세요.");
+        if (verified?.state === "deferred") return t("이 퍼즐은 더 살펴봐야 해요. 확인을 누르면 자세히 찾아봐요.");
         if (verified?.state === "solvable")
           return t("풀 수 있어요 · {n}수. 풀이 보기로 한 수씩 볼 수 있어요.", { n: verified.moves?.length ?? 0 });
         if (verified?.state === "unsolvable")
@@ -1038,27 +1088,33 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
         // 구멍 줄은 처음 누른 열을 구멍으로 둔다(아래위로 끌면 같은 열에 구멍이 이어진다)
         const at = tool === "garbage" ? index - (index % WIDTH) + stroke.col : index;
         if (applyTool(cells, tool, at, stroke.value)) {
+          if (!stroke.changed) {
+            clearTimeout(autoTimer);
+            stopChecking();
+          }
           stroke.changed = true;
           paintTiles();
         }
       };
       const endStroke = () => {
         if (!stroke) return;
-        if (stroke.changed) {
-          history.record(stroke.before);
+        const { changed: painted, before } = stroke;
+        stroke = null;
+        if (painted) {
+          history.record(before);
           changed();
         }
-        stroke = null;
       };
       const cellAt = target => /** @type {HTMLElement | null} */ (target?.closest?.("[data-cell]"));
       board.addEventListener("pointerdown", event => {
         const cell = cellAt(event.target);
         if (!cell || event.button > 0) return;
+        // 풀이 판 위에서 시작한 터치 스크롤은 편집으로 돌아가는 탭과 구별한다.
+        if (viewStep !== null && event.pointerType === "touch") return;
         event.preventDefault();
         // 풀이를 보는 중에 판을 누르면 편집으로 돌아온다
         if (viewStep !== null) {
-          viewStep = null;
-          refresh();
+          closeSolution();
           return;
         }
         const index = Number(cell.dataset.cell);
@@ -1096,7 +1152,9 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
       // 키보드(Enter·Space)로 누른 칸: 칸 하나에 도구를 한 번
       board.addEventListener("click", event => {
         const cell = cellAt(event.target);
-        if (!cell || event.detail > 0) return;
+        if (!cell) return;
+        if (viewStep !== null) return closeSolution();
+        if (event.detail > 0) return;
         const index = Number(cell.dataset.cell);
         if (tool === "piece") return doStamp(index);
         stroke = {
@@ -1214,23 +1272,41 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
         const code = keyNow();
         if (!code || checking || !canSearch(current())) return;
         verified = { code, state: "checking" };
-        const search = solver.run(solutionTask(current()));
+        const task = solutionTask(current());
+        const request = solver.run(auto ? { ...task, maxStates: AUTO_CHECK_STATES } : task);
+        const limit = auto
+          ? setTimeout(() => {
+              if (checking !== search) return;
+              stopChecking();
+              verified = { code, state: "deferred" };
+              if (dialog.open && dialog.contains(status)) refresh();
+            }, AUTO_CHECK_MS)
+          : undefined;
+        const search = {
+          cancel: () => {
+            clearTimeout(limit);
+            request.cancel();
+          },
+        };
         checking = search;
         refresh();
         if (!auto) stop.focus();
-        search.promise.then(result => {
+        request.promise.then(result => {
+          clearTimeout(limit);
           if (checking !== search) return;
           checking = null;
           if (result === undefined) return;
           verified =
-            result && "moves" in result
-              ? { code, state: "solvable", moves: result.moves }
-              : { code, state: result ? "exhausted" : "unsolvable" };
-          if (dialog.contains(status)) {
+            result === SOLVER_UNAVAILABLE
+              ? { code, state: "unavailable" }
+              : result && "moves" in result
+                ? { code, state: "solvable", moves: result.moves }
+                : { code, state: result ? (auto ? "deferred" : "exhausted") : "unsolvable" };
+          if (dialog.open && dialog.contains(status)) {
             // 저절로 확인한 것이면 포커스는 사용자가 두던 곳에 그대로
             const keepFocus = auto && document.activeElement !== stop;
             refresh();
-            if (!keepFocus) (view.disabled ? check : view).focus();
+            if (!keepFocus) (view.disabled ? (check.disabled ? trial : check) : view).focus();
           }
         });
       };
@@ -1253,20 +1329,37 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
           visual: getVisual(),
         });
       });
+      const closeSolution = () => {
+        viewStep = null;
+        renderPreview();
+        tiles[focusIndex].focus({ preventScroll: true });
+        preview.scrollIntoView({ block: "start", inline: "nearest" });
+      };
+      closePreview.addEventListener("click", closeSolution);
       view.addEventListener("change", () => {
-        viewStep = view.checked && solution() ? 0 : null;
-        refresh();
+        const moves = solution();
+        if (!view.checked || !moves) return closeSolution();
+        previewHeight = moves.reduce((rows, move) => {
+          const visible = move.board.subarray(move.board.length - PUZZLE_CELLS);
+          const heightOfMove = Math.max(...move.cells.map(([, y]) => move.board.length / WIDTH - y));
+          return Math.min(VISIBLE_ROWS, Math.max(rows, usedHeight(visible), heightOfMove));
+        }, EDIT_HEIGHTS[0]);
+        viewStep = 0;
+        renderPreview();
+        fitPreview();
+        (nextStep.disabled ? closePreview : nextStep).focus({ preventScroll: true });
+        preview.scrollIntoView({ block: "start", inline: "nearest" });
       });
       prevStep.addEventListener("click", () => {
         if (viewStep !== null && viewStep > 0) viewStep -= 1;
-        refresh();
-        if (prevStep.disabled) nextStep.focus();
+        renderPreview();
+        if (prevStep.disabled) nextStep.focus({ preventScroll: true });
       });
       nextStep.addEventListener("click", () => {
         const moves = solution();
         if (viewStep !== null && moves && viewStep < moves.length - 1) viewStep += 1;
-        refresh();
-        if (nextStep.disabled) prevStep.focus();
+        renderPreview();
+        if (nextStep.disabled) prevStep.focus({ preventScroll: true });
       });
 
       trial.addEventListener("click", () => {
@@ -1341,7 +1434,7 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
                 heights
               ),
               hint,
-              board,
+              preview,
               el(
                 "div",
                 { class: "puzzle-editor-tools", role: "toolbar", "aria-label": t("판 도구") },
@@ -1401,6 +1494,9 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
       const editorBody = /** @type {HTMLElement | null} */ (dialog.querySelector(".puzzle-editor"));
       editorBody?.addEventListener("paste", pastePieces);
       editorBody?.addEventListener("keydown", editorShortcuts);
+      previewResize = new ResizeObserver(fitPreview);
+      previewResize.observe(editorBody);
+      previewResize.observe(stepNav);
       layoutBoard();
       refresh();
       dialog.showModal();

@@ -70,7 +70,7 @@ import { createUndo } from "./modes/undo.js";
 import { createHelpUI } from "./ui/help.js";
 import { PUZZLES, createPuzzleProgress, findPuzzle, puzzleMode } from "./modes/puzzles.js";
 import { describeSteps } from "./modes/puzzle-hint.js";
-import { createSolver } from "./app/solver.js";
+import { createSolver, SOLVER_UNAVAILABLE } from "./app/solver.js";
 import {
   CHECKED_AUTO,
   CHECKED_TRIED,
@@ -1692,6 +1692,10 @@ const togglePuzzleHint = () => {
       game.state.hold === asked.hold;
     if (move === undefined || !same) return resetLessonHint();
     hintLabel.textContent = t("첫 수 보기");
+    if (move === SOLVER_UNAVAILABLE) {
+      $("downstack-status").textContent = t("백그라운드 풀이기를 열 수 없어요. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
     if (!move) {
       $("downstack-status").textContent = t("이 판에서는 더 풀 수 없어요. 다시 시작해 보세요");
       return;
