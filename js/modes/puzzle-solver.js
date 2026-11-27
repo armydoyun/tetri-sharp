@@ -7,7 +7,7 @@ import { HEIGHT, WIDTH, clearLines, collides, get, inBounds, isEmpty, place } fr
 import { PIECES } from "../core/pieces.js";
 import { detectTSpin } from "../core/tspin.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
-import { goalOf } from "./puzzle-goals.js";
+import { goalOf, puzzleCombo } from "./puzzle-goals.js";
 
 /** 한 번 찾을 때 살펴볼 최대 상태 수(오래 멈추지 않게) */
 const BUDGET = 1500000;
@@ -21,7 +21,7 @@ const BUDGET = 1500000;
  * - hold: 홀드를 쓸 수 있다
  * - ceilingRows: 아래에서 이 줄 수까지만 놓아 본다(없으면 처음 판의 높이 — 기본 퍼즐)
  * - looseRows: 처음 판의 높이 안에서 먼저 찾고, 못 찾으면 이 줄 수까지 넓혀 다시 찾는다(빠르게 찾되 "못 풀어요"는 넓게 찾아 본 뒤에만)
- * @typedef {{ sonic?: boolean, irs?: boolean, lockNone?: boolean, tspin?: "threeCorner" | "none", hold?: boolean, ceilingRows?: number, looseRows?: number }} SearchOptions
+ * @typedef {{ sonic?: boolean, irs?: boolean, lockNone?: boolean, tspin?: "threeCorner" | "none", hold?: boolean, allow180?: boolean, legacyArsSpin?: boolean, ceilingRows?: number, looseRows?: number }} SearchOptions
  */
 
 /**
@@ -30,14 +30,21 @@ const BUDGET = 1500000;
  * @param {any} rotation  js/rules/rotation 의 회전 시스템
  * @param {string} type
  * @param {Array<{ x: number, y: number, rot: number, first?: string }>} starts  시작 자리(first: 그 자리로 오는 첫 동작, 예: 미리 회전)
- * @param {{ half?: boolean, withPath?: boolean, budget?: { left: number }, sonic?: boolean, lockNone?: boolean }} [options]
+ * @param {{ half?: boolean, withPath?: boolean, budget?: { left: number }, sonic?: boolean, lockNone?: boolean, legacyArsSpin?: boolean }} [options]
  */
 export const reachable = (
   board,
   rotation,
   type,
   starts,
-  { half = false, withPath = false, budget = { left: BUDGET }, sonic = false, lockNone = false } = {}
+  {
+    half = false,
+    withPath = false,
+    budget = { left: BUDGET },
+    sonic = false,
+    lockNone = false,
+    legacyArsSpin = false,
+  } = {}
 ) => {
   const fits = (x, y, rot) => !collides(board, rotation.cells(type, rot), x, y);
   const key = s => `${s.x},${s.y},${s.rot},${s.last === "rotate" ? s.kick : "m"}`;
@@ -71,7 +78,8 @@ export const reachable = (
     if (!fits(s.x, s.y + 1, s.rot)) {
       const tspin = detectTSpin(
         board,
-        /** @type {any} */ ({ type, x: s.x, y: s.y, rot: s.rot, lastAction: s.last, kick: s.kick })
+        /** @type {any} */ ({ type, x: s.x, y: s.y, rot: s.rot, lastAction: s.last, kick: s.kick }),
+        legacyArsSpin ? undefined : rotation.id
       );
       const k = `${s.x},${s.y},${s.rot},${tspin}`;
       const found = { ...s, tspin, key: key(s) };
@@ -229,7 +237,7 @@ export const placeOn = (board, rotation, type, p, combo, total, opts) => {
     lines,
     tspin,
     perfect: lines > 0 && isEmpty(next),
-    combo: lines ? combo + 1 : -1,
+    combo: puzzleCombo(combo, lines),
     total: total + lines,
   };
   return { next, ev, cells };
@@ -272,14 +280,14 @@ export const findFirstMove = (puzzle, state, rest, rotation, opts = {}, control 
   let exhausted = false;
   const total0 = state.total ?? 0;
   const hold0 = state.hold ?? null;
-  for (const half of [false, true]) {
+  for (const half of opts.allow180 === false ? [false] : [false, true]) {
     const budget = control.budget ?? { left: BUDGET };
     if (budget.left <= 0) return { exhausted: true };
     // 여러 피스로 푸는 판은 놓을 높이를 정해 둔다. 기본 퍼즐은 처음 판의 높이 안에서만(판 비우기·4줄·콤보 — 그 위로 쌓는 풀이는 없다,
     // 판 비우기는 아래 두 줄이 다 비어 있을 수도 있어 적어도 두 줄). 만든 퍼즐은 ceilingRows로 받는다.
     const ceiling =
       opts.ceilingRows !== undefined ? HEIGHT - opts.ceilingRows : Math.min(topRow(state.board), HEIGHT - 2);
-    const search = { half, budget, sonic: opts.sonic, lockNone: opts.lockNone };
+    const search = { half, budget, sonic: opts.sonic, lockNone: opts.lockNone, legacyArsSpin: opts.legacyArsSpin };
     /** 다음 피스로 넘어간다: 목록이 끝나면 홀드한 피스가 나온다(만든 퍼즐의 규칙) */
     const advance = (queue, hold) =>
       queue.length ? { cur: queue[0], queue: queue.slice(1), hold } : hold ? { cur: hold, queue, hold: null } : null;

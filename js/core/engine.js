@@ -65,6 +65,7 @@ export const msToFrames = ms => (ms * 60) / 1000;
  * @typedef {Object} ModeHook
  * @property {(state: any, events: any[]) => null | { result: string }} [check]
  * @property {(state: any) => number} [levelFor]    줄 수 등에 따른 레벨 (없으면 1 고정)
+ * @property {boolean} [allowsFixedGravity]  모드 중력을 사용자 고정값으로 바꿀 수 있다
  * @property {(state: any) => number} [gravityFor]  레벨 등에 따른 중력 (없으면 rules.gravity)
  * @property {number} [initialLevel]                  시작 레벨 (기본 1)
  * @property {(state: any, lines: number) => number} [levelAfterLock]  고정마다 레벨을 올리는 방식(levelFor 대신)
@@ -78,9 +79,9 @@ export const msToFrames = ms => (ms * 60) / 1000;
  */
 
 /**
- * @param {{ rules: import("../rules/presets.js").RuleSet, handling?: Handling, seed?: number, mode?: ModeHook, onSpawn?: (state: any) => void }} options
+ * @param {{ rules: import("../rules/presets.js").RuleSet, handling?: Handling, seed?: number, mode?: ModeHook, onSpawn?: (state: any) => void, legacyArsSpin?: boolean }} options
  */
-export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode, onSpawn }) => {
+export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode, onSpawn, legacyArsSpin = false }) => {
   const rotation = ROTATIONS[rules.rotation];
   if (!rotation) throw new Error(`알 수 없는 회전 시스템: ${rules.rotation}`);
   const makeRandomizer = RANDOMIZERS[rules.randomizer];
@@ -89,7 +90,11 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
   const scoring = SCORINGS[rules.scoring ?? "guideline"];
   if (!scoring) throw new Error(`알 수 없는 점수표: ${rules.scoring}`);
   // 규칙이 조작감을 고정하면(예: Retro) 개인 설정 대신 그 값을 쓴다.
-  const withRules = h => (rules.fixedHandling ? { ...h, ...rules.fixedHandling } : h);
+  const withRules = h => {
+    if (!rules.fixedHandling) return h;
+    const { instantSoftDrop, ...fixed } = rules.fixedHandling;
+    return { ...h, ...fixed, sdf: instantSoftDrop ? Infinity : fixed.sdf };
+  };
   handling = withRules(handling);
 
   const randomizer = mode?.sequence?.length
@@ -155,7 +160,10 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
   let consumed = 0;
 
   const currentGravity = () => {
-    let g = mode?.gravityFor ? mode.gravityFor(state) : rules.gravity;
+    const g =
+      mode?.gravityFor && !(mode.allowsFixedGravity && rules.gravityMode === "fixed")
+        ? mode.gravityFor(state)
+        : rules.gravity;
     return g >= 20 ? Infinity : g;
   };
 
@@ -241,7 +249,8 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
   const lockPiece = () => {
     const a = /** @type {Active} */ (state.active);
     const shape = cells(a);
-    const tspin = rules.tspin === "threeCorner" ? detectTSpin(board, a) : "none";
+    const tspin =
+      rules.tspin === "threeCorner" ? detectTSpin(board, a, legacyArsSpin ? undefined : rotation.id) : "none";
     place(board, shape, a.x, a.y, CELL_ID[a.type]);
     state.active = null;
     state.holdUsed = false;
@@ -485,6 +494,10 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
   const advance = ({ held = 0, pressed = 0 } = {}) => {
     events = [];
     if (state.over) return events;
+    if (rules.allow180 === false) {
+      held &= ~BTN.R180;
+      pressed &= ~BTN.R180;
+    }
     currentHeld = held;
     consumed = 0;
     if (state.frame === 0 && !state.active) spawnNext();
@@ -549,6 +562,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
     step,
     state,
     rules,
+    legacyArsSpin,
     get handling() {
       return handling;
     },

@@ -793,6 +793,15 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
             control: yesNo("puzzle-hard-drop", r.hardDrop, (next, on) => (next.rules.hardDrop = on)),
           }),
           fieldRow({
+            id: "puzzle-allow180",
+            label: t("180도 회전 허용"),
+            control: yesNo(
+              "puzzle-allow180",
+              r.allow180 !== false,
+              (next, on) => (next.rules.allow180 = on ? undefined : false)
+            ),
+          }),
+          fieldRow({
             id: "puzzle-ghost",
             label: t("고스트"),
             hint: t("피스가 떨어질 자리를 흐리게 보여 줘요"),

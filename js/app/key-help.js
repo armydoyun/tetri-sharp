@@ -45,7 +45,11 @@ export const createKeyHelp = ({ target, getSettings, getRules, padConnected }) =
   /** 키 안내. 지금 규칙에서 쓸 수 없는 동작(하드 드롭·홀드가 꺼진 규칙 등)은 뺀다. 키 이름은 키캡(화살표는 SVG). */
   const render = () => {
     const r = getRules();
-    const unavailable = new Set([...(r.hardDrop ? [] : ["HARD"]), ...(r.hold.enabled ? [] : ["HOLD"])]);
+    const unavailable = new Set([
+      ...(r.hardDrop ? [] : ["HARD"]),
+      ...(r.hold.enabled ? [] : ["HOLD"]),
+      ...(r.allow180 === false ? ["R180"] : []),
+    ]);
     /** @type {Element[]} */
     const items = [icon("keyboard", { label: t("키보드") })];
     for (const a of ACTIONS) {

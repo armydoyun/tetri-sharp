@@ -20,7 +20,7 @@ const newId = () => Array.from(crypto.getRandomValues(new Uint32Array(4))).join(
  *   ask: (options: any) => Promise<boolean>,
  *   saveInterval: number,
  *   live: {
- *     journalInfo: () => { mode: any, rules: any, handling: any, name: string, resultPbSplits: any, pbSplits: any },
+ *     journalInfo: () => { mode: any, rules: any, handling: any, name: string, resultPbSplits: any, pbSplits: any, arsSpinFacing?: boolean },
  *     game: () => any,
  *     sceneEnded: () => boolean,
  *     fingerprint: () => string,
@@ -80,12 +80,13 @@ export const createRunSaver = ({ store, findMode, lessons, ask, saveInterval, li
     practice = false;
     savedRunId = savedRun()?.id ?? null;
     lastSavedStep = -1;
-    const { mode, rules, handling, name, resultPbSplits, pbSplits } = live.journalInfo();
+    const { mode, rules, handling, name, resultPbSplits, pbSplits, arsSpinFacing } = live.journalInfo();
     journal = createRunJournal({
       id: newId(),
       mode: mode.id,
       seed,
       rules,
+      ...(arsSpinFacing === true ? { arsSpinFacing: true } : {}),
       handling,
       name,
       target,

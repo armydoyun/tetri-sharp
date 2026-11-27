@@ -2,6 +2,24 @@
 // tests/unit/i18n.test.mjs가 코드와 index.html의 한국어 문장이 모두 여기 있는지 확인한다.
 /** @type {Record<string, string>} */
 export const EN = {
+  "180도 회전 허용": "Allow 180° rotations",
+  "180도 회전 없음": "180° rotations off",
+  "꺼 두면 플레이와 미리 회전에 180도 입력을 쓰지 않아요.": "Disable 180° rotations during play and initial rotation.",
+  "중력 적용": "Gravity behavior",
+  "모드 기본 — 레벨별 중력이 없는 모드는 아래 값을 써요.":
+    "Mode default — Use the value below in modes without level-based gravity.",
+  "고정 중력 — 기본 플레이 모드에서 아래 값을 유지해요.":
+    "Fixed gravity — Use the value below throughout regular play modes.",
+  "모드별 중력": "Mode gravity",
+  "0G (자동 낙하 없음)": "0G (no automatic fall)",
+  "{n}칸/초": "{n} cells/s",
+  "즉시 소프트 드롭": "Instant soft drop",
+  "즉시 소프트 드롭을 켜서 배율을 쓰지 않아요.": "With instant soft drop on, the multiplier is unused.",
+  "소프트 드롭을 누르면 즉시 바닥까지 내려요.": "Soft drop moves the piece straight to the floor.",
+  "피스가 나오거나 회전한 뒤 자동 가로 이동을 다시 시작하기까지 기다리는 시간":
+    "Delay before horizontal auto-repeat resumes after spawning or rotating.",
+  "개인 설정 따르기": "Use personal setting",
+  "반시계 · 시계 방향 회전": "Rotate counterclockwise or clockwise",
   "풀이 비교": "Compare solutions",
   "풀이 A": "Solution A",
   "풀이 B": "Solution B",

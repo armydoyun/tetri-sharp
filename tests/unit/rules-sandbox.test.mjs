@@ -8,6 +8,8 @@ import { createRng } from "../../js/core/rng.js";
 import { PIECE_TYPES } from "../../js/core/pieces.js";
 import { ARCADE, MODERN, PRESET_LIST, RETRO } from "../../js/rules/presets.js";
 import { makeCustomRules, rulesId, sanitizeRuleBody } from "../../js/rules/sanitize.js";
+import { MARATHON, SPRINT_40 } from "../../js/modes/index.js";
+import { decodeRules, encodeRules } from "../../js/rules/share.js";
 import { BTN, VISIBLE_TOP, createGame } from "../../js/core/engine.js";
 import { HEIGHT, WIDTH, set } from "../../js/core/board.js";
 
@@ -204,4 +206,62 @@ test("Arcade: 내려갈 때만 리셋 — 좌우로 흔들어도 지연 시간�
     frames++;
   }
   assert.ok(frames <= ARCADE.lock.delay + 1, `흔들어도 ${frames}F 만에 고정`);
+});
+
+test("모드 기본과 고정 중력: Marathon의 레벨 곡선을 덮어쓸 수 있고 훈련의 중력은 우선한다", () => {
+  const rules = makeCustomRules({ ...MODERN, gravity: 20 });
+  const spawn = (rules, mode) => {
+    const game = createGame({ rules, mode, seed: 1 });
+    game.step();
+    return game;
+  };
+  const sprint = spawn(rules, SPRINT_40);
+  assert.equal(sprint.state.active.y, sprint.ghostY());
+  const leveling = spawn(rules, MARATHON);
+  assert.ok(leveling.state.active.y < leveling.ghostY());
+  const fixed = makeCustomRules({ ...rules, gravityMode: "fixed" });
+  const marathon = spawn(fixed, MARATHON);
+  assert.equal(marathon.state.active.y, marathon.ghostY());
+  const lesson = spawn(fixed, { gravityFor: () => 0 });
+  assert.ok(lesson.state.active.y < lesson.ghostY());
+  const zero = spawn(makeCustomRules({ ...fixed, gravity: 0 }), MARATHON);
+  const y = zero.state.active.y;
+  for (let i = 0; i < 120; i++) zero.step();
+  assert.equal(zero.state.active.y, y);
+});
+
+test("Custom 공유 코드: 180도 제한, 고정 중력, DCD와 즉시 소프트 드롭이 함께 저장된다", () => {
+  const incoming = {
+    ...MODERN,
+    allow180: false,
+    gravity: 0,
+    gravityMode: "fixed",
+    fixedHandling: { das: 6, arr: 1, sdf: 12, dcd: 3, instantSoftDrop: true },
+  };
+  const body = decodeRules(encodeRules(incoming));
+  assert.deepEqual(body, sanitizeRuleBody(incoming));
+  assert.equal(body.gravity, 0);
+  const game = createGame({ rules: makeCustomRules(body), handling: { das: 10, arr: 3, sdf: 41, dcd: 7 }, seed: 1 });
+  const result = game.step({ held: BTN.R180, pressed: BTN.R180 });
+  assert.ok(!result.some(e => e.type === "irs" || e.type === "rotate"));
+  assert.equal(game.state.active.rot, 0);
+  assert.equal(game.step({ pressed: BTN.CW }).find(e => e.type === "rotate").turn, 1);
+  assert.equal(
+    game.step({ pressed: BTN.R180 }).some(e => e.type === "rotate"),
+    false
+  );
+  assert.equal(game.handling.dcd, 3);
+  assert.equal(game.handling.sdf, Infinity);
+  game.step({ held: BTN.SOFT });
+  assert.equal(game.state.active.y, game.ghostY());
+  assert.equal(game.state.stats.pieces, 0);
+  game.setHandling({ das: 20, arr: 4, sdf: 20, dcd: 5 });
+  assert.equal(game.handling.dcd, 3);
+
+  assert.equal(rulesId(MODERN), rulesId({ ...MODERN, allow180: true, gravityMode: "mode" }));
+  assert.equal(
+    createGame({ rules: RETRO, handling: { das: 10, arr: 3, sdf: 41, dcd: 7 } }).handling.dcd,
+    7,
+    "기존 고정 규칙은 개인 DCD를 유지한다"
+  );
 });

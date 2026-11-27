@@ -29,7 +29,7 @@ const describeGoal = (puzzle, need) => {
       title: kind === "lines" ? t("{n}줄 지우기", { n: target }) : title,
       segments,
       progress: state => {
-        const count = Math.min(target, kind === "lines" ? state.puzzle.lines : state.combo + 1);
+        const count = Math.min(target, kind === "lines" ? state.puzzle.lines : state.puzzle.combo + 1);
         return { value: `${count} / ${target}`, filled: Math.floor((count * segments) / target) };
       },
     };
