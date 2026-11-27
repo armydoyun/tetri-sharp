@@ -56,6 +56,10 @@ test("본편 오늘의 퍼즐: 날짜 시드로 플레이하고 새로고침 뒤
   await play.click();
   await page.waitForFunction(() => document.body.dataset.screen === "play");
 
+  const goal = page.locator("#puzzle-goal-hud");
+  await goal.getByRole("heading", { name: "퍼펙트 클리어" }).waitFor();
+  assert.equal(await goal.locator(".goal-value").textContent(), "남은 줄 3");
+
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:run:suspended")));
   assert.equal(saved.puzzle, today.code);
   assert.deepEqual(saved.dailyPuzzle, { key: "2026-11-26", family: "fill" });
@@ -68,6 +72,8 @@ test("본편 오늘의 퍼즐: 날짜 시드로 플레이하고 새로고침 뒤
   }
   await page.locator("#results").waitFor();
   assert.equal(await page.locator("#results-title").textContent(), "성공!");
+  assert.equal(await goal.locator(".goal-status").textContent(), "목표 달성");
+  assert.equal(await goal.locator(".goal-value").textContent(), "남은 줄 0");
   assert.ok((await page.locator("#results-mode").textContent()).includes(`${name} · 2026-11-26`));
   await page.locator('#results [data-action="menu"]').click();
   await page.locator("#daily-puzzle[open]").waitFor();

@@ -5,6 +5,7 @@ import { createBoardGrid } from "../render/board-grid.js";
 import { ALL_THEME_IDS, THEMES } from "../render/themes.js";
 import { button, dropdown, segmented, setSegmented } from "../ui/components.js";
 import { el } from "../ui/dom.js";
+import { createGoalDisplay } from "../ui/puzzle-goal.js";
 import { BOARD_ROWS, BOARD_TOP, puzzleGoalFrames } from "./scenes.js";
 
 document.documentElement.lang = lang;
@@ -17,7 +18,6 @@ const phases = [
   ["1", t("진행 중")],
   ["2", t("목표 달성")],
 ];
-const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const titles = {
   lines: t("{n}줄 지우기", { n: 2 }),
   tsd: t("T스핀 더블"),
@@ -30,11 +30,9 @@ const instructions = {
 };
 const values = {
   lines: frame => `${frame.lines} / 2`,
-  tsd: () => t("한 번에 2줄"),
+  tsd: () => t("한 번에 {n}줄", { n: 2 }),
   pc: frame => t("남은 줄 {n}", { n: frame.remaining }),
 };
-
-const mark = () => el("span", { class: "goal-mark" });
 
 const createCard = id => {
   const cell = Math.round(24 * (devicePixelRatio || 1));
@@ -50,40 +48,24 @@ const createCard = id => {
   const ctx = board.getContext("2d");
   const grid = createBoardGrid(0, 0, WIDTH, BOARD_ROWS, cell);
   const title = el("h2", { id: `goal-${id}-title`, text: titles[id] });
-  const status = el("p", { class: "goal-status" });
-  const value = el("p", { class: "goal-value" });
-  const bars = Array.from({ length: id === "pc" ? 3 : 2 }, mark);
-  const tCells = id === "tsd" ? Array.from({ length: 4 }, mark) : [];
-  const marks = el("div", { class: "goal-marks", "data-kind": id, "aria-hidden": "true" });
-  if (tCells.length) marks.append(el("div", { class: "goal-t" }, ...tCells));
-  marks.append(...bars);
-  const hud = el("div", { class: "goal-hud" }, status, marks, value);
+  const goal = createGoalDisplay({ kind: id, segments: id === "pc" ? 3 : 2, spin: id === "tsd" });
   const card = el(
     "article",
     { class: "goal-card", "data-goal": id, "aria-labelledby": title.id },
     title,
-    el("div", { class: "goal-stage" }, board, hud),
+    el("div", { class: "goal-stage" }, board, goal.hud),
     el("p", { text: instructions[id] })
   );
 
   const update = (theme, phase, celebrate) => {
     const frame = frames[id][phase];
-    status.textContent = phases[phase][1];
-    value.textContent = values[id](frame);
-    hud.dataset.complete = String(frame.done);
-    const filled = id === "pc" ? frame.remaining : frame.lines;
-    bars.forEach((bar, index) => (bar.dataset.filled = String(index < filled)));
-    tCells.forEach(cell => (cell.dataset.filled = String(frame.done)));
-    for (const animation of hud.getAnimations()) animation.cancel();
-    if (celebrate && frame.done && !reducedMotion.matches) {
-      hud.animate(
-        [
-          { outline: "var(--border-w) solid var(--accent)", outlineOffset: "calc(-1 * var(--border-w))" },
-          { outline: "var(--border-w) solid transparent", outlineOffset: "calc(-1 * var(--border-w))" },
-        ],
-        { duration: 360, easing: "ease-out" }
-      );
-    }
+    goal.update({
+      status: phases[phase][1],
+      value: values[id](frame),
+      filled: id === "pc" ? frame.remaining : frame.lines,
+      complete: frame.done,
+      celebrate,
+    });
     if (!ctx) return;
 
     grid(ctx, theme, true);

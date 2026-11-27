@@ -3243,6 +3243,7 @@ test("편의: 카운트다운 '없음'이면 바로 시작하고, 연습에서�
   await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "1");
   await page.keyboard.press("KeyU");
   await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "0");
+  assert.equal(await text(page, "puzzle-goal-hud .goal-status"), "시작 전");
   await page.keyboard.press("Escape");
   await page.click('#pause [data-action="menu"]');
   await page.click('[data-confirm="ok"]');
@@ -3807,9 +3808,11 @@ test("퍼즐 만들기: 닫았다 다시 열어도 저장 전 새 퍼즐은 이�
   await page.waitForFunction(() => document.body.dataset.screen === "results");
   assert.equal(await text(page, "results-title"), "실패");
   assert.equal(await visible(page, "undo-piece"), true, "실패 결과에서도 되돌리기");
+  assert.equal(await text(page, "puzzle-goal-hud .goal-status"), "목표 미달성");
   await page.keyboard.press("KeyU");
   await page.waitForFunction(() => document.body.dataset.screen === "play");
   await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "0");
+  assert.equal(await text(page, "puzzle-goal-hud .goal-status"), "시작 전");
   await page.keyboard.press("Escape");
   await page.click('#pause [data-action="menu"]');
   await page.click('[data-confirm="ok"]');
@@ -3960,10 +3963,8 @@ test("퍼즐 만들기 목표·고급 설정: 목표와 규칙이 링크로 가�
   const recipient = await other.newPage();
   await recipient.goto(link);
   await recipient.waitForFunction(() => document.body.dataset.screen === "play");
-  assert.equal(
-    await text(recipient, "mode-objective"),
-    "목표 · T-spin Double · 20G · 홀드(처음 I) · 자동 확인으로 풀 수 있는 퍼즐"
-  );
+  assert.equal(await text(recipient, "puzzle-goal-hud .goal-title"), "T스핀 더블");
+  assert.equal(await text(recipient, "mode-objective"), "20G · 홀드(처음 I) · 자동 확인으로 풀 수 있는 퍼즐");
   await other.close();
 
   // 규칙대로 떨어지는 퍼즐: 자동 확인을 쓸 수 없고, 게임 중 첫 수 보기도 꺼진다
@@ -4069,10 +4070,8 @@ test("내 퍼즐·받은 퍼즐: 고치면 저절로 저장되고, 목록에서 
   await friend.goto(link);
   await friend.waitForFunction(() => document.body.dataset.screen === "play");
   assert.equal(await text(friend, "session-title"), "첫 퍼즐");
-  assert.equal(
-    await text(friend, "mode-objective"),
-    "목표 · 판 비우기 · 만든 사람이 직접 풀어 봤어요 · 오른쪽을 보세요"
-  );
+  assert.equal(await text(friend, "puzzle-goal-hud .goal-title"), "퍼펙트 클리어");
+  assert.equal(await text(friend, "mode-objective"), "만든 사람이 직접 풀어 봤어요 · 오른쪽을 보세요");
   await friend.keyboard.press("Space");
   await friend.waitForFunction(() => document.body.dataset.screen === "results");
   await friend.click('#results [data-action="menu"]');
@@ -4198,6 +4197,7 @@ test("만든 퍼즐: 시험 플레이 성공 후에만 공유하고, 휴대폰�
     await recipient.goto(link);
     await recipient.waitForFunction(() => document.body.dataset.screen === "play");
     assert.equal(await text(recipient, "session-title"), "Custom puzzle");
+    assert.equal(await text(recipient, "puzzle-goal-hud .goal-value"), "1 row left");
     await recipient.waitForFunction(() => document.body.style.getPropertyValue("--lesson-hud-h"));
     const touchRowFits = () =>
       recipient.locator("#touchpad").evaluate(pad => pad.getBoundingClientRect().bottom <= innerHeight);
@@ -4737,6 +4737,83 @@ const openPuzzle = async (page, number) => {
   await page.waitForFunction(() => document.body.dataset.screen === "play");
   await page.evaluate(() => window.advanceFrame());
 };
+
+test("본편 퍼즐 목표: 줄 누적을 이어서 복원하고 T스핀 더블은 한 번에 판정한다", async () => {
+  const { context, page, errors } = await openPage(
+    () =>
+      localStorage.setItem(
+        "tetrisharp:settings",
+        JSON.stringify({ access: { countdown: "off" }, handling: { sdf: 41 }, visual: { effects: "off" } })
+      ),
+    undefined,
+    { frameClock: true }
+  );
+  try {
+    const start = async (rows, pieces, goal) => {
+      const cells = new Uint8Array(PUZZLE_CELLS);
+      const terrain = [...rows.join("")].map(cell => Number(cell));
+      cells.set(terrain, cells.length - terrain.length);
+      await page.goto(`${url}#puzzle=${encodePuzzle({ cells, pieces, goal })}`);
+      await page.waitForFunction(() => document.body.dataset.screen === "play");
+      await page.evaluate(() => window.advanceFrame());
+    };
+    const goal = page.locator("#puzzle-goal-hud");
+    const layout = async () => {
+      const card = await goal.boundingBox();
+      const board = await page.locator("#board").boundingBox();
+      return { card, board };
+    };
+    const value = () => goal.locator(".goal-value").textContent();
+    const status = () => goal.locator(".goal-status").textContent();
+    const filled = () => goal.locator('.goal-mark[data-filled="true"]').count();
+
+    await start(["1110000111", "1110000111"], "II", { kind: "lines", lines: 2 });
+    assert.equal(await value(), "0 / 2");
+    assert.equal(await filled(), 0);
+    const initial = await layout();
+    await runKeys(page, [["Space", 1]]);
+    assert.equal(await value(), "1 / 2");
+    assert.equal(await status(), "진행 중");
+    assert.equal(await filled(), 1);
+    assert.deepEqual(await layout(), initial);
+
+    await page.click("#pause-game");
+    await page.reload();
+    assert.ok(await goal.isHidden());
+    await page.click("#continue-run");
+    await page.evaluate(() => window.advanceFrame());
+    assert.equal(await value(), "1 / 2");
+    await runKeys(page, [["Space", 1]]);
+    assert.equal(await value(), "2 / 2");
+    assert.equal(await status(), "목표 달성");
+    assert.equal(await filled(), 2);
+    assert.equal(await goal.evaluate(root => root.getAnimations({ subtree: true }).length), 0);
+
+    await page.click('#results [data-action="retry"]');
+    await page.evaluate(() => window.advanceFrame());
+    assert.equal(await value(), "0 / 2");
+    assert.equal(await status(), "시작 전");
+
+    await page.click("#pause-game");
+    await page.click('#pause [data-action="menu"]');
+    await page.click('[data-confirm="ok"]');
+    await start(["1100001111", "1111000111", "1111101111"], "T", { kind: "tsd" });
+    assert.equal(await filled(), 0);
+    await runKeys(page, [
+      ["ArrowRight", 1],
+      ["KeyZ", 1],
+      ["ArrowDown", 1],
+      ["KeyZ", 1],
+    ]);
+    assert.equal(await filled(), 0);
+    await runKeys(page, [["Space", 1]]);
+    assert.equal(await status(), "목표 달성");
+    assert.equal(await filled(), 6);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
 
 test("본편 상황 연출: 높은 판과 벽 차기를 표시하고 판을 낮추면 위험선을 걷는다", async () => {
   const { context, page, errors } = await openPage(
