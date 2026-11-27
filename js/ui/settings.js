@@ -97,6 +97,13 @@ const EFFECT_HINTS = {
   reduced: t("줄이 삭제된 위치에 가는 선을 잠깐 표시해요"),
   off: t("연출을 모두 꺼요"),
 };
+const GAMEPLAY_EFFECT_ROWS = [
+  ["next", t("다음 피스 등장"), t("새 피스와 다음 칸의 테두리를 잠깐 밝혀요")],
+  ["hold", t("홀드 교환"), t("홀드 칸에 들어가는 피스를 짧게 움직여요")],
+  ["spin", t("T스핀 회전 강조"), t("T스핀을 확정한 자리에서 회전선을 보여 줘요")],
+  ["perfect", t("퍼펙트 클리어"), t("보드를 모두 비우면 가장자리를 밝혀요")],
+  ["combo", t("콤보 표시"), t("연속으로 줄을 지울 때 보드 옆 칸을 채워요")],
+];
 const SCHEME_HINTS = {
   system: "기기의 라이트·다크 설정을 따라요",
   light: "첫 화면과 메뉴를 밝게 써요",
@@ -467,6 +474,27 @@ export const createSettingsUI = ({
     });
   };
 
+  const gameplayEffectRows = visual =>
+    GAMEPLAY_EFFECT_ROWS.map(([key, label, hint]) => {
+      const id = `set-gameplay-effect-${key}`;
+      const disabled = visual.effects !== "full";
+      return fieldRow({
+        id,
+        label,
+        hint: disabled ? t("화면 효과 ‘전체’에서 조절해요") : hint,
+        disabled,
+        control: toggle({
+          id,
+          checked: visual.gameplayEffects[key],
+          disabled,
+          onChange: enabled => {
+            const current = getSettings().visual;
+            update({ visual: { ...current, gameplayEffects: { ...current.gameplayEffects, [key]: enabled } } });
+          },
+        }),
+      });
+    });
+
   const visualAccessRows = visual => [
     fieldRow({
       id: "set-effects",
@@ -482,6 +510,7 @@ export const createSettingsUI = ({
       }),
     }),
     clearEffectLengthRow(visual),
+    ...gameplayEffectRows(visual),
     fieldRow({
       id: "set-palette",
       label: t("블록 색"),

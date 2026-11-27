@@ -13,6 +13,7 @@ import { launchOptions } from "../helpers/browser.mjs";
 import { runScenarios } from "../helpers/ui-scenarios.mjs";
 import { keysFor, solvePuzzle } from "../helpers/puzzle-solve.mjs";
 import { PUZZLES } from "../../js/modes/puzzles.js";
+import { DEFAULT_RULES, encodePuzzle, PUZZLE_CELLS } from "../../js/modes/custom-puzzle.js";
 import { botDailyReplay } from "../helpers/daily.mjs";
 import { dateKey } from "../../js/modes/daily.js";
 import { verifyReplay } from "../../js/replay/replay.js";
@@ -968,12 +969,15 @@ test("줄 삭제 효과 길이: 전체에서만 배율을 바꾸고 0%와 이전
     await page.click('.dialog-tabs [data-value="visual"]');
   };
   const slider = page.locator("#set-clear-effect-length");
+  const effect = name => page.locator(`#set-gameplay-effect-${name}`);
   const select = mode => page.click(`#set-effects [data-value="${mode}"]`);
   try {
     await openVisual();
     await select("full");
     assert.equal(await slider.inputValue(), "100");
     assert.equal(await page.getByRole("slider", { name: "줄 삭제 효과 길이" }).count(), 1);
+    for (const name of ["next", "hold", "spin", "perfect", "combo"]) assert.equal(await effect(name).isChecked(), true);
+    await effect("hold").uncheck();
     await slider.press("End");
     assert.equal(await slider.inputValue(), "150");
     await slider.press("ArrowLeft");
@@ -981,15 +985,21 @@ test("줄 삭제 효과 길이: 전체에서만 배율을 바꾸고 0%와 이전
     for (const mode of ["reduced", "off"]) {
       await select(mode);
       assert.equal(await slider.isDisabled(), true);
+      assert.equal(await effect("hold").isDisabled(), true);
     }
     await select("full");
     assert.equal(await slider.isEnabled(), true);
+    assert.equal(await effect("hold").isEnabled(), true);
+    assert.equal(await effect("hold").isChecked(), false);
     assert.equal(await slider.inputValue(), "145");
     await slider.press("Home");
     assert.equal(await slider.inputValue(), "0");
+    assert.equal(await effect("hold").isChecked(), false);
+    assert.equal(await effect("spin").isChecked(), true);
     await page.reload();
     await openVisual();
     assert.equal(await slider.inputValue(), "0");
+    assert.equal(await effect("hold").isChecked(), false);
     await page.click('.dialog-tabs [data-value="access"]');
     assert.equal(await slider.inputValue(), "0");
     assert.deepEqual(errors, []);
@@ -4663,6 +4673,81 @@ const openPuzzle = async (page, number) => {
   await page.evaluate(() => window.advanceFrame());
 };
 
+test("본편 연출: 홀드로 꺼낸 T로 두 줄을 지우고 다음 I로 콤보와 퍼펙트 클리어를 완성한다", async () => {
+  const { context, page, errors } = await openPage(
+    () => {
+      localStorage.setItem(
+        "tetrisharp:settings",
+        JSON.stringify({ access: { countdown: "off" }, visual: { effects: "full" } })
+      );
+      window.seenAccents = {};
+      const canvas = CanvasRenderingContext2D.prototype;
+      const fill = canvas.fillRect;
+      const arc = canvas.arc;
+      const rect = canvas.rect;
+      const text = canvas.fillText;
+      canvas.fillRect = function (x, y, w, h) {
+        if (this.canvas.id === "board" && y === 2.92) window.seenAccents[x < 1 ? "hold" : "next"] = true;
+        return fill.call(this, x, y, w, h);
+      };
+      canvas.arc = function (...args) {
+        if (this.canvas.id === "board" && args[5] === true) window.seenAccents.spin = true;
+        return arc.apply(this, args);
+      };
+      canvas.rect = function (x, y, w, h) {
+        if (this.canvas.id === "board" && w > 9 && w < 10 && h > 19 && h < 20) window.seenAccents.perfect = true;
+        return rect.call(this, x, y, w, h);
+      };
+      canvas.fillText = function (...args) {
+        if (this.canvas.id === "board" && args[0] === "콤보") window.seenAccents.combo = true;
+        return text.apply(this, args);
+      };
+    },
+    undefined,
+    { frameClock: true }
+  );
+  try {
+    const cells = new Uint8Array(PUZZLE_CELLS);
+    cells.set(
+      [..."11....22771112...27711888.8877"].map(value => Number(value !== ".")),
+      cells.length - 30
+    );
+    const code = encodePuzzle({
+      cells,
+      pieces: "ZIOS",
+      holdStart: "T",
+      rules: { ...DEFAULT_RULES, hold: { enabled: true } },
+    });
+    assert.ok(code);
+    await page.goto(`${url}#puzzle=${code}`);
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    await page.evaluate(() => window.advanceFrame());
+    await runKeys(page, [
+      ["KeyC", 1],
+      ["ArrowRight", 1],
+      ["KeyZ", 1],
+      ["ArrowDown", 70],
+      ["KeyZ", 1],
+      ["Space", 1],
+      ["F24", 20],
+      ["ArrowLeft", 1],
+      ["Space", 1],
+      ["F24", 30],
+    ]);
+    assert.equal(await text(page, "results-title"), "성공!");
+    assert.deepEqual(await page.evaluate(() => window.seenAccents), {
+      next: true,
+      hold: true,
+      spin: true,
+      combo: true,
+      perfect: true,
+    });
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test("퍼즐 콤보 이어 가기: 줄을 못 지운 피스가 나오면 남은 피스와 상관없이 바로 실패", async () => {
   const { context, page, errors } = await openPage(
     () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } })),
@@ -4689,7 +4774,18 @@ test("퍼즐 콤보 이어 가기: 줄을 못 지운 피스가 나오면 남은 
 
 test("퍼즐 T-spin Mini: 곧장 떨어뜨리면 실패, 바닥까지 내린 뒤 마지막에 돌려 넣으면 Mini로 성공", async () => {
   const { context, page, errors } = await openPage(
-    () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } })),
+    () => {
+      localStorage.setItem(
+        "tetrisharp:settings",
+        JSON.stringify({ access: { countdown: "off" }, visual: { effects: "full" } })
+      );
+      window.spinArcs = 0;
+      const arc = CanvasRenderingContext2D.prototype.arc;
+      CanvasRenderingContext2D.prototype.arc = function (...args) {
+        if (this.canvas.id === "board" && args[5] === true) window.spinArcs++;
+        return arc.apply(this, args);
+      };
+    },
     undefined,
     { frameClock: true }
   );
@@ -4700,6 +4796,7 @@ test("퍼즐 T-spin Mini: 곧장 떨어뜨리면 실패, 바닥까지 내린 뒤
   await runKeys(page, [["Space", 1]]);
   await page.waitForFunction(() => !document.getElementById("results")?.hidden);
   assert.equal(await text(page, "results-title"), "실패");
+  assert.equal(await page.evaluate(() => window.spinArcs), 0);
   await page.click('#results [data-action="menu"]');
   await openPuzzle(page, first.number);
   // 오른쪽 네 칸 → 바닥까지 소프트 드롭 → 반시계로 돌려 넣고, 그대로 두면(고정 지연) 회전이 마지막 동작으로 남는다
@@ -4714,6 +4811,7 @@ test("퍼즐 T-spin Mini: 곧장 떨어뜨리면 실패, 바닥까지 내린 뒤
   ]);
   await page.waitForFunction(() => !document.getElementById("results")?.hidden);
   assert.equal(await text(page, "results-title"), "성공!");
+  assert.ok((await page.evaluate(() => window.spinArcs)) > 0, "판정된 T스핀 자리에서 회전선이 그려진다");
   assert.deepEqual(errors, []);
   await context.close();
 });

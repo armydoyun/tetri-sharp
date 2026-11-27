@@ -407,6 +407,7 @@ test("시각 설정 보정과 예전 형식 옮기기", () => {
       theme: "modern",
       effects: "off",
       clearEffectLength: 100,
+      gameplayEffects: { next: true, hold: true, spin: true, perfect: true, combo: true },
       palette: "theme",
       pattern: "off",
       ghost: "normal",
@@ -421,6 +422,7 @@ test("시각 설정 보정과 예전 형식 옮기기", () => {
     "clearEffectLength",
     "colors",
     "effects",
+    "gameplayEffects",
     "ghost",
     "grid",
     "inputs",
@@ -432,6 +434,13 @@ test("시각 설정 보정과 예전 형식 옮기기", () => {
   assert.equal(sanitizeVisual({ clearEffectLength: 200 }).clearEffectLength, 150);
   assert.equal(sanitizeVisual({ clearEffectLength: 73 }).clearEffectLength, 75);
   assert.equal(sanitizeVisual({ clearEffectLength: "invalid" }).clearEffectLength, 100);
+  assert.deepEqual(sanitizeVisual({ gameplayEffects: { hold: false, spin: "off", other: false } }).gameplayEffects, {
+    next: true,
+    hold: false,
+    spin: true,
+    perfect: true,
+    combo: true,
+  });
   assert.equal(sanitizeVisual({ ghost: "huge", grid: 0, pattern: "on" }).ghost, "normal");
   assert.equal(sanitizeVisual({ pattern: "on" }).pattern, "on");
   assert.deepEqual(sanitizeVisual({ colors: { T: "#AABBCC", I: "red", Q: "#000000" } }).colors, { T: "#aabbcc" });

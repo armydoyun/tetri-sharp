@@ -18,8 +18,25 @@ const SIDE = 4.4;
 const SMALL = 0.62;
 
 /**
+ * @typedef {{
+ *   piece: {type: import("../core/pieces.js").PieceType, cells: number[][], ghost: number[][], down: number} | null,
+ *   queue: readonly string[],
+ *   board: number[][],
+ *   clear: {rows: number[], landed: number[][]} | null,
+ *   clearAge: number,
+ *   pivot: number | null
+ * }} PreviewBoardFrame
+ * @typedef {{
+ *   hold: import("../core/pieces.js").PieceType,
+ *   holdOffset: number,
+ *   overlay(ctx: CanvasRenderingContext2D, boardLeft: number, boardRight: number, slotWidth: number): void
+ * }} SampleDetails
+ * @typedef {{ at: number, events: Parameters<ReturnType<typeof createEffects>["add"]>[0] }} SampleCue
+ *
  * @param {HTMLCanvasElement} canvas
  * @returns {{ play(): void, stop(): void, playClear(lines: number, spin?: boolean): void,
+ * playSample(duration: number, getScene: (elapsed: number) => PreviewBoardFrame,
+ *   cues: readonly SampleCue[], details?: (elapsed: number, scene: PreviewBoardFrame) => SampleDetails): void,
  * show(theme: any, palette: readonly string[], visual: import("./canvas.js").Visual): void }}
  */
 export const createThemeStage = canvas => {
@@ -58,8 +75,8 @@ export const createThemeStage = canvas => {
     for (const [x, y] of shape) block(ox + x * size, oy + y * size, size, CELL_ID[type]);
   };
 
-  /** @param {ReturnType<typeof getPreviewFrame>} scene */
-  const draw = (scene, elapsed = 0) => {
+  /** @param {PreviewBoardFrame} scene @param {number} [elapsed] @param {SampleDetails} [details] */
+  const draw = (scene, elapsed = 0, details) => {
     if (!ctx || !theme) return;
     effects.prune(elapsed, visual.effects, visual.clearEffectLength);
 
@@ -113,8 +130,20 @@ export const createThemeStage = canvas => {
     const nx = bx + COLS * cell + pad;
     ctx.fillText(t("홀드"), pad, Math.round(cell * 0.2));
     ctx.fillText(t("다음"), nx, Math.round(cell * 0.2));
-    boxPiece(HOLD, pad, cell * 1.3);
+    if (details) {
+      // 밝은 테마의 잉크도 어두운 둘레에서 읽을 수 있게 슬롯 바탕을 해당 테마 색으로 깐다.
+      ctx.fillStyle = theme.board.bg;
+      ctx.fillRect(cell * 0.4, cell * 0.93, bx - cell * 0.8, cell * 1.9);
+      ctx.fillRect(bx + cell * (COLS + 0.4), cell * 0.93, width - bx - cell * (COLS + 0.8), cell * 1.9);
+    }
+    boxPiece(details?.hold ?? HOLD, pad, cell * (1.3 + (details?.holdOffset ?? 0)));
     queue.forEach((type, i) => boxPiece(type, nx, cell * 1.3 + i * cell * SMALL * 3));
+    if (details) {
+      ctx.save();
+      ctx.scale(cell, cell);
+      details.overlay(ctx, bx / cell, bx / cell + COLS, (width - bx) / cell - COLS);
+      ctx.restore();
+    }
   };
 
   const animate = now => {
@@ -142,6 +171,32 @@ export const createThemeStage = canvas => {
     draw(getPreviewFrame(0));
   };
 
+  /** @type {ReturnType<typeof createThemeStage>["playSample"]} */
+  const playSample = (duration, getScene, cues, details) => {
+    if (!ctx || !theme) return;
+    stop();
+    start = performance.now();
+    let nextCue = 0;
+    const paint = elapsed => {
+      while (nextCue < cues.length && cues[nextCue].at <= elapsed) {
+        const { events, at } = cues[nextCue++];
+        effects.add(events, visual.effects, at, theme.motion);
+      }
+      const scene = getScene(elapsed);
+      draw(scene, elapsed, details?.(elapsed, scene));
+    };
+    const animateSample = now => {
+      const elapsed = now - start;
+      if (elapsed >= duration) stop();
+      else {
+        paint(elapsed);
+        frame = requestAnimationFrame(animateSample);
+      }
+    };
+    paint(0);
+    frame = requestAnimationFrame(animateSample);
+  };
+
   return {
     /** 그릴 테마와 설정을 바꾼다(움직이는 중이면 다음 프레임부터, 멈춰 있으면 바로 다시 그린다) */
     show(nextTheme, nextPalette, nextVisual) {
@@ -158,24 +213,12 @@ export const createThemeStage = canvas => {
       frame = requestAnimationFrame(animate);
     },
     playClear(lines, spin = false) {
-      if (!ctx || !theme) return;
       const sample = getClearSample(lines, spin);
-      if (!sample) return;
-      stop();
-      effects.add([sample.event], visual.effects, 0, theme.motion);
-      start = performance.now();
-      draw(getPreviewFrame(0, sample));
+      if (!sample || !theme) return;
       const until = Math.max(200, clearEffectDuration(theme.motion, visual.clearEffectLength)) + 170;
-      const animateClear = now => {
-        const elapsed = now - start;
-        if (elapsed >= until) stop();
-        else {
-          draw(getPreviewFrame(elapsed, sample), elapsed);
-          frame = requestAnimationFrame(animateClear);
-        }
-      };
-      frame = requestAnimationFrame(animateClear);
+      playSample(until, elapsed => getPreviewFrame(elapsed, sample), [{ at: 0, events: [sample.event] }]);
     },
+    playSample,
     stop,
   };
 };
