@@ -1478,6 +1478,14 @@ test("규칙 공유: 받은 코드·링크는 지금 규칙을 덮어쓰지 않�
   await page.click('[data-preset="modern"]');
   await page.locator("#rule-share-paste").fill(code);
   await page.click("#rule-share-load");
+  await page.locator("#ask-ok").waitFor();
+  assert.match(await page.locator("#ask .dialog-body").textContent(), /Modern 기본값과 다른 설정.*회전 시스템 킥 없음/);
+  assert.equal(await page.locator("#rule-slot-name").inputValue(), "내 규칙 1");
+  await page.click("#ask-cancel");
+  assert.equal(await page.locator("#rule-share-paste").inputValue(), code, "취소하면 입력값을 유지한다");
+  await page.click("#rule-share-load");
+  await page.click("#ask-ok");
+  await page.waitForFunction(() => document.querySelector("#rule-slot-name")?.value === "받은 규칙");
   assert.match(await text(page, "rules-record"), /새 칸으로 불러왔어요/);
   assert.equal(await page.locator("#rule-slot-name").inputValue(), "받은 규칙");
   await page.click('.dialog-tabs [data-value="피스"]');
@@ -1503,7 +1511,16 @@ test("규칙 공유: 받은 코드·링크는 지금 규칙을 덮어쓰지 않�
   p2.on("pageerror", e => errs2.push(e.message));
   await p2.goto(`${url}#rules=${code.slice(4)}`);
   await p2.waitForFunction(() => document.documentElement.dataset.ready === "1");
-  assert.equal(await p2.locator('[data-rules="custom"]').getAttribute("aria-pressed"), "true");
+  assert.equal(await p2.locator('[data-rules="custom"]').getAttribute("aria-pressed"), "false");
+  await p2.locator("#ask-ok").waitFor();
+  await p2.keyboard.press("Escape");
+  await p2.locator("#ask-ok").waitFor({ state: "hidden" });
+  assert.equal(await p2.locator('[data-rules="custom"]').getAttribute("aria-pressed"), "false");
+  await p2.goto(`${url}#rules=${code.slice(4)}`);
+  await p2.click("#ask-ok");
+  await p2.waitForFunction(
+    () => document.querySelector('[data-rules="custom"]')?.getAttribute("aria-pressed") === "true"
+  );
   assert.match(await p2.locator("#menu-notice").textContent(), /내 규칙에 새로 넣었어요/);
   assert.equal(new URL(p2.url()).hash, "", "주소의 해시는 지운다");
   assert.equal(await p2.locator("#rule-slot .select-value").textContent(), "받은 규칙");
@@ -1511,6 +1528,57 @@ test("규칙 공유: 받은 코드·링크는 지금 규칙을 덮어쓰지 않�
   assert.match(await p2.locator("#rule-rotation .select-value").textContent(), /킥 없음/);
   assert.deepEqual([...errors, ...errs2], []);
   await fresh.close();
+});
+
+test("내 규칙 미리보기·복제·시험 플레이: 긴 이름으로 복제하고 저장된 판을 유지하며 편집으로 돌아간다", async () => {
+  const { context, page, errors } = await openPage(() => {
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
+  });
+  await startMode(page, "sprint40");
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Escape");
+  await page.locator("#resume-save-status").waitFor();
+  const storage = await page.evaluate(() => {
+    const key = "tetrisharp:run:suspended";
+    return [key, localStorage.getItem(key)];
+  });
+  assert.ok(storage[1], "이어 할 판이 있다");
+  await page.reload();
+  await page.click('[data-rules="custom"]');
+  assert.match(await text(page, "rule-desc"), /Modern 기본값과 같아요/);
+  await page.click("#edit-rules");
+  await page.locator("#rule-slot-name").fill("123456789012345678901234");
+  await page.click("#rule-slot-duplicate");
+  assert.match(await page.locator("#rule-slot-name").inputValue(), /복사본$/);
+  await page.locator("#rule-allow180").uncheck();
+  await page.click("#rules-close");
+  await page.waitForFunction(() => document.querySelector("#rule-desc")?.textContent.includes("180도 회전 허용 끄기"));
+  await page.click("#edit-rules");
+  await page.locator("#rule-allow180").focus();
+  await page.click("#rule-trial");
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  assert.match(await text(page, "session-title"), /규칙 시험 플레이/);
+  assert.equal(await page.locator('[data-touch="R180"]').isDisabled(), true);
+  assert.equal(await page.locator("#ask").isVisible(), false);
+  await page.keyboard.press("Escape");
+  await page.click('#pause [data-action="menu"]');
+  await page.locator("#rule-allow180").waitFor();
+  assert.equal(await page.locator("#rule-allow180").evaluate(el => document.activeElement === el), true);
+  assert.equal(await page.locator("#rule-allow180").isChecked(), false);
+  await page.click("#rule-trial");
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  for (let i = 0; i < 40 && (await page.evaluate(() => document.body.dataset.screen)) === "play"; i++)
+    await page.keyboard.press("Space", { delay: 40 });
+  await page.locator("#rule-allow180").waitFor();
+  assert.equal(await page.evaluate(key => localStorage.getItem(key), storage[0]), storage[1]);
+  await page.click("#rules-close");
+  await page.waitForFunction(() => document.querySelector("#rule-slot .select-value")?.textContent.endsWith("복사본"));
+  await choose(page, "rule-slot", "0");
+  await page.waitForFunction(() =>
+    document.querySelector("#rule-desc")?.textContent.includes("Modern 기본값과 같아요")
+  );
+  assert.deepEqual(errors, []);
+  await context.close();
 });
 
 test("내 규칙: 첫 화면에서 고르고 공유 탭을 열며, 편집기에서 새 규칙·이름·지우기를 한다", async () => {

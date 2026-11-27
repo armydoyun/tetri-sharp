@@ -11,7 +11,7 @@ import { RANK_STEPS, isRankedRules, rankLabel, rankOf } from "./modes/ranks.js";
 import { MAX_RULE_SLOTS, createRuleSlots } from "./storage/rule-slots.js";
 import { ACHIEVEMENTS, createAchievements } from "./storage/achievements.js";
 import { createAchievementsUI } from "./ui/achievements.js";
-import { MODES, RECORD_MODES, SURVIVAL_MILESTONES, findMode as findBaseMode } from "./modes/index.js";
+import { ENDLESS, MODES, RECORD_MODES, SURVIVAL_MILESTONES, findMode as findBaseMode } from "./modes/index.js";
 import { dailyMode, dateKey, findDaily, recentDailyKeys } from "./modes/daily.js";
 import { decodeReplayCode, encodeReplayCode, replayLink } from "./replay/share.js";
 import { createDailyUI } from "./ui/daily.js";
@@ -24,7 +24,7 @@ import { runFingerprint } from "./storage/suspended-run.js";
 import { loadSettings, sanitizeSettings, saveSettings, toEngineHandling } from "./storage/settings.js";
 import { createRecords } from "./storage/records.js";
 import { createSettingsUI } from "./ui/settings.js";
-import { createRulesUI } from "./ui/rules.js";
+import { createRulesUI, noRuleChanges, ruleChanges } from "./ui/rules.js";
 import { createAsk } from "./ui/ask.js";
 import { button, menuRow, segmentButtons } from "./ui/components.js";
 import { el } from "./ui/dom.js";
@@ -398,6 +398,15 @@ const RULE_DESCRIPTIONS = {
   arcade: t("아케이드 느낌: ARS 회전, 최근 4개를 피하는 생성기, 생성·줄 삭제 지연, 미리 회전(IRS)."),
 };
 
+const rulesTrial = {
+  ...ENDLESS,
+  id: "rules-trial",
+  name: t("규칙 시험 플레이"),
+  description: t("Endless에서 지금 규칙을 시험해요. 기록은 남지 않아요."),
+  practice: true,
+  noReplay: true,
+};
+
 /** 첫 화면 규칙 카드의 내 규칙 줄(Custom일 때만 보이고, 자리는 늘 차지한다) */
 const renderRuleSlotRow = () => {
   const row = $("rule-slot-row");
@@ -449,10 +458,30 @@ const renderRuleTabs = () => {
   renderRuleSlotRow();
   // 편집 버튼은 늘 같은 자리에 있다. Custom이 아닐 때는 비활성(원칙 2) — 이유는 설명 줄에.
   /** @type {HTMLButtonElement} */ ($("edit-rules")).disabled = ruleChoice !== "custom";
-  $("rule-desc").textContent =
-    ruleChoice === "custom"
-      ? t('직접 조합한 규칙이에요. "편집"으로 바꿀 수 있고, 조합마다 기록이 따로 쌓여요.')
-      : RULE_DESCRIPTIONS[ruleChoice];
+  const desc = $("rule-desc");
+  desc.removeAttribute("title");
+  if (ruleChoice !== "custom") {
+    desc.textContent = RULE_DESCRIPTIONS[ruleChoice];
+    return;
+  }
+  const changes = ruleChanges(customBody);
+  if (!changes.length) {
+    desc.textContent = noRuleChanges();
+    return;
+  }
+  desc.title = changes.join(" · ");
+  desc.replaceChildren(
+    ...changes
+      .slice(0, 2)
+      .map((change, index) =>
+        el(
+          "span",
+          { class: "rule-desc-line" },
+          el("span", { text: change }),
+          ...(index === 1 && changes.length > 2 ? [el("span", { text: t("외 {n}개", { n: changes.length - 2 }) })] : [])
+        )
+      )
+  );
 };
 
 /** 이 모드·규칙의 최고 기록과 그 리플레이(둘이 같은 판이고, 끝까지 간 판일 때만) */
@@ -782,7 +811,7 @@ const start = (
 ) => {
   if (runs.restoring) {
     if (!restored) return;
-  } else if (!confirmed && runs.replacesSaved()) {
+  } else if (m !== rulesTrial && !confirmed && runs.replacesSaved()) {
     runs.confirmReplace(() => start(m, selectedRules, target, retrySeed, restored, true));
     return;
   }
@@ -858,8 +887,10 @@ const start = (
   $("countdown-label").textContent = t("준비");
   // 카운트다운 "없음": 바로 시작
   if (runs.restoring) return;
-  runs.begin(seed, target);
-  runs.save();
+  if (m !== rulesTrial) {
+    runs.begin(seed, target);
+    runs.save();
+  }
   if (countdown <= 0) {
     countdownEl.hidden = true;
     setScreen("play");
@@ -903,6 +934,7 @@ const inProgress = () => screen === "play" || screen === "countdown" || screen =
  */
 const backList = () => {
   if (sceneView.current) return null;
+  if (mode === rulesTrial) return { label: t("규칙 편집"), open: rulesUI.returnFromTrial };
   if (mode.dailyPuzzle) {
     const { key } = mode.dailyPuzzle;
     return { label: t("오늘의 퍼즐"), open: () => dailyPuzzleUI.open(key) };
@@ -948,6 +980,7 @@ const updateBackLabels = () => {
 /** 첫 화면으로 — 퍼즐·연습이면 그 목록을 위에 연다 */
 const leaveToMenu = () => {
   const back = backList();
+  if (mode === rulesTrial) mode = findMode(store.get("lastMode", null));
   toMenu(false, Boolean(back));
   // Esc로 왔으면 같은 키 입력이 방금 연 목록을 바로 닫는다(대화상자의 Esc 닫기) → 키 처리가 끝난 뒤에 연다
   if (back) setTimeout(back.open, 0);
@@ -1089,7 +1122,9 @@ const anyDialogOpen = () =>
     helpUI,
     puzzleUI,
     shareUI,
-  ].some(ui => ui.isOpen) || puzzleReviewDialog.open;
+  ].some(ui => ui.isOpen) ||
+  puzzleReviewDialog.open ||
+  askDialog.open;
 
 /** 로고: 첫 화면으로. 게임 중이면 먼저 묻는다 */
 $("go-home").addEventListener("click", () => {
@@ -1099,6 +1134,7 @@ $("go-home").addEventListener("click", () => {
     return window.scrollTo(0, 0);
   }
   if (sceneView.current) sceneView.exit();
+  if (mode === rulesTrial) return leaveToMenu();
   if (inProgress()) return askConfirm("menu");
   if (screen === "replay") replayView.stop();
   toMenu();
@@ -1271,6 +1307,7 @@ const renderResultStats = rows =>
 
 const finish = () => {
   if (!game) return;
+  if (mode === rulesTrial) return leaveToMenu();
   const state = game.state;
   failedPuzzleMove = mode.puzzle ? puzzleReview.failed(state, runs.journal?.entry) : null;
   runs.clear();
@@ -1518,7 +1555,19 @@ const settingsUI = createSettingsUI({
 });
 
 /** 앱 안 확인 대화상자(브라우저 확인창 대신) */
-const ask = createAsk(/** @type {HTMLDialogElement} */ ($("ask")));
+const askDialog = /** @type {HTMLDialogElement} */ ($("ask"));
+const ask = createAsk(askDialog);
+
+const previewRuleImport = body => {
+  const changes = ruleChanges(body);
+  return ask({
+    title: t("받은 규칙 미리보기"),
+    message: changes.length ? t("Modern 기본값과 다른 설정") : noRuleChanges(),
+    details: changes,
+    okLabel: t("내 규칙에 저장"),
+    okIcon: "folder",
+  });
+};
 
 const rulesUI = createRulesUI({
   dialog: /** @type {HTMLDialogElement} */ ($("rules-editor")),
@@ -1529,8 +1578,7 @@ const rulesUI = createRulesUI({
   },
   // 편집기의 내 규칙 줄(이름·새 규칙·지우기)과 받은 코드: 바꾼 뒤 지금 고른 규칙을 다시 읽는다
   slots: {
-    read: ruleSlots.read,
-    rename: name => ruleSlots.rename(name),
+    ...ruleSlots,
     add: (name, body) => {
       const added = ruleSlots.add(name, body);
       customBody = ruleSlots.active().body;
@@ -1544,8 +1592,11 @@ const rulesUI = createRulesUI({
   },
   onClose: () => {
     renderMenu();
+    renderKeyHelp();
     /** @type {HTMLElement | null} */ ($("edit-rules"))?.focus();
   },
+  onTrial: () => start(rulesTrial, makeCustomRules(customBody)),
+  previewImport: previewRuleImport,
 });
 
 $("active-rules").addEventListener("click", e => {
@@ -2081,7 +2132,7 @@ for (const btn of document.querySelectorAll("[data-action]")) {
       start(puzzleMode(next), MODERN);
     }
     if (action === "menu") {
-      if (inProgress()) askConfirm("menu");
+      if (inProgress() && mode !== rulesTrial) askConfirm("menu");
       else leaveToMenu();
     }
     if (action === "watch") {
@@ -2484,25 +2535,26 @@ const importDailyFromLink = async () => {
   });
 };
 
-/** 공유 링크(#rules=…)로 열었으면 그 규칙을 Custom으로 들이고 알린다. 주소의 해시는 지운다. */
-const importRulesFromLink = () => {
-  const hash = takeLinkHash("rules");
-  if (!hash) return false;
+/** 공유 링크의 규칙을 먼저 보여 주고 확인한 뒤 내 규칙에 저장한다. */
+const importRulesFromLink = async hash => {
   const body = decodeRules(hash);
   if (!body) {
     showLinkError(t("링크의 규칙 코드를 읽을 수 없었어요."));
-    return false;
+    return;
   }
+  if (!(await previewRuleImport(body))) return;
   // 지금 규칙을 덮어쓰지 않고 내 규칙에 새 칸으로
   if (!ruleSlots.add(t("받은 규칙"), body)) {
     showLinkError(t("내 규칙이 가득 찼어요({n}개). 하나를 지우고 링크를 다시 열어 주세요", { n: MAX_RULE_SLOTS }));
-    return false;
+    return;
   }
   customBody = ruleSlots.active().body;
   ruleChoice = "custom";
   store.set("lastRules", "custom");
   showMenuNotice(t("링크로 받은 규칙을 내 규칙에 새로 넣었어요"));
-  return true;
+  renderMenu();
+  renderKeyHelp();
+  $("rule-slot").focus();
 };
 
 document.documentElement.lang = lang;
@@ -2510,9 +2562,9 @@ translateDom(document.documentElement);
 hydrateIcons();
 applyTouch();
 renderKeyHelp();
-// 링크로 규칙을 받았으면 Custom 규칙 기준으로 키 안내를 다시 그린 뒤 메뉴를 연다.
-if (importRulesFromLink()) renderKeyHelp();
 toMenu(true);
+const rulesHash = takeLinkHash("rules");
+if (rulesHash) importRulesFromLink(rulesHash);
 const puzzleHash = takeLinkHash("puzzle");
 if (puzzleHash) {
   // 링크로 받은 퍼즐은 받은 퍼즐 목록에 남긴다(내가 만든 퍼즐이면 남기지 않는다)

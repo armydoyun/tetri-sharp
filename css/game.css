@@ -253,6 +253,18 @@ body.touch-on .rule-slot-home {
   color: var(--text-dim);
 }
 
+.rule-desc-line {
+  display: flex;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.rule-desc-line > :first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 #continue-run {
   width: 100%;
   margin-bottom: var(--space-2);

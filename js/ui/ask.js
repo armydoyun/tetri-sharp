@@ -7,11 +7,11 @@ import { t } from "../i18n/index.js";
 
 /**
  * @param {HTMLDialogElement} dialog
- * @returns {(o: { title: string, message: string | string[], okLabel: string, okIcon?: import("./icons.js").IconName }) => Promise<boolean>}
+ * @returns {(o: { title: string, message: string | string[], details?: string[], okLabel: string, okIcon?: import("./icons.js").IconName }) => Promise<boolean>}
  */
 export const createAsk =
   dialog =>
-  ({ title, message, okLabel, okIcon }) =>
+  ({ title, message, details = [], okLabel, okIcon }) =>
     new Promise(resolve => {
       let answer = false;
       const ok = button({
@@ -27,7 +27,14 @@ export const createAsk =
       const lines = Array.isArray(message) ? message : [message];
       fillDialog(dialog, {
         title,
-        body: el("div", { class: "ask-body" }, ...lines.map(text => el("p", { text }))),
+        body: el(
+          "div",
+          { class: "ask-body" },
+          ...lines.map(text => el("p", { text })),
+          ...(details.length
+            ? [el("ul", { class: "rule-change-list" }, ...details.map(text => el("li", { text })))]
+            : [])
+        ),
         notice: el("p", { class: "notice-slot", role: "status" }),
         actions: [ok],
         closeId: "ask-cancel",
