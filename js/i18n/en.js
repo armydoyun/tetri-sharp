@@ -10,7 +10,7 @@ export const EN = {
   "더 최근 날짜": "Newer dates",
   "더 오래된 날짜": "Older dates",
   "모든 목표": "All goals",
-  "모든 난이도": "All difficulties",
+  "모든 난이도": "Any level",
   "모든 완료 상태": "Any completion status",
   미완료: "Unsolved",
   "끼워 넣기": "Tucks",
