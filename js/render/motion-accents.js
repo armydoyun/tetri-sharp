@@ -69,6 +69,8 @@ const stroke = (ctx, [finish, weight], color, alpha, path) => {
   ctx.restore();
 };
 
+export { stroke as drawAccentStroke };
+
 const slotPath =
   (left, top, width, height, finish, spread = 1) =>
   ctx => {

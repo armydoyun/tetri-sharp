@@ -1,9 +1,8 @@
-import { CELL_ID } from "../core/pieces.js";
-import { COLS, ROWS, getPreviewFrame } from "../render/preview-scene.js";
-import srs from "../rules/rotation/srs.js";
+import { COLS, getPreviewFrame } from "../render/preview-scene.js";
 import { drawMotionAccents } from "../render/motion-accents.js";
 
-/** @typedef {import("../core/pieces.js").PieceType} PieceType */
+import { active, boardFromRows, finishPiece, pieceCells } from "./scene-board.js";
+import { SITUATION_SAMPLES, playSituation } from "./situation-scenes.js";
 /** @typedef {readonly [number, string, number?]} SoundCue */
 
 const HOLD_AT = 460;
@@ -17,26 +16,9 @@ const SPIN_X = 4;
 const SPIN_Y = 6;
 const spinPivot = { x: SPIN_X + 1.5, y: SPIN_Y + 1.5, direction: /** @type {const} */ (-1) };
 
-const pieceCells = (/** @type {PieceType} */ type, rot, x, y) =>
-  srs.cells(type, rot).map(([dx, dy]) => [x + dx, y + dy]);
-
 // 세로 T가 홈에 내려온 뒤 반시계 90°로 두 줄을 지운다.
 // 내려온 마지막 줄의 네 칸을 가로 I로 채우면 콤보와 퍼펙트 클리어가 동시에 난다.
-const startBoard = Array.from({ length: ROWS }, (_, y) =>
-  [...(["11....2277", "1112...277", "11888.8877"][y - 6] ?? "..........")].map(value => Number(value) || 0)
-);
-const finishPiece = (board, /** @type {PieceType} */ type, cells, tspin) => {
-  const landed = board.map(row => [...row]);
-  for (const [x, y] of cells) landed[y][x] = CELL_ID[type];
-  const rows = landed.flatMap((row, y) => (row.every(Boolean) ? [y] : []));
-  const after = [...rows.map(() => Array(COLS).fill(0)), ...landed.filter((_, y) => !rows.includes(y))];
-  return {
-    landed,
-    rows,
-    after,
-    event: { type: "lock", piece: type, rows, cells, lines: rows.length, tspin },
-  };
-};
+const startBoard = boardFromRows(["11....2277", "1112...277", "11888.8877"]);
 const spinCells = pieceCells("T", 2, SPIN_X, SPIN_Y);
 const spin = finishPiece(startBoard, "T", spinCells, "full");
 const dropCells = pieceCells("I", 0, 2, 7);
@@ -45,9 +27,6 @@ const drop = finishPiece(spin.after, "I", dropCells, "none");
 const idle = getPreviewFrame(0);
 const initialQueue = ["I", "O", "S"];
 const shiftedQueue = ["O", "S", "J"];
-
-/** @param {PieceType} type */
-const active = (type, cells, ghost = []) => ({ type, cells, ghost, down: 0 });
 
 const sceneAt = time => {
   const scene = { ...idle, piece: null, clear: null, queue: initialQueue, board: startBoard };
@@ -98,10 +77,13 @@ export const MOTION_SAMPLES = {
   spinClear: { start: SPIN_AT, end: NEXT_AT },
   perfect: { start: DROP_AT - 340, end: FINISH_AT },
   combo: { start: DROP_AT - 340, end: FINISH_AT },
+  ...SITUATION_SAMPLES,
 };
 
 /** @param {ReturnType<typeof import("../render/preview.js").createThemeStage>} stage */
 export const playMotionSample = (stage, id, themeId, theme, reduced) => {
+  const situation = SITUATION_SAMPLES[id];
+  if (situation) return playSituation(stage, situation, themeId, theme, reduced);
   const { start, end } = MOTION_SAMPLES[id];
   const cues = reduced
     ? []
@@ -142,6 +124,7 @@ export const playMotionSample = (stage, id, themeId, theme, reduced) => {
 
 /** @returns {SoundCue[]} */
 export const motionSounds = id => {
+  if (SITUATION_SAMPLES[id]) return SITUATION_SAMPLES[id].sounds;
   const { start, end } = MOTION_SAMPLES[id];
   return sounds
     .filter(([at, sound]) => at >= start && at < end && (id !== "combo" || sound !== "perfect"))
