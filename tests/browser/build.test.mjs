@@ -4463,8 +4463,14 @@ test("휴대폰: 일시정지·결과 카드가 잘리지 않고, 리플레이 �
     await page.tap('[data-confirm="cancel"]');
     await page.tap('#pause [data-action="resume"]');
     await page.waitForFunction(() => document.body.dataset.screen === "play");
-    for (let i = 0; i < 40 && (await page.evaluate(() => document.body.dataset.screen)) !== "results"; i++)
-      await page.tap('[data-touch="HARD"]').catch(() => {});
+    const hardDrop = page.locator('[data-touch="HARD"]');
+    for (let i = 0; i < 40 && (await hardDrop.isVisible()); i++) {
+      try {
+        await hardDrop.tap({ timeout: 1000 });
+      } catch (error) {
+        if ((await page.evaluate(() => document.body.dataset.screen)) !== "results") throw error;
+      }
+    }
     await page.waitForFunction(() => document.body.dataset.screen === "results");
     assert.deepEqual(await reachable("#results .actions .btn"), [], `결과 버튼이 다 보인다 · ${where}`);
     assert.deepEqual(
