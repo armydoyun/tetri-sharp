@@ -2,6 +2,7 @@
 // 로직은 고정 60Hz로 진행하고 화면은 모니터 주사율대로 그린다.
 import { BTN, createGame } from "./core/engine.js";
 import { createRenderer } from "./render/canvas.js";
+import { accentEnabled } from "./render/gameplay-accents.js";
 import { createKeyboard } from "./input/keyboard.js";
 import { createTouch, touchVisible } from "./input/touch.js";
 import { compilePadmap, createGamepad } from "./input/gamepad.js";
@@ -32,7 +33,7 @@ import { createRecordsUI } from "./ui/records.js";
 import { createStatsUI } from "./ui/stats.js";
 import { createPracticeUI } from "./ui/practice.js";
 import { practiceMode } from "./modes/practice.js";
-import { advanceSplits, analyzeSplits, formatDelta, splitDelta } from "./modes/splits.js";
+import { advanceSplits, analyzeSplits, formatDelta, splitDelta, tookSplitLead } from "./modes/splits.js";
 import { hydrateIcons, icon } from "./ui/icons.js";
 import { keycap } from "./ui/keycap.js";
 import {
@@ -145,6 +146,7 @@ const applyScheme = () => {
 };
 
 const renderer = createRenderer(canvas, { getVisual: () => settings.visual });
+let splitPulse;
 /** 지금 쓸 효과음 묶음(테마 키): 고정했으면 그 테마의 소리, 아니면 게임 테마의 소리 */
 const soundSetFor = (themeId = settings.visual.theme) => (settings.sound === "theme" ? themeId : settings.sound);
 const sfx = createSfx({ getVolume: () => settings.volume, getSet: () => soundSetFor() });
@@ -811,6 +813,7 @@ const start = (
   showPanel(null);
   fb.clearAction();
   renderer.clearEffects();
+  splitPulse?.cancel();
   renderKeyHelp();
   setScreen("countdown");
   window.scrollTo(0, 0);
@@ -1427,6 +1430,7 @@ const settingsUI = createSettingsUI({
   onChange: next => {
     // 저장소가 막혀 있어도 이번 실행 동안은 반영되도록 메모리 값을 먼저 바꾼다.
     settings = sanitizeSettings(next);
+    if (!accentEnabled(settings.visual, "record")) splitPulse?.cancel();
     sfx.setVolume();
     saveSettings(store, settings);
     bindings = compileKeymap(settings.keymap);
@@ -2228,7 +2232,20 @@ const advanceRun = (held, pressed, reconstructing = false) => {
   if (hasHintControls(mode) && events.some(event => event.type === "lock")) resetLessonHint();
   const extra = finesse?.frame(held, pressed, hadActive, events) ?? 0;
   if (!reconstructing && extra > 0 && mode.finesse) announceText([t("피네스 +{n}", { n: extra })]);
-  if (mode.splits) splits = advanceSplits(mode.splits, splits, game.state.stats.lines, game.state.frame);
+  if (mode.splits) {
+    const previous = splits;
+    splits = advanceSplits(mode.splits, splits, game.state.stats.lines, game.state.frame);
+    if (!reconstructing && accentEnabled(settings.visual, "record") && tookSplitLead(previous, splits, pbSplits)) {
+      splitPulse?.cancel();
+      splitPulse = hud.split.parentElement.animate(
+        [
+          { outline: "var(--border-w) solid var(--accent)", outlineOffset: "calc(-1 * var(--border-w))" },
+          { outline: "var(--border-w) solid transparent", outlineOffset: "calc(-1 * var(--border-w))" },
+        ],
+        { id: "split-lead", duration: 420, easing: "ease-out" }
+      );
+    }
+  }
   if (race) {
     if (!race.player.done) race.player.step();
     if (!reconstructing) updateRaceProgress();

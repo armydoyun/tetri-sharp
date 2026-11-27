@@ -320,6 +320,7 @@ export const SURVIVAL = Object.freeze({
       const blocked = Math.min(g.pending, survivalBlock(ev));
       g.pending -= blocked;
       g.blocked += blocked;
+      if (blocked) events.push({ type: "garbageCancel", blocked, pending: g.pending });
       return false;
     }
     receiveGarbage(state, events);

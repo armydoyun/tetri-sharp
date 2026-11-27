@@ -194,8 +194,17 @@ const motionActions = [
   ["perfect", t("퍼펙트 클리어")],
   ["combo", t("콤보 표시")],
 ];
-node("motion-actions").append(
-  ...motionActions.map(([id, label]) =>
+/** @type {typeof motionActions} */
+const situationActions = [
+  ["danger", t("위험 진입·해제")],
+  ["kick", t("벽 차기 접촉선")],
+  ["cancel", t("가비지 상쇄")],
+  ["record", t("개인 기록 추월")],
+];
+
+/** @param {typeof motionActions} actions */
+const sampleButtons = actions =>
+  actions.map(([id, label]) =>
     button({
       label,
       icon: id === "flow" ? "play" : undefined,
@@ -205,9 +214,9 @@ node("motion-actions").append(
       "data-motion": id,
       onClick: () => listen(motionSounds(id), label, id),
     })
-  ),
-  stopButton
-);
+  );
+node("motion-actions").append(...sampleButtons(motionActions), stopButton);
+node("situation-actions").append(...sampleButtons(situationActions));
 
 const groups = [
   {

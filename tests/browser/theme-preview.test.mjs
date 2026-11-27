@@ -198,13 +198,13 @@ test("독립 테마 견본에서 보드를 비교하고 효과음을 재생·정
     }));
     assert.equal(layout.width, layout.viewport, `${locale} ${width} 가로 넘침`);
     assert.equal(layout.sounds, 14);
-    assert.equal(layout.samples, 6);
+    assert.equal(layout.samples, 10);
     assert.equal(layout.clipped, 0, `${locale} ${width} 단추 이름 잘림`);
     await mobile.close();
   }
 });
 
-test("테마 21종에서 무음으로 재생해도 다섯 연출과 연속 장면이 그려진다", { timeout: 45_000 }, async t => {
+test("테마 21종에서 무음으로 재생해도 기본·상황별 연출과 연속 장면이 그려진다", { timeout: 45_000 }, async t => {
   const { browser, url } = await openPreview(t);
   const page = await browser.newPage({ locale: "ko-KR" });
   const errors = [];
@@ -220,6 +220,10 @@ test("테마 21종에서 무음으로 재생해도 다섯 연출과 연속 장�
     ["perfect", 900],
     ["combo", 440],
     ["flow", 2900],
+    ["danger", 1140],
+    ["kick", 540],
+    ["cancel", 1080],
+    ["record", 1090],
   ];
   const choices = page.locator("#audition-candidates button");
   const canvas = page.locator("#candidate-board");
@@ -257,11 +261,11 @@ test("테마 21종에서 무음으로 재생해도 다섯 연출과 연속 장�
 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.getByRole("button", { name: "A/B 비교" }).click();
-  await page.locator('[data-motion="hold"]').click();
+  await page.locator('[data-motion="kick"]').click();
   assert.equal(await page.locator("#candidate-card").getAttribute("data-playing"), "true");
-  await page.clock.fastForward(1400);
+  await page.clock.fastForward(1480);
   assert.equal(await page.locator("#reference-card").getAttribute("data-playing"), "true");
-  await page.clock.fastForward(1400);
+  await page.clock.fastForward(1480);
   assert.equal(await page.locator("#play-status").textContent(), "재생 완료");
   assert.deepEqual(errors, []);
 });

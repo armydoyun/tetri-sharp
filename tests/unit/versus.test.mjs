@@ -45,6 +45,10 @@ test("대전 입문 세 문제는 기존 공격 규칙으로 전송·상쇄를 �
     const attack = events.find(event => event.type === "attack");
     assert.equal(attack.base, 4);
     assert.equal(attack.blocked, blocked);
+    assert.deepEqual(
+      events.find(event => event.type === "garbageCancel"),
+      blocked ? { type: "garbageCancel", blocked, pending: 0 } : undefined
+    );
     assert.equal(attack.lines, sent);
     assert.equal(game.state.garbage.pending, 0);
 

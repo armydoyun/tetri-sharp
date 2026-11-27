@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { advanceSplits, analyzeSplits, formatDelta, splitDelta } from "../../js/modes/splits.js";
+import { advanceSplits, analyzeSplits, formatDelta, splitDelta, tookSplitLead } from "../../js/modes/splits.js";
 import { SPRINT_40, ZEN } from "../../js/modes/index.js";
 import { MODERN, RETRO } from "../../js/rules/presets.js";
 import { createRecords, recordKey } from "../../js/storage/records.js";
@@ -29,6 +29,10 @@ test("PB 대비: 가장 최근 구간 기준, 앞서면 음수, 비교할 게 �
   assert.equal(formatDelta(1.5), "+1.50");
   assert.equal(formatDelta(0), "+0.00");
   assert.equal(formatDelta(null), "—");
+  assert.equal(tookSplitLead([610], [610, 1190], [600, 1200]), true);
+  assert.equal(tookSplitLead([590], [590, 1190], [600, 1200]), false);
+  assert.equal(tookSplitLead([610, 1190], [610, 1190], [600, 1200]), false);
+  assert.equal(tookSplitLead([], [610], undefined), false);
 });
 
 test("기록: 구간은 숫자 배열일 때만 남고, 규칙별 기록표 목록을 알려 준다", () => {

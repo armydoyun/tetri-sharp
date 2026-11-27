@@ -976,8 +976,10 @@ test("줄 삭제 효과 길이: 전체에서만 배율을 바꾸고 0%와 이전
     await select("full");
     assert.equal(await slider.inputValue(), "100");
     assert.equal(await page.getByRole("slider", { name: "줄 삭제 효과 길이" }).count(), 1);
-    for (const name of ["next", "hold", "spin", "perfect", "combo"]) assert.equal(await effect(name).isChecked(), true);
+    for (const name of ["next", "hold", "spin", "perfect", "combo", "danger", "kick", "cancel", "record"])
+      assert.equal(await effect(name).isChecked(), true);
     await effect("hold").uncheck();
+    await effect("kick").uncheck();
     await slider.press("End");
     assert.equal(await slider.inputValue(), "150");
     await slider.press("ArrowLeft");
@@ -986,15 +988,18 @@ test("줄 삭제 효과 길이: 전체에서만 배율을 바꾸고 0%와 이전
       await select(mode);
       assert.equal(await slider.isDisabled(), true);
       assert.equal(await effect("hold").isDisabled(), true);
+      assert.equal(await effect("kick").isDisabled(), true);
     }
     await select("full");
     assert.equal(await slider.isEnabled(), true);
     assert.equal(await effect("hold").isEnabled(), true);
     assert.equal(await effect("hold").isChecked(), false);
+    assert.equal(await effect("kick").isChecked(), false);
     assert.equal(await slider.inputValue(), "145");
     await slider.press("Home");
     assert.equal(await slider.inputValue(), "0");
     assert.equal(await effect("hold").isChecked(), false);
+    assert.equal(await effect("kick").isChecked(), false);
     assert.equal(await effect("spin").isChecked(), true);
     await page.reload();
     await openVisual();
@@ -1240,6 +1245,53 @@ test("기록 화면: 표는 늘 10줄, 조건을 바꿔도 크기가 그대로, 
   assert.equal(await text(page, "hud-split"), "—");
   assert.deepEqual(errors, []);
   await context.close();
+});
+
+test("Sprint 구간에서 뒤처지다가 앞서면 기록 칸을 한 번 강조한다", async () => {
+  const { replay, record } = JSON.parse(
+    fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8")
+  );
+  record.splits = [120, 270, 390, 455];
+  const { context, page, errors } = await openPage(
+    ({ seed, record }) => {
+      Math.random = () => seed / 2 ** 32;
+      localStorage.setItem(
+        "tetrisharp:settings",
+        JSON.stringify({ access: { countdown: "off" }, visual: { effects: "full" } })
+      );
+      localStorage.setItem("tetrisharp:records", JSON.stringify({ "sprint40|modern": [record] }));
+      window.leadPulses = 0;
+      const animate = Element.prototype.animate;
+      Element.prototype.animate = function (frames, options) {
+        if (this.matches('[data-hud="split"]') && options?.id === "split-lead") window.leadPulses++;
+        return animate.call(this, frames, options);
+      };
+    },
+    { seed: replay.seed, record },
+    { frameClock: true }
+  );
+  try {
+    await startMode(page, "sprint40");
+    await playReplayFrames(page, replay.inputs, 0, 145);
+    assert.equal(await page.locator("#hud-split").getAttribute("data-ahead"), "false");
+    assert.equal(await page.evaluate(() => window.leadPulses), 0);
+    await playReplayFrames(page, replay.inputs, 145, 290);
+    assert.equal(await page.locator("#hud-split").getAttribute("data-ahead"), "true");
+    assert.equal(await page.evaluate(() => window.leadPulses), 1);
+    assert.equal(
+      await page.locator('[data-hud="split"]').evaluate(el => {
+        const pulse = el.getAnimations().find(animation => animation.id === "split-lead");
+        pulse.currentTime = 0;
+        return getComputedStyle(el).outlineStyle;
+      }),
+      "solid"
+    );
+    await playReplayFrames(page, replay.inputs, 290, 420);
+    assert.equal(await page.evaluate(() => window.leadPulses), 1);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
 });
 
 test("Sprint 최고 기록과 달리기: 같은 규칙에서 시작하고 상대 진행을 같이 멈춘다", async () => {
@@ -1587,7 +1639,18 @@ test("입문 코스 완료 표시와 수동 Sprint 시도 기록을 볼 수 있�
 });
 
 test("CPU 대전 입문: 즉시 재시도하고 공격·상쇄·전송 수를 비교한다", async () => {
-  const { context, page, errors } = await openPage(null, undefined, { frameClock: true });
+  const { context, page, errors } = await openPage(
+    () => {
+      window.foldingBars = 0;
+      const fill = CanvasRenderingContext2D.prototype.fillRect;
+      CanvasRenderingContext2D.prototype.fillRect = function (x, y, width, height) {
+        if (this.canvas.id === "board" && this.globalAlpha === 0.83 && width < height / 3) window.foldingBars++;
+        return fill.call(this, x, y, width, height);
+      };
+    },
+    undefined,
+    { frameClock: true }
+  );
   const play = codes =>
     page.evaluate(keys => {
       for (const code of keys) {
@@ -1611,11 +1674,13 @@ test("CPU 대전 입문: 즉시 재시도하고 공격·상쇄·전송 수를 �
     assert.equal(await text(page, "hud-lines"), "4");
     await play(["Space"]);
     assert.equal(await text(page, "results-title"), "실패");
+    assert.equal(await page.evaluate(() => window.foldingBars), 0, "그대로 받은 가비지는 접히지 않는다");
     assert.match(await text(page, "results-stats"), /받은 쓰레기4/);
     await page.click('#results [data-action="retry"]');
     assert.equal(await page.locator("body").getAttribute("data-screen"), "play");
     await play(["ArrowUp", ...Array(4).fill("ArrowLeft"), "Space"]);
     assert.equal(await text(page, "race-result"), "공격 4줄 · 상쇄 4줄 · 상대에게 0줄");
+    assert.equal(await page.evaluate(() => window.foldingBars), 4, "상쇄한 네 줄만 접힌다");
 
     await page.click('#results [data-action="next-puzzle"]');
     await play(["ArrowUp", ...Array(3).fill("ArrowRight"), "Space"]);
@@ -4672,6 +4737,57 @@ const openPuzzle = async (page, number) => {
   await page.waitForFunction(() => document.body.dataset.screen === "play");
   await page.evaluate(() => window.advanceFrame());
 };
+
+test("본편 상황 연출: 높은 판과 벽 차기를 표시하고 판을 낮추면 위험선을 걷는다", async () => {
+  const { context, page, errors } = await openPage(
+    () => {
+      localStorage.setItem(
+        "tetrisharp:settings",
+        JSON.stringify({ access: { countdown: "off" }, visual: { effects: "full" } })
+      );
+      window.situation = { danger: 0, kick: 0 };
+      const moveTo = CanvasRenderingContext2D.prototype.moveTo;
+      const translate = CanvasRenderingContext2D.prototype.translate;
+      CanvasRenderingContext2D.prototype.moveTo = function (x, y) {
+        if (this.canvas.id === "board" && y === 2 + 0.87) window.situation.danger++;
+        return moveTo.call(this, x, y);
+      };
+      CanvasRenderingContext2D.prototype.translate = function (x, y) {
+        if (this.canvas.id === "board" && x === 5 && this.getTransform().a > 1) window.situation.kick++;
+        return translate.call(this, x, y);
+      };
+    },
+    undefined,
+    { frameClock: true }
+  );
+  try {
+    const cells = new Uint8Array(PUZZLE_CELLS);
+    cells[28] = 1;
+    for (let i = cells.length - 40; i < cells.length; i++) cells[i] = Number(i % 10 !== 5);
+    const code = encodePuzzle({ cells, pieces: "TI", goal: { kind: "lines", lines: 4 } });
+    assert.ok(code);
+    await page.goto(`${url}#puzzle=${code}`);
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    await runKeys(page, [["F24", 16]]);
+    assert.ok((await page.evaluate(() => window.situation.danger)) > 0);
+    await runKeys(page, [["ArrowUp", 1], ...Array.from({ length: 4 }, () => ["ArrowLeft", 1]), ["KeyZ", 1]]);
+    assert.ok((await page.evaluate(() => window.situation.kick)) > 0);
+    await runKeys(page, [
+      ["Space", 1],
+      ["F24", 10],
+      ["ArrowUp", 1],
+      ["Space", 1],
+      ["F24", 24],
+    ]);
+    assert.equal(await text(page, "results-title"), "성공!");
+    const end = await page.evaluate(() => window.situation.danger);
+    await runKeys(page, [["F24", 10]]);
+    assert.equal(await page.evaluate(() => window.situation.danger), end);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
 
 test("본편 연출: 홀드로 꺼낸 T로 두 줄을 지우고 다음 I로 콤보와 퍼펙트 클리어를 완성한다", async () => {
   const { context, page, errors } = await openPage(

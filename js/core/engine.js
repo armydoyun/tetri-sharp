@@ -349,6 +349,17 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
     for (let i = 0; i < kicks.length; i++) {
       const [dx, dy] = kicks[i];
       if (fits(a, dx, dy, to)) {
+        // 킥 전 자리를 막은 면만 표시한다. 실제 이동과 판정에는 쓰지 않는다.
+        const hit = dx || dy ? rotation.cells(a.type, to).find(([x, y]) => blocked(x, y)) : null;
+        const horizontal = hit && dx && (!dy || (a.y + hit[1] >= 0 && a.y + hit[1] < board.height));
+        const contact = hit
+          ? {
+              x: Math.max(0, Math.min(board.width, a.x + hit[0] + (horizontal ? Number(dx > 0) : 0.5))),
+              y: Math.max(0, Math.min(board.height, a.y + hit[1] + (horizontal ? 0.5 : Number(dy > 0)))),
+              dx: horizontal ? dx : 0,
+              dy: horizontal ? 0 : dy,
+            }
+          : null;
         a.x += dx;
         a.y += dy;
         a.rot = to;
@@ -358,7 +369,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
         cutDas();
         onShifted();
         onDescended(a);
-        events.push({ type: "rotate", kick: i });
+        events.push({ type: "rotate", kick: i, ...(contact ? { contact } : {}) });
         state.tally.rotations += 1;
         if (i > 0) state.tally.kicks += 1;
         return true;
