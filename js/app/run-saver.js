@@ -39,6 +39,7 @@ const newId = () => Array.from(crypto.getRandomValues(new Uint32Array(4))).join(
  */
 export const createRunSaver = ({ store, findMode, lessons, ask, saveInterval, live, hooks }) => {
   let journal = null;
+  let practice = false;
   /** 이 창이 마지막으로 저장한(또는 시작할 때 본) 저장된 판의 id — 다른 창이 바꿨는지 가린다 */
   let savedRunId = null;
   let lastSavedStep = -1;
@@ -76,6 +77,7 @@ export const createRunSaver = ({ store, findMode, lessons, ask, saveInterval, li
   /** 새 판의 기록을 시작한다(되살리는 중에는 기록을 이어 쓰므로 하지 않는다) */
   const begin = (seed, target, scene = null) => {
     if (restoring) return;
+    practice = false;
     savedRunId = savedRun()?.id ?? null;
     lastSavedStep = -1;
     const { mode, rules, handling, name, resultPbSplits, pbSplits } = live.journalInfo();
@@ -99,7 +101,7 @@ export const createRunSaver = ({ store, findMode, lessons, ask, saveInterval, li
   /** 지금 판을 저장한다. force가 아니면 마지막 저장 뒤 saveInterval 걸음이 지났을 때만 */
   const save = (force = true) => {
     const game = live.game();
-    if (restoring || !journal || !game || game.state.over || live.sceneEnded()) return;
+    if (practice || restoring || !journal || !game || game.state.over || live.sceneEnded()) return;
     const entry = journal.entry;
     if (!force && entry.steps - lastSavedStep < saveInterval) return;
     const current = savedRun();
@@ -130,7 +132,7 @@ export const createRunSaver = ({ store, findMode, lessons, ask, saveInterval, li
 
   /** 이 판의 기록을 버린다(끝났거나 다른 판으로 넘어갔다). 저장된 판이 이 판이면 지운다 */
   const clear = () => {
-    if (journal && savedRun()?.id === journal.entry.id) store.set(SUSPENDED_RUN_KEY, null);
+    if (!practice && journal && savedRun()?.id === journal.entry.id) store.set(SUSPENDED_RUN_KEY, null);
     journal = null;
   };
 
@@ -167,6 +169,7 @@ export const createRunSaver = ({ store, findMode, lessons, ask, saveInterval, li
       if (savedRun()?.id !== entry.id || live.fingerprint() !== entry.fingerprint) throw new Error("checkpoint");
       hooks.adopted(m);
       savedRunId = entry.id;
+      practice = false;
       journal = createRunJournal(null, { ...entry, id: newId() });
       lastSavedStep = -1;
       success = true;
@@ -194,6 +197,10 @@ export const createRunSaver = ({ store, findMode, lessons, ask, saveInterval, li
     },
     renderContinue,
     begin,
+    beginPractice(entry) {
+      practice = true;
+      journal = createRunJournal(null, entry);
+    },
     save,
     clear,
     replacesSaved,

@@ -2,6 +2,7 @@
 import { BUILD_LESSONS } from "../modes/build-lessons.js";
 import { BATTLE_LESSONS } from "../modes/battle-lessons.js";
 import { FINESSE_LESSONS } from "../modes/finesse-lessons.js";
+import { GESTURE_LESSONS } from "../modes/gesture-lessons.js";
 import { INTRO_LESSONS } from "../modes/intro-lessons.js";
 import { DOWNSTACK_LESSONS } from "../modes/downstack.js";
 import { DRILLS } from "../modes/practice.js";
@@ -9,8 +10,8 @@ import { el, fillDialog } from "./dom.js";
 import { button, menuRow } from "./components.js";
 import { t } from "../i18n/index.js";
 
-/** @param {{ dialog: HTMLDialogElement, onPick: (drill: any) => void, progress: ReturnType<typeof import("../storage/practice-progress.js").createPracticeProgress>, onStage: (mode: any) => void }} options */
-export const createPracticeUI = ({ dialog, onPick, progress, onStage }) => {
+/** @param {{ dialog: HTMLDialogElement, onPick: (drill: any) => void, progress: ReturnType<typeof import("../storage/practice-progress.js").createPracticeProgress>, onStage: (mode: any) => void, isTouch: () => boolean }} options */
+export const createPracticeUI = ({ dialog, onPick, progress, onStage, isTouch }) => {
   const notice = el("p", { class: "notice-slot", role: "status" });
   /** 단계 목록. focusId: 포커스를 둘 단계(게임에서 "연습 목록으로" 돌아왔을 때 방금 한 단계) */
   const openStages = ({ name, lessons }, focusId = "") => {
@@ -71,6 +72,12 @@ export const createPracticeUI = ({ dialog, onPick, progress, onStage }) => {
         description: t("이동·회전·홀드·첫 줄 지우기"),
         lessons: INTRO_LESSONS,
       };
+      const gestures = {
+        id: "gesture-training",
+        name: t("모바일 제스처 훈련"),
+        description: t("180도 회전과 밀어 넣기를 보드에서 직접 연습해요."),
+        lessons: GESTURE_LESSONS,
+      };
       const battle = {
         id: "battle-training",
         name: t("CPU 대전 입문"),
@@ -87,6 +94,7 @@ export const createPracticeUI = ({ dialog, onPick, progress, onStage }) => {
       const ORDER = [
         "free",
         "intro",
+        "gesture-training",
         "finesse-lesson",
         "finesse",
         "quad",
@@ -98,7 +106,15 @@ export const createPracticeUI = ({ dialog, onPick, progress, onStage }) => {
         "pc",
         "battle-training",
       ];
-      const all = [intro, battle, build, downstack, lesson, ...DRILLS];
+      const all = [
+        intro,
+        ...(isTouch() || from === gestures.id ? [gestures] : []),
+        battle,
+        build,
+        downstack,
+        lesson,
+        ...DRILLS,
+      ];
       const drills = [
         ...ORDER.map(id => all.find(d => d.id === id)).filter(Boolean),
         ...all.filter(d => !ORDER.includes(d.id)),

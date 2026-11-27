@@ -4861,6 +4861,48 @@ test("본편 퍼즐 목표: 줄 누적을 이어서 복원하고 T스핀 더블�
   }
 });
 
+test("실패 복기에서 마지막 수를 다시 놓아도 퍼즐 완료는 따로 남긴다", async () => {
+  const { page, context, errors } = await openPage(
+    () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } })),
+    undefined,
+    { frameClock: true }
+  );
+  try {
+    const cells = new Uint8Array(PUZZLE_CELLS);
+    cells.set(Array.from("11100001111110000111", Number), PUZZLE_CELLS - 20);
+    const code = encodePuzzle({ cells, pieces: "II", goal: { kind: "lines", lines: 2 } });
+    await page.goto(`${url}#puzzle=${code}`);
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    await page.evaluate(() => window.advanceFrame());
+    await runKeys(page, [
+      ["Space", 1],
+      ["F24", 10],
+      ["ArrowLeft", 1],
+      ["Space", 1],
+    ]);
+    assert.equal(await text(page, "results-title"), "실패");
+    await page.click("#results-watch");
+    const review = page.locator("#puzzle-review");
+    assert.equal(await review.getByRole("img").count(), 2);
+    assert.ok(await review.getByText("2줄 목표 중 1줄을 지웠어요.").isVisible());
+    await review.getByRole("button", { name: "이 수부터 연습" }).click();
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    await page.evaluate(() => window.advanceFrame());
+    assert.equal(await text(page, "puzzle-goal-hud .goal-value"), "1 / 2");
+    assert.match(await text(page, "session-title"), /마지막 수 연습/);
+    assert.equal(await page.evaluate(() => localStorage.getItem("tetrisharp:run:suspended") ?? "null"), "null");
+    await runKeys(page, [["Space", 1]]);
+    assert.equal(await text(page, "results-title"), "성공!");
+    assert.equal(await text(page, "results-main"), "마지막 수 연습");
+    await page.click('#results [data-action="menu"]');
+    await page.locator("#puzzles[open]").waitFor();
+    assert.match(await page.locator("[data-received-play]").textContent(), /아직/);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test("본편 상황 연출: 높은 판과 벽 차기를 표시하고 판을 낮추면 위험선을 걷는다", async () => {
   const { context, page, errors } = await openPage(
     () => {
@@ -5095,8 +5137,27 @@ test("휴대폰 제스처로 밀어 넣기: 옆으로 한 칸 → 끌어내려 �
     undefined,
     { frameClock: true, viewport: { width: 390, height: 844 }, hasTouch: true }
   );
-  const first = PUZZLES.find(p => p.kind === "tuck");
-  await openPuzzle(page, first.number);
+  await openList(page, "#open-practice");
+  await page.click('[data-drill="gesture-training"]');
+  await page.click('[data-practice-stage="gesture-lesson-1"]');
+  await page.evaluate(() => window.advanceFrame());
+  await runKeys(page, [["KeyA", 1]]);
+  assert.equal(await page.locator("body").getAttribute("data-screen"), "play", "터치에서는 제스처로 연습한다");
+  const { x, y, width } = await page.locator(".board-wrap").boundingBox();
+  const session = await context.newCDPSession(page);
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [
+      { id: 1, x: x + width * 0.25, y: y + 80 },
+      { id: 2, x: x + width * 0.75, y: y + 80 },
+    ],
+  });
+  await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await page.evaluate(() => window.advanceFrame());
+  assert.equal(await text(page, "results-title"), "성공!");
+  await page.click('#results [data-action="next-puzzle"]');
+  assert.equal(await text(page, "session-title"), "손가락을 떼지 않고 밀어 넣기");
+  await page.evaluate(() => window.advanceFrame());
   await page.evaluate(() => {
     const wrap = /** @type {HTMLElement} */ (document.querySelector(".board-wrap"));
     const board = /** @type {HTMLElement} */ (document.getElementById("board"));

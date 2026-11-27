@@ -369,7 +369,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
         cutDas();
         onShifted();
         onDescended(a);
-        events.push({ type: "rotate", kick: i, ...(contact ? { contact } : {}) });
+        events.push({ type: "rotate", turn: delta, kick: i, ...(contact ? { contact } : {}) });
         state.tally.rotations += 1;
         if (i > 0) state.tally.kicks += 1;
         return true;
