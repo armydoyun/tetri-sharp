@@ -630,6 +630,7 @@ export const EN = {
   "좌우로 밀기": "Swipe left or right",
   "한 칸씩 이동": "Move one cell at a time",
   두드리기: "Tap",
+  "두 손가락으로 함께 두드리기": "Tap with two fingers together",
   "회전 (오른쪽 절반은 시계, 왼쪽 절반은 반시계)": "Rotate (right half clockwise, left half counterclockwise)",
   "아래로 밀고 있기": "Swipe down and hold",
   "아래로 빠르게 튕기기": "Flick down",
@@ -748,8 +749,8 @@ export const EN = {
   "익숙해지면: 누르고 있으면 바로 벽까지 가요": "Once you're used to it: holding a direction goes straight to the wall",
   "숙련자용: 가장 빨리 반응하고 소프트 드롭은 즉시 바닥까지": "For experts: quickest response and instant soft drop",
   "보드 아래 버튼으로 조작해요": "Play with the buttons under the board",
-  "보드를 좌우로 밀어 이동, 두드려 회전(왼쪽 절반은 반대 방향), 아래로 튕겨 하드 드롭, 위로 밀어 홀드":
-    "Swipe to move, tap to rotate (left half the other way), flick down to hard drop, swipe up to hold",
+  "좌우로 밀어 이동, 한 손가락 탭으로 90도·두 손가락 탭으로 180도 회전, 아래로 튕겨 하드 드롭, 위로 밀어 홀드":
+    "Swipe sideways to move. Tap with one finger for 90° or two together for 180°. Flick down to hard drop. Swipe up to hold.",
   접근성: "Accessibility",
   조작감: "Handling",
   "아래에서 직접 조절한 값이에요": "Custom values set below",
