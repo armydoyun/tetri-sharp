@@ -7,6 +7,12 @@ import { icon } from "./icons.js";
 /** 지금 열린 목록 하나(다른 목록을 열면 닫는다) */
 let current = /** @type {null | { close: (focus?: boolean) => void }} */ (null);
 
+/** 긴 선택지는 짧은 이름과 목록에 붙일 설명으로 나눈다. */
+export const splitOption = label => {
+  const at = label.indexOf(" — ");
+  return at < 0 ? [label, ""] : [label.slice(0, at), label.slice(at + 3)];
+};
+
 // 열린 목록이 있으면 Esc가 대화상자를 닫지 않고 목록만 닫는다.
 if (typeof document !== "undefined") {
   document.addEventListener(

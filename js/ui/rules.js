@@ -4,7 +4,7 @@ import { MODERN, PRESET_LIST } from "../rules/presets.js";
 import { GRAVITY_OPTIONS, LIMITS, makeCustomRules, sanitizeRuleBody } from "../rules/sanitize.js";
 import { el, fieldRow, fillDialog, focusKey, restoreFocus } from "./dom.js";
 import { button, confirmButton, rangeRow, slider, tabBar, textInput, toggle } from "./components.js";
-import { dropdown } from "./select.js";
+import { dropdown, splitOption } from "./select.js";
 import { decodeRules, encodeRules, rulesLink } from "../rules/share.js";
 import { MAX_RULE_NAME, MAX_RULE_SLOTS } from "../storage/rule-slots.js";
 import { t } from "../i18n/index.js";
@@ -215,12 +215,6 @@ const setPath = (obj, path, value) => {
   for (const k of keys.slice(0, -1)) o = o[k] ??= {};
   o[keys.at(-1)] = value;
   return next;
-};
-
-/** "SRS — 벽차기 5단계 (현대 표준)" → ["SRS", "벽차기 5단계 (현대 표준)"] */
-const splitOption = label => {
-  const at = label.indexOf(" — ");
-  return at < 0 ? [label, ""] : [label.slice(0, at), label.slice(at + 3)];
 };
 
 /** 고른 선택지의 설명(있으면) */

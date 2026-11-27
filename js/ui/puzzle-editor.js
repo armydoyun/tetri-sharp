@@ -52,6 +52,7 @@ import {
 import { el, fieldRow, fillDialog, focusKey, restoreFocus } from "./dom.js";
 import { openPuzzleComparison } from "./puzzle-comparison.js";
 import { copyText, revealForCopy } from "./clipboard.js";
+import { splitOption } from "./select.js";
 import {
   button,
   confirmButton,
@@ -719,10 +720,13 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
               "puzzle-rotation",
               t("회전 시스템"),
               [
-                { value: "srs", label: t("SRS — 벽차기 5단계 (현대 표준)") },
-                { value: "ars", label: t("ARS — 좌우 1칸만, 중앙열 규칙 (아케이드)") },
-                { value: "classic", label: t("킥 없음 — 막히면 안 돈다 (옛날 방식)") },
-              ],
+                ["srs", t("SRS — 벽차기 5단계 (현대 표준)")],
+                ["ars", t("ARS — 좌우 1칸만, 중앙열 규칙 (아케이드)")],
+                ["classic", t("킥 없음 — 막히면 안 돈다 (옛날 방식)")],
+              ].map(([value, text]) => {
+                const [label, hint] = splitOption(text);
+                return { value, label, hint };
+              }),
               r.rotation,
               (next, v) => (next.rules.rotation = v)
             ),
