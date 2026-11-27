@@ -1053,6 +1053,8 @@ test("테마: 라이트에서 UI는 밝고 게임 화면(보드)은 어둡다, �
     const page = await context.newPage();
     await page.goto(url);
     await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+    // 첫 화면 진입 시 진행 중인 배경색 전환까지 끝난 뒤 대비를 잰다.
+    await page.locator("body").evaluate(body => Promise.allSettled(body.getAnimations().map(a => a.finished)));
     const colors = await page.evaluate(() => ({
       body: getComputedStyle(document.body).backgroundColor,
       game: getComputedStyle(document.querySelector(".board-wrap")).backgroundColor,
