@@ -14,6 +14,17 @@ const run = (g, n, held = 0) => {
 const minX = g => Math.min(...g.activeCells().map(c => c[0]));
 const maxX = g => Math.max(...g.activeCells().map(c => c[0]));
 
+test("벽 차기는 회전에 성공한 위치와 벽 접촉 좌표를 남긴다", () => {
+  const game = make({ gravity: 0 });
+  tick(game);
+  game.state.active = { type: "T", rot: 1, x: -1, y: VISIBLE_TOP + 3, lastAction: null, kick: 0 };
+  const event = tick(game, 0, BTN.CCW).find(e => e.type === "rotate");
+  assert.equal(game.state.active.x, 0);
+  assert.equal(game.state.active.rot, 0);
+  assert.deepEqual(event.contact, { x: 0, y: VISIBLE_TOP + 4.5, dx: 1, dy: 0 });
+  assert.equal(tick(game, 0, BTN.CW).find(e => e.type === "rotate").contact, undefined);
+});
+
 test("첫 프레임에 피스가 생성되어 보이는 영역 맨 윗줄에 걸친다", () => {
   const g = make();
   tick(g);

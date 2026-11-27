@@ -9,7 +9,8 @@ import { createEffects } from "./effects.js";
 import { createSlide } from "./motion.js";
 import { boxOrigin, drawMark, findTheme, paletteFor } from "./themes.js";
 import { createBoardGrid } from "./board-grid.js";
-import { createGameplayAccents } from "./gameplay-accents.js";
+import { accentEnabled, createGameplayAccents } from "./gameplay-accents.js";
+import { drawDangerLine, drawFoldingBar, drawKickLine } from "./situation-effects.js";
 import {
   accentInk,
   drawCombo,
@@ -22,6 +23,7 @@ import {
 const MARGIN_TOP = 2; // 보드 위 여유 줄
 const ROWS = VISIBLE_ROWS + MARGIN_TOP;
 const CSS_CELL = 28;
+const DANGER_ROWS = 3;
 
 /**
  * @typedef {{ theme: string, effects: "full" | "reduced" | "off", clearEffectLength?: number, palette: "theme" | "contrast" | "custom", pattern?: "on" | "off", ghost?: string, grid?: "on" | "off", colors?: Record<string, string>, gameplayEffects?: Partial<Record<import("./gameplay-accents.js").Accent, boolean>> }} Visual
@@ -158,7 +160,12 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     const bx = side * cell;
     const by = MARGIN_TOP * cell;
     const toY = y => by + (y - VISIBLE_TOP) * cell;
-    const feedback = game && motion ? accents.frame(now, visual, theme) : null;
+    const dangerous =
+      game &&
+      motion &&
+      accentEnabled(visual, "danger") &&
+      board.cells.subarray(0, (VISIBLE_TOP + DANGER_ROWS) * board.width).some(Boolean);
+    const feedback = game && motion ? accents.frame(now, visual, theme, dangerous) : null;
     const ink = accentInk(theme);
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -205,6 +212,10 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     if (feedback) {
       ctx.save();
       ctx.scale(cell, cell);
+      if (feedback.danger) {
+        const { entered, released } = feedback.danger;
+        drawDangerLine(ctx, feedback.material, theme.palette[CELL_ID.L], side, MARGIN_TOP, COLS, entered, released);
+      }
       if (feedback.spin) {
         drawSpinAccent(ctx, feedback.material, {
           ...feedback.spin,
@@ -285,13 +296,33 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       ctx.restore();
     }
 
+    if (feedback?.kick) {
+      const { x, y, dx, dy, age } = feedback.kick;
+      if (toY(y) >= 0) {
+        ctx.save();
+        ctx.scale(cell, cell);
+        drawKickLine(ctx, feedback.material, ink, { x: side + x, y: toY(y) / cell, dx, dy }, age, false);
+        ctx.restore();
+      }
+    }
+
     // 대기 중인 쓰레기는 한 줄씩 구분한다. CPU의 좁은 캔버스에서는 안쪽에 그린다.
-    if (pending > 0) {
+    if (pending > 0 || feedback?.canceled) {
       const w = Math.max(2, Math.round(cell * 0.18));
       ctx.fillStyle = "#e5484d";
       const x = compact ? bx + 1 : bx - w - 1;
       for (let row = VISIBLE_ROWS - pending; row < VISIBLE_ROWS; row++) {
         ctx.fillRect(x, by + row * cell + 1, w, cell - 2);
+      }
+      if (feedback?.canceled) {
+        const { age, blocked, pending: remaining } = feedback.canceled;
+        const top = Math.min(VISIBLE_ROWS, remaining + blocked);
+        ctx.save();
+        ctx.fillStyle = theme.palette[CELL_ID.Z];
+        for (let row = top - 1; row >= Math.max(pending, remaining); row--) {
+          drawFoldingBar(ctx, x, by + (VISIBLE_ROWS - row) * cell - 1, w, cell - 2, age, top - 1 - row);
+        }
+        ctx.restore();
       }
     }
 

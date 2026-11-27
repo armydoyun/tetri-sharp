@@ -14,6 +14,10 @@ const DEFAULT_GAMEPLAY_EFFECTS = Object.freeze({
   spin: true,
   perfect: true,
   combo: true,
+  danger: true,
+  kick: true,
+  cancel: true,
+  record: true,
 });
 
 /** [최소, 최대, 기본] */

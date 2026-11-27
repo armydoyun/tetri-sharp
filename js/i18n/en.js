@@ -67,6 +67,11 @@ export const EN = {
   "대기 {n}줄": "{n} pending",
   "기록 대비": "Vs best",
   "{n}줄 구간": "Line {n} split",
+  "판이 위까지 차오르면 보드 상단을 강조해요": "Highlights the top of the board when the stack is high.",
+  "피스가 벽이나 블록을 차고 돌 때 짧은 선을 보여 줘요":
+    "Shows a brief contact line when a piece kicks off a wall or block.",
+  "상쇄한 가비지만 대기 막대에서 접히듯 사라져요": "Folds away the canceled lines in the garbage meter.",
+  "구간 기록을 앞서는 순간 기록 칸을 강조해요": "Highlights the split display when you pull ahead.",
   "플레이 흐름": "Play full scene",
   "다음 피스 등장": "Next piece arrival",
   "홀드 교환": "Hold swap",

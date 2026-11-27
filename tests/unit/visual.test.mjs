@@ -407,7 +407,17 @@ test("시각 설정 보정과 예전 형식 옮기기", () => {
       theme: "modern",
       effects: "off",
       clearEffectLength: 100,
-      gameplayEffects: { next: true, hold: true, spin: true, perfect: true, combo: true },
+      gameplayEffects: {
+        next: true,
+        hold: true,
+        spin: true,
+        perfect: true,
+        combo: true,
+        danger: true,
+        kick: true,
+        cancel: true,
+        record: true,
+      },
       palette: "theme",
       pattern: "off",
       ghost: "normal",
@@ -440,6 +450,10 @@ test("시각 설정 보정과 예전 형식 옮기기", () => {
     spin: true,
     perfect: true,
     combo: true,
+    danger: true,
+    kick: true,
+    cancel: true,
+    record: true,
   });
   assert.equal(sanitizeVisual({ ghost: "huge", grid: 0, pattern: "on" }).ghost, "normal");
   assert.equal(sanitizeVisual({ pattern: "on" }).pattern, "on");

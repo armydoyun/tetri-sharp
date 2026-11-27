@@ -22,6 +22,10 @@ export const splitDelta = (current, best) => {
   return (current[i] - best[i]) / 60;
 };
 
+/** 새 구간에서 처음 앞서거나, 뒤처진 뒤 다시 앞섰을 때만 표시한다. */
+export const tookSplitLead = (previous, current, best) =>
+  current.length > previous.length && (splitDelta(current, best) ?? 0) < 0 && (splitDelta(previous, best) ?? 0) >= 0;
+
 /** "+1.23" / "-0.45" / "—" */
 export const formatDelta = delta => (delta === null ? "—" : `${delta < 0 ? "-" : "+"}${Math.abs(delta).toFixed(2)}`);
 

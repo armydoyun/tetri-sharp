@@ -1,14 +1,15 @@
 import { CELL_ID } from "../core/pieces.js";
 import { t } from "../i18n/index.js";
 import { formatDelta } from "../modes/splits.js";
+import { accentInk, accentMaterial, accentOpacity, drawSlotAccent } from "../render/motion-accents.js";
+import { COLS, HOLD } from "../render/preview-scene.js";
 import {
-  accentInk,
-  accentMaterial,
-  accentOpacity,
-  drawAccentStroke,
-  drawSlotAccent,
-} from "../render/motion-accents.js";
-import { HOLD } from "../render/preview-scene.js";
+  DANGER_ENTER_MS,
+  DANGER_RELEASE_MS,
+  drawDangerLine,
+  drawKickLine,
+  drawFoldingBar,
+} from "../render/situation-effects.js";
 import { active, boardFromRows, finishPiece, pieceCells } from "./scene-board.js";
 
 /** @typedef {import("../render/preview.js").PreviewBoardFrame} PreviewBoardFrame */
@@ -67,18 +68,9 @@ const dangerFrame = time => {
 /** @param {CanvasRenderingContext2D} ctx @param {Style} style */
 const dangerLine = (ctx, { left, theme, material, reduced }, time) => {
   if (time < DANGER_AT || (reduced && time >= RECOVER_AT)) return;
-  const entered = reduced ? 1 : progress(time - DANGER_AT, 210);
-  const released = progress(time - RECOVER_AT, 340);
-  const width = 1.1 + 3.64 * entered * (1 - released);
-  const color = theme.palette[CELL_ID.L];
-  drawAccentStroke(ctx, material, color, 0.88 * entered * (1 - released), path => {
-    for (const side of [-1, 1]) {
-      const edge = left + 5 + 4.84 * side;
-      path.moveTo(edge, 0.87);
-      path.lineTo(edge, 0.22);
-      path.lineTo(edge - side * width, 0.22);
-    }
-  });
+  const entered = reduced ? 1 : progress(time - DANGER_AT, DANGER_ENTER_MS);
+  const released = progress(time - RECOVER_AT, DANGER_RELEASE_MS);
+  drawDangerLine(ctx, material, theme.palette[CELL_ID.L], left, 0, COLS, entered, released);
 };
 
 const KICK_AT = 460;
@@ -89,15 +81,7 @@ const afterKick = active("T", pieceCells("T", 0, 0, 4));
 
 /** @param {CanvasRenderingContext2D} ctx @param {Style} style */
 const kickLine = (ctx, { left, material, ink, reduced }, time) => {
-  const age = time - KICK_AT;
-  const alpha = accentOpacity(age, Math.min(320, material[2]), reduced, 1.15);
-  const from = 4.65 - (reduced ? 0 : 0.14 * progress(age, 220));
-  const [finish, weight, duration] = material;
-  drawAccentStroke(ctx, [finish, Math.max(0.09, weight), duration], ink, alpha, path => {
-    path.moveTo(left - 0.15, from);
-    path.lineTo(left - 0.15, from + 0.97);
-    path.lineTo(left + 0.24, from + 0.97);
-  });
+  drawKickLine(ctx, material, ink, { x: left, y: 5.135, dx: 1, dy: 0 }, time - KICK_AT, reduced);
 };
 
 /** @param {CanvasRenderingContext2D} ctx */
@@ -122,13 +106,15 @@ const garbageMeter = (ctx, { left, theme, ink, reduced }, time) => {
   ctx.fillText(t("대기 {n}줄", { n: after ? 2 : 6 }), 0.65, 3.76, width - 0.5);
   ctx.fillStyle = color;
   for (let i = 0; i < 6; i++) {
-    const fold = after && i >= 2 ? (reduced ? 1 : progress(time - CLEAR_AT - (5 - i) * 24, 236)) : 0;
-    if (fold === 1) continue;
-    ctx.globalAlpha = 0.83 * (1 - fold ** 1.4);
-    const height = 0.36 * (1 - fold);
-    const barWidth = (width - 0.5) * (1 - 0.7 * fold);
     const edge = left - 0.64;
-    ctx.fillRect(edge - barWidth, 8.33 - i * 0.61 - height, barWidth, height);
+    const bottom = 8.33 - i * 0.61;
+    const barWidth = width - 0.5;
+    if (!after || i < 2) {
+      ctx.globalAlpha = 0.83;
+      ctx.fillRect(edge - barWidth, bottom - 0.36, barWidth, 0.36);
+    } else if (!reduced) {
+      drawFoldingBar(ctx, edge - barWidth, bottom, barWidth, 0.36, time - CLEAR_AT, 5 - i);
+    }
   }
   ctx.globalAlpha = 1;
 };
