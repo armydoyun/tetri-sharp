@@ -19,6 +19,7 @@ import { dateKey } from "../../js/modes/daily.js";
 import { verifyReplay } from "../../js/replay/replay.js";
 import { findMode } from "../../js/modes/index.js";
 import { decodeRules } from "../../js/rules/share.js";
+import { ALL_SPINS, spinBit, spinMask, spinSettings, T_SPIN } from "../../js/rules/spins.js";
 import { decodeReplayCode, encodeReplayCode } from "../../js/replay/share.js";
 
 let dir, html, result, server, url, browser;
@@ -714,6 +715,78 @@ test("Custom 옵션: 고정 중력의 적용값이 메뉴에 보이고 180도·D
     await marathon.click();
     await page.waitForFunction(() => document.body.dataset.screen === "play");
     assert.ok(await page.locator('[data-touch="R180"]').isDisabled());
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("올스핀: Custom과 퍼즐 편집에서 미노별로 조정하고 O스핀을 플레이에서 표시한다", async () => {
+  const { context, page, errors } = await openPage(
+    () => {
+      localStorage.setItem(
+        "tetrisharp:settings",
+        JSON.stringify({
+          access: { countdown: "off" },
+          handling: { sdf: 41 },
+          visual: { effects: "full" },
+        })
+      );
+      window.spinArcs = 0;
+      const arc = CanvasRenderingContext2D.prototype.arc;
+      CanvasRenderingContext2D.prototype.arc = function (...args) {
+        if (this.canvas.id === "board" && args[5] === true) window.spinArcs++;
+        return arc.apply(this, args);
+      };
+    },
+    undefined,
+    { frameClock: true, viewport: { width: 320, height: 568 }, hasTouch: true }
+  );
+  try {
+    await page.click('[data-rules="custom"]');
+    await page.click("#edit-rules");
+    await page.click('#rules-editor [data-value="점수"]');
+    assert.equal(await text(page, "rule-spin .select-value"), "T스핀만");
+    await choose(page, "rule-spin", "0");
+    await page.click("#rule-spin-details summary");
+    assert.ok(!(await page.locator("#rule-spin-T").isChecked()));
+    await choose(page, "rule-spin", String(ALL_SPINS));
+    assert.ok(await page.locator("#rule-spin-O").isChecked());
+    await page.locator("#rule-spin-O").uncheck();
+    assert.equal(await text(page, "rule-spin .select-value"), "직접 선택 · I, J, L, S, T, Z");
+    await page.click('#rules-editor [data-value="공유"]');
+    assert.equal(spinMask(decodeRules(await page.locator("#rule-share-code").inputValue())), ALL_SPINS ^ spinBit("O"));
+    await page.click("#rules-close");
+    await openList(page, "#open-puzzles");
+    await page.click("#puzzle-create");
+    await page.click("#puzzle-advanced summary");
+    await page.click("#puzzle-spin-details summary");
+    await page.locator("#puzzle-spin-L").check();
+    assert.equal(await text(page, "puzzle-spin .select-value"), "직접 선택 · L, T");
+    assert.ok(await page.locator("#puzzle-spin-T").isChecked());
+    assert.equal(Number(await page.getAttribute("#puzzle-spin", "data-value")), T_SPIN | spinBit("L"));
+
+    const cells = new Uint8Array(PUZZLE_CELLS);
+    cells.fill(1, cells.length - 10);
+    cells[cells.length - 6] = cells[cells.length - 5] = 0;
+    cells[cells.length - 25] = 1;
+    const code = encodePuzzle({
+      cells,
+      pieces: "OO",
+      goal: { kind: "lines", lines: 2 },
+      rules: { ...DEFAULT_RULES, ...spinSettings(spinBit("O")) },
+    });
+    await page.goto(`${url}#puzzle=${code}`);
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    await runKeys(page, [
+      ["ArrowLeft", 1],
+      ["ArrowDown", 1],
+      ["ArrowUp", 1],
+      ["Space", 1],
+      ["F24", 5],
+    ]);
+    assert.match(await text(page, "action"), /O-SPIN SINGLE/);
+    assert.ok(await page.evaluate(() => window.spinArcs > 0));
     assert.deepEqual(errors, []);
   } finally {
     await context.close();

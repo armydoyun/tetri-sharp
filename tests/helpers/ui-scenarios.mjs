@@ -120,10 +120,17 @@ const scenarios = async (page, quick) => {
   for (const tab of await tabs("#rules-editor")) {
     await page.click(`#rules-editor .dialog-tabs [data-value="${tab}"]`);
     await check(`규칙/${tab}`);
+    const spinDetails = page.locator("#rule-spin-details > summary");
+    const hasSpins = await spinDetails.count();
+    if (hasSpins) {
+      await spinDetails.click();
+      await check(`규칙/${tab} 미노별 스핀 펼침`);
+    }
     await switches(`규칙/${tab}`, "#rules-editor");
     await sliders(`규칙/${tab}`, "#rules-editor");
     await dropdowns(`규칙/${tab}`, "#rules-editor");
     await switches(`규칙/${tab} 되돌림`, "#rules-editor");
+    if (hasSpins) await spinDetails.click();
   }
   for (const p of ["retro", "arcade", "modern"]) {
     await page
@@ -164,6 +171,10 @@ const scenarios = async (page, quick) => {
     await page.click(`#puzzle-height [data-value="${h}"]`);
     await check(`퍼즐 만들기 높이=${h}`);
   }
+  await page.click("#puzzle-advanced > summary");
+  await page.click("#puzzle-spin-details > summary");
+  await check("퍼즐 만들기 미노별 스핀 펼침");
+  await switches("퍼즐 만들기 미노별 스핀", "#puzzle-spin-details");
   await esc();
   // 퍼즐 목록의 내 퍼즐(방금 편집기가 저장한 퍼즐 한 줄)·받은 퍼즐(빈 목록) 탭
   await page.click("#open-puzzles");

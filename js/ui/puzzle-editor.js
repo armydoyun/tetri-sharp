@@ -25,6 +25,8 @@ import {
 } from "../modes/custom-puzzle.js";
 import { GOAL_KINDS } from "../modes/puzzle-goals.js";
 import { LOCK_TYPES } from "../rules/sanitize.js";
+import { spinSettings } from "../rules/spins.js";
+import { spinControls } from "./spin-settings.js";
 import { MAX_MADE } from "../storage/custom-puzzles.js";
 import {
   COPYABLE_STAGES,
@@ -50,6 +52,7 @@ import {
 import { el, fieldRow, fillDialog, focusKey, restoreFocus } from "./dom.js";
 import { openPuzzleComparison } from "./puzzle-comparison.js";
 import { copyText, revealForCopy } from "./clipboard.js";
+import { splitOption } from "./select.js";
 import {
   button,
   confirmButton,
@@ -695,6 +698,12 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
           rules: t("규칙의 중력대로 떨어져요. 자동 확인과 첫 수 보기를 쓸 수 없어요"),
         }[settings.gravity];
         const holdOff = !r.hold.enabled;
+        const spins = spinControls({
+          prefix: "puzzle",
+          rules: r,
+          expanded: /** @type {HTMLDetailsElement | null} */ (advancedBody.querySelector("#puzzle-spin-details"))?.open,
+          onChange: mask => editSettings(next => Object.assign(next.rules, spinSettings(mask))),
+        });
         advancedBody.replaceChildren(
           fieldRow({
             id: "puzzle-base",
@@ -711,10 +720,13 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
               "puzzle-rotation",
               t("회전 시스템"),
               [
-                { value: "srs", label: t("SRS — 벽차기 5단계 (현대 표준)") },
-                { value: "ars", label: t("ARS — 좌우 1칸만, 중앙열 규칙 (아케이드)") },
-                { value: "classic", label: t("킥 없음 — 막히면 안 돈다 (옛날 방식)") },
-              ],
+                ["srs", t("SRS — 벽차기 5단계 (현대 표준)")],
+                ["ars", t("ARS — 좌우 1칸만, 중앙열 규칙 (아케이드)")],
+                ["classic", t("킥 없음 — 막히면 안 돈다 (옛날 방식)")],
+              ].map(([value, text]) => {
+                const [label, hint] = splitOption(text);
+                return { value, label, hint };
+              }),
               r.rotation,
               (next, v) => (next.rules.rotation = v)
             ),
@@ -751,21 +763,8 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
               (next, v) => (next.rules.previewCount = v)
             ),
           }),
-          fieldRow({
-            id: "puzzle-tspin",
-            label: t("T-spin 판정"),
-            hint: "",
-            control: pick(
-              "puzzle-tspin",
-              t("T-spin 판정"),
-              [
-                { value: "threeCorner", label: t("3-corner (Mini 포함)") },
-                { value: "none", label: t("없음") },
-              ],
-              r.tspin,
-              (next, v) => (next.rules.tspin = v)
-            ),
-          }),
+          spins.preset,
+          spins.details,
           fieldRow({
             id: "puzzle-lock",
             label: t("고정 방식"),

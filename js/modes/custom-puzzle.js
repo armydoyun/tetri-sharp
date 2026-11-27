@@ -12,6 +12,7 @@ import { MODERN, PRESETS } from "../rules/presets.js";
 import { RANDOMIZERS } from "../rules/randomizer/index.js";
 import { GRAVITY_OPTIONS, sanitizeRuleBody } from "../rules/sanitize.js";
 import { SCORINGS } from "../rules/scoring/index.js";
+import { ALL_SPINS, spinBit, spinMask, spinSettings, T_SPIN } from "../rules/spins.js";
 import { GOAL_KINDS, goalOf } from "./puzzle-goals.js";
 import { KIND_NAMES, makePuzzleMode } from "./puzzles.js";
 
@@ -122,7 +123,20 @@ const RULE_FIELDS = [
     },
   ],
   ["v", b => indexIn(GRAVITY_OPTIONS, b.gravity), (b, v) => (b.gravity = GRAVITY_OPTIONS[+v])],
-  ["s", b => (b.tspin === "none" ? "n" : "t"), (b, v) => (b.tspin = v === "n" ? "none" : "threeCorner")],
+  [
+    "s",
+    b => {
+      const mask = spinMask(b);
+      return mask === 0 ? "n" : mask === T_SPIN ? "t" : `p${mask.toString(36)}`;
+    },
+    (b, v) => {
+      if (v === "n" || v === "t") Object.assign(b, spinSettings(v === "n" ? 0 : T_SPIN));
+      else if (/^p[0-9a-z]{1,2}$/.test(v)) {
+        const mask = Number.parseInt(v.slice(1), 36);
+        if (mask <= ALL_SPINS) Object.assign(b, spinSettings(mask));
+      }
+    },
+  ],
   ["c", b => indexIn(Object.keys(SCORINGS), b.scoring), (b, v) => (b.scoring = Object.keys(SCORINGS)[+v])],
   [
     "f",
@@ -304,6 +318,7 @@ export const searchOptions = puzzle => {
     irs: p.rules.irs,
     lockNone: p.rules.lock.type === "none",
     tspin: p.rules.tspin,
+    ...(p.rules.spinPieces === undefined ? {} : { spinPieces: p.rules.spinPieces }),
     hold: p.rules.hold.enabled,
     allow180: p.rules.allow180 !== false,
     // 판 비우기는 쌓을 수 있는 높이가 정해진다. 다른 목표는 처음 판의 높이 안에서 먼저 찾고 못 찾으면 보이는 판 전체로
@@ -352,7 +367,11 @@ export const ruleSummary = puzzle => {
   if (r.rotation !== DEFAULT_RULES.rotation) parts.push(t("{name} 회전", { name: r.rotation.toUpperCase() }));
   if (r.hold.enabled) parts.push(p.holdStart ? t("홀드(처음 {piece})", { piece: p.holdStart }) : t("홀드"));
   if (r.previewCount !== DEFAULT_RULES.previewCount) parts.push(t("미리보기 {n}", { n: r.previewCount }));
-  if (r.tspin === "none") parts.push(t("T-spin 없음"));
+  const spins = spinMask(r);
+  if (spins === 0) parts.push(t("스핀 없음"));
+  else if (spins === ALL_SPINS) parts.push(t("올스핀"));
+  else if (spins !== T_SPIN)
+    parts.push(t("직접 선택 · {pieces}", { pieces: PIECE_TYPES.filter(piece => spins & spinBit(piece)).join(", ") }));
   if (!r.hardDrop) parts.push(t("하드 드롭 없음"));
   if (r.allow180 === false) parts.push(t("180도 회전 없음"));
   if (r.lock.type === "none") parts.push(t("고정 지연 없음"));

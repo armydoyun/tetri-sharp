@@ -3,6 +3,18 @@
 /** @type {Record<string, string>} */
 export const EN = {
   "180도 회전 허용": "Allow 180° rotations",
+  "스핀 판정": "Spin detection",
+  "스핀 없음": "No spins",
+  T스핀만: "T-spins only",
+  올스핀: "All-spins",
+  "직접 선택 · {pieces}": "Custom · {pieces}",
+  "미노별 스핀 설정": "Spins by piece",
+  "{piece} 스핀": "{piece} spin",
+  "T는 세 모서리로 판정해요. 다른 미노는 마지막 회전 뒤 상하좌우가 막혀야 하고, O는 대각선으로 포켓에 들어가야 해요.":
+    "T uses the three-corner rule. Other pieces must be trapped on all four sides after the last rotation. O must rotate diagonally into a pocket.",
+  "{piece}-SPIN {n}줄": "{piece}-SPIN {n} lines",
+  "스핀 회전 강조": "Spin accent",
+  "스핀을 확정한 자리에서 회전선을 보여 줘요": "Draw an arc where a spin locks",
   "180도 회전 없음": "180° rotations off",
   "꺼 두면 플레이와 미리 회전에 180도 입력을 쓰지 않아요.": "Disable 180° rotations during play and initial rotation.",
   "중력 적용": "Gravity behavior",

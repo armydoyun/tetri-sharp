@@ -3,6 +3,7 @@ import { formatScore, formatTime } from "../modes/format.js";
 import { el, fillDialog } from "./dom.js";
 import { button } from "./components.js";
 import { t } from "../i18n/index.js";
+import { clearName } from "../rules/scoring/guideline.js";
 
 const CLEAR_ROWS = [
   ["none-1", t("1줄")],
@@ -40,6 +41,12 @@ export const statRows = state => {
     ],
     clears: [
       ...CLEAR_ROWS.map(([key, label]) => [label, String(tally.clears[key] ?? 0)]),
+      ...Object.entries(tally.clears).flatMap(([key, count]) => {
+        const match = /^([IJLOSZ])-([0-4])$/.exec(key);
+        return match
+          ? [[clearName({ lines: Number(match[2]), tspin: "none", spinPiece: match[1] }), String(count)]]
+          : [];
+      }),
       [t("퍼펙트 클리어"), String(tally.perfect)],
       [t("최대 콤보"), String(Math.max(0, tally.maxCombo))],
       [t("최대 B2B"), String(tally.maxB2b)],

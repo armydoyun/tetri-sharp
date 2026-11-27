@@ -14,7 +14,8 @@ import {
 } from "./board.js";
 import { CELL_ID, PIECES } from "./pieces.js";
 import { createRng } from "./rng.js";
-import { detectTSpin } from "./tspin.js";
+import { detectSpin, movedByRotation, spinKicks } from "./spins.js";
+import { spinBit, spinMask } from "../rules/spins.js";
 import { SCORINGS } from "../rules/scoring/index.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
 import { RANDOMIZERS } from "../rules/randomizer/index.js";
@@ -55,7 +56,8 @@ export const msToFrames = ms => (ms * 60) / 1000;
  * @property {number} rot
  * @property {number} x
  * @property {number} y
- * @property {"move" | "rotate" | "drop" | null} lastAction  T-spin 판정용
+ * @property {"move" | "rotate" | "drop" | null} lastAction  스핀 판정용
+ * @property {boolean} [spinMoved] 마지막 회전이 실제 칸을 바꿨는지(미노별 판정)
  * @property {number} kick  마지막 회전에서 쓴 킥 번호
  * @property {number} [turn] 마지막 회전 방향(화면 효과용)
  */
@@ -83,6 +85,7 @@ export const msToFrames = ms => (ms * 60) / 1000;
  */
 export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode, onSpawn, legacyArsSpin = false }) => {
   const rotation = ROTATIONS[rules.rotation];
+  const enabledSpins = spinMask(rules);
   if (!rotation) throw new Error(`알 수 없는 회전 시스템: ${rules.rotation}`);
   const makeRandomizer = RANDOMIZERS[rules.randomizer];
   if (!makeRandomizer) throw new Error(`알 수 없는 생성기: ${rules.randomizer}`);
@@ -249,8 +252,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
   const lockPiece = () => {
     const a = /** @type {Active} */ (state.active);
     const shape = cells(a);
-    const tspin =
-      rules.tspin === "threeCorner" ? detectTSpin(board, a, legacyArsSpin ? undefined : rotation.id) : "none";
+    const { tspin, spinPiece } = detectSpin(board, rotation, a, enabledSpins, legacyArsSpin);
     place(board, shape, a.x, a.y, CELL_ID[a.type]);
     state.active = null;
     state.holdUsed = false;
@@ -266,7 +268,10 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
     state.b2b = scored.b2b;
     state.combo = scored.combo;
     const t = state.tally;
-    if (lines > 0 || tspin !== "none") t.clears[`${tspin}-${lines}`] = (t.clears[`${tspin}-${lines}`] ?? 0) + 1;
+    if (lines > 0 || tspin !== "none" || spinPiece) {
+      const key = `${spinPiece ?? tspin}-${lines}`;
+      t.clears[key] = (t.clears[key] ?? 0) + 1;
+    }
     if (perfect) t.perfect += 1;
     t.maxCombo = Math.max(t.maxCombo, scored.combo);
     t.maxB2b = Math.max(t.maxB2b, scored.b2b);
@@ -279,7 +284,16 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
       rows: cleared,
       ...(lines > 0 ? { clearedCells } : {}),
       tspin,
-      ...(tspin !== "none" ? { spinPivot: { x: a.x + 1.5, y: a.y + 1.5, direction: a.turn > 0 ? 1 : -1 } } : {}),
+      ...(spinPiece ? { spinPiece } : {}),
+      ...(tspin !== "none" || spinPiece
+        ? {
+            spinPivot: {
+              x: a.x + (spinPiece ? shape.reduce((sum, [x]) => sum + x + 0.5, 0) / shape.length : 1.5),
+              y: a.y + (spinPiece ? shape.reduce((sum, [, y]) => sum + y + 0.5, 0) / shape.length : 1.5),
+              direction: a.turn > 0 ? 1 : -1,
+            },
+          }
+        : {}),
       perfect,
       points: scored.points,
       b2b: scored.b2bApplied,
@@ -354,7 +368,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
       const y = a.y + cy;
       return !inBounds(board, x, y) || get(board, x, y) !== 0;
     };
-    const kicks = rotation.kicks(a.type, a.rot, to, blocked);
+    const kicks = spinKicks(board, rotation, a, to, enabledSpins, blocked);
     for (let i = 0; i < kicks.length; i++) {
       const [dx, dy] = kicks[i];
       if (fits(a, dx, dy, to)) {
@@ -369,18 +383,21 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
               dy: horizontal ? 0 : dy,
             }
           : null;
+        const kick = a.type === "O" && dx ? 1 : i;
+        if (a.type !== "T" && enabledSpins & spinBit(a.type))
+          a.spinMoved = movedByRotation(rotation, a.type, a.rot, to, dx, dy);
         a.x += dx;
         a.y += dy;
         a.rot = to;
         a.lastAction = "rotate";
-        a.kick = i;
+        a.kick = kick;
         a.turn = delta;
         cutDas();
         onShifted();
         onDescended(a);
-        events.push({ type: "rotate", turn: delta, kick: i, ...(contact ? { contact } : {}) });
+        events.push({ type: "rotate", turn: delta, kick, ...(contact ? { contact } : {}) });
         state.tally.rotations += 1;
-        if (i > 0) state.tally.kicks += 1;
+        if (kick > 0) state.tally.kicks += 1;
         return true;
       }
     }

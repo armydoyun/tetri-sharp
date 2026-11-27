@@ -44,7 +44,15 @@ export const applyBattleLock = (state, ev, events) => {
     g.blocked += blocked;
     g.sent += sent;
     g.outgoing += sent;
-    events.push({ type: "attack", lines: sent, cleared: ev.lines, tspin: ev.tspin, blocked, ...parts });
+    events.push({
+      type: "attack",
+      lines: sent,
+      cleared: ev.lines,
+      tspin: ev.tspin,
+      ...(ev.spinPiece ? { spinPiece: ev.spinPiece } : {}),
+      blocked,
+      ...parts,
+    });
     if (blocked) events.push({ type: "garbageCancel", blocked, pending: g.pending });
   } else receiveGarbage(state, events);
   return false;

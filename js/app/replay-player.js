@@ -394,7 +394,7 @@ export const createReplayPlayer = deps => {
     for (let i = 0; i < count && !player.done; i++) {
       const events = player.step();
       inputDisplay.show(player.input.held, player.input.pressed);
-      if (!player.cpu) for (const e of events) fb.announce(e);
+      for (const e of events) if (!player.cpu || (e.type === "lock" && e.spinPiece)) fb.announce(e);
       renderer.addEvents(events);
       if (player.cpu) cpuRenderer.addEvents(player.cpuEvents);
       // 빨리 감기 중에는 소리를 겹쳐 내지 않는다.
