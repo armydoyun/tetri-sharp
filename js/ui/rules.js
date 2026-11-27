@@ -1,4 +1,5 @@
 // Custom 규칙 편집 대화상자. 바꿀 때마다 onChange(규칙 내용)를 부르고, 저장·적용은 호출한 쪽이 한다.
+import { gravityLabel } from "../modes/format.js";
 import { PRESET_LIST } from "../rules/presets.js";
 import { GRAVITY_OPTIONS, LIMITS, makeCustomRules, sanitizeRuleBody } from "../rules/sanitize.js";
 import { el, fieldRow, fillDialog } from "./dom.js";
@@ -11,13 +12,11 @@ import { copyText } from "./clipboard.js";
 
 const ms = frames => `${Math.round((frames * 1000) / 60)}ms`;
 
-const GRAVITY_LABELS = [t("1칸/초"), t("1.25칸/초"), t("2칸/초"), t("6칸/초"), t("1G (60칸/초)"), t("20G (즉시 바닥)")];
-
 /**
  * 편집 항목. path는 규칙 객체 안의 위치.
  * when이 거짓이면 항목을 숨기지 않고 같은 자리에서 비활성으로 두며, 설명 줄에 off(쓸 수 없는 이유)를 보여 준다(원칙 2).
  * @type {ReadonlyArray<{ section?: string, path?: string, label?: string, hint?: string, type?: "select" | "toggle" | "number",
- *   options?: ReadonlyArray<[any, string]>, range?: readonly number[], unit?: (v: number) => string, when?: (r: any) => boolean, off?: string, fallback?: any }>}
+ *   options?: ReadonlyArray<[any, string]>, range?: readonly number[], unit?: (v: number) => string, when?: (r: any) => boolean, off?: string | ((r: any) => string), fallback?: any }>}
  */
 const FIELDS = [
   { section: t("피스") },
@@ -55,6 +54,14 @@ const FIELDS = [
   { path: "ghost", label: t("고스트"), hint: t("피스가 떨어질 자리를 흐리게 보여 줘요"), type: "toggle" },
   { path: "hardDrop", label: t("하드 드롭"), hint: t("한 번에 바닥까지 떨어뜨리고 바로 고정"), type: "toggle" },
 
+  {
+    path: "allow180",
+    label: t("180도 회전 허용"),
+    hint: t("꺼 두면 플레이와 미리 회전에 180도 입력을 쓰지 않아요."),
+    type: "toggle",
+    fallback: true,
+  },
+
   { section: t("고정·낙하") },
   {
     path: "lock.type",
@@ -86,11 +93,20 @@ const FIELDS = [
     off: t("‘움직이면 리셋’ 방식에서만 써요"),
   },
   {
+    path: "gravityMode",
+    label: t("중력 적용"),
+    type: "select",
+    options: [
+      ["mode", t("모드 기본 — 레벨별 중력이 없는 모드는 아래 값을 써요.")],
+      ["fixed", t("고정 중력 — 기본 플레이 모드에서 아래 값을 유지해요.")],
+    ],
+    fallback: "mode",
+  },
+  {
     path: "gravity",
     label: t("기본 중력"),
-    hint: t("Marathon은 레벨에 따라 따로 정해진다"),
     type: "select",
-    options: GRAVITY_OPTIONS.map((g, i) => [g, GRAVITY_LABELS[i]]),
+    options: GRAVITY_OPTIONS.map(g => [g, gravityLabel(g, t)]),
   },
   { path: "are.spawn", label: t("생성 지연"), type: "number", range: LIMITS.are, unit: v => `${v}F · ${ms(v)}` },
   { path: "are.lineClear", label: t("줄 삭제 지연"), type: "number", range: LIMITS.are, unit: v => `${v}F · ${ms(v)}` },
@@ -157,9 +173,35 @@ const FIELDS = [
     type: "number",
     range: LIMITS.sdf,
     unit: v => t("{n}배", { n: v }),
+    when: r => r.fixedHandling && !r.fixedHandling.instantSoftDrop,
+    off: r =>
+      r.fixedHandling ? t("즉시 소프트 드롭을 켜서 배율을 쓰지 않아요.") : t("‘조작감 고정’을 켜면 쓸 수 있어요"),
+    fallback: 30,
+  },
+  {
+    path: "fixedHandling.instantSoftDrop",
+    label: t("즉시 소프트 드롭"),
+    type: "toggle",
+    hint: t("소프트 드롭을 누르면 즉시 바닥까지 내려요."),
     when: r => r.fixedHandling,
     off: t("‘조작감 고정’을 켜면 쓸 수 있어요"),
-    fallback: 30,
+  },
+  {
+    path: "fixedHandling.dcd",
+    label: "DCD",
+    type: "select",
+    hint: t("피스가 나오거나 회전한 뒤 자동 가로 이동을 다시 시작하기까지 기다리는 시간"),
+    options: [
+      [-1, t("개인 설정 따르기")],
+      [0, t("끄기")],
+      ...Array.from(
+        { length: LIMITS.dcd[1] },
+        (_, i) => /** @type {[number, string]} */ ([i + 1, `${i + 1}F · ${ms(i + 1)}`])
+      ),
+    ],
+    when: r => r.fixedHandling,
+    off: t("‘조작감 고정’을 켜면 쓸 수 있어요"),
+    fallback: -1,
   },
 ];
 
@@ -171,7 +213,7 @@ const getPath = (obj, path) => {
 const setPath = (obj, path, value) => {
   const next = structuredClone(obj);
   if (path === "fixedHandlingOn") {
-    next.fixedHandling = value ? { das: 16, arr: 6, sdf: 30 } : null;
+    next.fixedHandling = value ? { das: 16, arr: 6, sdf: 30, dcd: 0 } : null;
     return next;
   }
   const keys = path.split(".");
@@ -445,7 +487,11 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
         if (current !== tab) continue;
         const disabled = Boolean(field.when && !field.when(rules));
         const id = `rule-${field.path.replace(/\./g, "-")}`;
-        const hint = disabled ? field.off : selectedDescription(field, rules) || field.hint || "";
+        const hint = disabled
+          ? typeof field.off === "function"
+            ? field.off(rules)
+            : field.off
+          : selectedDescription(field, rules) || field.hint || "";
         section.append(fieldRow({ id, label: field.label, hint, control: control(field, rules, disabled), disabled }));
       }
       body.append(section);

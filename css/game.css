@@ -1160,6 +1160,10 @@ body[data-screen="replay"] .touchpad {
   color: var(--on-accent);
 }
 
+.touchpad button:disabled {
+  opacity: 0.4;
+}
+
 .touchpad .touch-system {
   color: var(--text-dim);
 }

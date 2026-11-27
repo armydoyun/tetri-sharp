@@ -249,3 +249,35 @@ test("풀이 비교는 같은 첫 배치를 제외하고 다른 경로를 찾지
     comparison: "limit",
   });
 });
+
+test("클래식 점수표를 써도 퍼즐의 줄 삭제 연속 횟수는 탐색과 실제 판에서 같다", () => {
+  const cells = new Uint8Array(PUZZLE_CELLS);
+  cells.set(Array.from("11100001111110000111", Number), PUZZLE_CELLS - 2 * WIDTH);
+  const puzzle = { cells, pieces: "II", goal: { kind: "combo" }, rules: { ...DEFAULT_RULES, scoring: "classic" } };
+  const solution = runSolverTask(solutionTask(puzzle));
+  assert.deepEqual(
+    solution.moves.map(move => move.lines),
+    [1, 1]
+  );
+  const mode = customPuzzleMode(puzzle);
+  const game = createGame({ mode, rules: mode.rules, seed: 1 });
+  play(game, [BTN.HARD]);
+  assert.equal(game.state.puzzle.combo, 0);
+  play(game, [BTN.HARD]);
+  assert.equal(game.state.puzzle.combo, 1);
+  assert.equal(game.state.combo, -1, "클래식 점수표의 콤보 보너스는 그대로다");
+  assert.equal(game.state.over, "clear");
+});
+
+test("퍼즐 링크에서도 180도 제한과 고정 DCD·즉시 소프트 드롭이 왕복한다", () => {
+  const rules = {
+    ...DEFAULT_RULES,
+    allow180: false,
+    fixedHandling: { das: 7, arr: 2, sdf: 12, dcd: 0, instantSoftDrop: true },
+  };
+  const source = { cells: bottomRow(6), pieces: "I", rules };
+  const decoded = decodePuzzle(encodePuzzle(source));
+  assert.equal(decoded.rules.allow180, false);
+  assert.deepEqual(decoded.rules.fixedHandling, rules.fixedHandling);
+  assert.equal(solutionTask(decoded).opts.allow180, false);
+});

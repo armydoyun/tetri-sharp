@@ -19,6 +19,7 @@ import { t } from "../i18n/index.js";
  * @property {import("../rules/presets.js").RuleSet} rules
  * @property {(state: any, events: any[]) => null | { result: string }} check
  * @property {(state: any) => number} [levelFor]
+ * @property {boolean} [allowsFixedGravity]
  * @property {(state: any) => number} [gravityFor]
  * @property {(state: any) => { label: string, value: string }} hudLines
  * @property {(state: any) => { label: string, frames: number }} hudTime   경과 또는 남은 시간
@@ -97,6 +98,7 @@ export const MARATHON = Object.freeze({
   goal: MARATHON_GOAL,
   check: state => (state.stats.lines >= MARATHON_GOAL ? { result: "clear" } : null),
   levelFor: levelByLines,
+  allowsFixedGravity: true,
   gravityFor: state => guidelineGravity(state.level),
   hudLines: state => ({ label: t("줄"), value: `${state.stats.lines}/${MARATHON_GOAL}` }),
   hudTime: elapsed,
@@ -210,6 +212,7 @@ export const MASTER = Object.freeze({
     // 구간 끝(x99)과 998에서는 줄을 지워야만 넘어간다.
     return L % 100 === 99 || L === MASTER_MAX - 1 ? L : L + 1;
   },
+  allowsFixedGravity: true,
   gravityFor: state => masterGravity(state.level),
   scoreLevel: state => 1 + Math.floor(state.level / 100),
   check: state => (state.level >= MASTER_MAX ? { result: "clear" } : null),
@@ -305,6 +308,7 @@ export const SURVIVAL = Object.freeze({
     state.garbage = { pending: 0, timer: 0, hole: rng.int(10), received: 0, blocked: 0, rng };
   },
   levelFor: state => Math.min(MAX_LEVEL, 1 + Math.floor(state.frame / SURVIVAL_LEVEL_FRAMES)),
+  allowsFixedGravity: true,
   gravityFor: state => guidelineGravity(Math.min(state.level, 10)),
   onFrame: (state, events) => {
     const g = state.garbage;
@@ -371,6 +375,7 @@ export const ENDLESS = Object.freeze({
   rules: MODERN,
   check: () => null,
   levelFor: state => Math.min(ENDLESS_MAX_LEVEL, 1 + Math.floor(state.stats.lines / LINES_PER_LEVEL)),
+  allowsFixedGravity: true,
   gravityFor: state => guidelineGravity(state.level),
   hudLines: state => ({ label: t("줄"), value: String(state.stats.lines) }),
   hudTime: elapsed,

@@ -18,7 +18,7 @@ import { createDailyUI } from "./ui/daily.js";
 import { createDailyPuzzleUI } from "./ui/daily-puzzle.js";
 import { dailyPuzzleMode } from "./modes/daily-puzzle.js";
 import { createDailyPuzzleProgress } from "./storage/daily-puzzle.js";
-import { formatScore, formatTime } from "./modes/format.js";
+import { formatScore, formatTime, gravityLabel } from "./modes/format.js";
 import { createStore } from "./storage/store.js";
 import { runFingerprint } from "./storage/suspended-run.js";
 import { loadSettings, sanitizeSettings, saveSettings, toEngineHandling } from "./storage/settings.js";
@@ -256,6 +256,7 @@ const runs = createRunSaver({
       name: runPlayerName,
       resultPbSplits,
       pbSplits,
+      arsSpinFacing: rules.rotation === "ars" && rules.tspin === "threeCorner" && game?.legacyArsSpin === false,
     }),
     game: () => game,
     sceneEnded: () => Boolean(sceneView.current?.ended),
@@ -384,7 +385,11 @@ const keyHelp = createKeyHelp({
   padConnected: () => Boolean(padRef?.connected),
 });
 const keysOf = keyHelp.keysOf;
-const renderKeyHelp = keyHelp.render;
+const renderKeyHelp = () => {
+  keyHelp.render();
+  const rotate180 = /** @type {HTMLButtonElement} */ (document.querySelector('[data-touch="R180"]'));
+  rotate180.disabled = (game?.rules ?? currentRules()).allow180 === false;
+};
 
 /** 프리셋 한 줄 설명(첫 화면 규칙 카드) */
 const RULE_DESCRIPTIONS = {
@@ -504,14 +509,24 @@ const renderMenu = () => {
   renderPuzzleProgress();
   renderAchievementProgress();
   const ruleSet = currentRules();
-  $("active-rules").textContent = t("규칙 · {name}", { name: ruleSet.name });
+  const custom = ruleChoice === "custom";
+  const gravity = gravityLabel(ruleSet.gravity, t);
+  const gravitySetting = ruleSet.gravityMode === "fixed" ? gravity : t("모드별 중력");
+  const active = t("규칙 · {name}", { name: ruleSet.name });
+  $("active-rules").textContent = custom ? `${active} · ${gravitySetting}` : active;
   const list = $("mode-list");
   list.replaceChildren(
     ...MODES.map(m => {
       const best = records.best(m, ruleSet);
       const rank = rankOf(m, best, ruleSet);
-      return menuRow({
+      const appliedGravity = custom
+        ? m.gravityFor && ruleSet.gravityMode !== "fixed"
+          ? t("모드별 중력")
+          : gravity
+        : null;
+      const row = menuRow({
         "data-mode": m.id,
+        "aria-description": appliedGravity,
         title: m.name,
         desc: m.description,
         meta: best
@@ -519,6 +534,8 @@ const renderMenu = () => {
           : "",
         onClick: () => start(m),
       });
+      if (appliedGravity) row.title = appliedGravity;
+      return row;
     }),
     versusRow(),
     dailyRow()
@@ -782,21 +799,28 @@ const start = (
   $("race-label").textContent = target?.friend ? t("{name}의 기록", { name: target.friend }) : t("내 최고 기록");
   race = target ? { target, player: createPlayer(target.replay, findMode) } : null;
   racePanel.hidden = !race;
-  game = createGame({ rules, handling: toEngineHandling(restored?.handling ?? settings.handling), seed, mode: m });
+  const legacyArsSpin = Boolean(restored && restored.arsSpinFacing !== true);
+  game = createGame({
+    rules,
+    handling: toEngineHandling(restored?.handling ?? settings.handling),
+    seed,
+    mode: m,
+    legacyArsSpin,
+  });
   updateRaceProgress();
   // 대전: CPU도 같은 시드(같은 블록 순서)로 시작한다. 상대와 함께라야 재현되므로 리플레이는 남기지 않는다.
   if (m.versus) {
-    const cpu = createGame({ rules, seed, mode: m });
+    const cpu = createGame({ rules, seed, mode: m, legacyArsSpin });
     versus = {
       cpu,
       bot: createBot({ game: cpu, rotation: ROTATIONS[rules.rotation], level: m.versus, seed }),
-      recorder: createRecorder({ seed, mode: m, rules, handling: cpu.handling }),
+      recorder: createRecorder({ seed, mode: m, rules, handling: cpu.handling, legacyArsSpin }),
     };
     $("versus-name").textContent = versusTitle(m.versus);
   } else versus = null;
   versusPanel.hidden = !versus;
   document.body.classList.toggle("is-versus", Boolean(versus));
-  recorder = m.noReplay ? null : createRecorder({ seed, mode: m, rules, handling: game.handling });
+  recorder = m.noReplay ? null : createRecorder({ seed, mode: m, rules, handling: game.handling, legacyArsSpin });
   finesse = createFinesseTracker(game, ROTATIONS[rules.rotation]);
   splits = [];
   showModeHud(m);
@@ -1589,12 +1613,12 @@ const togglePuzzleHint = () => {
     rotation: rules.rotation,
     board: game.state.board.cells.slice(),
     active: { type: active.type, x: active.x, y: active.y, rot: active.rot },
-    combo: game.state.combo ?? -1,
+    combo: p.combo,
     total: p.lines ?? 0,
     hold,
     holdUsed,
     rest,
-    opts: mode.puzzle.custom ? searchOptions(mode.puzzle.custom) : {},
+    opts: { ...(mode.puzzle.custom ? searchOptions(mode.puzzle.custom) : {}), legacyArsSpin: game.legacyArsSpin },
   });
   puzzleHintSearch = search;
   $("downstack-status").textContent = t("첫 수를 찾는 중…");
@@ -1938,6 +1962,7 @@ padRef = pad;
 // ---- 도움말 · 처음 오신 분 안내 ----
 const helpUI = createHelpUI({
   dialog: /** @type {HTMLDialogElement} */ ($("help")),
+  allows180: () => (game?.rules ?? currentRules()).allow180 !== false,
   getSettings: () => (gestureTrainingOn() ? { ...settings, touchMode: "gestures" } : settings),
   isTouch: () => Boolean(gestureTrainingOn()) || touchVisible(settings.touch, isTouchScreen()),
   canStart: () => screen === "menu",
@@ -2354,7 +2379,8 @@ const tick = () => {
   if (screen === "replay") return replayView.tick();
   if (screen !== "play" || !game) return;
   if (goTimer > 0 && --goTimer === 0) countdownEl.hidden = true;
-  const allowed = sceneView.current?.target ? ~(BTN.HOLD | BTN.SOFT) : mode.lesson ? ~BTN.SOFT : -1;
+  const modeMask = sceneView.current?.target ? ~(BTN.HOLD | BTN.SOFT) : mode.lesson ? ~BTN.SOFT : -1;
+  const allowed = rules.allow180 === false ? modeMask & ~BTN.R180 : modeMask;
   const buttonHeld = keyboard.held | pad.held | touch.held;
   const buttonPressed = keyboard.takePressed() | touch.takePressed();
   const training = gestureTrainingOn();

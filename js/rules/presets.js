@@ -10,13 +10,15 @@
  * @property {number} previewCount        넥스트 미리보기 개수(0~6)
  * @property {{ enabled: boolean }} hold
  * @property {boolean} ghost
+ * @property {false} [allow180]  생략하면 180도 회전 허용
  * @property {boolean} hardDrop
  * @property {{ type: "moveReset" | "stepReset" | "infinite" | "none", delay: number, maxResets: number }} lock
  * @property {{ spawn: number, lineClear: number }} are   생성 지연 / 줄 삭제 후 지연
+ * @property {"fixed"} [gravityMode]  지원하는 모드에서 고정 중력 사용
  * @property {number} gravity             프레임당 낙하 칸 수 (1/60 = 1초에 1칸, 20 이상 = 20G). 모드가 레벨별 중력을 주면 그쪽이 우선
  * @property {"threeCorner" | "none"} tspin  T-spin 판정 방식
  * @property {"guideline" | "classic"} scoring  점수표
- * @property {null | { das: number, arr: number, sdf: number }} fixedHandling  개인 설정 대신 강제할 조작감(프레임)
+ * @property {null | { das: number, arr: number, sdf: number, dcd?: number, instantSoftDrop?: true }} fixedHandling  개인 설정 대신 강제할 조작감(프레임)
  * @property {boolean} irs   생성 순간 회전 버튼을 누르고 있으면 돌린 채로 생성
  * @property {boolean} ihs   생성 순간 홀드 버튼을 누르고 있으면 바로 홀드
  */

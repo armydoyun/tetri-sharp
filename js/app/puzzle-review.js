@@ -55,7 +55,13 @@ export const reconstructPuzzleReview = async (review, mode, rules) => {
     inputs: review.entry.inputs.filter(([step]) => step < steps),
     actions: review.entry.actions.filter(([step]) => step <= steps),
   };
-  const game = createGame({ mode, rules, seed: entry.seed, handling: toEngineHandling(entry.handling) });
+  const game = createGame({
+    mode,
+    rules,
+    seed: entry.seed,
+    handling: toEngineHandling(entry.handling),
+    legacyArsSpin: entry.arsSpinFacing !== true,
+  });
   const undo = createUndo();
   await replayRunJournal(entry, {
     applyInput(held, pressed) {

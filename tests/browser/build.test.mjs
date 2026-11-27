@@ -18,6 +18,7 @@ import { botDailyReplay } from "../helpers/daily.mjs";
 import { dateKey } from "../../js/modes/daily.js";
 import { verifyReplay } from "../../js/replay/replay.js";
 import { findMode } from "../../js/modes/index.js";
+import { decodeRules } from "../../js/rules/share.js";
 import { decodeReplayCode, encodeReplayCode } from "../../js/replay/share.js";
 
 let dir, html, result, server, url, browser;
@@ -678,6 +679,45 @@ test("Custom 규칙: 편집 내용이 저장되고 기록표 id가 바뀌며, �
   assert.equal(await text(page, "hud-pieces"), "0", "Custom에서 끈 하드 드롭은 동작하지 않는다");
   assert.deepEqual(errors, []);
   await context.close();
+});
+
+test("Custom 옵션: 고정 중력의 적용값이 메뉴에 보이고 180도·DCD·즉시 소프트 드롭을 공유한다", async () => {
+  const { context, page, errors } = await openPage(
+    () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" }, touch: "on" })),
+    undefined,
+    { viewport: { width: 390, height: 844 }, hasTouch: true }
+  );
+  try {
+    await page.click('[data-rules="custom"]');
+    const marathon = page.locator('[data-mode="marathon"]');
+    assert.equal(await marathon.getAttribute("aria-description"), "모드별 중력");
+    await page.click("#edit-rules");
+    await page.locator("#rule-allow180").uncheck();
+    await page.click('#rules-editor [data-value="고정·낙하"]');
+    await choose(page, "rule-gravityMode", "fixed");
+    await choose(page, "rule-gravity", "0");
+    await page.click('#rules-editor [data-value="조작"]');
+    await page.locator("#rule-fixedHandlingOn").check();
+    await page.locator("#rule-fixedHandling-instantSoftDrop").check();
+    assert.ok(await page.locator("#rule-fixedHandling-sdf").isDisabled());
+    await choose(page, "rule-fixedHandling-dcd", "3");
+    await page.click('#rules-editor [data-value="공유"]');
+    const exported = decodeRules(await page.locator("#rule-share-code").inputValue());
+    assert.equal(exported.allow180, false);
+    assert.equal(exported.gravityMode, "fixed");
+    assert.equal(exported.gravity, 0);
+    assert.equal(exported.fixedHandling.dcd, 3);
+    assert.equal(exported.fixedHandling.instantSoftDrop, true);
+    await page.click("#rules-close");
+    await page.waitForFunction(() => document.getElementById("active-rules")?.textContent.includes("0G"));
+    assert.match(await marathon.getAttribute("aria-description"), /0G/);
+    await marathon.click();
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    assert.ok(await page.locator('[data-touch="R180"]').isDisabled());
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
 });
 
 test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파일 저장 → 메뉴에서 열기", async () => {
@@ -4423,8 +4463,14 @@ test("휴대폰: 일시정지·결과 카드가 잘리지 않고, 리플레이 �
     await page.tap('[data-confirm="cancel"]');
     await page.tap('#pause [data-action="resume"]');
     await page.waitForFunction(() => document.body.dataset.screen === "play");
-    for (let i = 0; i < 40 && (await page.evaluate(() => document.body.dataset.screen)) !== "results"; i++)
-      await page.tap('[data-touch="HARD"]').catch(() => {});
+    const hardDrop = page.locator('[data-touch="HARD"]');
+    for (let i = 0; i < 40 && (await hardDrop.isVisible()); i++) {
+      try {
+        await hardDrop.tap({ timeout: 1000 });
+      } catch (error) {
+        if ((await page.evaluate(() => document.body.dataset.screen)) !== "results") throw error;
+      }
+    }
     await page.waitForFunction(() => document.body.dataset.screen === "results");
     assert.deepEqual(await reachable("#results .actions .btn"), [], `결과 버튼이 다 보인다 · ${where}`);
     assert.deepEqual(

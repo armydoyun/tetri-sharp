@@ -126,14 +126,30 @@ const RULE_FIELDS = [
   ["c", b => indexIn(Object.keys(SCORINGS), b.scoring), (b, v) => (b.scoring = Object.keys(SCORINGS)[+v])],
   [
     "f",
-    b => (b.fixedHandling ? `${b.fixedHandling.das}x${b.fixedHandling.arr}x${b.fixedHandling.sdf}` : "n"),
+    b => {
+      const fixed = b.fixedHandling;
+      if (!fixed) return "n";
+      const base = `${fixed.das}x${fixed.arr}x${fixed.sdf}`;
+      return fixed.dcd === undefined && !fixed.instantSoftDrop
+        ? base
+        : `${base}x${fixed.dcd ?? "n"}x${bit(fixed.instantSoftDrop)}`;
+    },
     (b, v) => {
-      const m = /^(\d+)x(\d+)x(\d+)$/.exec(v);
-      b.fixedHandling = m ? { das: +m[1], arr: +m[2], sdf: +m[3] } : null;
+      const m = /^(\d+)x(\d+)x(\d+)(?:x(\d+|n)x([01]))?$/.exec(v);
+      b.fixedHandling = m
+        ? {
+            das: +m[1],
+            arr: +m[2],
+            sdf: +m[3],
+            ...(m[4] && m[4] !== "n" ? { dcd: +m[4] } : {}),
+            instantSoftDrop: m[5] === "1",
+          }
+        : null;
     },
   ],
   ["i", b => bit(b.irs), (b, v) => (b.irs = v === "1")],
   ["j", b => bit(b.ihs), (b, v) => (b.ihs = v === "1")],
+  ["m", b => bit(b.allow180 !== false), (b, v) => (b.allow180 = v !== "0")],
 ];
 
 /** 블록이 있는 가장 높은 줄까지의 높이(아래에서부터, 빈 판은 0) @param {Uint8Array} cells */
@@ -289,6 +305,7 @@ export const searchOptions = puzzle => {
     lockNone: p.rules.lock.type === "none",
     tspin: p.rules.tspin,
     hold: p.rules.hold.enabled,
+    allow180: p.rules.allow180 !== false,
     // 판 비우기는 쌓을 수 있는 높이가 정해진다. 다른 목표는 처음 판의 높이 안에서 먼저 찾고 못 찾으면 보이는 판 전체로
     ...(p.goal.kind === "pc" ? { ceilingRows: Math.min(VISIBLE_ROWS, pcRows) } : { looseRows: VISIBLE_ROWS }),
   };
@@ -337,6 +354,7 @@ export const ruleSummary = puzzle => {
   if (r.previewCount !== DEFAULT_RULES.previewCount) parts.push(t("미리보기 {n}", { n: r.previewCount }));
   if (r.tspin === "none") parts.push(t("T-spin 없음"));
   if (!r.hardDrop) parts.push(t("하드 드롭 없음"));
+  if (r.allow180 === false) parts.push(t("180도 회전 없음"));
   if (r.lock.type === "none") parts.push(t("고정 지연 없음"));
   return parts.join(" · ");
 };
