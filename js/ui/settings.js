@@ -548,7 +548,7 @@ export const createSettingsUI = ({
       visual,
       ids: [...THEME_IDS, ...openedThemes()],
       getVolume: () => getSettings().volume,
-      onSelect: id => setVisual("theme", id),
+      onSelect: theme => update({ visual: { ...getSettings().visual, theme } }),
       onPreviewTheme,
     });
     if (!reducedMotion.matches) {

@@ -49,7 +49,11 @@
             </div>
           </section>
 
-          <a class="home-tools-link" href="#training-tools-title">연습·퍼즐·기록</a>
+          <nav class="home-shortcuts" aria-label="연습·퍼즐·기록">
+            <button id="quick-daily-puzzle" class="btn btn-small" type="button"><span class="btn-label">오늘의 퍼즐</span></button>
+            <button id="quick-puzzles" class="btn btn-small" type="button"><span class="btn-label">퍼즐</span></button>
+            <a class="home-tools-link" href="#training-tools-title">연습·기록</a>
+          </nav>
           <section class="home-block home-modes" aria-labelledby="mode-title">
             <div class="block-head">
               <h2 id="mode-title" class="section-title">플레이 모드</h2>
@@ -296,29 +300,31 @@
 
         <!-- 보드 아래 자리: 게임 중에는 터치 버튼, 리플레이 중에는 리플레이 조작 -->
         <div id="replay-bar" class="replay-bar" hidden>
-          <div class="replay-info">
-            <div class="replay-heading">
-              <span class="replay-tag">REPLAY</span>
-              <span id="replay-title" class="replay-title"></span>
-              <span id="replay-status" class="replay-status"></span>
+          <div class="replay-fixed">
+            <div class="replay-info">
+              <div class="replay-heading">
+                <span class="replay-tag">REPLAY</span>
+                <span id="replay-title" class="replay-title"></span>
+                <span id="replay-status" class="replay-status"></span>
+              </div>
+              <button type="button" class="btn btn-ghost" data-replay="exit"><span data-icon="close"></span><span class="btn-label">닫기</span></button>
             </div>
-            <button type="button" class="btn btn-ghost" data-replay="exit"><span data-icon="close"></span><span class="btn-label">닫기</span></button>
-          </div>
-          <p id="replay-note" class="replay-note" role="status"></p>
-          <dl id="replay-battle-tally" class="replay-battle-tally" hidden>
-            <div><dt>내가 받을 쓰레기</dt><dd id="replay-own-pending" class="num">0</dd></div>
-            <div><dt>CPU가 받을 쓰레기</dt><dd id="replay-cpu-pending" class="num">0</dd></div>
-          </dl>
-          <!-- 진행 막대: 눌러서 원하는 시점으로. 위에는 분석 표시(피네스 실수·오래 고민한 피스·주요 장면) -->
-          <div class="replay-timeline">
-            <div class="replay-track range">
-              <div id="replay-markers" class="replay-markers"></div>
-              <input id="replay-progress" type="range" min="0" max="1" step="1" value="0" aria-label="리플레이 위치" />
+            <p id="replay-note" class="replay-note" role="status"></p>
+            <dl id="replay-battle-tally" class="replay-battle-tally" hidden>
+              <div><dt>내가 받을 쓰레기</dt><dd id="replay-own-pending" class="num">0</dd></div>
+              <div><dt>CPU가 받을 쓰레기</dt><dd id="replay-cpu-pending" class="num">0</dd></div>
+            </dl>
+            <!-- 진행 막대: 눌러서 원하는 시점으로. 위에는 분석 표시(피네스 실수·오래 고민한 피스·주요 장면) -->
+            <div class="replay-timeline">
+              <div class="replay-track range">
+                <div id="replay-markers" class="replay-markers"></div>
+                <input id="replay-progress" type="range" min="0" max="1" step="1" value="0" aria-label="리플레이 위치" />
+              </div>
+              <span class="replay-clock num">
+                <span id="replay-time-width" aria-hidden="true"></span>
+                <span id="replay-time"></span>
+              </span>
             </div>
-            <span class="replay-clock num">
-              <span id="replay-time-width" aria-hidden="true"></span>
-              <span id="replay-time"></span>
-            </span>
           </div>
           <div class="replay-analysis">
             <div class="replay-annotations">
@@ -342,8 +348,9 @@
               <button type="button" class="btn btn-ghost num" data-replay="step-back" aria-label="한 프레임 뒤로"><span class="btn-label">-1F</span></button>
               <button type="button" class="btn btn-ghost num" data-replay="step" aria-label="한 프레임 앞으로"><span class="btn-label">+1F</span></button>
               <button type="button" class="btn btn-ghost" data-replay="restart"><span data-icon="restart"></span><span class="btn-label">처음부터</span></button>
+              <button id="replay-more" type="button" class="btn btn-ghost" aria-expanded="false" aria-controls="replay-actions"><span class="btn-label">도구</span><span data-icon="chevron-down"></span></button>
             </div>
-            <div class="replay-actions">
+            <div id="replay-actions" class="replay-actions">
               <button type="button" class="btn btn-ghost" data-replay="practice" hidden><span class="btn-label">장면 연습</span></button>
               <button type="button" class="btn btn-ghost" data-replay="share"><span data-icon="link"></span><span class="btn-label">공유</span></button>
               <button type="button" class="btn btn-ghost" data-replay="puzzle" title="이 장면으로 퍼즐 만들기" aria-label="이 장면으로 퍼즐 만들기"><span data-icon="edit"></span><span class="btn-label">퍼즐로</span></button>

@@ -856,8 +856,8 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
       };
 
       const toolHint = {
-        cell: t("누르거나 끌어서 칸을 채우고 지워요."),
-        row: t("누르거나 끌어서 줄 전체를 채우고 지워요."),
+        cell: t("누른 칸을 채우거나 지워요."),
+        row: t("누른 줄 전체를 채우거나 지워요."),
         garbage: t("누른 열만 빈 쓰레기 줄을 만들어요. 아래위로 끌면 같은 열에 구멍이 이어져요."),
       };
       const hint = el("p", { class: "field-help puzzle-editor-hint" });
@@ -960,7 +960,7 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
           ? t("직접 풀어 봤어요. 링크를 공유할 수 있어요.")
           : solvable
             ? t("풀 수 있는 퍼즐이에요. 링크를 공유할 수 있어요.")
-            : t("풀 수 있는지 확인하거나 시험 플레이에서 풀면 링크를 공유할 수 있어요.");
+            : t("풀이 확인·시험 성공 후 공유할 수 있어요.");
       };
       const renderPreview = () => {
         const moves = solution();
@@ -1106,11 +1106,26 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
         }
       };
       const cellAt = target => /** @type {HTMLElement | null} */ (target?.closest?.("[data-cell]"));
+      /** @param {number} index @param {Exclude<Tool, "piece">} paintTool */
+      const startStroke = (index, paintTool) => {
+        stroke = {
+          value: strokeValue(cells, paintTool, index),
+          before: snapshot(),
+          changed: false,
+          col: index % WIDTH,
+          last: -1,
+        };
+        paintAt(index);
+      };
+      const dragPaint = toggle({
+        id: "puzzle-drag-paint",
+        onChange: on => board.classList.toggle("is-touch-painting", on),
+      });
       board.addEventListener("pointerdown", event => {
         const cell = cellAt(event.target);
         if (!cell || event.button > 0) return;
-        // 풀이 판 위에서 시작한 터치 스크롤은 편집으로 돌아가는 탭과 구별한다.
-        if (viewStep !== null && event.pointerType === "touch") return;
+        // 터치는 탭이 끝난 다음에만 편집한다. 끌어 칠하기를 켜면 바로 붓질을 시작한다.
+        if (event.pointerType === "touch" && (viewStep !== null || !dragPaint.checked)) return;
         event.preventDefault();
         // 풀이를 보는 중에 판을 누르면 편집으로 돌아온다
         if (viewStep !== null) {
@@ -1120,15 +1135,8 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
         const index = Number(cell.dataset.cell);
         cell.focus({ preventScroll: true });
         if (tool === "piece") return doStamp(index);
-        stroke = {
-          value: strokeValue(cells, tool, index),
-          before: snapshot(),
-          changed: false,
-          col: index % WIDTH,
-          last: -1,
-        };
         board.setPointerCapture(event.pointerId);
-        paintAt(index);
+        startStroke(index, tool);
       });
       board.addEventListener("pointermove", event => {
         const cell = cellAt(document.elementFromPoint(event.clientX, event.clientY));
@@ -1149,22 +1157,16 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
         paintTiles();
       });
       for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) board.addEventListener(type, endStroke);
-      // 키보드(Enter·Space)로 누른 칸: 칸 하나에 도구를 한 번
+      // 키보드·터치 탭은 칸 하나에 도구를 한 번 적용한다.
       board.addEventListener("click", event => {
         const cell = cellAt(event.target);
         if (!cell) return;
         if (viewStep !== null) return closeSolution();
-        if (event.detail > 0) return;
+        const touchTap = event instanceof PointerEvent && event.pointerType === "touch";
+        if (event.detail > 0 && (!touchTap || dragPaint.checked)) return;
         const index = Number(cell.dataset.cell);
         if (tool === "piece") return doStamp(index);
-        stroke = {
-          value: strokeValue(cells, tool, index),
-          before: snapshot(),
-          changed: false,
-          col: index % WIDTH,
-          last: -1,
-        };
-        paintAt(index);
+        startStroke(index, tool);
         endStroke();
       });
       board.addEventListener("focusin", event => {
@@ -1434,6 +1436,7 @@ export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver
                 heights
               ),
               hint,
+              el("label", { class: "puzzle-touch-paint" }, dragPaint, t("끌어서 칠하기")),
               preview,
               el(
                 "div",

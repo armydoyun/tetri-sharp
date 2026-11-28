@@ -1,7 +1,7 @@
 import { t } from "../i18n/index.js";
 import { createThemeStage, drawThemeSwatch } from "../render/preview.js";
 import { findTheme, paletteFor, THEMES } from "../render/themes.js";
-import { button, choiceCards } from "./components.js";
+import { button, choiceCards, dropdown, setSegmented } from "./components.js";
 import { el } from "./dom.js";
 
 /**
@@ -21,19 +21,21 @@ export const createThemePicker = ({ visual, ids, getVolume, onSelect, onPreviewT
   const desc = el("small", { class: "theme-stage-desc" });
   const soundNotice = el("small", { id: "theme-sound-notice", class: "theme-stage-notice", role: "status" });
   const stage = createThemeStage(canvas);
+  let selected = visual.theme;
   let shown = null;
   const showTheme = id => {
-    if (id === shown) return;
-    shown = id;
-    const theme = findTheme(id);
-    stage.show(theme, paletteFor(visual, theme), visual);
-    name.textContent = theme.name;
-    desc.textContent = theme.description;
-    const current = id === visual.theme;
+    if (id !== shown) {
+      shown = id;
+      const theme = findTheme(id);
+      stage.show(theme, paletteFor(visual, theme), visual);
+      name.textContent = theme.name;
+      desc.textContent = theme.description;
+    }
+    const current = id === selected;
     state.textContent = current ? t("사용 중") : t("미리보기");
     state.classList.toggle("is-preview", !current);
   };
-  const restoreSelection = () => showTheme(visual.theme);
+  const restoreSelection = () => showTheme(selected);
   restoreSelection();
   const listen = button({
     label: t("소리 들어 보기"),
@@ -47,10 +49,29 @@ export const createThemePicker = ({ visual, ids, getVolume, onSelect, onPreviewT
         return;
       }
       soundNotice.textContent = "";
-      onPreviewTheme?.(visual.theme);
+      onPreviewTheme?.(selected);
     },
   });
   listen.addEventListener("focus", restoreSelection);
+  const selectTheme = id => {
+    if (id === selected) return;
+    selected = id;
+    setSegmented(cards, id);
+    choice.setValue(id);
+    choice.setAttribute("aria-label", choiceName());
+    restoreSelection();
+    onSelect(id);
+    if (choice.getClientRects().length) picker.scrollIntoView({ block: "nearest" });
+  };
+  const choice = dropdown({
+    id: "theme-choice",
+    label: t("게임 테마"),
+    options: ids.map(id => ({ value: id, label: THEMES[id].name })),
+    value: selected,
+    onChange: selectTheme,
+  });
+  const choiceName = () => `${t("게임 테마")} · ${THEMES[selected].name}`;
+  choice.setAttribute("aria-label", choiceName());
   const cards = choiceCards({
     id: "set-theme",
     label: t("게임 테마"),
@@ -60,8 +81,8 @@ export const createThemePicker = ({ visual, ids, getVolume, onSelect, onPreviewT
       drawThemeSwatch(swatch, THEMES[id], paletteFor(visual, THEMES[id]));
       return { value: id, title: THEMES[id].name, preview: swatch };
     }),
-    value: visual.theme,
-    onChange: onSelect,
+    value: selected,
+    onChange: selectTheme,
   });
   cards.querySelectorAll("button").forEach((card, index) => {
     const id = ids[index];
@@ -100,7 +121,8 @@ export const createThemePicker = ({ visual, ids, getVolume, onSelect, onPreviewT
         el("div", { class: "theme-stage-actions" }, listen, soundNotice)
       )
     ),
-    cards
+    cards,
+    el("div", { class: "theme-touch-choice" }, choice)
   );
   return { element: picker, stage };
 };
