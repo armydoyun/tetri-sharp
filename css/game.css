@@ -2319,7 +2319,7 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
 .mode-objective { max-width: 100%; overflow-wrap: anywhere; }
 
 @media (max-width: 720px) and (orientation: portrait) {
-  body.is-expedition {
+  body:is(.is-expedition, .is-time-shift) {
     --chrome-h: 240px;
   }
 }

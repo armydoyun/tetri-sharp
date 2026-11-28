@@ -6,6 +6,7 @@ import { createRunJournal, readSuspendedRun, replayRunJournal, SUSPENDED_RUN_KEY
 import { sanitizeSettings } from "../storage/settings.js";
 import { customPuzzleMode, decodePuzzle } from "../modes/custom-puzzle.js";
 import { packStageMode } from "../modes/puzzle-pack.js";
+import { TIME_SHIFT_ID, timeShiftMode, validTimeShiftMoves } from "../modes/time-shift.js";
 import { dailyPuzzleMode } from "../modes/daily-puzzle.js";
 import { formatTime } from "../modes/format.js";
 import { t } from "../i18n/index.js";
@@ -51,6 +52,10 @@ export const createRunSaver = ({ store, findMode, lessons, ask, saveInterval, li
 
   /** 저장된 판의 모드(연습 단계·만든 퍼즐 포함). 지금 버전에 없는 모드면 null */
   const runMode = entry => {
+    if (entry.mode === TIME_SHIFT_ID) {
+      if (entry.timeShiftPast == null) return timeShiftMode();
+      return validTimeShiftMoves(entry.timeShiftPast) ? timeShiftMode(entry.timeShiftPast) : null;
+    }
     if (entry.mode === "custom-puzzle") {
       if (entry.packStage) {
         const stage = packStageMode(entry.packStage.code, entry.packStage.index);
@@ -98,6 +103,7 @@ export const createRunSaver = ({ store, findMode, lessons, ask, saveInterval, li
       puzzle: mode.puzzleCode,
       dailyPuzzle: mode.dailyPuzzle,
       packStage: mode.packStage,
+      ...(mode.timeShift ? { timeShiftPast: mode.past } : {}),
       trial: Boolean(mode.trialCode),
       scene,
       resultPbSplits,

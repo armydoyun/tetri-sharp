@@ -109,7 +109,11 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     const queue = state?.queue ?? emptyQueue;
     const pending = Math.min(VISIBLE_ROWS, state?.garbage?.pending ?? 0);
     const hintCells =
-      state?.downstack?.hintCells ?? state?.buildLesson?.hintCells ?? state?.puzzle?.hintCells ?? state?.finesseTarget;
+      state?.downstack?.hintCells ??
+      state?.buildLesson?.hintCells ??
+      state?.puzzle?.hintCells ??
+      state?.finesseTarget ??
+      state?.timeShift?.preview?.cells;
     const lockTimer = active ? state.lock.timer : 0;
     // 퍼즐은 남은 피스만(움직이는 피스·홀드 칸 제외), 규칙의 미리보기 개수까지
     const shown = state?.puzzle
@@ -117,7 +121,9 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
           game?.rules.previewCount ?? 5,
           Math.max(0, state.puzzle.need - state.puzzle.placed - 1 - (state.hold ? 1 : 0))
         )
-      : game?.rules.previewCount;
+      : state?.timeShift
+        ? Math.min(game.rules.previewCount, Math.max(0, state.timeShift.turns - state.stats.pieces - (active ? 1 : 0)))
+        : game?.rules.previewCount;
 
     // 같은 엔진 프레임이라도 힌트나 화면 설정이 바뀔 수 있고, 반대로 프레임이 흘러도 보드는 그대로일 수 있다.
     const view = [
@@ -290,6 +296,7 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       ctx.strokeStyle = theme.board.ink;
       ctx.lineWidth = Math.max(2, cell / 12);
       ctx.setLineDash([cell / 5, cell / 8]);
+      if (state.timeShift) ctx.globalAlpha = 0.75;
       for (const [x, y] of hintCells) {
         ctx.strokeRect(bx + x * cell + 3, toY(y) + 3, cell - 6, cell - 6);
       }

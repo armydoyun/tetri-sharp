@@ -2,6 +2,24 @@
 // tests/unit/i18n.test.mjs가 코드와 index.html의 한국어 문장이 모두 여기 있는지 확인한다.
 /** @type {Record<string, string>} */
 export const EN = {
+  시간차: "Time Shift",
+  "시간차 · 첫 합주": "Time Shift · First duet",
+  "6수를 되감아 과거의 블록과 한 줄을 완성하세요.": "Rewind six moves and clear a line with your past pieces.",
+  "과거 블록으로 한 줄을 완성하세요. 점선은 예상 착지예요.":
+    "Clear a line with a past piece. The dashed outline shows where it will land.",
+  "첫 O를 왼쪽 끝에 놓고 6수를 기록하세요.": "Place the first O on the far left and record six moves.",
+  "두 번째 플레이": "Second pass",
+  "첫 번째 플레이": "First pass",
+  "6수를 기록했어요": "Six moves recorded",
+  "되감으면 과거의 수가 하나씩 돌아와요.": "Rewind to bring back your past moves one at a time.",
+  "과거 블록이 한 줄을 완성했어요!": "A past piece completed a line!",
+  "{n}번째 과거 블록이 들어갈 자리가 막혔어요.": "Past piece {n} has no room to enter.",
+  "과거 블록으로 줄을 완성하지 못했어요.": "No line was completed by a past piece.",
+  "지금 놓으면 과거 블록의 진입이 막혀요.": "Placing here would block the past piece.",
+  되감기: "Rewind",
+  "두 번째 플레이 다시 하기": "Retry second pass",
+  "처음부터 다시 하기": "Start from the beginning",
+
   "퍼즐 팩": "Puzzle packs",
   "퍼즐 팩 목록": "Puzzle packs",
   "퍼즐 팩 만들기": "Create puzzle pack",
