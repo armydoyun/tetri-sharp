@@ -173,17 +173,20 @@ export const createSettingsUI = ({
   let capture = null;
   const notice = el("p", { class: "notice-slot", role: "status", id: "settings-notice" });
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-  /** @type {ReturnType<typeof createThemePicker>["stage"] | null} */
+  /** @type {ReturnType<typeof createThemePicker> | null} */
   let themePreview = null;
+  let previewPlayback = null;
   const stopThemePreview = () => {
-    themePreview?.stop();
+    themePreview?.setPlaying(false);
     themePreview = null;
   };
   const syncThemePreview = () => {
-    if (!dialog.open || reducedMotion.matches) themePreview?.stop();
-    else themePreview?.play();
+    themePreview?.setPlaying(dialog.open && (previewPlayback ?? !reducedMotion.matches));
   };
-  reducedMotion.addEventListener("change", syncThemePreview);
+  reducedMotion.addEventListener("change", () => {
+    previewPlayback = null;
+    syncThemePreview();
+  });
 
   const update = patch => onChange({ ...getSettings(), ...patch });
 
@@ -552,8 +555,12 @@ export const createSettingsUI = ({
       getVolume: () => getSettings().volume,
       onSelect: theme => update({ visual: { ...getSettings().visual, theme } }),
       onPreviewTheme,
+      onTogglePlayback: () => {
+        previewPlayback = !(previewPlayback ?? !reducedMotion.matches);
+        syncThemePreview();
+      },
     });
-    themePreview = picker.stage;
+    themePreview = picker;
     return el(
       "section",
       { class: "field-section" },
@@ -1019,6 +1026,7 @@ export const createSettingsUI = ({
     if (capture) e.preventDefault();
   });
   dialog.addEventListener("close", () => {
+    previewPlayback = null;
     stopThemePreview();
     capture = null;
     notice.textContent = "";

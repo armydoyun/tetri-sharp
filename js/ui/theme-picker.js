@@ -1,7 +1,7 @@
 import { t } from "../i18n/index.js";
 import { createThemeStage, drawThemeSwatch } from "../render/preview.js";
 import { findTheme, paletteFor, THEMES } from "../render/themes.js";
-import { button, choiceCards, dropdown, setSegmented } from "./components.js";
+import { button, choiceCards, dropdown, iconButton, setSegmented } from "./components.js";
 import { el } from "./dom.js";
 
 /**
@@ -10,11 +10,12 @@ import { el } from "./dom.js";
  *   visual: import("../render/canvas.js").Visual,
  *   ids: readonly string[],
  *   getVolume: () => number,
+ *   onTogglePlayback: () => void,
  *   onSelect: (id: string) => void,
  *   onPreviewTheme?: (id: string) => void
  * }} options
  */
-export const createThemePicker = ({ visual, ids, getVolume, onSelect, onPreviewTheme }) => {
+export const createThemePicker = ({ visual, ids, getVolume, onSelect, onPreviewTheme, onTogglePlayback }) => {
   const canvas = el("canvas", { class: "theme-stage-canvas", "aria-hidden": "true" });
   const name = el("strong", { class: "theme-stage-name" });
   const state = el("span", { class: "theme-stage-state" });
@@ -37,6 +38,15 @@ export const createThemePicker = ({ visual, ids, getVolume, onSelect, onPreviewT
   };
   const restoreSelection = () => showTheme(selected);
   restoreSelection();
+  const playback = iconButton({
+    label: t("보드 동작 보기"),
+    icon: "play",
+    variant: "default",
+    size: "s",
+    id: "theme-play",
+    "aria-pressed": "false",
+    onClick: onTogglePlayback,
+  });
   const listen = button({
     label: t("소리 들어 보기"),
     icon: "sound",
@@ -118,11 +128,19 @@ export const createThemePicker = ({ visual, ids, getVolume, onSelect, onPreviewT
           // 같은 칸에 포개서 현재 너비에서 가장 긴 설명의 높이를 잡는다.
           ...ids.map(id => el("small", { "aria-hidden": "true", text: THEMES[id].description }))
         ),
-        el("div", { class: "theme-stage-actions" }, listen, soundNotice)
+        el("div", { class: "theme-stage-actions" }, playback, listen, soundNotice)
       )
     ),
     cards,
     el("div", { class: "theme-touch-choice" }, choice)
   );
-  return { element: picker, stage };
+  return {
+    element: picker,
+    setPlaying(playing) {
+      playback.setAttribute("aria-pressed", String(playing));
+      playback.classList.toggle("btn-primary", playing);
+      if (playing) stage.play();
+      else stage.stop();
+    },
+  };
 };
