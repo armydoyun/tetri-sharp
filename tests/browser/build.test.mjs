@@ -2210,6 +2210,7 @@ test("단일 HTML 파일을 처음부터 오프라인에서 열어 Sprint와 시
     await page.click(".logo-btn");
     await page.click('#confirm [data-confirm="ok"]');
     await page.click('[data-mode="time-shift-1"]');
+    await page.click('[data-time-shift-stage="time-shift-1"]');
     await page.keyboard.press("Space");
     await page.waitForFunction(() => document.getElementById("hud-lines")?.textContent === "1 / 6");
   } finally {
@@ -6149,6 +6150,7 @@ test("시간차: 기록을 되감고 첫 합주를 완성한 뒤 두 범위로 �
   const retry = page.locator('#results [data-action="retry"]');
   try {
     await page.click('[data-mode="time-shift-1"]');
+    await page.click('[data-time-shift-stage="time-shift-1"]');
     await advance();
     assert.equal(await text(page, "hud-lines-label"), "첫 번째 플레이");
     for (let i = 0; i < 4; i++) await press("ArrowLeft");
@@ -6212,6 +6214,7 @@ test("시간차: 모바일 세로·가로에서 터치로 풀고 보드와 안�
     };
     try {
       await page.tap('[data-mode="time-shift-1"]');
+      await page.tap('[data-time-shift-stage="time-shift-1"]');
       await advance();
       assert.equal(await text(page, "hud-lines-label"), first);
       assert.deepEqual(await page.evaluate(auditInPage), []);
@@ -6262,6 +6265,7 @@ test("시간차: 다섯 단계를 완주하고 이어하기와 백업으로 같�
   try {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.click(menuRow);
+    await page.click('[data-time-shift-stage="time-shift-1"]');
     for (const [index, solution] of timeShiftSolutions.entries()) {
       await advance();
       assert.equal(await text(page, "hud-lines-label"), "First pass");
@@ -6319,7 +6323,7 @@ test("시간차: 다섯 단계를 완주하고 이어하기와 백업으로 같�
     assert.match(await text(page, "results-main"), /sixth past piece/);
     await page.click('#results [data-action="menu"]');
     await page.locator("#time-shift-stages[open]").waitFor();
-    assert.equal(await page.locator("#time-shift-stages .menu-row:not(:disabled)").count(), 5);
+    assert.equal(await page.locator("#time-shift-stages [data-time-shift-stage]:not(:disabled)").count(), 5);
     assert.deepEqual(await page.evaluate(auditInPage), []);
     await page.keyboard.press("Escape");
     assert.match(await page.locator(menuRow).textContent(), /5 \/ 5 stages cleared/);
@@ -6366,6 +6370,7 @@ test("시간차: 게임패드로 놓고 되감아 다음 단계로 간다", asyn
   };
   try {
     await page.click('[data-mode="time-shift-1"]');
+    await page.click('[data-time-shift-stage="time-shift-1"]');
     await advance();
     for (let i = 0; i < 4; i++) await tap(14);
     for (let i = 0; i < 6; i++) await tap(12);
@@ -6389,6 +6394,7 @@ test("시간차: 저장된 단계 버전이 다르면 이유를 표시한다", a
   const { context, page } = await openPage();
   try {
     await page.click('[data-mode="time-shift-1"]');
+    await page.click('[data-time-shift-stage="time-shift-1"]');
     await page.click("#pause-game");
     await page.evaluate(() => {
       const key = "tetrisharp:run:suspended";
@@ -6424,6 +6430,7 @@ test("시간차 실패 결과: 상태가 크게 보이고 재도전 버튼과 �
     };
     try {
       await page.click('[data-mode="time-shift-1"]');
+      await page.click('[data-time-shift-stage="time-shift-1"]');
       await sixDrops();
       await page.click('#results [data-action="next-puzzle"]');
       await sixDrops();
@@ -6457,5 +6464,112 @@ test("시간차 실패 결과: 상태가 크게 보이고 재도전 버튼과 �
     } finally {
       await context.close();
     }
+  }
+});
+
+test("시간차 한 수 체험은 공식 진행을 건드리지 않고 두 배치의 차이를 보여 준다", async () => {
+  const { context, page, errors } = await openPage(null, undefined, {
+    frameClock: true,
+    viewport: { width: 360, height: 740 },
+    hasTouch: true,
+  });
+  const advance = () => page.evaluate(() => window.advanceFrame());
+  const tap = async action => {
+    await page.tap(`[data-touch="${action}"]`);
+    await advance();
+  };
+  try {
+    await page.tap('[data-mode="time-shift-1"]');
+    assert.match(await page.locator("#time-shift-stages .dialog-body").textContent(), /한 수 체험/);
+    assert.deepEqual(await page.evaluate(auditInPage), []);
+    await page.tap("#time-shift-demo");
+    await advance();
+    assert.match(await text(page, "mode-objective"), /점선/);
+    for (let i = 0; i < 4; i++) await tap("LEFT");
+    await tap("HARD");
+    assert.equal(await text(page, "results-title"), "실패");
+    await page.locator('#results [data-action="retry"]').tap();
+    await advance();
+    await tap("LEFT");
+    await tap("LEFT");
+    await tap("HARD");
+    assert.equal(await text(page, "results-title"), "성공!");
+    assert.equal(await page.evaluate(() => localStorage.getItem("tetrisharp:time-shift:progress")), null);
+    await page.locator('#results [data-action="next-puzzle"]').tap();
+    await advance();
+    assert.equal(await text(page, "hud-lines-label"), "첫 번째 플레이");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("시간차 친구 도전은 링크와 코드로 열리고 진행 중인 판을 보존할 수 있다", async () => {
+  const sender = await openPage(null, undefined, { frameClock: true });
+  const friend = await openPage(null, undefined, { frameClock: true, locale: "en-US" });
+  const advance = page => page.evaluate(() => window.advanceFrame());
+  const press = async (page, key) => {
+    await page.keyboard.press(key);
+    await advance(page);
+  };
+  const saved = page => page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:run:suspended")));
+  try {
+    await sender.page.click('[data-mode="time-shift-1"]');
+    await sender.page.click('[data-time-shift-stage="time-shift-1"]');
+    await advance(sender.page);
+    for (let i = 0; i < 4; i++) await press(sender.page, "ArrowLeft");
+    for (let i = 0; i < 6; i++) {
+      await press(sender.page, "Space");
+      await advance(sender.page);
+    }
+    await sender.page.click('#results [data-action="export"]');
+    const field = sender.page.locator("#time-shift-share-code");
+    const code = await field.inputValue();
+    assert.match(code, /^TS1-/);
+    await sender.page.click("#time-shift-copy-link");
+    const link = await field.inputValue();
+    assert.equal(new URL(link).hash, `#time-shift=${code}`);
+    await sender.page.click("#time-shift-close");
+    assert.equal(await text(sender.page, "results-title"), "6수를 기록했어요");
+
+    await friend.page.click('[data-mode="time-shift-1"]');
+    await friend.page.click('[data-time-shift-stage="time-shift-1"]');
+    await advance(friend.page);
+    await friend.page.click("#pause-game");
+    const original = await saved(friend.page);
+    await friend.page.goto(link);
+    await friend.page.click("#time-shift-accept");
+    await friend.page.click("#ask-cancel");
+    assert.equal((await saved(friend.page)).id, original.id);
+
+    await friend.page.click('[data-mode="time-shift-1"]');
+    await friend.page.click("#time-shift-paste");
+    const input = friend.page.locator("#time-shift-code");
+    await input.fill("TS1-invalid");
+    await input.press("Enter");
+    assert.match(await friend.page.locator("#time-shift-stages .notice-slot").textContent(), /Could not read/);
+    await input.fill(code);
+    await input.press("Enter");
+    await friend.page.click("#time-shift-accept");
+    await friend.page.click("#ask-ok");
+    await friend.page.waitForFunction(() => document.body.dataset.screen === "play");
+    await advance(friend.page);
+    assert.match(await text(friend.page, "session-title"), /Friend challenge/);
+    assert.equal(await text(friend.page, "hud-lines-label"), "Second pass");
+    await friend.page.click("#pause-game");
+    assert.equal((await saved(friend.page)).timeShiftSource, "friend");
+    await friend.page.reload();
+    await friend.page.click("#continue-run");
+    await friend.page.waitForFunction(() => document.body.dataset.screen === "play");
+    await advance(friend.page);
+    await press(friend.page, "ArrowLeft");
+    await press(friend.page, "ArrowLeft");
+    await press(friend.page, "Space");
+    assert.equal(await text(friend.page, "results-title"), "Solved!");
+    assert.equal(await friend.page.locator('#results [data-action="next-puzzle"]').isVisible(), false);
+    assert.equal(await friend.page.evaluate(() => localStorage.getItem("tetrisharp:time-shift:progress")), null);
+    assert.deepEqual([...sender.errors, ...friend.errors, ...sender.blocked, ...friend.blocked], []);
+  } finally {
+    await Promise.all([sender.context.close(), friend.context.close()]);
   }
 });

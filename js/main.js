@@ -86,7 +86,8 @@ import { sceneToPuzzle } from "./modes/puzzle-edit.js";
 import { createPuzzleEditor } from "./ui/puzzle-editor.js";
 import { createCustomPuzzles } from "./storage/custom-puzzles.js";
 import { createPuzzleUI } from "./ui/puzzles.js";
-import { TIME_SHIFT_ID, TIME_SHIFT_STAGES, timeShiftMode } from "./modes/time-shift.js";
+import { TIME_SHIFT_ID, TIME_SHIFT_STAGES, timeShiftDemo, timeShiftMode } from "./modes/time-shift.js";
+import { decodeTimeShiftChallenge, encodeTimeShiftChallenge } from "./modes/time-shift-share.js";
 import { createTimeShiftProgress } from "./storage/time-shift-progress.js";
 import { createTimeShiftUI } from "./ui/time-shift.js";
 import { decodePack, packStageMode } from "./modes/puzzle-pack.js";
@@ -606,9 +607,9 @@ const renderMenu = () => {
     menuRow({
       "data-mode": TIME_SHIFT_ID,
       title: t("시간차"),
-      desc: t("6수를 되감아 과거 블록과 함께 5개의 퍼즐을 푸세요."),
+      desc: t("과거의 배치와 맞춰 퍼즐 풀기 · 친구 도전"),
       meta: t("{n} / {total}단계 완료", { n: timeShiftCleared, total: TIME_SHIFT_STAGES.length }),
-      onClick: () => (timeShiftCleared ? timeShiftUI.open() : startTimeShift()),
+      onClick: () => timeShiftUI.open(),
     }),
     versusRow(),
     dailyRow()
@@ -958,9 +959,24 @@ const start = (
 
 let pausedFrom = /** @type {"play" | "countdown"} */ ("play");
 
-const startTimeShift = (stage = TIME_SHIFT_STAGES[0], past = null) => {
-  const m = timeShiftMode(past, stage);
+/** @param {Parameters<typeof timeShiftMode>[2]} source */
+const startTimeShift = (stage = TIME_SHIFT_STAGES[0], past = null, source = "official") => {
+  const m = timeShiftMode(past, stage, source);
   start(m, m.rules);
+};
+
+const timeShiftChallengeMoves = () => {
+  if (mode.timeShiftSource !== "official") return null;
+  if (game?.state.over === "rewind") return game.state.timeShift.moves;
+  return game?.state.over === "clear" ? mode.past : null;
+};
+
+const shareTimeShift = () => {
+  const code = encodeTimeShiftChallenge(mode.timeShift, timeShiftChallengeMoves());
+  if (!code) return;
+  const link = location.protocol.startsWith("http") ? new URL(location.href) : null;
+  if (link) link.hash = `time-shift=${code}`;
+  timeShiftUI.share(code, link?.href);
 };
 
 const rewindTimeShift = () => {
@@ -1208,6 +1224,7 @@ const anyDialogOpen = () =>
     helpUI,
     puzzleUI,
     shareUI,
+    timeShiftUI,
   ].some(ui => ui.isOpen) ||
   puzzleReviewDialog.open ||
   askDialog.open;
@@ -1407,7 +1424,8 @@ const finish = () => {
     practiceProgress.mark(mode.id, lessonHintState(state)?.usedHint);
   }
 
-  const timeShiftSaved = !mode.timeShift || state.over !== "clear" || timeShiftProgress.mark(mode.id);
+  const timeShiftSaved =
+    mode.timeShiftSource !== "official" || state.over !== "clear" || timeShiftProgress.mark(mode.id);
   if (state.over === "clear" && mode.expedition != null) {
     expeditionProgress.mark(mode.id, mode.earnsBonus(state));
   }
@@ -1454,9 +1472,10 @@ const finish = () => {
   const nextPuzzle = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="next-puzzle"]'));
   const hasNext = nextStage() || (mode.puzzle?.number && mode.puzzle.number < PUZZLES.length);
   nextPuzzle.hidden = reviewPractice || !(rewind || (hasNext && state.over === "clear"));
-  nextPuzzle.querySelector(".btn-label").textContent = rewind ? t("되감기") : t("다음 단계");
+  nextPuzzle.querySelector(".btn-label").textContent =
+    mode.timeShiftSource === "demo" ? t("첫 합주") : rewind ? t("되감기") : t("다음 단계");
   $("time-shift-reset")?.remove();
-  if (mode.timeShift && mode.past) {
+  if (mode.timeShiftSource === "official" && mode.past) {
     const stage = mode.timeShift;
     panels.results.querySelector('[data-action="menu"]').before(
       button({
@@ -1468,11 +1487,8 @@ const finish = () => {
     );
   }
   const retry = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="retry"]'));
-  retry.querySelector(".btn-label").textContent = mode.timeShift
-    ? mode.past
-      ? t("2차 재도전")
-      : t("처음부터")
-    : t("다시 하기");
+  retry.querySelector(".btn-label").textContent =
+    mode.timeShift && mode.timeShiftSource !== "demo" ? (mode.past ? t("2차 재도전") : t("처음부터")) : t("다시 하기");
   lastReplay = recorder ? recorder.finish(state) : null;
   const survivalRetry = $("survival-retry-seed");
   survivalRetry.hidden = !survival || !lastReplay;
@@ -1486,10 +1502,16 @@ const finish = () => {
   // 피스 몇 개 만에 막힌 판: 비율 값(PPS)은 뜻이 없고, 공유·"마지막 판"으로 남길 만한 판도 아니다(F11)
   const tooShort = isShortGame(state);
   const exportButton = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="export"]'));
-  exportButton.disabled = !mode.trialCode && (!lastReplay || Boolean(versus) || tooShort);
+  const shareChallenge = Boolean(timeShiftChallengeMoves());
+  exportButton.disabled = !shareChallenge && !mode.trialCode && (!lastReplay || Boolean(versus) || tooShort);
   exportButton.querySelector(".btn-label").textContent = mode.trialCode ? t("퍼즐 편집") : t("공유");
-  exportButton.setAttribute("aria-label", mode.trialCode ? t("퍼즐 편집·공유") : t("리플레이 공유"));
-  exportButton.title = mode.trialCode ? t("퍼즐 편집·공유") : t("리플레이 공유(링크·파일)");
+  const exportLabel = shareChallenge
+    ? t("시간차 도전 공유")
+    : mode.trialCode
+      ? t("퍼즐 편집·공유")
+      : t("리플레이 공유");
+  exportButton.setAttribute("aria-label", exportLabel);
+  exportButton.title = shareChallenge || mode.trialCode ? exportLabel : t("리플레이 공유(링크·파일)");
   if (lastReplay && !versus && !tooShort) {
     replays.saveLast(lastReplay);
     if (outcome && outcome.rank < MAX_RANKED)
@@ -1755,6 +1777,8 @@ const nextPracticeLesson = () =>
 const nextStage = () => {
   if (mode.packStage) return packStageMode(mode.packStage.code, mode.packStage.index + 1);
   if (mode.timeShift) {
+    if (mode.timeShiftSource === "demo") return timeShiftMode();
+    if (mode.timeShiftSource === "friend") return null;
     const stage = TIME_SHIFT_STAGES[TIME_SHIFT_STAGES.indexOf(mode.timeShift) + 1];
     return stage ? timeShiftMode(null, stage) : null;
   }
@@ -1896,9 +1920,15 @@ const timeShiftUI = createTimeShiftUI({
   dialog: timeShiftDialog,
   progress: timeShiftProgress,
   onStage: stage => startTimeShift(stage),
+  onDemo: () => {
+    const demo = timeShiftDemo();
+    start(demo, demo.rules);
+  },
+  onChallenge: ({ stage, moves }) => startTimeShift(stage, moves, "friend"),
 });
 timeShiftDialog.addEventListener("close", () => {
   if (screen === "menu") returnFocus(document.querySelector(`[data-mode="${TIME_SHIFT_ID}"]`));
+  if (screen === "results") returnFocus(panels.results.querySelector('[data-action="export"]:not(:disabled)'));
 });
 
 // ---- 퍼즐 ----
@@ -2330,6 +2360,7 @@ for (const btn of document.querySelectorAll("[data-action]")) {
       statsUI.open(game.state, `${mode.name} · ${rules.name}`, !!mode.splits && splits.length > 0);
     if (action === "export") {
       if (mode.trialCode) puzzleEditor.open();
+      else if (timeShiftChallengeMoves()) shareTimeShift();
       else if (lastReplay && !lastReplay.cpu) shareUI.open(lastReplay, `${mode.name} · ${rules.name}`);
     }
   });
@@ -2752,9 +2783,14 @@ renderKeyHelp();
 toMenu(true);
 const rulesHash = takeLinkHash("rules");
 if (rulesHash) importRulesFromLink(rulesHash);
+const timeShiftHash = takeLinkHash("time-shift");
 const packHash = takeLinkHash("pack");
 const puzzleHash = takeLinkHash("puzzle");
-if (packHash) {
+if (timeShiftHash) {
+  const challenge = decodeTimeShiftChallenge(timeShiftHash);
+  if (challenge) timeShiftUI.receive(challenge);
+  else showLinkError(t("링크의 시간차 도전을 읽을 수 없었어요."));
+} else if (packHash) {
   const code = new URLSearchParams(packHash.slice(1)).get("pack");
   if (!decodePack(code)) showLinkError(t("링크의 퍼즐 팩을 읽을 수 없었어요."));
   else {
@@ -2790,11 +2826,11 @@ if (
   });
 }
 
-// 이미 열려 있는 앱에서 공유 링크(#pack= · #puzzle= · #replay= · #daily= · #rules=)를 열면 주소의 해시만 바뀌고 페이지는 그대로다.
+// 이미 열려 있는 앱에서 공유 링크(#pack= · #puzzle= · #replay= · #daily= · #rules= · #time-shift=)를 열면 주소의 해시만 바뀌고 페이지는 그대로다.
 // 처음 열 때와 같은 흐름(진행 중인 판 저장·묻기, 받은 퍼즐 남기기 등)을 타도록 다시 불러온다.
 // 진행 중인 판은 이어서 하기로 저장돼 있고, 만들던 퍼즐은 내 퍼즐에 저장돼 있다.
 window.addEventListener("hashchange", () => {
-  if (/[#&](pack|puzzle|replay|daily|rules)=/.test(location.hash)) location.reload();
+  if (/[#&](pack|puzzle|replay|daily|rules|time-shift)=/.test(location.hash)) location.reload();
 });
 
 // 브라우저 테스트가 "앱이 끝까지 떴는지" 확인하는 표시.

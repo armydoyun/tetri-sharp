@@ -141,26 +141,37 @@ export const TIME_SHIFT_STAGES = [
 
 export const findTimeShiftStage = id => TIME_SHIFT_STAGES.find(stage => stage.id === id);
 
-/** @param {unknown} value */
+/** @param {unknown} value @returns {value is Move[]} */
 export const validTimeShiftMoves = (value, stage = TIME_SHIFT_STAGES[0]) =>
   Array.isArray(value) &&
   value.length === TURNS &&
-  value.every((move, index) => {
-    if (move?.type !== stage.recording[index] || !Number.isInteger(move.x) || ![0, 1, 2, 3].includes(move.rot))
-      return false;
+  stage.recording.every((type, index) => {
+    const move = value[index];
+    if (move?.type !== type || !Number.isInteger(move.x) || ![0, 1, 2, 3].includes(move.rot)) return false;
     return srs.cells(move.type, move.rot).every(([x]) => move.x + x >= 0 && move.x + x < WIDTH);
   });
 
-/** @param {Move[] | null} past */
-export const timeShiftMode = (past = null, stage = TIME_SHIFT_STAGES[0]) => {
+/** @param {Move[] | null} past @param {"official" | "friend" | "demo"} source */
+export const timeShiftMode = (past = null, stage = TIME_SHIFT_STAGES[0], source = "official") => {
   const echo = past !== null;
+  const demo = source === "demo";
+  const turns = demo ? 1 : TURNS;
   const goal = stage.goal();
   return {
     id: stage.id,
     timeShift: stage,
+    timeShiftSource: source,
     past,
-    name: t("시간차 · {stage}", { stage: stage.title() }),
-    description: echo ? `${goal} ${t("점선은 과거 블록의 착지예요.")}` : stage.recordHint(),
+    name: demo
+      ? t("한 수 체험")
+      : source === "friend"
+        ? t("친구 도전 · {stage}", { stage: stage.title() })
+        : t("시간차 · {stage}", { stage: stage.title() }),
+    description: demo
+      ? t("현재 O를 옮겨 점선이 바뀌는지 보고, 두 O로 아래 줄을 채우세요.")
+      : echo
+        ? `${goal} ${t("점선은 과거 블록의 착지예요.")}`
+        : stage.recordHint(),
     rules,
     sequence: echo ? stage.playing : stage.recording,
     hud: ["lines", "time"],
@@ -176,7 +187,7 @@ export const timeShiftMode = (past = null, stage = TIME_SHIFT_STAGES[0]) => {
       }
       state.timeShift = {
         past,
-        turns: TURNS,
+        turns,
         moves: [],
         activePosition: "",
         preview: null,
@@ -227,7 +238,7 @@ export const timeShiftMode = (past = null, stage = TIME_SHIFT_STAGES[0]) => {
       });
     },
     onFrame(state) {
-      if (!echo || !state.active || state.stats.pieces >= TURNS) return;
+      if (!echo || !state.active || state.stats.pieces >= turns) return;
       const active = state.active;
       const key = `${state.stats.pieces}:${active.x}:${active.y}:${active.rot}`;
       const shift = state.timeShift;
@@ -241,13 +252,13 @@ export const timeShiftMode = (past = null, stage = TIME_SHIFT_STAGES[0]) => {
     check(state) {
       if (state.timeShift.blocked) return { result: "echoBlocked" };
       if (state.timeShift.cleared) return { result: "clear" };
-      if (state.stats.pieces >= TURNS) return { result: echo ? "fail" : "rewind" };
+      if (state.stats.pieces >= turns) return { result: echo ? "fail" : "rewind" };
       return null;
     },
     hudLines(state) {
       return {
         label: echo ? t("두 번째 플레이") : t("첫 번째 플레이"),
-        value: `${state.stats.pieces} / ${TURNS}`,
+        value: `${state.stats.pieces} / ${turns}`,
       };
     },
     hudTime: state => ({ label: t("시간"), frames: state.frame }),
@@ -258,6 +269,11 @@ export const timeShiftMode = (past = null, stage = TIME_SHIFT_STAGES[0]) => {
           title: t("6수를 기록했어요"),
           detail: t("되감으면 시작 판으로 돌아가요. 현재 블록을 놓을 때마다 과거 블록 하나가 떨어져요."),
         };
+      if (demo) {
+        return state.over === "clear"
+          ? { title: t("성공!"), detail: t("현재 O와 과거 O가 빈칸 네 칸을 나눠 채웠어요.") }
+          : { title: t("실패"), detail: t("왼쪽에서 세 번째 칸에 현재 O의 왼쪽을 맞춰 보세요.") };
+      }
       if (state.over === "clear") return { title: t("성공!"), detail: stage.success() };
       const detail =
         state.over === "echoBlocked"
@@ -271,4 +287,10 @@ export const timeShiftMode = (past = null, stage = TIME_SHIFT_STAGES[0]) => {
       return { title: t("실패"), detail };
     },
   };
+};
+
+export const timeShiftDemo = () => {
+  const stage = TIME_SHIFT_STAGES[0];
+  const past = stage.recording.map((type, i) => ({ type, x: i === 0 ? 0 : 3, rot: 0 }));
+  return timeShiftMode(past, stage, "demo");
 };

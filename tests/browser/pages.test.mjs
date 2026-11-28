@@ -132,6 +132,7 @@ test("설치 캐시로 서버 장애와 오프라인 상태에서도 기록·리
     await offline.click("#go-home");
     await offline.click('#confirm [data-confirm="ok"]');
     await offline.click('[data-mode="time-shift-1"]');
+    await offline.click('[data-time-shift-stage="time-shift-1"]');
     await offline.keyboard.press("Space");
     await offline.waitForFunction(() => document.getElementById("hud-lines")?.textContent === "1 / 6");
     await offline.reload();

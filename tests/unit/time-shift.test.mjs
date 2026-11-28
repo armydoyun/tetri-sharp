@@ -1,9 +1,11 @@
+import { toBase64Url } from "../../js/core/base64url.js";
+import { decodeTimeShiftChallenge, encodeTimeShiftChallenge } from "../../js/modes/time-shift-share.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { HEIGHT, WIDTH, set } from "../../js/core/board.js";
 import { BTN, createGame } from "../../js/core/engine.js";
 import { GARBAGE } from "../../js/core/pieces.js";
-import { TIME_SHIFT_STAGES, timeShiftMode, validTimeShiftMoves } from "../../js/modes/time-shift.js";
+import { TIME_SHIFT_STAGES, timeShiftDemo, timeShiftMode, validTimeShiftMoves } from "../../js/modes/time-shift.js";
 
 import { timeShiftInputs, timeShiftSolutions } from "../helpers/time-shift-solutions.mjs";
 
@@ -135,3 +137,59 @@ for (const [index, stage] of TIME_SHIFT_STAGES.entries()) {
     }
   });
 }
+
+test("한 수 체험에서 같은 과거 블록이 현재 O의 위치에 따라 달라지는 높이에 착지한다", () => {
+  const mode = timeShiftDemo();
+  const game = createGame({ mode, rules: mode.rules });
+  game.step();
+  moveLeft(game, 2);
+  const beside = game.state.timeShift.preview;
+  moveLeft(game, 2);
+  const above = game.state.timeShift.preview;
+  assert.equal(beside.y, HEIGHT - 2);
+  assert.equal(above.y, HEIGHT - 4);
+  assert.equal(above.cells[0][0], beside.cells[0][0]);
+  assert.deepEqual(press(game, BTN.HARD).find(event => event.type === "echoLock").cells, above.cells);
+  assert.equal(game.state.over, "fail");
+  const retry = createGame({ mode, rules: mode.rules });
+  retry.step();
+  moveLeft(retry, 2);
+  press(retry, BTN.HARD);
+  assert.equal(retry.state.over, "clear");
+});
+
+test("친구 도전 코드와 링크는 단계 버전과 과거 6수를 그대로 옮긴다", () => {
+  for (const [index, stage] of TIME_SHIFT_STAGES.entries()) {
+    const first = play(null, stage);
+    for (let turn = 0; turn < 6; turn++) {
+      placeAt(first, timeShiftSolutions[index].record[turn]);
+      first.step();
+    }
+    const moves = first.state.timeShift.moves;
+    const code = encodeTimeShiftChallenge(stage, moves);
+    assert.ok(code.length < 100);
+    assert.deepEqual(decodeTimeShiftChallenge(code), { stage, moves });
+    assert.deepEqual(decodeTimeShiftChallenge(`https://example.org/game#time-shift=${code}`), { stage, moves });
+    assert.equal(encodeTimeShiftChallenge(stage, new Array(6)), null);
+  }
+});
+
+test("친구 도전은 알 수 없는 단계·버전, 잘못된 회전이나 열과 잘린 기록을 받지 않는다", () => {
+  const stage = TIME_SHIFT_STAGES[0];
+  const pairs = record().map(move => [move.x, move.rot]);
+  const rejected = [
+    ["unknown", stage.version, pairs],
+    [stage.id, stage.version + 1, pairs],
+    [stage.id, stage.version, pairs.slice(0, 5)],
+    [stage.id, stage.version, [[-9, 0], ...pairs.slice(1)]],
+    [stage.id, stage.version, [[0, 4], ...pairs.slice(1)]],
+    [stage.id, stage.version, [[0, 0, 1], ...pairs.slice(1)]],
+  ];
+  for (const value of rejected) {
+    const code = "TS1-" + toBase64Url(new TextEncoder().encode(JSON.stringify(value)));
+    assert.equal(decodeTimeShiftChallenge(code), null);
+  }
+  for (const code of ["", "TS2-valid", "TS1-+/", "TS1-" + "a".repeat(500)]) {
+    assert.equal(decodeTimeShiftChallenge(code), null);
+  }
+});
