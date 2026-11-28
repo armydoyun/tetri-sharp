@@ -728,14 +728,33 @@ body[data-screen="paused"] .countdown {
   display: none;
 }
 
-.results-main {
+.result-heading {
+  font-size: clamp(var(--text-3xl), 4vh, var(--text-5xl));
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.result-detail {
   margin: 0;
-  font-family: var(--font-num);
-  font-size: var(--text-5xl);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+  color: var(--text-dim);
+  font-size: var(--text-m);
+  font-weight: 500;
+  line-height: 1.45;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+}
+
+.result-metric {
+  margin: 0;
   color: var(--accent);
+  font-family: var(--font-num);
+  font-size: var(--text-2xl);
+  font-weight: 800;
+}
+
+.result-detail:empty,
+.result-metric:empty {
+  display: none;
 }
 
 /* 결과 숫자: 이름 | 값, 줄마다 가는 선 */
@@ -1414,14 +1433,6 @@ body[data-screen="replay"] .touchpad {
   --btn-px: var(--space-2);
 }
 
-.results-card .panel-title {
-  font-size: var(--text-2xl);
-}
-
-.results-main {
-  font-size: clamp(28px, 5.2vh, 40px);
-}
-
 .results-stats {
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
   column-gap: var(--space-3);
@@ -1811,7 +1822,13 @@ body.gestures-mode {
   order: -1;
 }
 
-#time-shift-reset { grid-column: 1 / -1; }
+body.is-time-shift .results-card [data-action="retry"] {
+  grid-column: 1 / -1;
+}
+
+body.is-time-shift .results-card #time-shift-reset {
+  --btn-px: var(--space-2);
+}
 
 /* ---- 키 입력 표시: 2줄 × 4칸, 누르고 있는 칸에 불 ---- */
 .input-display {
@@ -2552,11 +2569,6 @@ body[data-scene-practice] .race-panel {
   overscroll-behavior: contain;
 }
 
-.scene-result-content .panel-title {
-  font-size: var(--text-2xl);
-  line-height: 1.2;
-}
-
 .scene-result-content p {
   margin: 0;
 }
@@ -2582,11 +2594,6 @@ body[data-scene-practice] .race-panel {
 .scene-result-times dd {
   margin: var(--space-1) 0 0;
   font-size: var(--text-l);
-  font-weight: 700;
-}
-
-#scene-result-delta {
-  font-size: var(--text-m);
   font-weight: 700;
 }
 

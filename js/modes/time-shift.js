@@ -58,7 +58,7 @@ const beforeCurrentClear = (board, lock) => {
 
 /** @type {ReadonlyArray<{
  *   id: string, version: number, title: () => string, recordHint: () => string, goal: () => string,
- *   success: () => string, board: string[], recording: PieceType[], playing: PieceType[],
+ *   success: () => string, miss: () => string, board: string[], recording: PieceType[], playing: PieceType[],
  *   clears: (turn: Turn) => boolean,
  * }>} */
 export const TIME_SHIFT_STAGES = [
@@ -69,6 +69,7 @@ export const TIME_SHIFT_STAGES = [
     recordHint: () => t("첫 O를 왼쪽 끝에 놓고 6수를 기록하세요."),
     goal: () => t("과거 블록으로 한 줄을 완성하세요."),
     success: () => t("과거 블록이 한 줄을 완성했어요!"),
+    miss: () => t("과거 블록이 줄을 완성하지 못했어요."),
     board: ["....######"],
     recording: ["O", "I", "T", "J", "L", "S"],
     playing: ["O", "T", "I", "L", "Z", "J"],
@@ -81,6 +82,7 @@ export const TIME_SHIFT_STAGES = [
     recordHint: () => t("첫 O를 회색 칸 위에 놓고 6수를 기록하세요."),
     goal: () => t("먼저 줄을 지워 과거 블록을 더 아래에 떨어뜨리세요."),
     success: () => t("현재 블록이 길을 열어 과거 블록이 더 아래에 닿았어요!"),
+    miss: () => t("과거 블록이 줄 삭제로 더 아래에 떨어진 수가 없었어요."),
     board: ["....######"],
     recording: ["O", "T", "I", "L", "Z", "J"],
     playing: ["I", "O", "J", "S", "L", "T"],
@@ -97,6 +99,7 @@ export const TIME_SHIFT_STAGES = [
     recordHint: () => t("첫 I를 왼쪽 틈에 가로로 놓고 6수를 기록하세요."),
     goal: () => t("현재 블록을 받침으로 놓아 위쪽 줄을 과거 블록으로 채우세요."),
     success: () => t("과거 블록이 받침 위에 내려앉아 위쪽 줄을 채웠어요!"),
+    miss: () => t("과거 블록을 받침 위에 놓아 위쪽 줄을 완성하지 못했어요."),
     board: ["....######", "....#.....", "....#....."],
     recording: ["I", "O", "J", "T", "S", "L"],
     playing: ["O", "T", "L", "Z", "J", "I"],
@@ -115,6 +118,7 @@ export const TIME_SHIFT_STAGES = [
     recordHint: () => t("첫 I를 오른쪽 통로에 가로로 놓고 6수를 기록하세요."),
     goal: () => t("한 턴에 현재 블록과 과거 블록으로 각각 줄을 지우세요."),
     success: () => t("같은 턴에 현재 블록과 과거 블록이 각각 줄을 지웠어요!"),
+    miss: () => t("현재 블록과 과거 블록이 같은 턴에 각각 줄을 지우지 못했어요."),
     board: ["######....", "######...."],
     recording: ["I", "O", "J", "S", "T", "Z"],
     playing: ["I", "L", "T", "J", "O", "S"],
@@ -127,6 +131,7 @@ export const TIME_SHIFT_STAGES = [
     recordHint: () => t("두 플레이의 12개 블록으로 빈칸을 채울 계획을 세우세요."),
     goal: () => t("여섯 번째 과거 블록까지 놓아 판을 완전히 비우세요."),
     success: () => t("여섯 번째 과거 블록까지 놓아 판을 비웠어요!"),
+    miss: () => t("마지막 과거 블록이 떨어진 뒤 판에 블록이 남았어요."),
     board: ["........##"],
     recording: ["I", "J", "L", "O", "J", "L"],
     playing: ["I", "J", "L", "O", "J", "L"],
@@ -251,10 +256,10 @@ export const timeShiftMode = (past = null, stage = TIME_SHIFT_STAGES[0]) => {
       if (state.over === "rewind")
         return {
           title: t("6수를 기록했어요"),
-          main: t("되감으면 시작 판으로 돌아가요. 현재 블록을 놓을 때마다 과거 블록 하나가 떨어져요."),
+          detail: t("되감으면 시작 판으로 돌아가요. 현재 블록을 놓을 때마다 과거 블록 하나가 떨어져요."),
         };
-      if (state.over === "clear") return { title: t("성공!"), main: stage.success() };
-      const main =
+      if (state.over === "clear") return { title: t("성공!"), detail: stage.success() };
+      const detail =
         state.over === "echoBlocked"
           ? t("{n}번째 과거 블록의 진입이 막혔어요. 막힌 열: {columns}번.", {
               n: turn,
@@ -262,8 +267,8 @@ export const timeShiftMode = (past = null, stage = TIME_SHIFT_STAGES[0]) => {
             })
           : state.over === "blockOut" || state.over === "lockOut"
             ? t("{n}번째 현재 블록을 놓을 공간이 부족해요.", { n: turn + Number(state.over === "blockOut") })
-            : t("{n}턴 안에 목표를 달성하지 못했어요. {goal}", { n: turn, goal });
-      return { title: t("실패"), main };
+            : t("{n}턴 종료 · {reason}", { n: turn, reason: stage.miss() });
+      return { title: t("실패"), detail };
     },
   };
 };

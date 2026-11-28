@@ -73,7 +73,7 @@ test("과거 블록 진입이 막히면 다음 턴 없이 실패한다", () => {
   assert.equal(game.state.timeShift.preview, null);
   assert.ok(press(game, BTN.HARD).some(event => event.type === "finish" && event.result === "echoBlocked"));
   assert.equal(game.state.active, null);
-  assert.match(timeShiftMode(game.state.timeShift.past).summary(game.state).main, /1번째.*막힌 열: 1번/);
+  assert.match(timeShiftMode(game.state.timeShift.past).summary(game.state).detail, /1번째.*막힌 열: 1번/);
 });
 
 const inputs = { left: BTN.LEFT, right: BTN.RIGHT, rotate: BTN.R180, drop: BTN.HARD };

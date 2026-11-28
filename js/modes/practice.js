@@ -360,7 +360,7 @@ export const practiceMode = drill => {
     hudTime: state => ({ label: t("시간"), frames: state.frame }),
     summary: state => ({
       title: t("연습 끝"),
-      main:
+      metric:
         drill.success || drill.judge
           ? `${state.practice.success} / ${state.practice.tries}`
           : drill.finesse

@@ -151,7 +151,7 @@ export const versusMode = (level, style = "balanced") => {
     hudTime: state => ({ label: t("시간"), frames: state.frame }),
     summary: state => ({
       title: state.over === WIN ? t("승리!") : t("패배"),
-      main: formatTime(state.frame),
+      metric: formatTime(state.frame),
     }),
     record: Object.freeze({ metric: "frames", order: "asc" }),
     formatRecord: e => formatTime(e.frames),

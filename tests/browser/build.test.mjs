@@ -1768,7 +1768,8 @@ test("파내기 훈련: 단계 선택, 두 가지 힌트, 같은 판 재시작 �
     assert.match(await text(page, "downstack-status"), /피스를 놓을 수 있는/);
     await press("ArrowLeft");
     await press("Space");
-    assert.equal(await text(page, "results-title"), "쓰레기 줄이 남았어요");
+    assert.equal(await text(page, "results-title"), "실패");
+    assert.equal(await text(page, "results-main"), "쓰레기 줄이 남았어요");
 
     await page.click('#results [data-action="retry"]');
     await page.evaluate(() => window.advanceFrame());
@@ -1779,7 +1780,8 @@ test("파내기 훈련: 단계 선택, 두 가지 힌트, 같은 판 재시작 �
     assert.equal(await text(page, "downstack-status"), "");
     assert.equal(await text(page, "hud-lines"), "2");
     await press("Space");
-    assert.equal(await text(page, "results-title"), "쓰레기 줄을 모두 지웠어요!");
+    assert.equal(await text(page, "results-title"), "성공!");
+    assert.equal(await text(page, "results-main"), "쓰레기 줄을 모두 지웠어요!");
     await page.click('#results [data-action="next-puzzle"]');
     await page.evaluate(() => window.advanceFrame());
     assert.equal(await text(page, "hud-lines"), "4");
@@ -2343,7 +2345,7 @@ test("Survival 목표는 30초에 갱신되고, 같은 시드 재도전 결과�
     assert.ok(startTime.startsWith("0:30."));
     assert.ok(await visible(page, "hud-lines"));
     await topOut();
-    assert.equal(await text(page, "scene-result-title"), "구조 시도 결과");
+    assert.match(await text(page, "scene-result-title"), /^(더 버텼어요|덜 버텼어요|같은 시간)$/);
     assert.match(await text(page, "scene-result-best"), /막은 쓰레기 줄 차이/);
     await page.setViewportSize({ width: 560, height: 320 });
     for (const button of await page.locator("#scene-result .actions-row button").all()) {
@@ -2892,7 +2894,8 @@ test("피네스 훈련: 같은 문제를 더 적은 입력으로 다시 풀고 �
     await play();
     await page.waitForTimeout(50);
     await drop();
-    assert.equal(await text(page, "results-title"), "목표와 다른 칸에 놓았어요");
+    assert.equal(await text(page, "results-title"), "실패");
+    assert.equal(await text(page, "results-main"), "목표와 다른 칸에 놓았어요");
     assert.equal(await page.locator('[data-action="next-puzzle"]').isVisible(), false);
     assert.match(await text(page, "results-stats"), /F, Space/);
     await page.click('#results [data-action="retry"]');
@@ -3140,7 +3143,7 @@ test("Sprint 첫 결과에서 피네스 장면을 추천하고 같은 배치의 
     assert.equal(await page.locator("body").getAttribute("data-scene-practice"), "finesse");
     const result = page.locator("#scene-result");
     await input(["ArrowLeft", "Space"]);
-    assert.equal(await text(page, "scene-result-title"), "목표와 다른 칸에 놓았어요");
+    assert.equal(await text(page, "scene-result-title"), "실패");
     await result.locator('[data-action="scene-retry"]').click();
     await input(["Space"]);
     assert.equal(await text(page, "scene-result-original"), "2회 입력");
@@ -4463,7 +4466,7 @@ test("내 퍼즐·받은 퍼즐: 고치면 저절로 저장되고, 목록에서 
   ]);
   assert.ok(await page.locator("[data-made-link]").isDisabled(), "확인 전에는 링크를 보낼 수 없다");
 
-  // 목록에서 플레이 → 풀면 '직접 풀어 봄'이 저장되고, 결과의 '퍼즐 목록'은 내 퍼즐 탭
+  // 목록에서 플레이 → 풀면 '직접 풀어 봄'이 저장되고, 결과의 '목록으로'는 내 퍼즐 탭
   await page.click("[data-made-play]");
   await solve(page);
   assert.equal(await text(page, "session-title"), "첫 퍼즐");
@@ -5702,7 +5705,7 @@ test("업적: Custom 규칙 판은 결과에 '플레이 업적만 쌓여요'를 
   await context.close();
 });
 
-test("퍼즐 첫 수 보기와 목록으로: 힌트는 자리와 누를 순서를 보이고, 결과의 '퍼즐 목록'은 방금 한 단계에 포커스를 둔 목록을 연다", async () => {
+test("퍼즐 첫 수 보기와 목록으로: 힌트는 자리와 누를 순서를 보이고, 결과의 '목록으로'는 방금 한 단계에 포커스를 둔 목록을 연다", async () => {
   const { context, page, errors } = await openPage(
     () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } })),
     undefined,
@@ -5725,10 +5728,10 @@ test("퍼즐 첫 수 보기와 목록으로: 힌트는 자리와 누를 순서�
   assert.equal(await page.locator("#downstack-hint .btn-label").textContent(), "힌트 숨기기");
   await page.click("#downstack-hint");
   assert.equal(await text(page, "downstack-status"), "", "한 번 더 누르면 숨긴다");
-  // 결과에서 "퍼즐 목록" → 목록이 열리고 방금 한 단계에 포커스
+  // 결과에서 "목록으로" → 목록이 열리고 방금 한 단계에 포커스
   await runKeys(page, [["Space", 1]]);
   await page.waitForFunction(() => !document.getElementById("results")?.hidden);
-  assert.equal(await page.locator('#results [data-action="menu"] .btn-label').textContent(), "퍼즐 목록");
+  assert.equal(await page.locator('#results [data-action="menu"] .btn-label').textContent(), "목록으로");
   await page.click('#results [data-action="menu"]');
   // 목록은 클릭 처리가 끝난 뒤에 열린다. 이 판은 그리기 프레임을 멈춰 두었으니 시간 간격으로 기다린다
   await page.waitForFunction(() => document.getElementById("puzzles")?.open, null, { polling: 50 });
@@ -5738,7 +5741,7 @@ test("퍼즐 첫 수 보기와 목록으로: 힌트는 자리와 누를 순서�
   await context.close();
 });
 
-test("연습 목록으로: 연습 중 일시정지의 '연습 목록으로'는 그 연습 줄에 포커스를 둔 목록을 연다", async () => {
+test("연습 목록으로: 연습 중 일시정지의 '목록으로'는 그 연습 줄에 포커스를 둔 목록을 연다", async () => {
   const { context, page, errors } = await openPage(() =>
     localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
   );
@@ -5746,7 +5749,7 @@ test("연습 목록으로: 연습 중 일시정지의 '연습 목록으로'는 �
   await page.click('[data-drill="pc"]');
   await page.waitForFunction(() => document.body.dataset.screen === "play");
   await page.keyboard.press("Escape");
-  assert.equal(await page.locator('#pause [data-action="menu"] .btn-label').textContent(), "연습 목록으로");
+  assert.equal(await page.locator('#pause [data-action="menu"] .btn-label').textContent(), "목록으로");
   await page.click('#pause [data-action="menu"]');
   // 진행 중인 판이면 묻는다
   await page.waitForFunction(() => document.getElementById("confirm-title")?.textContent === "연습 목록으로 갈까요?");
@@ -5980,7 +5983,8 @@ test("규칙 원정: 단계 잠금, 보너스 클리어, 다음 단계, 같은 �
     await row(5).click();
     await advance();
     await play("ArrowUp", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "Space");
-    assert.equal(await text(page, "results-title"), "추가 목표까지 달성!");
+    assert.equal(await text(page, "results-title"), "성공!");
+    assert.equal(await text(page, "results-main"), "추가 목표 달성");
     assert.equal(await next.isVisible(), true);
 
     await page.setViewportSize({ width: 958, height: 951 });
@@ -6015,7 +6019,8 @@ test("규칙 원정: 단계 잠금, 보너스 클리어, 다음 단계, 같은 �
     assert.equal(await checkpoint(), saved);
 
     await play("ArrowRight", "ArrowRight", "ArrowRight", "Space");
-    assert.equal(await text(page, "results-title"), "추가 목표까지 달성!");
+    assert.equal(await text(page, "results-title"), "성공!");
+    assert.equal(await text(page, "results-main"), "추가 목표 달성");
     await page.keyboard.press("Escape");
     await page.locator("#expedition[open]").waitFor();
     assert.match(await row(6).textContent(), /추가 목표 달성/);
@@ -6330,6 +6335,7 @@ test("시간차: 다섯 단계를 완주하고 이어하기와 백업으로 같�
     await page.reload();
     await page.setInputFiles("#backup-file", file);
     await page.click("#ask-ok");
+    await page.waitForFunction(() => document.getElementById("menu-notice")?.textContent.includes("Backup loaded"));
     assert.match(await page.locator(menuRow).textContent(), /5 \/ 5 stages cleared/);
     assert.deepEqual(errors, []);
     assert.deepEqual(blocked, []);
@@ -6396,5 +6402,60 @@ test("시간차: 저장된 단계 버전이 다르면 이유를 표시한다", a
     assert.match(await text(page, "menu-notice"), /현재 버전과 맞지 않아요/);
   } finally {
     await context.close();
+  }
+});
+
+test("시간차 실패 결과: 상태가 크게 보이고 재도전 버튼과 단축키는 한 줄에 들어간다", async () => {
+  for (const { viewport, locale, hasTouch } of [
+    { viewport: { width: 958, height: 951 }, locale: "ko-KR", hasTouch: false },
+    { viewport: { width: 460, height: 575 }, locale: "ko-KR", hasTouch: false },
+    { viewport: { width: 360, height: 640 }, locale: "en-US", hasTouch: false },
+    { viewport: { width: 667, height: 375 }, locale: "en-US", hasTouch: true },
+  ]) {
+    const { context, page } = await openPage(null, undefined, { frameClock: true, viewport, locale, hasTouch });
+    const sixDrops = async () => {
+      for (let i = 0; i < 6; i++) {
+        await page.keyboard.press("Space");
+        await page.evaluate(() => {
+          window.advanceFrame();
+          window.advanceFrame();
+        });
+      }
+    };
+    try {
+      await page.click('[data-mode="time-shift-1"]');
+      await sixDrops();
+      await page.click('#results [data-action="next-puzzle"]');
+      await sixDrops();
+      const ko = locale === "ko-KR";
+      assert.match(await text(page, "results-title"), ko ? /^실패$/ : /^Fail/);
+      assert.match(await text(page, "results-main"), ko ? /6턴.*줄을 완성하지 못했어요/ : /6 turns.*completed a line/);
+      const size = id => page.locator(`#${id}`).evaluate(el => parseFloat(getComputedStyle(el).fontSize));
+      assert.ok((await size("results-title")) >= 1.5 * (await size("results-main")));
+      assert.equal(
+        await page.locator('#results [data-action="retry"] .btn-label').textContent(),
+        ko ? "2차 재도전" : "Retry pass 2"
+      );
+
+      const buttons = page.locator('#results [data-action="retry"], #time-shift-reset, #results [data-action="menu"]');
+      for (const button of await buttons.all()) {
+        const layout = await button.evaluate(el => {
+          const range = document.createRange();
+          range.selectNodeContents(el.querySelector(".btn-label"));
+          const text = range.getBoundingClientRect();
+          const bounds = el.getBoundingClientRect();
+          const key = el.querySelector(".keycap")?.getBoundingClientRect();
+          return {
+            lines: range.getClientRects().length,
+            fits: text.left >= bounds.left && text.right <= bounds.right,
+            clear: !key?.width || text.right <= key.left,
+          };
+        });
+        assert.deepEqual(layout, { lines: 1, fits: true, clear: true });
+      }
+      assert.deepEqual(await page.evaluate(auditInPage), []);
+    } finally {
+      await context.close();
+    }
   }
 });

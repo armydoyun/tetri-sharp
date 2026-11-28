@@ -1055,12 +1055,12 @@ const backList = () => {
 /** 결과·일시정지의 "첫 화면" 단추: 퍼즐·연습이면 "퍼즐 목록"·"연습 목록" */
 const updateBackLabels = () => {
   const back = backList();
+  const listLabel = back && (mode === rulesTrial ? back.label : t("목록으로"));
   /** @type {HTMLElement} */ (panels.results.querySelector('[data-action="menu"] .btn-label')).textContent =
-    mode.timeShift || mode.expedition != null ? t("목록으로") : (back?.label ?? t("첫 화면"));
+    listLabel || t("첫 화면");
   if (!sceneView.current)
-    /** @type {HTMLElement} */ (panels.pause.querySelector('[data-action="menu"] .btn-label')).textContent = back
-      ? t("{list}으로", { list: back.label })
-      : t("첫 화면으로");
+    /** @type {HTMLElement} */ (panels.pause.querySelector('[data-action="menu"] .btn-label')).textContent =
+      listLabel || t("첫 화면으로");
 };
 
 /** 첫 화면으로 — 퍼즐·연습이면 그 목록을 위에 연다 */
@@ -1461,19 +1461,17 @@ const finish = () => {
     panels.results.querySelector('[data-action="menu"]').before(
       button({
         id: "time-shift-reset",
-        label: t("처음부터 다시 하기"),
+        label: t("처음부터"),
         icon: "restart",
-        wrap: true,
         onClick: () => startTimeShift(stage),
       })
     );
   }
   const retry = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="retry"]'));
-  retry.classList.toggle("btn-wrap", Boolean(mode.timeShift));
   retry.querySelector(".btn-label").textContent = mode.timeShift
     ? mode.past
-      ? t("두 번째 플레이 다시 하기")
-      : t("처음부터 다시 하기")
+      ? t("2차 재도전")
+      : t("처음부터")
     : t("다시 하기");
   lastReplay = recorder ? recorder.finish(state) : null;
   const survivalRetry = $("survival-retry-seed");
@@ -1501,9 +1499,14 @@ const finish = () => {
 
   $("results-mode").textContent = `${mode.name} · ${rules.name}`;
   const summary = mode.summary(state);
+  const detail = reviewPractice
+    ? t("마지막 수 연습")
+    : failedPuzzleMove
+      ? reviewReason(mode.puzzle, failedPuzzleMove)
+      : summary.detail || (["blockOut", "lockOut"].includes(state.over) ? t("피스를 놓을 공간이 부족했어요.") : "");
   $("results-title").textContent = summary.title;
-  $("results-main").textContent = reviewPractice ? t("마지막 수 연습") : summary.main;
-  if (!mode.lesson && !survival && !mode.battleLesson) say(`${summary.title} ${summary.main}`);
+  $("results-metric").textContent = summary.metric ?? "";
+  $("results-main").textContent = detail;
   fb.clearAction();
   countdownEl.hidden = true;
   $("results-badge").classList.toggle("is-invisible", !outcome?.isBest);
@@ -1531,7 +1534,7 @@ const finish = () => {
       : "";
   const timeShiftNote = timeShiftSaved ? "" : t("시간차 완료 진행도를 저장하지 못했어요.");
   $("race-result").textContent = [resultNote, packNote, shortNote, timeShiftNote].filter(Boolean).join(" · ");
-  if (survival || mode.battleLesson) say(`${summary.title} ${summary.main}. ${resultNote}`);
+  if (!mode.lesson) say([summary.title, summary.metric, detail, resultNote].filter(Boolean).join(" "));
 
   const seconds = state.frame / 60;
   if (mode.versus && versus) {

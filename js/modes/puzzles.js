@@ -382,7 +382,6 @@ export const makePuzzleMode = (puzzle, rules = MODERN) => {
     hudTime: state => ({ label: t("시간"), frames: state.frame }),
     summary: state => ({
       title: state.over === "clear" ? t("성공!") : t("실패"),
-      main: puzzle.number ? t("단계 {n}", { n: puzzle.number }) : t("만든 퍼즐"),
     }),
     record: Object.freeze({ metric: "frames", order: "asc" }),
     formatRecord: () => "",

@@ -107,7 +107,7 @@ export const BUILD_LESSONS = Object.freeze(
       hudTime: state => ({ label: t("시간"), frames: state.frame }),
       isRecordable: () => false,
       formatRecord: () => "",
-      summary: state => ({ main: exercise.name, title: state.over === "clear" ? t("성공!") : t("실패") }),
+      summary: state => ({ title: state.over === "clear" ? t("성공!") : t("실패") }),
     });
   })
 );

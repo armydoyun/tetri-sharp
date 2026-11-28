@@ -47,11 +47,17 @@ export const EN = {
   "{n}번째 과거 블록의 진입이 막혔어요. 막힌 열: {columns}번.":
     "Past piece {n} was blocked at the top in columns {columns}.",
   "{n}번째 현재 블록을 놓을 공간이 부족해요.": "Present piece {n} ran out of space.",
-  "{n}턴 안에 목표를 달성하지 못했어요. {goal}": "The goal was missed after {n} turns. {goal}",
+  "{n}턴 종료 · {reason}": "{n} turns played · {reason}",
+  "과거 블록이 줄을 완성하지 못했어요.": "No past piece completed a line.",
+  "과거 블록이 줄 삭제로 더 아래에 떨어진 수가 없었어요.": "No past piece fell farther because of a line clear.",
+  "과거 블록을 받침 위에 놓아 위쪽 줄을 완성하지 못했어요.":
+    "A past piece on the platform did not complete the upper row.",
+  "현재 블록과 과거 블록이 같은 턴에 각각 줄을 지우지 못했어요.":
+    "The present and past pieces did not each clear a line on the same turn.",
+  "마지막 과거 블록이 떨어진 뒤 판에 블록이 남았어요.": "Blocks remained after the last past piece landed.",
   "지금 놓으면 과거 블록의 진입이 막혀요.": "Placing here would block the past piece.",
   되감기: "Rewind",
-  "두 번째 플레이 다시 하기": "Retry second pass",
-  "처음부터 다시 하기": "Start from the beginning",
+  "2차 재도전": "Retry pass 2",
 
   "퍼즐 팩": "Puzzle packs",
   "퍼즐 팩 목록": "Puzzle packs",
@@ -344,6 +350,9 @@ export const EN = {
   "공격 {attack}줄 · 상쇄 {blocked}줄 · 상대에게 {sent}줄": "Attack {attack} · Canceled {blocked} · Sent {sent}",
   "막히기 전 다시 해보기": "Retry before top-out",
   "Survival 구조 연습": "Survival rescue practice",
+  "더 버텼어요": "Survived longer",
+  "덜 버텼어요": "Survived less",
+  "같은 시간": "Same time",
   "구조 시도 결과": "Rescue attempt",
   "원래 판보다 {time}초 더 버텼어요.": "Survived {time}s longer than the original.",
   "원래 판보다 {time}초 덜 버텼어요.": "Survived {time}s less than the original.",
@@ -612,6 +621,7 @@ export const EN = {
   "변경은 즉시 저장되며, 규칙 조합마다 기록을 따로 보관해요.":
     "Changes save automatically. Each rule set keeps its own records.",
   "최고 기록과 달리기": "Race my best",
+  "같은 순서로 다시": "Retry same order",
   "같은 블록 순서로 재시작": "Retry same blocks",
   "규칙 · {name}": "Rules · {name}",
   "받은 사람이 링크를 열면 바로 재생할 수 있어요.": "Anyone who opens the link can watch this replay.",

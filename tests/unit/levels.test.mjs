@@ -89,5 +89,5 @@ test("Master 등급: 100레벨마다 9급 → 1급, 900부터 초단, 999는 마
   assert.equal(masterGrade(998), "초단");
   assert.equal(masterGrade(999), "마스터");
   assert.equal(MASTER.formatRecord({ level: 512 }), "레벨 512 · 4급");
-  assert.equal(MASTER.summary({ level: 999, over: "clear" }).main, "레벨 999 · 마스터");
+  assert.equal(MASTER.summary({ level: 999, over: "clear" }).metric, "레벨 999 · 마스터");
 });
