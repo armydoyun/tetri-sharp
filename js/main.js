@@ -86,6 +86,9 @@ import { sceneToPuzzle } from "./modes/puzzle-edit.js";
 import { createPuzzleEditor } from "./ui/puzzle-editor.js";
 import { createCustomPuzzles } from "./storage/custom-puzzles.js";
 import { createPuzzleUI } from "./ui/puzzles.js";
+import { decodePack, packStageMode } from "./modes/puzzle-pack.js";
+import { createPuzzlePacks, MAX_PACKS } from "./storage/puzzle-packs.js";
+import { createPuzzlePacksUI } from "./ui/puzzle-packs.js";
 import { createShareUI } from "./ui/share.js";
 import { createVersusUI } from "./ui/versus.js";
 import { lang, t, translateDom } from "./i18n/index.js";
@@ -969,6 +972,10 @@ const backList = () => {
     const { key } = mode.dailyPuzzle;
     return { label: t("오늘의 퍼즐"), open: () => dailyPuzzleUI.open(key) };
   }
+  if (mode.packStage) {
+    const { code, index } = mode.packStage;
+    return { label: t("퍼즐 팩"), open: () => puzzlePacksUI.details(code, index) };
+  }
   const number = mode.puzzle?.number;
   if (number) return { label: t("퍼즐 목록"), open: () => puzzleUI.open(number) };
   // 만든 퍼즐: 시험 플레이·내 퍼즐이면 내 퍼즐 목록, 받은 퍼즐이면 받은 퍼즐 목록
@@ -1373,9 +1380,12 @@ const finish = () => {
   // 퍼즐: 깬 단계를 남기고, 깼으면 "다음 단계"를 보인다(마지막 단계면 다시 하기만)
   if (!reviewPractice && mode.puzzle?.number && state.over === "clear") puzzleProgress.markCleared(mode.puzzle.id);
   if (!reviewPractice && mode.dailyPuzzle && state.over === "clear") dailyPuzzleProgress.mark(mode.dailyPuzzle.key);
+  const packStage = mode.packStage;
+  const packSaved =
+    !packStage || reviewPractice || state.over !== "clear" || puzzlePacks.markCleared(packStage.code, packStage.index);
   if (!reviewPractice && mode.trialCode && state.over === "clear") puzzleEditor.markCleared(mode.trialCode);
   // 받은 퍼즐: 풀었는지·가장 빠른 시간·첫 수 보기를 썼는지
-  if (!reviewPractice && mode.puzzleCode && !mode.trialCode && !mode.dailyPuzzle)
+  if (!reviewPractice && mode.puzzleCode && !mode.trialCode && !mode.dailyPuzzle && !mode.packStage)
     customs.recordReceived(mode.puzzleCode, {
       solved: state.over === "clear",
       hinted: Boolean(state.puzzle?.hinted),
@@ -1437,10 +1447,16 @@ const finish = () => {
         ? raceResultText(state, race.target.best, race.target.friend)
         : "";
   const shortNote =
-    tooShort && !mode.trialCode && mode.expedition == null
+    tooShort && !mode.trialCode && !mode.packStage && mode.expedition == null
       ? t("너무 일찍 끝난 판이라 공유하지 않고 마지막 판으로 남기지 않아요")
       : "";
-  $("race-result").textContent = [resultNote, shortNote].filter(Boolean).join(" · ");
+  const pack = packStage && puzzlePacks.find(packStage.code);
+  const packNote = !packSaved
+    ? t("퍼즐 팩을 저장하지 못했어요.")
+    : pack
+      ? t("{n} / {total}단계 완료", { n: pack.cleared.length, total: pack.pack.puzzles.length })
+      : "";
+  $("race-result").textContent = [resultNote, packNote, shortNote].filter(Boolean).join(" · ");
   if (survival || mode.battleLesson) say(`${summary.title} ${summary.main}. ${resultNote}`);
 
   const seconds = state.frame / 60;
@@ -1659,7 +1675,10 @@ const nextPracticeLesson = () =>
             : mode.lesson
               ? FINESSE_LESSONS[mode.lesson.index + 1]
               : null;
-const nextStage = () => (mode.expedition != null ? EXPEDITION_STAGES[mode.expedition + 1] : nextPracticeLesson());
+const nextStage = () => {
+  if (mode.packStage) return packStageMode(mode.packStage.code, mode.packStage.index + 1);
+  return mode.expedition != null ? EXPEDITION_STAGES[mode.expedition + 1] : nextPracticeLesson();
+};
 const downstackHint = $("downstack-hint");
 // 이름만 바꾼다(단추 안의 단축키 표시는 그대로)
 const hintLabel = /** @type {HTMLElement} */ (downstackHint.querySelector(".btn-label"));
@@ -1833,6 +1852,18 @@ const playCustomPuzzle = (code, trial = false) => {
 };
 /** 내 퍼즐·받은 퍼즐(이 기기) */
 const customs = createCustomPuzzles(store);
+const puzzlePacks = createPuzzlePacks(store);
+const puzzlePacksDialog = /** @type {HTMLDialogElement} */ ($("puzzle-packs"));
+const puzzlePacksUI = createPuzzlePacksUI({
+  dialog: puzzlePacksDialog,
+  packs: puzzlePacks,
+  customs,
+  onPlay(code, index) {
+    const stage = packStageMode(code, index);
+    if (stage) start(stage, stage.rules);
+  },
+});
+bindPuzzleOpeners(puzzlePacksDialog, ["open-puzzle-packs"], puzzlePacksUI.open);
 const puzzleEditor = createPuzzleEditor({
   dialog: puzzleDialog,
   comparisonDialog: /** @type {HTMLDialogElement} */ ($("puzzle-comparison")),
@@ -2624,8 +2655,22 @@ renderKeyHelp();
 toMenu(true);
 const rulesHash = takeLinkHash("rules");
 if (rulesHash) importRulesFromLink(rulesHash);
+const packHash = takeLinkHash("pack");
 const puzzleHash = takeLinkHash("puzzle");
-if (puzzleHash) {
+if (packHash) {
+  const code = new URLSearchParams(packHash.slice(1)).get("pack");
+  if (!decodePack(code)) showLinkError(t("링크의 퍼즐 팩을 읽을 수 없었어요."));
+  else {
+    const entry = puzzlePacks.add(code);
+    if (entry) puzzlePacksUI.details(entry.code);
+    else
+      showLinkError(
+        puzzlePacks.read().length >= MAX_PACKS
+          ? t("퍼즐 팩은 {n}개까지 저장할 수 있어요.", { n: MAX_PACKS })
+          : t("퍼즐 팩을 저장하지 못했어요.")
+      );
+  }
+} else if (puzzleHash) {
   // 링크로 받은 퍼즐은 받은 퍼즐 목록에 남긴다(내가 만든 퍼즐이면 남기지 않는다)
   const code = new URLSearchParams(puzzleHash.slice(1)).get("puzzle");
   if (code && decodePuzzle(code)) customs.receive(code);
@@ -2648,11 +2693,11 @@ if (
   });
 }
 
-// 이미 열려 있는 앱에서 공유 링크(#puzzle= · #replay= · #daily= · #rules=)를 열면 주소의 해시만 바뀌고 페이지는 그대로다.
+// 이미 열려 있는 앱에서 공유 링크(#pack= · #puzzle= · #replay= · #daily= · #rules=)를 열면 주소의 해시만 바뀌고 페이지는 그대로다.
 // 처음 열 때와 같은 흐름(진행 중인 판 저장·묻기, 받은 퍼즐 남기기 등)을 타도록 다시 불러온다.
 // 진행 중인 판은 이어서 하기로 저장돼 있고, 만들던 퍼즐은 내 퍼즐에 저장돼 있다.
 window.addEventListener("hashchange", () => {
-  if (/[#&](puzzle|replay|daily|rules)=/.test(location.hash)) location.reload();
+  if (/[#&](pack|puzzle|replay|daily|rules)=/.test(location.hash)) location.reload();
 });
 
 // 브라우저 테스트가 "앱이 끝까지 떴는지" 확인하는 표시.

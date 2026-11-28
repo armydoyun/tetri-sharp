@@ -6029,3 +6029,77 @@ test("규칙 원정: 작은 터치 화면에서 긴 목표와 보드·조작이 
     }
   }
 });
+
+test("퍼즐 팩: 휴대폰에서 만들고 순서를 바꿔 공유한 뒤, 받은 사람이 이어서 풀 수 있다", async () => {
+  const cells = new Uint8Array(PUZZLE_CELLS);
+  cells.fill(1, cells.length - 10);
+  cells.fill(0, cells.length - 7, cells.length - 3);
+  const made = ["첫 판", "두 번째 판"].map((title, index) => ({
+    id: `pack-fixture-${index}`,
+    code: encodePuzzle({ cells, pieces: "I", title, base: "modern" }),
+  }));
+  const { context, page, errors } = await openPage(
+    entries => {
+      localStorage.setItem("tetrisharp:customPuzzles", JSON.stringify({ made: entries }));
+      Object.defineProperty(navigator, "clipboard", {
+        value: {
+          writeText: async link => {
+            window.copiedPack = link;
+          },
+        },
+      });
+    },
+    made,
+    { viewport: { width: 390, height: 844 }, hasTouch: true }
+  );
+  const received = await browser.newContext({ locale: "ko-KR" });
+  try {
+    await page.tap("#open-puzzle-packs");
+    await page.tap("#pack-create");
+    await page.locator("#pack-title").fill("친구와 도전");
+    for (const item of made) {
+      await page.locator("#pack-add-stage").scrollIntoViewIfNeeded();
+      await page.tap("#pack-add-stage");
+      await page.tap(`#pack-add-stage-list [data-value="${item.id}"]`);
+    }
+    await page.tap("#pack-up-pack-fixture-1");
+    await page.tap("#pack-save");
+    assert.match(await page.locator("#pack-stage-0").textContent(), /두 번째 판/);
+    assert.deepEqual(await page.evaluate(auditInPage), []);
+    await page.tap("#pack-share");
+    const link = await page.evaluate(() => window.copiedPack);
+    assert.match(link, /#pack=1\./);
+    assert.deepEqual(errors, []);
+
+    await received.addInitScript(() =>
+      localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+    );
+    const friend = await received.newPage();
+    await friend.goto(link);
+    await friend.locator("#pack-stage-0").click();
+    await friend.waitForFunction(() => document.body.dataset.screen === "play");
+    await friend.reload();
+    await friend.locator("#continue-run").click();
+    await friend.waitForFunction(() => document.body.dataset.screen === "play");
+    for (const stage of [0, 1]) {
+      await friend.waitForTimeout(100);
+      await friend.keyboard.press("Space");
+      await friend.locator('#results [data-action="menu"]').waitFor();
+      assert.match(await friend.locator("#race-result").textContent(), new RegExp(`${stage + 1} / 2단계 완료`));
+      const next = friend.locator('[data-action="next-puzzle"]');
+      assert.equal(await next.isVisible(), stage === 0);
+      if (stage === 0) await next.click();
+    }
+    await friend.locator('#results [data-action="menu"]').click();
+    await friend.locator("#pack-progress").waitFor();
+    assert.equal(await friend.locator("#pack-progress").textContent(), "2 / 2단계 완료");
+    await friend.goto(link);
+    await friend.locator("#pack-progress").waitFor();
+    assert.equal(await friend.locator("#pack-progress").textContent(), "2 / 2단계 완료");
+    await friend.goto(url + "#pack=invalid");
+    await friend.waitForFunction(() => !location.hash);
+    assert.match(await friend.locator("#menu-notice").textContent(), /퍼즐 팩을 읽을 수 없었어요/);
+  } finally {
+    await Promise.all([context.close(), received.close()]);
+  }
+});
