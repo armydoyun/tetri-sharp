@@ -3,6 +3,7 @@ import { createThemeStage, drawThemeSwatch } from "../render/preview.js";
 import { findTheme, paletteFor, THEMES } from "../render/themes.js";
 import { button, choiceCards, dropdown, iconButton, setSegmented } from "./components.js";
 import { el } from "./dom.js";
+import { icon } from "./icons.js";
 
 /**
  * 가리킨 테마는 미리 보고, 누른 테마만 설정에 적용한다.
@@ -137,7 +138,11 @@ export const createThemePicker = ({ visual, ids, getVolume, onSelect, onPreviewT
   return {
     element: picker,
     setPlaying(playing) {
-      playback.setAttribute("aria-pressed", String(playing));
+      const pressed = String(playing);
+      if (playback.getAttribute("aria-pressed") !== pressed) {
+        playback.setAttribute("aria-pressed", pressed);
+        playback.replaceChildren(icon(playing ? "pause" : "play"));
+      }
       playback.classList.toggle("btn-primary", playing);
       if (playing) stage.play();
       else stage.stop();

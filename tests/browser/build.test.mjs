@@ -1273,11 +1273,14 @@ test("게임 테마: 미리보기는 움직이고, 칩에 올리면 미리보기
     await page.click('#set-effects [data-value="full"]');
     assert.equal(await moves(), false, "전체 효과를 골라도 자동 재생은 멈춰 있다");
     const play = page.locator("#theme-play");
+    const playIcon = await play.locator("svg").innerHTML();
     assert.equal(await play.getAttribute("aria-pressed"), "false");
     await play.click();
     assert.equal(await play.getAttribute("aria-pressed"), "true");
+    assert.notEqual(await play.locator("svg").innerHTML(), playIcon, "재생 중에는 일시정지 아이콘");
     assert.ok(await moves(), "동작 줄이기가 켜져 있어도 직접 재생할 수 있다");
     await play.click();
+    assert.equal(await play.locator("svg").innerHTML(), playIcon, "정지하면 재생 아이콘");
     assert.equal(await moves(), false, "다시 누르면 멈춘다");
     await page.emulateMedia({ reducedMotion: "no-preference" });
     assert.ok(await moves(), "모션 줄이기를 해제하면 열려 있는 미리보기가 다시 움직인다");
