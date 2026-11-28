@@ -1078,6 +1078,20 @@
   margin: 0;
 }
 
+@media (orientation: landscape) and (max-height: 400px) {
+  #daily-puzzle .daily-puzzle-body {
+    gap: var(--space-2);
+  }
+
+  #daily-puzzle .daily-puzzle-picker .select {
+    width: auto;
+  }
+
+  #daily-puzzle .daily-puzzle-info {
+    gap: var(--space-1);
+  }
+}
+
 /* ---- 퍼즐 단계 격자 ---- */
 /* 장: 제목 줄(이름 · 깬 수) + 격자 */
 .puzzle-chapter-title {

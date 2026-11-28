@@ -76,6 +76,7 @@ export const createDailyPuzzleUI = ({ dialog, solver, progress, getVisual, onPla
     const title = el("h3", { id: "daily-puzzle-name", text: "—" });
     const detail = el("p", { class: "field-help", id: "daily-puzzle-type", text: "—" });
     const level = el("p", { id: "daily-puzzle-level", class: "field-help", text: "—" });
+    const difficulty = el("p", { id: "daily-puzzle-difficulty", class: "field-help", text: "—" });
     const objective = el("p", { id: "daily-puzzle-goal", class: "field-help", text: "—" });
     const pieces = el("p", { id: "daily-puzzle-pieces", class: "num", text: "—" });
     const canvas = /** @type {HTMLCanvasElement} */ (
@@ -111,8 +112,9 @@ export const createDailyPuzzleUI = ({ dialog, solver, progress, getVisual, onPla
           "div",
           { class: "daily-puzzle-info" },
           title,
-          detail,
           level,
+          difficulty,
+          detail,
           objective,
           el("div", {}, el("p", { class: "field-help", text: t("피스 순서") }), pieces)
         )
@@ -139,6 +141,10 @@ export const createDailyPuzzleUI = ({ dialog, solver, progress, getVisual, onPla
       title.textContent = dailyPuzzleTitle(day.family, day.key, day.cells);
       detail.textContent = info.title;
       level.textContent = dailyPuzzleLevel(day.level);
+      difficulty.textContent = t("판단 {planning} · 조작 {execution}", {
+        planning: dailyPuzzleLevel(day.planning),
+        execution: dailyPuzzleLevel(day.execution),
+      });
       objective.textContent = info.description;
       pieces.textContent = [...day.pieces].join(" · ");
       paint(day.cells.map(value => value * GARBAGE));
