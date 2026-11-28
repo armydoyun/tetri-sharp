@@ -1418,8 +1418,8 @@ export const EN = {
   "다양성 확인": "Variety report",
   "좌우 반전을 같은 판으로 세며, 같은 유형에서 두 칸 이하만 다른 판은 비슷한 판으로 셉니다. 판단 난이도는 첫 배치와 막다른 길을, 조작 난이도는 내려간 뒤의 이동과 회전을 봅니다.":
     "Mirrored boards count as the same. Boards in the same family that differ by up to two cells count as similar. Planning considers first placements and dead ends. Execution considers shifts and turns after lowering a piece.",
-  "첫 수 수치는 각 문제에 표시된 높이 안에서 90° 회전으로 도달할 수 있는 고정 위치를 비교한 값입니다.":
-    "First-move counts compare lock positions reachable with quarter turns inside the indicated search height.",
+  "첫 수 수치는 표시된 높이 안에서 도달할 수 있는 고정 위치를 비교한 값입니다.":
+    "First-move counts compare reachable lock positions within the indicated search height.",
   "짧은 판 비우기": "Quick perfect clear",
   "콤보 설계": "Combo planning",
   "홀드 순서": "Hold order",
@@ -1433,8 +1433,8 @@ export const EN = {
     "Fill the gaps with the early pieces, then clear four lines at once.",
   "첫 피스로 자리를 만든 뒤 T-spin Triple을 하세요.": "Use the first piece to set up a T-spin Triple.",
   "첫 피스로 자리를 만든 뒤 T-spin Double을 하세요.": "Use the first piece to set up a T-spin Double.",
-  "네 피스로 판을 비우세요. 마지막에 남을 모양까지 생각해 보세요.":
-    "Clear the board with four pieces. Plan for the shape you will leave at the end.",
+  "주어진 피스로 판을 비우세요. 마지막에 남을 모양까지 생각해 보세요.":
+    "Clear the board with the given pieces. Plan for the shape you will leave at the end.",
   "주어진 피스로 판을 비워 보세요.": "Clear the board with the given pieces.",
   "{from}부터 {to}까지 · 날짜 시드로 만든 {n}일": "{from} to {to} · {n} seeded days",
   "게임에서 풀기": "Play in Tetri#",
@@ -1442,6 +1442,7 @@ export const EN = {
   "홀드 후 {piece} 배치 · {n}줄": "Hold, then place {piece} · {n} lines",
   "{piece} 배치 · {n}줄": "Place {piece} · {n} lines",
   "판단 난이도": "Planning difficulty",
+  "판단 {planning} · 조작 {execution}": "Planning {planning} · Execution {execution}",
   "조작 난이도": "Execution difficulty",
   "첫 배치 후보": "First placements",
   "완주 가능한 첫 배치": "Winning first placements",

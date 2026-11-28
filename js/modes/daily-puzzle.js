@@ -12,7 +12,7 @@ export const DAILY_PUZZLE_FAMILIES = Object.freeze({
   spin: { title: "T스핀 자리 만들기", description: "첫 피스로 자리를 만든 뒤 T-spin Double을 하세요." },
   trap: {
     title: "첫 배치 함정",
-    description: "네 피스로 판을 비우세요. 마지막에 남을 모양까지 생각해 보세요.",
+    description: "주어진 피스로 판을 비우세요. 마지막에 남을 모양까지 생각해 보세요.",
   },
 });
 

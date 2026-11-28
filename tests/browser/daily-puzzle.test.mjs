@@ -27,6 +27,8 @@ test("본편 오늘의 퍼즐: 날짜 시드로 플레이하고 새로고침 뒤
   const page = await browser.newPage({
     locale: "ko-KR",
     timezoneId: "Asia/Seoul",
+    hasTouch: true,
+    isMobile: true,
     viewport: { width: 390, height: 844 },
   });
   page.setDefaultTimeout(8000);
@@ -51,6 +53,7 @@ test("본편 오늘의 퍼즐: 날짜 시드로 플레이하고 새로고침 뒤
   assert.equal(await page.locator("#daily-puzzle-name").textContent(), name);
   assert.equal(await page.locator("#daily-puzzle-type").textContent(), "짧은 판 비우기");
   assert.equal(await page.locator("#daily-puzzle-level").textContent(), "입문");
+  assert.equal(await page.locator("#daily-puzzle-difficulty").textContent(), "판단 입문 · 조작 입문");
   assert.equal(await page.locator("#daily-puzzle-pieces").textContent(), "J");
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
   await play.click();
@@ -116,5 +119,17 @@ test("본편 오늘의 퍼즐: 날짜 시드로 플레이하고 새로고침 뒤
   const reopened = await page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:run:suspended")));
   assert.equal(reopened.puzzle, today.code);
   assert.equal(reopened.dailyPuzzle.key, today.key);
+
+  await page.clock.setFixedTime(new Date("2026-12-02T01:00:00Z"));
+  await page.goto(url);
+  await page.tap("#quick-daily-puzzle");
+  await play.and(page.locator(":enabled")).waitFor();
+  assert.equal(await page.locator("#daily-puzzle-level").textContent(), "어려움");
+  assert.equal(await page.locator("#daily-puzzle-difficulty").textContent(), "판단 어려움 · 조작 입문");
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+  await play.tap();
+  await page.locator("#ask-ok").tap();
+  await page.tap("#downstack-hint");
+  await page.locator("#downstack-status").filter({ hasText: "첫 수 · 홀드한 뒤" }).waitFor();
   assert.deepEqual(errors, []);
 });

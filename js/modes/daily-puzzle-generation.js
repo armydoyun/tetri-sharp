@@ -11,6 +11,8 @@ import { comparePuzzleFingerprints, puzzleFingerprint, rateDailyPuzzle } from ".
 const DAY = 86_400_000;
 const EPOCH = Date.UTC(2026, 10, 26);
 const MAX_ATTEMPTS = 24;
+const CHALLENGE_START = Date.UTC(2026, 10, 29);
+const CHALLENGE_ATTEMPTS = 16;
 const VARIETY_START = Date.UTC(2026, 10, 27);
 // 같은 유형이 다섯 번 돌아오는 구간만 살펴보므로, 먼 미래의 날짜도 그 기간만 계산하면 된다.
 const VARIETY_WEEKS = 5;
@@ -34,6 +36,13 @@ const pc = (rng, count, hold = false, rows = 2) => {
   const decoys = PIECE_TYPES.filter(type => !order.includes(type));
   const pieces = hold ? [pick(rng, decoys), ...order] : order;
   return complete(board, pieces.join(""), "pc", hold);
+};
+
+const challenge = (rng, recipe) => {
+  const puzzle = pc(rng, 5 + rng.int(2), recipe === 1, 4);
+  if (!puzzle || recipe !== 2) return puzzle;
+  const [first, second, ...rest] = puzzle.pieces;
+  return { ...puzzle, pieces: [second, first, ...rest].join(""), rules: { ...DEFAULT_RULES, hold: { enabled: true } } };
 };
 
 const quad = rng => {
@@ -158,23 +167,50 @@ const WEEK = ["fill", "combo", "hold", "tuck", "quad", "spin", "trap"];
 
 export const dayKey = day => new Date(day).toISOString().slice(0, 10);
 
+const assessed = (puzzle, stats) => {
+  const controls = analyzeDailyControls(puzzle, stats.path);
+  return { controls, ...rateDailyPuzzle({ stats, controls }) };
+};
+
 const generateFor = (date, recent, varied) => {
   const key = dayKey(date);
-  const index = Math.round((date - EPOCH) / DAY);
-  const planned = WEEK[((index % WEEK.length) + WEEK.length) % WEEK.length];
+  const offset = Math.round((date - EPOCH) / DAY);
+  const planned = WEEK[((offset % WEEK.length) + WEEK.length) % WEEK.length];
   const seed = dailyPuzzleSeed(key);
   const rng = createRng(seed);
-  for (const [pass, family] of [planned, "fill"].entries()) {
+  const advanced = date >= CHALLENGE_START && planned === "trap";
+  const recipeOffset = Math.floor((date - CHALLENGE_START) / (WEEK.length * DAY));
+  const passes = advanced ? ["challenge", planned, "fill"] : [planned, "fill"];
+  for (const [passIndex, pass] of passes.entries()) {
+    const hard = pass === "challenge";
+    const family = hard ? "trap" : pass;
+    const attempts = hard ? CHALLENGE_ATTEMPTS : MAX_ATTEMPTS;
+    const candidateRng = hard ? createRng(dailyPuzzleSeed(`challenge:${key}`)) : rng;
     let nearest = null;
     let bestPenalty = Infinity;
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      const puzzle = pass === 1 && attempt === MAX_ATTEMPTS ? fallback(rng) : FAMILIES[family].make(rng, varied);
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      // 같은 조합에 막히면 다른 홀드 조건으로 넘어가고, 기준을 만족하는 판만 어려움으로 내보낸다.
+      const recipe = (recipeOffset + Math.floor((attempt - 1) / 6)) % 3;
+      const puzzle = hard
+        ? challenge(candidateRng, recipe)
+        : passIndex === passes.length - 1 && attempt === attempts
+          ? fallback(candidateRng)
+          : FAMILIES[family].make(candidateRng, varied);
       if (!puzzle) continue;
-      const stats = analyzeDailyPuzzle(puzzle);
-      if (!stats.complete || !stats.path || !FAMILIES[family].accepts(stats, puzzle)) continue;
+      const stats = analyzeDailyPuzzle(puzzle, hard);
+      if (!stats.complete || !stats.path || (!hard && !FAMILIES[family].accepts(stats, puzzle))) continue;
+      const rating = assessed(puzzle, stats);
+      if (
+        hard &&
+        (!rating.controls ||
+          rating.level !== 3 ||
+          (recipe === 1 && stats.holdWins !== stats.wins) ||
+          (recipe === 2 && !stats.path.some(move => move.hold)))
+      )
+        continue;
       const code = encodePuzzle({ ...puzzle, title: key });
       if (!code) continue;
-      const result = { key, seed, family, planned, attempt, ...puzzle, stats, code };
+      const result = { key, seed, family, planned, attempt, ...puzzle, stats, code, ...rating };
       if (!recent.length) return result;
       const fingerprint = puzzleFingerprint(result);
       const penalty = recent.reduce((score, other) => {
@@ -205,14 +241,18 @@ const generateWith = (date, cache) => {
     }
   }
   const selected = generateFor(date, recent, varied);
-  const controls = analyzeDailyControls(selected, selected.stats.path);
-  const { level, planning, execution } = rateDailyPuzzle({ stats: selected.stats, controls });
-  const result = { ...selected, level, planning, execution, controls };
+  const result = selected.controls ? selected : { ...selected, ...assessed(selected, selected.stats) };
   cache.set(date, result);
   return result;
 };
 
-export const generateDay = key => generateWith(Date.parse(key), new Map());
+const recentDays = new Map();
+export const generateDay = key => {
+  const day = generateWith(Date.parse(key), recentDays);
+  // 지난 퍼즐을 둘러볼 때 앞 주의 후보를 다시 만들지 않는다. 오래 떨어진 날짜는 제한한다.
+  while (recentDays.size > 64) recentDays.delete(recentDays.keys().next().value);
+  return day;
+};
 
 export const SAMPLE_START = "2026-11-26";
 export const generateSample = (start = SAMPLE_START, count = 90) => {

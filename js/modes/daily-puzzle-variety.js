@@ -55,15 +55,14 @@ export const comparePuzzleFingerprints = (a, b) => ({
 
 /** 제한된 첫 수 탐색에서 본 판단 부담과 대표 입력의 조작 부담을 따로 평가한다. */
 export const rateDailyPuzzle = ({ stats, controls = null }) => {
-  const { firstChoices, wins, holdWins, deepestDeadEnd, path } = stats;
+  const { firstChoices, wins, holdWins, naturalDeadEnd, quickWin, complete, path } = stats;
   const moves = path.length;
   const wrong = firstChoices - wins;
   const needsHold = holdWins === wins;
-  const narrow = wrong >= 2 && wins * 2 <= firstChoices;
-  const lateTrap = narrow && deepestDeadEnd >= 3;
-  const planning = (moves >= 4 || needsHold) && lateTrap ? 3 : moves >= 3 || needsHold || wrong >= 2 ? 2 : 1;
+  const lateTrap = moves >= 5 && naturalDeadEnd >= 3 && wins * 3 <= firstChoices;
+  const planning = complete && lateTrap && !quickWin ? 3 : moves >= 3 || needsHold || wrong >= 2 ? 2 : 1;
   const maneuvers = controls?.maxManeuvers ?? 0;
   const spin = path.some(move => move.tspin !== "none");
   const execution = maneuvers >= 3 ? 3 : maneuvers > 0 || spin ? 2 : 1;
-  return { level: Math.max(planning, execution), planning, execution };
+  return { level: planning === 3 ? 3 : Math.max(planning, Math.min(execution, 2)), planning, execution };
 };
