@@ -86,6 +86,7 @@ import { sceneToPuzzle } from "./modes/puzzle-edit.js";
 import { createPuzzleEditor } from "./ui/puzzle-editor.js";
 import { createCustomPuzzles } from "./storage/custom-puzzles.js";
 import { createPuzzleUI } from "./ui/puzzles.js";
+import { TIME_SHIFT_ID, timeShiftMode } from "./modes/time-shift.js";
 import { decodePack, packStageMode } from "./modes/puzzle-pack.js";
 import { createPuzzlePacks, MAX_PACKS } from "./storage/puzzle-packs.js";
 import { createPuzzlePacksUI } from "./ui/puzzle-packs.js";
@@ -293,7 +294,7 @@ const runs = createRunSaver({
         if (!sceneView.current) throw new Error("scene");
       } else {
         const savedRules =
-          m.puzzle || m.expedition != null || isGuidedPractice(m)
+          m.puzzle || m.timeShift || m.expedition != null || isGuidedPractice(m)
             ? m.rules
             : (PRESETS[entry.rules.id] ?? makeCustomRules(entry.rules));
         const replay = entry.target && sanitizeReplay(entry.target.replay, findMode);
@@ -593,6 +594,12 @@ const renderMenu = () => {
       }),
       onClick: () => expeditionUI.open(),
     }),
+    menuRow({
+      "data-mode": TIME_SHIFT_ID,
+      title: t("시간차"),
+      desc: t("6수를 되감아 과거의 블록과 한 줄을 완성하세요."),
+      onClick: () => startTimeShift(),
+    }),
     versusRow(),
     dailyRow()
   );
@@ -707,6 +714,10 @@ const updateHud = () => {
   setText(hud.level, game ? (mode.hudLevel?.(game.state) ?? String(game.state.level)) : "1");
   setText(hud.linesLabel, lines.label);
   setText(hud.lines, lines.value);
+  if (mode.past && screen === "play") {
+    const blocked = game.state.active && !game.state.timeShift.preview;
+    setText($("mode-objective"), blocked ? t("지금 놓으면 과거 블록의 진입이 막혀요.") : mode.description);
+  }
   setText(hud.pieces, String(stats.pieces));
   setText(hud.attack, String(game?.state.garbage?.sent ?? 0));
   if (versus) {
@@ -750,6 +761,7 @@ const setScreen = next => {
   applyTouch();
   document.body.classList.toggle("is-practice", Boolean(mode.practice && !isGuidedPractice()) && next !== "menu");
   document.body.classList.toggle("is-expedition", mode.expedition != null && next !== "menu");
+  document.body.classList.toggle("is-time-shift", Boolean(mode.timeShift) && next !== "menu");
   document.body.classList.toggle("is-trial", Boolean(mode.trialCode) && next !== "menu");
   document.body.classList.toggle(
     "is-trial-failed",
@@ -776,6 +788,7 @@ const puzzleInstructions = {
 };
 
 function modeObjective(m) {
+  if (m.timeShift) return m.description;
   if (m.expedition != null) return `${m.description} ${t("추가 목표 · {goal}", { goal: m.bonus })}`;
   if (m.dailyPuzzle || m.practice) return m.description;
   if (m.puzzle?.custom) return customPuzzleDetails(m.puzzle.custom);
@@ -850,7 +863,8 @@ const start = (
   puzzleReview.reset();
   failedPuzzleMove = null;
   reviewPractice = false;
-  if (!runs.restoring && !m.practice && m.expedition == null && m.id !== "custom-puzzle") store.set("lastMode", m.id);
+  if (!runs.restoring && !m.practice && !m.timeShift && m.expedition == null && m.id !== "custom-puzzle")
+    store.set("lastMode", m.id);
   rules = selectedRules;
   runPlayerName = restored?.name ?? records.playerName;
   const seed = target?.replay.seed ?? retrySeed ?? m.fixedSeed ?? (Math.random() * 2 ** 32) >>> 0;
@@ -899,7 +913,10 @@ const start = (
     pbSplits = restored.pbSplits;
   }
   acc = 0;
-  countdown = hasLessonHints(m) || m.battleLesson ? 0 : (COUNTDOWN_FRAMES[settings.access.countdown] ?? READY_FRAMES);
+  countdown =
+    hasLessonHints(m) || m.battleLesson || m.timeShift
+      ? 0
+      : (COUNTDOWN_FRAMES[settings.access.countdown] ?? READY_FRAMES);
   if (hasHintControls(m)) resetLessonHint();
   updateBackLabels();
   goTimer = 0;
@@ -929,6 +946,11 @@ const start = (
 };
 
 let pausedFrom = /** @type {"play" | "countdown"} */ ("play");
+
+const startTimeShift = (past = null) => {
+  const stage = timeShiftMode(past);
+  start(stage, stage.rules);
+};
 
 const pause = () => {
   if (runs.restoring) return;
@@ -1401,7 +1423,15 @@ const finish = () => {
       : "";
   const nextPuzzle = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="next-puzzle"]'));
   const hasNext = nextStage() || (mode.puzzle?.number && mode.puzzle.number < PUZZLES.length);
-  nextPuzzle.hidden = reviewPractice || !(hasNext && state.over === "clear");
+  const rewind = mode.timeShift && state.over === "rewind";
+  nextPuzzle.hidden = reviewPractice || !(rewind || mode.past || (hasNext && state.over === "clear"));
+  nextPuzzle.querySelector(".btn-label").textContent = rewind
+    ? t("되감기")
+    : mode.past
+      ? t("처음부터 다시 하기")
+      : t("다음 단계");
+  const retry = panels.results.querySelector('[data-action="retry"] .btn-label');
+  retry.textContent = mode.past ? t("두 번째 플레이 다시 하기") : t("다시 하기");
   lastReplay = recorder ? recorder.finish(state) : null;
   const survivalRetry = $("survival-retry-seed");
   survivalRetry.hidden = !survival || !lastReplay;
@@ -1447,7 +1477,7 @@ const finish = () => {
         ? raceResultText(state, race.target.best, race.target.friend)
         : "";
   const shortNote =
-    tooShort && !mode.trialCode && !mode.packStage && mode.expedition == null
+    tooShort && !mode.timeShift && !mode.trialCode && !mode.packStage && mode.expedition == null
       ? t("너무 일찍 끝난 판이라 공유하지 않고 마지막 판으로 남기지 않아요")
       : "";
   const pack = packStage && puzzlePacks.find(packStage.code);
@@ -2215,6 +2245,9 @@ for (const btn of document.querySelectorAll("[data-action]")) {
     )
       start(mode, rules, null, lastReplay.seed);
     if (action === "race-best" && mode.splits) startRace(mode, rules);
+    if (action === "next-puzzle" && screen === "results" && mode.past) return startTimeShift();
+    if (action === "next-puzzle" && screen === "results" && mode.timeShift && game?.state.over === "rewind")
+      return startTimeShift(game.state.timeShift.moves);
     if (action === "next-puzzle" && !reviewPractice && screen === "results" && game?.state.over === "clear") {
       const next = nextStage();
       if (next) return start(next, next.rules);

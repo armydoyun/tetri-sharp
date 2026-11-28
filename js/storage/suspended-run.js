@@ -81,6 +81,9 @@ export const runFingerprint = (game, opponent = null) =>
         garbage?.pending,
         garbage?.received,
         garbage?.sent,
+        ...(current.state.timeShift
+          ? [current.state.timeShift.past, current.state.timeShift.moves, current.state.timeShift.echoLines]
+          : []),
       ];
     })
   );
