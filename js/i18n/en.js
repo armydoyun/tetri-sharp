@@ -2,6 +2,23 @@
 // tests/unit/i18n.test.mjs가 코드와 index.html의 한국어 문장이 모두 여기 있는지 확인한다.
 /** @type {Record<string, string>} */
 export const EN = {
+  "퍼즐 팩": "Puzzle packs",
+  "퍼즐 팩 목록": "Puzzle packs",
+  "퍼즐 팩 만들기": "Create puzzle pack",
+  "퍼즐 팩 지우기": "Delete pack",
+  "퍼즐 팩을 저장하지 못했어요.": "Could not save the puzzle pack.",
+  "퍼즐 팩은 {n}개까지 저장할 수 있어요.": "You can save up to {n} puzzle packs.",
+  "저장된 퍼즐 팩이 없어요.": "You have no saved puzzle packs.",
+  "팩 이름": "Pack name",
+  "내 퍼즐 추가": "Add a puzzle",
+  "내 퍼즐을 {min}~{max}개 골라 순서를 정하세요.": "Choose {min}–{max} of your puzzles and arrange them in order.",
+  "먼저 내 퍼즐을 {n}개 이상 만들어 주세요.": "Create at least {n} puzzles to get started.",
+  "위로 이동": "Move up",
+  "아래로 이동": "Move down",
+  "팩에서 빼기": "Remove from pack",
+  "링크를 복사했어요.": "Link copied.",
+  "링크의 퍼즐 팩을 읽을 수 없었어요.": "Could not read the puzzle pack in this link.",
+
   "규칙 원정": "Rules Expedition",
   "규칙 원정 완료 {n}단계": "{n} Expedition stages cleared",
   "규칙 원정 목록": "Expedition stages",
@@ -1035,8 +1052,8 @@ export const EN = {
     "Puzzles cleared {puzzles} · Practice stages cleared {practice} · Sprint runs {attempts}",
   "설정·기록·리플레이는 교체돼요. 백업에 없으면 설정은 기본값으로, 기록과 리플레이는 빈 상태로 돌아가요.":
     "Settings, records and replays are replaced. If missing from the backup, settings reset to defaults and records and replays are cleared.",
-  "내 퍼즐과 받은 퍼즐은 이 기기의 목록과 합쳐요.":
-    "Created and received puzzles are merged with those on this device.",
+  "내 퍼즐, 받은 퍼즐, 퍼즐 팩은 이 기기의 목록과 합쳐요.":
+    "Created and received puzzles and puzzle packs are merged with those on this device.",
   "연습·기본 퍼즐·Sprint·규칙 원정 진행도, 달성한 업적과 내 규칙은 백업에 있을 때만 바뀌어요.":
     "Practice, built-in puzzle, Sprint, and Expedition progress, unlocked achievements, and saved rules change only if present in the backup.",
   "백업을 저장하지 못했어요. 기존 데이터는 그대로예요.": "Could not save the backup. Your existing data is intact.",

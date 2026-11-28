@@ -9,6 +9,7 @@ import { SPRINT_HISTORY_KEY, sanitizeSprintHistory } from "./sprint-history.js";
 import { ACHIEVEMENTS_KEY, ACHIEVEMENT_TOTALS_KEY, sanitizeAchievements, sanitizeTotals } from "./achievements.js";
 import { RULE_SLOTS_KEY, sanitizeRuleSlots } from "./rule-slots.js";
 import { CUSTOM_PUZZLES_KEY, mergeCustomPuzzles, sanitizeCustomPuzzles } from "./custom-puzzles.js";
+import { PUZZLE_PACKS_KEY, sanitizePuzzlePacks, serializePuzzlePacks } from "./puzzle-packs.js";
 import { DAILY_PUZZLE_CLEARED, sanitizeDailyPuzzleCleared } from "./daily-puzzle.js";
 import { isEntry } from "./records.js";
 import { sanitizeRuleBody } from "../rules/sanitize.js";
@@ -39,6 +40,7 @@ const BACKUP_KEYS = Object.freeze([
   ACHIEVEMENT_TOTALS_KEY,
   RULE_SLOTS_KEY,
   CUSTOM_PUZZLES_KEY,
+  PUZZLE_PACKS_KEY,
 ]);
 
 const MAX_TABLES = 500;
@@ -91,6 +93,8 @@ export const parseBackup = (raw, findMode) => {
   const slots = src[RULE_SLOTS_KEY] !== undefined ? sanitizeRuleSlots(src[RULE_SLOTS_KEY]) : null;
   if (slots) data[RULE_SLOTS_KEY] = slots;
   if (src[CUSTOM_PUZZLES_KEY] !== undefined) data[CUSTOM_PUZZLES_KEY] = sanitizeCustomPuzzles(src[CUSTOM_PUZZLES_KEY]);
+  if (src[PUZZLE_PACKS_KEY] !== undefined)
+    data[PUZZLE_PACKS_KEY] = serializePuzzlePacks(sanitizePuzzlePacks(src[PUZZLE_PACKS_KEY]));
   if (src.settings !== undefined) data.settings = sanitizeSettings(src.settings);
   if (isPlainObject(src.records)) {
     const records = {};
@@ -162,6 +166,13 @@ export const restoreBackup = (store, parsed) => {
     if (key === CUSTOM_PUZZLES_KEY) {
       if (key in parsed.data)
         values[key] = mergeCustomPuzzles(sanitizeCustomPuzzles(store.get(key, null)), parsed.data[key]);
+      continue;
+    }
+    if (key === PUZZLE_PACKS_KEY) {
+      if (key in parsed.data)
+        values[key] = serializePuzzlePacks(
+          sanitizePuzzlePacks([...sanitizePuzzlePacks(store.get(key, [])), ...parsed.data[key]])
+        );
       continue;
     }
     if (key === DAILY_PUZZLE_CLEARED) {

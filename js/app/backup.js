@@ -55,7 +55,7 @@ export const setupBackup = ({ store, findMode, fileInput, canImport, confirmImpo
       (expedition ? t("규칙 원정 완료 {n}단계", { n: expedition }) + "\n" : "") +
       t("설정·기록·리플레이는 교체돼요. 백업에 없으면 설정은 기본값으로, 기록과 리플레이는 빈 상태로 돌아가요.") +
       "\n" +
-      t("내 퍼즐과 받은 퍼즐은 이 기기의 목록과 합쳐요.") +
+      t("내 퍼즐, 받은 퍼즐, 퍼즐 팩은 이 기기의 목록과 합쳐요.") +
       "\n" +
       t("연습·기본 퍼즐·Sprint·규칙 원정 진행도, 달성한 업적과 내 규칙은 백업에 있을 때만 바뀌어요.");
     if (!(await confirmImport(message))) return;
