@@ -2,6 +2,7 @@
 // 판은 누르거나 끌어서 칠한다(마우스·터치·펜 모두 Pointer Events). 편집 동작 자체는 js/modes/puzzle-edit.js(DOM 없음).
 // 계획: docs/PUZZLE_MAKER.md
 import { WIDTH, VISIBLE_ROWS } from "../core/board.js";
+import { SOLVER_UNAVAILABLE } from "../app/solver.js";
 import { PIECE_TYPES } from "../core/pieces.js";
 import { t } from "../i18n/index.js";
 import {
@@ -25,6 +26,8 @@ import {
 } from "../modes/custom-puzzle.js";
 import { GOAL_KINDS } from "../modes/puzzle-goals.js";
 import { LOCK_TYPES } from "../rules/sanitize.js";
+import { spinSettings } from "../rules/spins.js";
+import { spinControls } from "./spin-settings.js";
 import { MAX_MADE } from "../storage/custom-puzzles.js";
 import {
   COPYABLE_STAGES,
@@ -41,13 +44,16 @@ import {
   removePiece,
   shiftCells,
   stampCells,
+  stampErases,
   stampIndices,
   strokeValue,
   template,
   usedHeight,
 } from "../modes/puzzle-edit.js";
 import { el, fieldRow, fillDialog, focusKey, restoreFocus } from "./dom.js";
+import { openPuzzleComparison } from "./puzzle-comparison.js";
 import { copyText, revealForCopy } from "./clipboard.js";
+import { splitOption } from "./select.js";
 import {
   button,
   confirmButton,
@@ -61,6 +67,20 @@ import {
 
 /** 저절로 확인하는 퍼즐의 피스 수 한도(이보다 많으면 확인 버튼으로만) */
 const AUTO_CHECK_PIECES = 12;
+const AUTO_CHECK_STATES = 60_000;
+const AUTO_CHECK_MS = 1500;
+
+/** @param {HTMLElement} controls @param {string} help */
+const editorContext = (controls, help) => {
+  const hint = el("p", { class: "field-help", text: help });
+  return {
+    root: el("div", { class: "puzzle-editor-context" }, controls, hint),
+    show(active) {
+      controls.setAttribute("aria-hidden", String(!active));
+      hint.setAttribute("aria-hidden", String(active));
+    },
+  };
+};
 
 /** @typedef {"cell" | "row" | "garbage" | "piece"} Tool */
 /**
@@ -91,21 +111,23 @@ const settingsOf = p => ({
   desc: p.desc,
 });
 
-/** @typedef {{ type: string, hold: boolean, board: Uint8Array, cells: Array<[number, number]> }} SolutionMove */
+/** @typedef {import("../modes/puzzle-solver.js").SolutionMove} SolutionMove */
 /**
  * 자동 확인 결과(그 퍼즐 코드에 대해). checking: 찾는 중
- * @typedef {{ code: string, state: "checking" | "solvable" | "unsolvable" | "exhausted", moves?: SolutionMove[] }} Verified
+ * @typedef {{ code: string, state: "checking" | "solvable" | "unsolvable" | "exhausted" | "deferred" | "unavailable", moves?: SolutionMove[] }} Verified
  */
 
 /**
  * @param {{
  *   dialog: HTMLDialogElement,
+ *   comparisonDialog: HTMLDialogElement,
+ *   getVisual: () => import("../render/canvas.js").Visual,
  *   solver: ReturnType<typeof import("../app/solver.js").createSolver>,
  *   customs: ReturnType<typeof import("../storage/custom-puzzles.js").createCustomPuzzles>,
  *   onTry: (code: string) => void,
  * }} options
  */
-export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
+export const createPuzzleEditor = ({ dialog, comparisonDialog, getVisual, solver, customs, onTry }) => {
   let cells = new Uint8Array(PUZZLE_CELLS);
   let pieces = "";
   let settings = defaultSettings();
@@ -153,6 +175,8 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
   };
   /** 편집기가 열려 있을 때만 단축키(Ctrl+Z)를 받는다 */
   let undoKeys = /** @type {null | ((redo: boolean) => void)} */ (null);
+  let previewResize = /** @type {ResizeObserver | null} */ (null);
+  let lastSaved = "";
 
   dialog.addEventListener("keydown", event => {
     if (!undoKeys || !dialog.querySelector(".puzzle-editor") || !(event.ctrlKey || event.metaKey) || event.altKey)
@@ -174,6 +198,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       draft = entryId === null && touched ? { state: snapshot(), history } : null;
     }
     undoKeys = null;
+    previewResize?.disconnect();
     stopChecking();
   });
 
@@ -184,17 +209,17 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
     (loaded?.code === key ? loaded.checked : 0);
   /** 내 퍼즐에 저장한다(고칠 때마다 저절로). 링크로 보낼 수 있는 퍼즐만 */
   const save = () => {
-    const code = encodePuzzle(current());
+    const key = keyNow();
+    const code = key && encodePuzzle({ ...current(), checked: checkedFor(key) }, { checked: true });
     if (!code) {
       saveState = "none";
       return;
     }
-    const id = customs.save(
-      entryId,
-      encodePuzzle({ ...current(), checked: checkedFor(keyNow()) }, { checked: true }) ?? ""
-    );
+    if (entryId && code === lastSaved) return;
+    const id = customs.save(entryId, code);
     if (id) {
       entryId = id;
+      lastSaved = code;
       histories.set(id, history);
     }
     saveState = id ? "saved" : "full";
@@ -213,6 +238,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
     history = (id && histories.get(id)) || createHistory();
     stopChecking();
     verified = null;
+    lastSaved = "";
     saveState = puzzle ? "saved" : "none";
   };
   const editor = {
@@ -299,6 +325,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       editor.open();
     },
     open() {
+      previewResize?.disconnect();
       const notice = el("p", { class: "notice-slot", role: "status" });
       let autoTimer = 0;
       /** 사용자가 멈춘 퍼즐(열쇠): 다시 고치기 전까지 저절로 확인하지 않는다 */
@@ -331,34 +358,39 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       );
       /** 보이는 칸 중 키보드로 들어올 칸(처음은 왼쪽 아래) */
       let focusIndex = PUZZLE_CELLS - WIDTH;
-      const firstVisible = () => (VISIBLE_ROWS - height) * WIDTH;
+      let previewHeight = height;
+      const displayHeight = () => (viewStep === null ? height : previewHeight);
+      const firstVisible = () => (VISIBLE_ROWS - displayHeight()) * WIDTH;
       /** 풀이 보기: 몇 번째 수를 보여 주는지(null이면 편집 중) */
       let viewStep = /** @type {number | null} */ (null);
       const solution = () => (verified?.state === "solvable" && verified.moves) || null;
       const paintTiles = () => {
         const move = viewStep !== null ? solution()?.[viewStep] : null;
         // 피스 도장 미리보기: 올린(또는 포커스한) 칸에 찍힐 네 칸
-        const stamp = new Set(
+        const stamp =
           tool === "piece" && stampAt !== null && !move
-            ? (stampIndices(stampType, stampRot, stampAt, firstVisible() / WIDTH) ?? [])
-            : []
-        );
+            ? stampIndices(stampType, stampRot, stampAt, firstVisible() / WIDTH)
+            : null;
+        const eraseStamp = stamp && stampErases(cells, stamp);
         // 풀이를 볼 때는 그 수를 놓기 전 판(40줄 중 보이는 20줄)과 놓을 칸
         const shown = move ? move.board.subarray(move.board.length - PUZZLE_CELLS) : cells;
         const ghost = new Set(
           (move?.cells ?? []).map(([x, y]) => (y - (move ? move.board.length / WIDTH - VISIBLE_ROWS : 0)) * WIDTH + x)
         );
         tiles.forEach((tile, i) => {
-          tile.setAttribute("aria-pressed", String(Boolean(shown[i])));
+          const pressed = String(Boolean(shown[i]));
+          if (tile.getAttribute("aria-pressed") !== pressed) tile.setAttribute("aria-pressed", pressed);
           if (ghost.has(i)) tile.dataset.ghost = "1";
           else delete tile.dataset.ghost;
-          if (stamp.has(i)) tile.dataset.stamp = "1";
+          if (stamp?.includes(i)) tile.dataset.stamp = eraseStamp ? "erase" : "place";
           else delete tile.dataset.stamp;
         });
         board.classList.toggle("is-viewing", Boolean(move));
       };
       const layoutBoard = () => {
-        board.dataset.rows = String(height);
+        const rows = String(displayHeight());
+        if (board.dataset.rows === rows && board.childElementCount) return;
+        board.dataset.rows = rows;
         board.replaceChildren(...tiles.slice(firstVisible()));
         if (focusIndex < firstVisible()) focusIndex = PUZZLE_CELLS - WIDTH;
         tiles.forEach((tile, i) => (tile.tabIndex = i === focusIndex ? 0 : -1));
@@ -378,9 +410,18 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
           title: t("{piece} 넣기", { piece }),
         })
       );
-      const moveBack = iconButton({ icon: "arrow-left", label: t("고른 피스를 앞으로") });
-      const moveForward = iconButton({ icon: "arrow-right", label: t("고른 피스를 뒤로") });
+      const moveBack = iconButton({
+        icon: "arrow-left",
+        label: t("고른 피스를 앞으로"),
+        "aria-keyshortcuts": "Shift+ArrowLeft Alt+ArrowLeft",
+      });
+      const moveForward = iconButton({
+        icon: "arrow-right",
+        label: t("고른 피스를 뒤로"),
+        "aria-keyshortcuts": "Shift+ArrowRight Alt+ArrowRight",
+      });
       const remove = button({ label: t("빼기"), size: "s", id: "puzzle-piece-remove" });
+      const sequenceActions = el("span", { class: "puzzle-editor-seq-actions" }, moveBack, moveForward, remove);
 
       // ---- 판 도구 ----
       const undo = iconButton({ icon: "undo", label: t("되돌리기"), id: "puzzle-undo" });
@@ -433,11 +474,36 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       // ---- 자동 확인 · 풀이 보기 ----
       const check = button({ id: "puzzle-check", label: t("풀 수 있는지 확인"), icon: "check", size: "s" });
       const stop = button({ id: "puzzle-check-stop", label: t("멈추기"), size: "s" });
+      const compare = button({ id: "puzzle-compare", label: t("풀이 비교"), size: "s" });
       const status = el("p", { class: "puzzle-editor-status", id: "puzzle-status", role: "status" });
       const view = toggle({ id: "puzzle-solution-view" });
       const prevStep = iconButton({ icon: "arrow-left", label: t("이전 수"), id: "puzzle-solution-prev" });
       const nextStep = iconButton({ icon: "arrow-right", label: t("다음 수"), id: "puzzle-solution-next" });
-      const stepOut = el("output", { class: "puzzle-editor-step num", id: "puzzle-solution-step" });
+      const stepOut = el("output", {
+        class: "puzzle-editor-step num",
+        id: "puzzle-solution-step",
+        "aria-live": "polite",
+      });
+      const closePreview = button({ id: "puzzle-solution-exit", label: t("편집으로"), size: "s" });
+      const holdNote = el("small", { class: "puzzle-editor-preview-hold", text: t("홀드 먼저") });
+      const stepNav = el(
+        "div",
+        { class: "puzzle-editor-preview-nav", role: "group", "aria-label": t("풀이 단계"), hidden: true },
+        el("span", { class: "puzzle-editor-step-nav" }, prevStep, stepOut, nextStep),
+        closePreview,
+        holdNote
+      );
+      const preview = el("div", { class: "puzzle-editor-preview" }, stepNav, board);
+      const checkActions = el("div", { class: "puzzle-editor-check-actions" }, check, stop, compare);
+      const solutionActions = el(
+        "div",
+        { class: "puzzle-editor-solution" },
+        el("label", { class: "puzzle-editor-switch" }, view, el("span", { text: t("풀이 보기") }))
+      );
+      const verification = editorContext(
+        el("div", { class: "puzzle-editor-check-content" }, checkActions, status, solutionActions),
+        t("판을 채우고 피스를 추가하면 풀이를 확인할 수 있어요.")
+      );
 
       // ---- 피스 도장(퍼즐 다시 보기 P9): 칠하기 도구 "피스"일 때 누른 칸에 고른 피스 모양을 찍는다 ----
       /** @type {import("../core/pieces.js").PieceType} */
@@ -460,7 +526,21 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         stampRot = (stampRot + 1) % 4;
         paintTiles();
       };
-      const stampRotate = iconButton({ icon: "rotate-cw", label: t("도장 돌리기 (R)"), onClick: rotateStamp });
+      const stampRotate = iconButton({
+        icon: "rotate-cw",
+        label: t("도장 돌리기 (R)"),
+        "aria-keyshortcuts": "R",
+        onClick: rotateStamp,
+      });
+      const stampOptions = editorContext(
+        el(
+          "div",
+          { class: "puzzle-editor-row" },
+          el("span", { class: "puzzle-editor-label", text: t("도장 피스") }),
+          el("span", { class: "puzzle-editor-stamp" }, stampPick, stampRotate)
+        ),
+        t("도장을 고르면 피스 모양을 찍을 수 있어요.")
+      );
       const doStamp = index => {
         const at = stampIndices(stampType, stampRot, index, firstVisible() / WIDTH);
         if (!at) {
@@ -470,6 +550,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         history.record(snapshot());
         cells = stampCells(cells, at);
         changed();
+        if (!cells[at[0]]) notice.textContent = t("도장으로 {n}칸을 지웠어요.", { n: at.length });
       };
       const tools = segmented({
         id: "puzzle-tool",
@@ -643,6 +724,12 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
           rules: t("규칙의 중력대로 떨어져요. 자동 확인과 첫 수 보기를 쓸 수 없어요"),
         }[settings.gravity];
         const holdOff = !r.hold.enabled;
+        const spins = spinControls({
+          prefix: "puzzle",
+          rules: r,
+          expanded: /** @type {HTMLDetailsElement | null} */ (advancedBody.querySelector("#puzzle-spin-details"))?.open,
+          onChange: mask => editSettings(next => Object.assign(next.rules, spinSettings(mask))),
+        });
         advancedBody.replaceChildren(
           fieldRow({
             id: "puzzle-base",
@@ -659,10 +746,13 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
               "puzzle-rotation",
               t("회전 시스템"),
               [
-                { value: "srs", label: t("SRS — 벽차기 5단계 (현대 표준)") },
-                { value: "ars", label: t("ARS — 좌우 1칸만, 중앙열 규칙 (아케이드)") },
-                { value: "classic", label: t("킥 없음 — 막히면 안 돈다 (옛날 방식)") },
-              ],
+                ["srs", t("SRS — 벽차기 5단계 (현대 표준)")],
+                ["ars", t("ARS — 좌우 1칸만, 중앙열 규칙 (아케이드)")],
+                ["classic", t("킥 없음 — 막히면 안 돈다 (옛날 방식)")],
+              ].map(([value, text]) => {
+                const [label, hint] = splitOption(text);
+                return { value, label, hint };
+              }),
               r.rotation,
               (next, v) => (next.rules.rotation = v)
             ),
@@ -699,21 +789,8 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
               (next, v) => (next.rules.previewCount = v)
             ),
           }),
-          fieldRow({
-            id: "puzzle-tspin",
-            label: t("T-spin 판정"),
-            hint: "",
-            control: pick(
-              "puzzle-tspin",
-              t("T-spin 판정"),
-              [
-                { value: "threeCorner", label: t("3-corner (Mini 포함)") },
-                { value: "none", label: t("없음") },
-              ],
-              r.tspin,
-              (next, v) => (next.rules.tspin = v)
-            ),
-          }),
+          spins.preset,
+          spins.details,
           fieldRow({
             id: "puzzle-lock",
             label: t("고정 방식"),
@@ -739,6 +816,15 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
             label: t("하드 드롭"),
             hint: t("한 번에 바닥까지 떨어뜨리고 바로 고정"),
             control: yesNo("puzzle-hard-drop", r.hardDrop, (next, on) => (next.rules.hardDrop = on)),
+          }),
+          fieldRow({
+            id: "puzzle-allow180",
+            label: t("180도 회전 허용"),
+            control: yesNo(
+              "puzzle-allow180",
+              r.allow180 !== false,
+              (next, on) => (next.rules.allow180 = on ? undefined : false)
+            ),
           }),
           fieldRow({
             id: "puzzle-ghost",
@@ -770,13 +856,17 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       };
 
       const toolHint = {
-        cell: t("누르거나 끌어서 칸을 채우고 지워요."),
-        row: t("누르거나 끌어서 줄 전체를 채우고 지워요."),
+        cell: t("누른 칸을 채우거나 지워요."),
+        row: t("누른 줄 전체를 채우거나 지워요."),
         garbage: t("누른 열만 빈 쓰레기 줄을 만들어요. 아래위로 끌면 같은 열에 구멍이 이어져요."),
       };
       const hint = el("p", { class: "field-help puzzle-editor-hint" });
 
+      let renderedSequence = "";
       const renderSequence = () => {
+        const key = `${pieces}/${selected}`;
+        if (key === renderedSequence) return;
+        renderedSequence = key;
         const focused = sequence.contains(document.activeElement)
           ? Number(/** @type {HTMLElement} */ (document.activeElement).dataset.at)
           : null;
@@ -845,36 +935,53 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         setSegmented(heights, String(height));
         hint.textContent =
           tool === "piece"
-            ? t("누른 칸에 {piece} 모양을 찍어요. 네 칸이 다 찬 자리를 누르면 지워요. R로 돌려요.", {
-                piece: stampType,
-              })
+            ? t("눌러 찍고, 네 칸이 찬 곳은 눌러 지워요. I J L O S T Z로 모양을 바꾸고 R로 돌려요.")
             : toolHint[tool];
         stampPick.disabled = tool !== "piece";
         stampRotate.disabled = tool !== "piece";
+        stampOptions.show(tool === "piece");
         // 자동 확인
         const moves = solution();
         if (!moves) viewStep = null;
-        check.disabled = !code || !canSearch(current()) || Boolean(checking) || Boolean(verified);
+        check.disabled =
+          !code ||
+          !canSearch(current()) ||
+          Boolean(checking) ||
+          Boolean(verified && verified.state !== "deferred" && verified.state !== "unavailable");
         stop.disabled = !checking;
         view.disabled = !moves;
-        view.checked = viewStep !== null;
-        prevStep.disabled = viewStep === null || viewStep === 0;
-        nextStep.disabled = viewStep === null || !moves || viewStep >= moves.length - 1;
-        const step = moves && viewStep !== null ? moves[viewStep] : null;
-        stepOut.textContent = moves
-          ? step?.hold
-            ? t("{n} / {total} · 홀드 먼저", { n: (viewStep ?? 0) + 1, total: moves.length })
-            : `${(viewStep ?? 0) + 1} / ${moves.length}`
-          : "- / -";
+        compare.disabled = !moves;
+        renderPreview();
         status.textContent = statusText(code);
+        verification.show(Boolean(code));
         scheduleAutoCheck();
         status.dataset.tone = verified?.state === "solvable" ? "ok" : verified || warnings().length ? "warn" : "";
-        paintTiles();
         notice.textContent = tried
           ? t("직접 풀어 봤어요. 링크를 공유할 수 있어요.")
           : solvable
             ? t("풀 수 있는 퍼즐이에요. 링크를 공유할 수 있어요.")
-            : t("풀 수 있는지 확인하거나 시험 플레이에서 풀면 링크를 공유할 수 있어요.");
+            : t("풀이 확인·시험 성공 후 공유할 수 있어요.");
+      };
+      const renderPreview = () => {
+        const moves = solution();
+        const step = moves && viewStep !== null ? moves[viewStep] : null;
+        view.checked = Boolean(step);
+        stepNav.hidden = !step;
+        prevStep.disabled = viewStep === null || viewStep === 0;
+        nextStep.disabled = viewStep === null || !moves || viewStep >= moves.length - 1;
+        if (step) stepOut.textContent = `${viewStep + 1} / ${moves.length}`;
+        holdNote.hidden = !moves?.some(move => move.hold);
+        holdNote.classList.toggle("is-invisible", !step?.hold);
+        layoutBoard();
+        paintTiles();
+      };
+      const fitPreview = () => {
+        if (viewStep === null) return;
+        const gap = Number.parseFloat(getComputedStyle(preview).rowGap);
+        const room = editorBody.clientHeight - stepNav.offsetHeight - gap - 2;
+        // 각 칸에는 높이 외에 행 사이 간격이 더해진다.
+        const cell = (room - (previewHeight - 1) * 2) / previewHeight;
+        preview.style.setProperty("--preview-width", `${Math.max(10, cell) * WIDTH + (WIDTH - 1) * 2}px`);
       };
       const warnings = () => puzzleWarnings(current());
       /**
@@ -885,6 +992,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         pieces.length <= AUTO_CHECK_PIECES &&
         canSearch(current()) &&
         !warnings().length &&
+        !stroke &&
         !checking &&
         keyNow() !== autoSkip &&
         !(verified && verified.code === keyNow());
@@ -898,6 +1006,9 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       /** 확인 결과가 있으면 그것, 없으면 미리 알려 줄 것 */
       const statusText = code => {
         if (verified?.state === "checking") return t("풀 수 있는지 찾는 중이에요…");
+        if (verified?.state === "unavailable")
+          return t("백그라운드 풀이기를 열 수 없어요. 잠시 후 다시 시도해 주세요.");
+        if (verified?.state === "deferred") return t("이 퍼즐은 더 살펴봐야 해요. 확인을 누르면 자세히 찾아봐요.");
         if (verified?.state === "solvable")
           return t("풀 수 있어요 · {n}수. 풀이 보기로 한 수씩 볼 수 있어요.", { n: verified.moves?.length ?? 0 });
         if (verified?.state === "unsolvable")
@@ -977,41 +1088,55 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         // 구멍 줄은 처음 누른 열을 구멍으로 둔다(아래위로 끌면 같은 열에 구멍이 이어진다)
         const at = tool === "garbage" ? index - (index % WIDTH) + stroke.col : index;
         if (applyTool(cells, tool, at, stroke.value)) {
+          if (!stroke.changed) {
+            clearTimeout(autoTimer);
+            stopChecking();
+          }
           stroke.changed = true;
           paintTiles();
         }
       };
       const endStroke = () => {
         if (!stroke) return;
-        if (stroke.changed) {
-          history.record(stroke.before);
+        const { changed: painted, before } = stroke;
+        stroke = null;
+        if (painted) {
+          history.record(before);
           changed();
         }
-        stroke = null;
       };
       const cellAt = target => /** @type {HTMLElement | null} */ (target?.closest?.("[data-cell]"));
-      board.addEventListener("pointerdown", event => {
-        const cell = cellAt(event.target);
-        if (!cell || event.button > 0) return;
-        event.preventDefault();
-        // 풀이를 보는 중에 판을 누르면 편집으로 돌아온다
-        if (viewStep !== null) {
-          viewStep = null;
-          refresh();
-          return;
-        }
-        const index = Number(cell.dataset.cell);
-        cell.focus({ preventScroll: true });
-        if (tool === "piece") return doStamp(index);
+      /** @param {number} index @param {Exclude<Tool, "piece">} paintTool */
+      const startStroke = (index, paintTool) => {
         stroke = {
-          value: strokeValue(cells, tool, index),
+          value: strokeValue(cells, paintTool, index),
           before: snapshot(),
           changed: false,
           col: index % WIDTH,
           last: -1,
         };
-        board.setPointerCapture(event.pointerId);
         paintAt(index);
+      };
+      const dragPaint = toggle({
+        id: "puzzle-drag-paint",
+        onChange: on => board.classList.toggle("is-touch-painting", on),
+      });
+      board.addEventListener("pointerdown", event => {
+        const cell = cellAt(event.target);
+        if (!cell || event.button > 0) return;
+        // 터치는 탭이 끝난 다음에만 편집한다. 끌어 칠하기를 켜면 바로 붓질을 시작한다.
+        if (event.pointerType === "touch" && (viewStep !== null || !dragPaint.checked)) return;
+        event.preventDefault();
+        // 풀이를 보는 중에 판을 누르면 편집으로 돌아온다
+        if (viewStep !== null) {
+          closeSolution();
+          return;
+        }
+        const index = Number(cell.dataset.cell);
+        cell.focus({ preventScroll: true });
+        if (tool === "piece") return doStamp(index);
+        board.setPointerCapture(event.pointerId);
+        startStroke(index, tool);
       });
       board.addEventListener("pointermove", event => {
         const cell = cellAt(document.elementFromPoint(event.clientX, event.clientY));
@@ -1032,20 +1157,16 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         paintTiles();
       });
       for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) board.addEventListener(type, endStroke);
-      // 키보드(Enter·Space)로 누른 칸: 칸 하나에 도구를 한 번
+      // 키보드·터치 탭은 칸 하나에 도구를 한 번 적용한다.
       board.addEventListener("click", event => {
         const cell = cellAt(event.target);
-        if (!cell || event.detail > 0) return;
+        if (!cell) return;
+        if (viewStep !== null) return closeSolution();
+        const touchTap = event instanceof PointerEvent && event.pointerType === "touch";
+        if (event.detail > 0 && (!touchTap || dragPaint.checked)) return;
         const index = Number(cell.dataset.cell);
         if (tool === "piece") return doStamp(index);
-        stroke = {
-          value: strokeValue(cells, tool, index),
-          before: snapshot(),
-          changed: false,
-          col: index % WIDTH,
-          last: -1,
-        };
-        paintAt(index);
+        startStroke(index, tool);
         endStroke();
       });
       board.addEventListener("focusin", event => {
@@ -1059,13 +1180,8 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         }
       });
       board.addEventListener("keydown", event => {
+        if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
         const cell = cellAt(event.target);
-        // 도장은 R로 돌린다
-        if (tool === "piece" && cell && event.key.toLowerCase() === "r" && !event.ctrlKey && !event.metaKey) {
-          event.preventDefault();
-          rotateStamp();
-          return;
-        }
         const offset = { ArrowUp: -WIDTH, ArrowDown: WIDTH, ArrowLeft: -1, ArrowRight: 1 }[event.key];
         if (!cell || offset === undefined) return;
         event.preventDefault();
@@ -1111,6 +1227,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
       moveBack.addEventListener("click", () => selected !== null && editPieces(movePiece(pieces, selected, -1)));
       moveForward.addEventListener("click", () => selected !== null && editPieces(movePiece(pieces, selected, 1)));
       sequence.addEventListener("keydown", event => {
+        if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
         const at = Number(/** @type {HTMLElement} */ (event.target).dataset.at);
         if (Number.isNaN(at)) return;
         if (event.key === "Delete" || event.key === "Backspace") {
@@ -1119,37 +1236,79 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
           event.preventDefault();
           const offset = event.key === "ArrowLeft" ? -1 : 1;
-          // Alt+화살표는 피스를 옮기고, 화살표만은 옆 칩으로 간다
-          if (event.altKey) editPieces(movePiece(pieces, at, offset));
-          else {
-            const next = /** @type {HTMLElement | undefined} */ (sequence.children[at + offset]);
-            next?.focus();
-          }
+          const next = /** @type {HTMLElement | undefined} */ (sequence.children[at + offset]);
+          next?.focus();
         }
       });
+
+      /** @param {KeyboardEvent} event */
+      const editorShortcuts = event => {
+        if (event.defaultPrevented || event.ctrlKey || event.metaKey) return;
+        const target = /** @type {HTMLElement} */ (event.target);
+        if (target.matches('input:not([type="checkbox"]), textarea, select') || target.isContentEditable) return;
+        if (tool === "piece" && !event.altKey) {
+          // 한글 배열에서는 영문 글자 대신 물리 키 위치를 사용한다.
+          const key = /^[a-z]$/i.test(event.key) ? event.key.toUpperCase() : event.code.replace(/^Key/, "");
+          if (key === "R") {
+            event.preventDefault();
+            rotateStamp();
+            return;
+          }
+          const piece = PIECE_TYPES.find(type => type === key);
+          if (piece) {
+            event.preventDefault();
+            stampPick.setValue(piece);
+            return;
+          }
+        }
+        // 브라우저가 Alt+화살표를 탐색 키로 잡는 경우에는 Shift+화살표를 쓴다.
+        if (event.shiftKey === event.altKey || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
+        const at = target.matches(".puzzle-seq-chip") ? Number(target.dataset.at) : selected;
+        if (at === null) return;
+        event.preventDefault();
+        editPieces(movePiece(pieces, at, event.key === "ArrowLeft" ? -1 : 1));
+      };
 
       /** 풀 수 있는지 찾는다. auto: 고치기를 멈추면 저절로(포커스는 옮기지 않는다) */
       const runCheck = (auto = false) => {
         const code = keyNow();
         if (!code || checking || !canSearch(current())) return;
         verified = { code, state: "checking" };
-        const search = solver.run(solutionTask(current()));
+        const task = solutionTask(current());
+        const request = solver.run(auto ? { ...task, maxStates: AUTO_CHECK_STATES } : task);
+        const limit = auto
+          ? setTimeout(() => {
+              if (checking !== search) return;
+              stopChecking();
+              verified = { code, state: "deferred" };
+              if (dialog.open && dialog.contains(status)) refresh();
+            }, AUTO_CHECK_MS)
+          : undefined;
+        const search = {
+          cancel: () => {
+            clearTimeout(limit);
+            request.cancel();
+          },
+        };
         checking = search;
         refresh();
         if (!auto) stop.focus();
-        search.promise.then(result => {
+        request.promise.then(result => {
+          clearTimeout(limit);
           if (checking !== search) return;
           checking = null;
           if (result === undefined) return;
           verified =
-            result && "moves" in result
-              ? { code, state: "solvable", moves: result.moves }
-              : { code, state: result ? "exhausted" : "unsolvable" };
-          if (dialog.contains(status)) {
+            result === SOLVER_UNAVAILABLE
+              ? { code, state: "unavailable" }
+              : result && "moves" in result
+                ? { code, state: "solvable", moves: result.moves }
+                : { code, state: result ? (auto ? "deferred" : "exhausted") : "unsolvable" };
+          if (dialog.open && dialog.contains(status)) {
             // 저절로 확인한 것이면 포커스는 사용자가 두던 곳에 그대로
             const keepFocus = auto && document.activeElement !== stop;
             refresh();
-            if (!keepFocus) (view.disabled ? check : view).focus();
+            if (!keepFocus) (view.disabled ? (check.disabled ? trial : check) : view).focus();
           }
         });
       };
@@ -1161,20 +1320,48 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         refresh();
         check.focus();
       });
+      compare.addEventListener("click", () => {
+        const baseline = solution();
+        if (!baseline || comparisonDialog.open) return;
+        openPuzzleComparison({
+          dialog: comparisonDialog,
+          task: solutionTask(current()),
+          solver,
+          baseline,
+          visual: getVisual(),
+        });
+      });
+      const closeSolution = () => {
+        viewStep = null;
+        renderPreview();
+        tiles[focusIndex].focus({ preventScroll: true });
+        preview.scrollIntoView({ block: "start", inline: "nearest" });
+      };
+      closePreview.addEventListener("click", closeSolution);
       view.addEventListener("change", () => {
-        viewStep = view.checked && solution() ? 0 : null;
-        refresh();
+        const moves = solution();
+        if (!view.checked || !moves) return closeSolution();
+        previewHeight = moves.reduce((rows, move) => {
+          const visible = move.board.subarray(move.board.length - PUZZLE_CELLS);
+          const heightOfMove = Math.max(...move.cells.map(([, y]) => move.board.length / WIDTH - y));
+          return Math.min(VISIBLE_ROWS, Math.max(rows, usedHeight(visible), heightOfMove));
+        }, EDIT_HEIGHTS[0]);
+        viewStep = 0;
+        renderPreview();
+        fitPreview();
+        (nextStep.disabled ? closePreview : nextStep).focus({ preventScroll: true });
+        preview.scrollIntoView({ block: "start", inline: "nearest" });
       });
       prevStep.addEventListener("click", () => {
         if (viewStep !== null && viewStep > 0) viewStep -= 1;
-        refresh();
-        if (prevStep.disabled) nextStep.focus();
+        renderPreview();
+        if (prevStep.disabled) nextStep.focus({ preventScroll: true });
       });
       nextStep.addEventListener("click", () => {
         const moves = solution();
         if (viewStep !== null && moves && viewStep < moves.length - 1) viewStep += 1;
-        refresh();
-        if (nextStep.disabled) prevStep.focus();
+        renderPreview();
+        if (nextStep.disabled) prevStep.focus({ preventScroll: true });
       });
 
       trial.addEventListener("click", () => {
@@ -1205,8 +1392,8 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
           "div",
           { class: "puzzle-editor" },
           el("p", {
-            class: "field-help",
-            text: t("판을 칠하고 피스와 목표를 고르세요. 규칙과 중력은 아래 고급 설정에서 바꿀 수 있어요."),
+            class: "field-help puzzle-editor-guide",
+            text: t("시작 틀을 고르거나 판을 칠하세요. 피스를 추가하면 시험 플레이로 확인할 수 있어요."),
           }),
           el(
             "div",
@@ -1237,16 +1424,11 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
               { class: "puzzle-editor-canvas", "aria-label": t("판") },
               el(
                 "div",
-                { class: "puzzle-editor-row" },
+                { class: "puzzle-editor-row puzzle-editor-paint" },
                 el("span", { class: "puzzle-editor-label", text: t("칠하기") }),
                 tools
               ),
-              el(
-                "div",
-                { class: "puzzle-editor-row" },
-                el("span", { class: "puzzle-editor-label", text: t("도장 피스") }),
-                el("span", { class: "puzzle-editor-stamp" }, stampPick, stampRotate)
-              ),
+              stampOptions.root,
               el(
                 "div",
                 { class: "puzzle-editor-row" },
@@ -1254,7 +1436,8 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
                 heights
               ),
               hint,
-              board,
+              el("label", { class: "puzzle-touch-paint" }, dragPaint, t("끌어서 칠하기")),
+              preview,
               el(
                 "div",
                 { class: "puzzle-editor-tools", role: "toolbar", "aria-label": t("판 도구") },
@@ -1290,7 +1473,7 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
                   { class: "puzzle-editor-seq-head" },
                   el("span", { class: "puzzle-editor-label", text: t("피스 순서") }),
                   count,
-                  el("span", { class: "puzzle-editor-seq-actions" }, moveBack, moveForward, remove)
+                  sequenceActions
                 ),
                 sequence
               ),
@@ -1298,21 +1481,10 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
                 "p",
                 { class: "field-help" },
                 t(
-                  '피스를 눌러 고르면 그 뒤에 넣고, 앞뒤로 옮기거나 뺄 수 있어요(Alt+화살표·Delete). 글자 키(I J L O S T Z)로 넣거나 "TSZ" 같은 순서를 붙여 넣어도 돼요.'
+                  '고른 피스 뒤에 넣어요. Shift+좌우 화살표로 옮기고, 순서 칸에서 Delete로 빼요. 글자 키(I J L O S T Z)로 넣거나 "TSZ"처럼 붙여 넣을 수 있어요.'
                 )
               ),
-              el(
-                "div",
-                { class: "puzzle-editor-check" },
-                el("div", { class: "puzzle-editor-check-actions" }, check, stop),
-                status,
-                el(
-                  "div",
-                  { class: "puzzle-editor-solution" },
-                  el("label", { class: "puzzle-editor-switch" }, view, el("span", { text: t("풀이 보기") })),
-                  el("span", { class: "puzzle-editor-step-nav" }, prevStep, stepOut, nextStep)
-                )
-              )
+              el("div", { class: "puzzle-editor-check" }, verification.root)
             )
           ),
           advanced,
@@ -1322,7 +1494,12 @@ export const createPuzzleEditor = ({ dialog, solver, customs, onTry }) => {
         actions: [trial, copy],
         closeId: "puzzle-editor-close",
       });
-      dialog.querySelector(".puzzle-editor")?.addEventListener("paste", pastePieces);
+      const editorBody = /** @type {HTMLElement | null} */ (dialog.querySelector(".puzzle-editor"));
+      editorBody?.addEventListener("paste", pastePieces);
+      editorBody?.addEventListener("keydown", editorShortcuts);
+      previewResize = new ResizeObserver(fitPreview);
+      previewResize.observe(editorBody);
+      previewResize.observe(stepNav);
       layoutBoard();
       refresh();
       dialog.showModal();

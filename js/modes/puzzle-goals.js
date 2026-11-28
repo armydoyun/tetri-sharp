@@ -21,3 +21,6 @@ export const goalOf = (kind, count, lines = 0) => {
   if (kind === "lines") return { goal: ev => (ev.total ?? ev.lines) >= Math.max(1, lines) };
   return { goal: ev => ev.perfect };
 };
+
+/** 점수표와 별개로 연속으로 줄을 지운 수를 센다. 첫 줄 삭제는 콤보 0이다. */
+export const puzzleCombo = (previous, lines) => (lines ? previous + 1 : -1);

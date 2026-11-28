@@ -2,7 +2,7 @@
 // Node 의존성이 없는 순수 함수라 빌드(tools/build.mjs)와 테스트가 같은 코드를 쓴다.
 
 // 개발용 index.html은 css/ 아래 파일을 <link> 여러 개로 건다. 배포본은 첫 링크 자리에 <style> 하나를 넣고 나머지를 지운다.
-export const CSS_LINK = /[ \t]*<link rel="stylesheet" href="\.\/(css\/[\w./-]+\.css)">\r?\n?/g;
+export const CSS_LINK = /[ \t]*<link rel="stylesheet" href="\.\/(css\/[\w./-]+\.css)"(?:\s*\/)?>\r?\n?/g;
 export const cssHrefs = html => [...html.matchAll(CSS_LINK)].map(m => m[1]);
 export const JS_TAG = '<script type="module" src="./js/main.js"></script>';
 export const DEV_COMMENT = "<!-- ES Modules: 개발용 실행은 http://localhost를 사용한다. -->";
@@ -29,7 +29,7 @@ export const styleSafe = css => {
 };
 
 /** html: 개발용 index.html, css: 링크 순서대로 이어 붙여 압축한 CSS, js: 압축된 IIFE 번들 */
-export const inlineHtml = ({ html, css, js }) => {
+export const inlineHtml = ({ html, css, js, entryTag = JS_TAG, buildComment = BUILD_COMMENT }) => {
   if (!cssHrefs(html).length) throw new Error("index.html에서 스타일시트 링크(./css/….css)를 찾지 못했습니다.");
   let first = true;
   let out = html.replace(CSS_LINK, () => {
@@ -37,8 +37,8 @@ export const inlineHtml = ({ html, css, js }) => {
     first = false;
     return `    <style>${styleSafe(css.trim())}</style>\n`;
   });
-  out = replaceOnce(out, DEV_COMMENT, BUILD_COMMENT, "개발용 스크립트 주석");
-  out = replaceOnce(out, JS_TAG, `<script>${scriptSafe(js.trim())}</script>`, "ES Module 진입 스크립트");
+  out = replaceOnce(out, DEV_COMMENT, buildComment, "개발용 스크립트 주석");
+  out = replaceOnce(out, entryTag, `<script>${scriptSafe(js.trim())}</script>`, "ES Module 진입 스크립트");
   // 바깥 파일을 하나라도 참조하면 한 파일로 옮겼을 때 깨진다. 인라인 코드는 빼고 마크업만 본다.
   const markup = out
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")

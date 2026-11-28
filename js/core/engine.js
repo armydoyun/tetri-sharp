@@ -14,7 +14,8 @@ import {
 } from "./board.js";
 import { CELL_ID, PIECES } from "./pieces.js";
 import { createRng } from "./rng.js";
-import { detectTSpin } from "./tspin.js";
+import { detectSpin, movedByRotation, spinKicks } from "./spins.js";
+import { spinBit, spinMask } from "../rules/spins.js";
 import { SCORINGS } from "../rules/scoring/index.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
 import { RANDOMIZERS } from "../rules/randomizer/index.js";
@@ -55,8 +56,10 @@ export const msToFrames = ms => (ms * 60) / 1000;
  * @property {number} rot
  * @property {number} x
  * @property {number} y
- * @property {"move" | "rotate" | "drop" | null} lastAction  T-spin 판정용
+ * @property {"move" | "rotate" | "drop" | null} lastAction  스핀 판정용
+ * @property {boolean} [spinMoved] 마지막 회전이 실제 칸을 바꿨는지(미노별 판정)
  * @property {number} kick  마지막 회전에서 쓴 킥 번호
+ * @property {number} [turn] 마지막 회전 방향(화면 효과용)
  */
 
 /**
@@ -64,6 +67,7 @@ export const msToFrames = ms => (ms * 60) / 1000;
  * @typedef {Object} ModeHook
  * @property {(state: any, events: any[]) => null | { result: string }} [check]
  * @property {(state: any) => number} [levelFor]    줄 수 등에 따른 레벨 (없으면 1 고정)
+ * @property {boolean} [allowsFixedGravity]  모드 중력을 사용자 고정값으로 바꿀 수 있다
  * @property {(state: any) => number} [gravityFor]  레벨 등에 따른 중력 (없으면 rules.gravity)
  * @property {number} [initialLevel]                  시작 레벨 (기본 1)
  * @property {(state: any, lines: number) => number} [levelAfterLock]  고정마다 레벨을 올리는 방식(levelFor 대신)
@@ -77,10 +81,11 @@ export const msToFrames = ms => (ms * 60) / 1000;
  */
 
 /**
- * @param {{ rules: import("../rules/presets.js").RuleSet, handling?: Handling, seed?: number, mode?: ModeHook, onSpawn?: (state: any) => void }} options
+ * @param {{ rules: import("../rules/presets.js").RuleSet, handling?: Handling, seed?: number, mode?: ModeHook, onSpawn?: (state: any) => void, legacyArsSpin?: boolean }} options
  */
-export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode, onSpawn }) => {
+export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode, onSpawn, legacyArsSpin = false }) => {
   const rotation = ROTATIONS[rules.rotation];
+  const enabledSpins = spinMask(rules);
   if (!rotation) throw new Error(`알 수 없는 회전 시스템: ${rules.rotation}`);
   const makeRandomizer = RANDOMIZERS[rules.randomizer];
   if (!makeRandomizer) throw new Error(`알 수 없는 생성기: ${rules.randomizer}`);
@@ -88,7 +93,11 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
   const scoring = SCORINGS[rules.scoring ?? "guideline"];
   if (!scoring) throw new Error(`알 수 없는 점수표: ${rules.scoring}`);
   // 규칙이 조작감을 고정하면(예: Retro) 개인 설정 대신 그 값을 쓴다.
-  const withRules = h => (rules.fixedHandling ? { ...h, ...rules.fixedHandling } : h);
+  const withRules = h => {
+    if (!rules.fixedHandling) return h;
+    const { instantSoftDrop, ...fixed } = rules.fixedHandling;
+    return { ...h, ...fixed, sdf: instantSoftDrop ? Infinity : fixed.sdf };
+  };
   handling = withRules(handling);
 
   const randomizer = mode?.sequence?.length
@@ -154,7 +163,10 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
   let consumed = 0;
 
   const currentGravity = () => {
-    let g = mode?.gravityFor ? mode.gravityFor(state) : rules.gravity;
+    const g =
+      mode?.gravityFor && !(mode.allowsFixedGravity && rules.gravityMode === "fixed")
+        ? mode.gravityFor(state)
+        : rules.gravity;
     return g >= 20 ? Infinity : g;
   };
 
@@ -179,7 +191,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
   };
 
   /** @param {import("./pieces.js").PieceType} type */
-  const spawn = type => {
+  const spawn = (type, fromHold = false) => {
     const size = PIECES[type].size;
     /** @type {Active} */
     const a = {
@@ -217,13 +229,14 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
     state.gravityAcc = 0;
     resetLock(a.y);
     cutDas();
-    events.push({ type: "spawn", piece: type });
+    events.push({ type: "spawn", piece: type, fromHold });
     onSpawn?.(state);
   };
 
   /** 다음 피스를 꺼내 생성한다. IHS: 생성 순간 홀드를 누르고 있으면 바로 홀드한 피스와 바꾼다. */
   const spawnNext = () => {
     let type = takeNext();
+    let fromHold = false;
     if (rules.ihs && rules.hold.enabled && currentHeld & BTN.HOLD && !state.holdUsed && canHold()) {
       const held = state.hold;
       state.hold = type;
@@ -231,20 +244,22 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
       events.push({ type: "hold", piece: type, initial: true });
       state.tally.holds += 1;
       type = held ?? takeNext();
+      fromHold = Boolean(held);
     }
-    spawn(type);
+    spawn(type, fromHold);
   };
 
   const lockPiece = () => {
     const a = /** @type {Active} */ (state.active);
     const shape = cells(a);
-    const tspin = rules.tspin === "threeCorner" ? detectTSpin(board, a) : "none";
+    const { tspin, spinPiece } = detectSpin(board, rotation, a, enabledSpins, legacyArsSpin);
     place(board, shape, a.x, a.y, CELL_ID[a.type]);
     state.active = null;
     state.holdUsed = false;
     state.stats.pieces += 1;
 
-    const cleared = clearLines(board);
+    const clearedCells = [];
+    const cleared = clearLines(board, (_row, cells) => clearedCells.push(cells));
     const lines = cleared.length;
     const perfect = lines > 0 && isEmpty(board);
     const scoreLevel = mode?.scoreLevel ? mode.scoreLevel(state) : state.level;
@@ -253,7 +268,10 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
     state.b2b = scored.b2b;
     state.combo = scored.combo;
     const t = state.tally;
-    if (lines > 0 || tspin !== "none") t.clears[`${tspin}-${lines}`] = (t.clears[`${tspin}-${lines}`] ?? 0) + 1;
+    if (lines > 0 || tspin !== "none" || spinPiece) {
+      const key = `${spinPiece ?? tspin}-${lines}`;
+      t.clears[key] = (t.clears[key] ?? 0) + 1;
+    }
     if (perfect) t.perfect += 1;
     t.maxCombo = Math.max(t.maxCombo, scored.combo);
     t.maxB2b = Math.max(t.maxB2b, scored.b2b);
@@ -264,7 +282,18 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
       cells: shape.map(([cx, cy]) => [a.x + cx, a.y + cy]),
       lines,
       rows: cleared,
+      ...(lines > 0 ? { clearedCells } : {}),
       tspin,
+      ...(spinPiece ? { spinPiece } : {}),
+      ...(tspin !== "none" || spinPiece
+        ? {
+            spinPivot: {
+              x: a.x + (spinPiece ? shape.reduce((sum, [x]) => sum + x + 0.5, 0) / shape.length : 1.5),
+              y: a.y + (spinPiece ? shape.reduce((sum, [, y]) => sum + y + 0.5, 0) / shape.length : 1.5),
+              direction: a.turn > 0 ? 1 : -1,
+            },
+          }
+        : {}),
       perfect,
       points: scored.points,
       b2b: scored.b2bApplied,
@@ -339,21 +368,36 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
       const y = a.y + cy;
       return !inBounds(board, x, y) || get(board, x, y) !== 0;
     };
-    const kicks = rotation.kicks(a.type, a.rot, to, blocked);
+    const kicks = spinKicks(board, rotation, a, to, enabledSpins, blocked);
     for (let i = 0; i < kicks.length; i++) {
       const [dx, dy] = kicks[i];
       if (fits(a, dx, dy, to)) {
+        // 킥 전 자리를 막은 면만 표시한다. 실제 이동과 판정에는 쓰지 않는다.
+        const hit = dx || dy ? rotation.cells(a.type, to).find(([x, y]) => blocked(x, y)) : null;
+        const horizontal = hit && dx && (!dy || (a.y + hit[1] >= 0 && a.y + hit[1] < board.height));
+        const contact = hit
+          ? {
+              x: Math.max(0, Math.min(board.width, a.x + hit[0] + (horizontal ? Number(dx > 0) : 0.5))),
+              y: Math.max(0, Math.min(board.height, a.y + hit[1] + (horizontal ? 0.5 : Number(dy > 0)))),
+              dx: horizontal ? dx : 0,
+              dy: horizontal ? 0 : dy,
+            }
+          : null;
+        const kick = a.type === "O" && dx ? 1 : i;
+        if (a.type !== "T" && enabledSpins & spinBit(a.type))
+          a.spinMoved = movedByRotation(rotation, a.type, a.rot, to, dx, dy);
         a.x += dx;
         a.y += dy;
         a.rot = to;
         a.lastAction = "rotate";
-        a.kick = i;
+        a.kick = kick;
+        a.turn = delta;
         cutDas();
         onShifted();
         onDescended(a);
-        events.push({ type: "rotate", kick: i });
+        events.push({ type: "rotate", turn: delta, kick, ...(contact ? { contact } : {}) });
         state.tally.rotations += 1;
-        if (i > 0) state.tally.kicks += 1;
+        if (kick > 0) state.tally.kicks += 1;
         return true;
       }
     }
@@ -467,6 +511,10 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
   const advance = ({ held = 0, pressed = 0 } = {}) => {
     events = [];
     if (state.over) return events;
+    if (rules.allow180 === false) {
+      held &= ~BTN.R180;
+      pressed &= ~BTN.R180;
+    }
     currentHeld = held;
     consumed = 0;
     if (state.frame === 0 && !state.active) spawnNext();
@@ -487,12 +535,13 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
 
     if (pressed & BTN.HOLD && rules.hold.enabled && !state.holdUsed && canHold()) {
       const current = state.active.type;
-      const next = state.hold ?? takeNext();
+      const held = state.hold;
+      const next = held ?? takeNext();
       state.hold = current;
       state.holdUsed = true;
       events.push({ type: "hold", piece: current });
       state.tally.holds += 1;
-      spawn(next);
+      spawn(next, Boolean(held));
       if (!state.active) return events;
     }
 
@@ -530,6 +579,7 @@ export const createGame = ({ rules, handling = DEFAULT_HANDLING, seed = 1, mode,
     step,
     state,
     rules,
+    legacyArsSpin,
     get handling() {
       return handling;
     },

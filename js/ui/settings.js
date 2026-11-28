@@ -12,6 +12,7 @@ import {
 } from "../input/gamepad.js";
 import { icon } from "./icons.js";
 import {
+  CLEAR_EFFECT_LENGTH_LIMITS,
   DEFAULT_SETTINGS,
   HANDLING_LIMITS,
   HANDLING_PRESETS,
@@ -22,11 +23,19 @@ import {
   handlingPresetOf,
 } from "../storage/settings.js";
 import { el, fieldRow, fillDialog, focusKey, restoreFocus } from "./dom.js";
-import { button, choiceCards, confirmButton, rangeRow, segmented, slider, tabBar, toggle } from "./components.js";
+import { button, confirmButton, rangeRow, segmented, slider, tabBar, toggle } from "./components.js";
 import { dropdown } from "./select.js";
-import { COLOR_SWATCHES, PIECE_ORDER, THEMES, THEME_IDS, findTheme, paletteFor } from "../render/themes.js";
+import {
+  ADDITIONAL_THEMES,
+  COLOR_SWATCHES,
+  PIECE_ORDER,
+  THEMES,
+  THEME_IDS,
+  findTheme,
+  paletteFor,
+} from "../render/themes.js";
 import { keycap } from "./keycap.js";
-import { createThemeStage, drawThemeSwatch } from "../render/preview.js";
+import { createThemePicker } from "./theme-picker.js";
 import { t } from "../i18n/index.js";
 
 const HANDLING_ROWS = [
@@ -63,7 +72,8 @@ const PRESET_HINTS = {
 };
 const TOUCH_MODE_HINTS = {
   buttons: "보드 아래 버튼으로 조작해요",
-  gestures: "보드를 좌우로 밀어 이동, 두드려 회전(왼쪽 절반은 반대 방향), 아래로 튕겨 하드 드롭, 위로 밀어 홀드",
+  gestures:
+    "좌우로 밀어 이동, 한 손가락 탭으로 90도·두 손가락 탭으로 180도 회전, 아래로 튕겨 하드 드롭, 위로 밀어 홀드",
 };
 
 const TABS = [
@@ -88,6 +98,17 @@ const EFFECT_HINTS = {
   reduced: t("줄이 삭제된 위치에 가는 선을 잠깐 표시해요"),
   off: t("연출을 모두 꺼요"),
 };
+const GAMEPLAY_EFFECT_ROWS = [
+  ["next", t("다음 피스 등장"), t("새 피스와 다음 칸의 테두리를 잠깐 밝혀요")],
+  ["hold", t("홀드 교환"), t("홀드 칸에 들어가는 피스를 짧게 움직여요")],
+  ["spin", t("스핀 회전 강조"), t("스핀을 확정한 자리에서 회전선을 보여 줘요")],
+  ["perfect", t("퍼펙트 클리어"), t("보드를 모두 비우면 가장자리를 밝혀요")],
+  ["combo", t("콤보 표시"), t("연속으로 줄을 지울 때 보드 옆 칸을 채워요")],
+  ["danger", t("위험 진입·해제"), t("판이 위까지 차오르면 보드 상단을 강조해요")],
+  ["kick", t("벽 차기 접촉선"), t("피스가 벽이나 블록을 차고 돌 때 짧은 선을 보여 줘요")],
+  ["cancel", t("가비지 상쇄"), t("상쇄한 가비지만 대기 막대에서 접히듯 사라져요")],
+  ["record", t("개인 기록 추월"), t("구간 기록을 앞서는 순간 기록 칸을 강조해요")],
+];
 const SCHEME_HINTS = {
   system: "기기의 라이트·다크 설정을 따라요",
   light: "첫 화면과 메뉴를 밝게 써요",
@@ -152,7 +173,7 @@ export const createSettingsUI = ({
   let capture = null;
   const notice = el("p", { class: "notice-slot", role: "status", id: "settings-notice" });
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-  /** @type {ReturnType<typeof createThemeStage> | null} */
+  /** @type {ReturnType<typeof createThemePicker>["stage"] | null} */
   let playingPreview = null;
   const stopThemePreview = () => {
     playingPreview?.stop();
@@ -434,6 +455,51 @@ export const createSettingsUI = ({
     render();
   };
 
+  const clearEffectLengthRow = visual => {
+    const id = "set-clear-effect-length";
+    const { min, max, step } = CLEAR_EFFECT_LENGTH_LIMITS;
+    const format = value => `${value}%`;
+    const disabled = visual.effects !== "full";
+    const input = slider({ id, min, max, step, value: visual.clearEffectLength, disabled });
+    const output = el("output", { text: format(visual.clearEffectLength) });
+    output.htmlFor.add(id);
+    input.addEventListener("input", () => {
+      const length = Number(input.value);
+      output.textContent = format(length);
+      update({ visual: { ...getSettings().visual, clearEffectLength: length } });
+    });
+    // 드래그하는 동안 슬라이더 포인터를 유지하고, 손을 뗀 뒤 테마 미리보기를 갱신한다.
+    input.addEventListener("change", () => render());
+    return fieldRow({
+      id,
+      label: t("줄 삭제 효과 길이"),
+      hint: disabled ? t("화면 효과 ‘전체’에서 조절해요") : t("테마 기본 시간 기준 · 0%는 끄기"),
+      disabled,
+      control: rangeRow(input, output, format),
+    });
+  };
+
+  const gameplayEffectRows = visual =>
+    GAMEPLAY_EFFECT_ROWS.map(([key, label, hint]) => {
+      const id = `set-gameplay-effect-${key}`;
+      const disabled = visual.effects !== "full";
+      return fieldRow({
+        id,
+        label,
+        hint: disabled ? t("화면 효과 ‘전체’에서 조절해요") : hint,
+        disabled,
+        control: toggle({
+          id,
+          checked: visual.gameplayEffects[key],
+          disabled,
+          onChange: enabled => {
+            const current = getSettings().visual;
+            update({ visual: { ...current, gameplayEffects: { ...current.gameplayEffects, [key]: enabled } } });
+          },
+        }),
+      });
+    });
+
   const visualAccessRows = visual => [
     fieldRow({
       id: "set-effects",
@@ -448,6 +514,8 @@ export const createSettingsUI = ({
         onChange: v => setVisual("effects", v),
       }),
     }),
+    clearEffectLengthRow(visual),
+    ...gameplayEffectRows(visual),
     fieldRow({
       id: "set-palette",
       label: t("블록 색"),
@@ -473,89 +541,20 @@ export const createSettingsUI = ({
     ...(visual.palette === "custom" ? [colorPicker(visual)] : []),
   ];
 
-  /**
-   * 게임 테마: 위에 큰 미리보기(작은 게임 화면) 하나, 아래에 견본 칩.
-   * 칩에 마우스를 올리거나 키보드로 옮기면 미리보기만 그 테마로 바뀌고, 누르면 적용한다.
-   * 미리보기는 지금 화면 설정(색 구성·무늬·고스트·격자·효과)을 그대로 따른다.
-   */
-  const themeCards = visual => {
-    const canvas = el("canvas", { class: "theme-stage-canvas", "aria-hidden": "true" });
-    const name = el("strong", { class: "theme-stage-name" });
-    const state = el("span", { class: "theme-stage-state" });
-    const desc = el("small", { class: "theme-stage-desc" });
-    const stage = createThemeStage(canvas);
-    // 지금 미리보기에 보이는 테마(칩에 올리면 바뀐다) → "소리 들어 보기"가 그 테마의 소리를 낸다
-    let shown = visual.theme;
-    const listen = button({
-      label: t("소리 들어 보기"),
-      icon: "sound",
-      size: "s",
-      id: "theme-listen",
-      onClick: () => onPreviewTheme?.(shown),
-    });
-    const showTheme = id => {
-      shown = id;
-      const theme = findTheme(id);
-      stage.show(theme, paletteFor(visual, theme), visual);
-      name.textContent = theme.name;
-      desc.textContent = theme.description;
-      const current = id === visual.theme;
-      state.textContent = current ? t("사용 중") : t("미리보기");
-      state.classList.toggle("is-preview", !current);
-    };
-    showTheme(visual.theme);
-    // 열린 숨은 테마는 목록 끝에 붙는다
-    const ids = [...THEME_IDS, ...openedThemes()];
-    const cards = choiceCards({
-      id: "set-theme",
-      label: t("게임 테마"),
-      compact: true,
-      options: ids.map(id => {
-        const swatch = el("canvas", { class: "theme-swatch", "aria-hidden": "true" });
-        drawThemeSwatch(swatch, THEMES[id], paletteFor(visual, THEMES[id]));
-        return { value: id, title: THEMES[id].name, preview: swatch };
-      }),
-      value: visual.theme,
-      onChange: v => setVisual("theme", v),
-    });
-    cards.querySelectorAll("button").forEach((card, index) => {
-      const id = ids[index];
-      card.addEventListener("pointerenter", e => {
-        if (e.pointerType === "mouse") showTheme(id);
-      });
-      card.addEventListener("pointerleave", () => showTheme(visual.theme));
-      card.addEventListener("focus", () => {
-        if (card.matches(":focus-visible")) showTheme(id);
-      });
-      card.addEventListener("blur", () => showTheme(visual.theme));
-    });
-    if (!reducedMotion.matches) {
-      playingPreview = stage;
-      stage.play();
-    }
-    return el(
-      "div",
-      { class: "theme-picker" },
-      el(
-        "div",
-        // 미리보기 둘레는 게임 중 화면과 같은 색(늘 어둡게 / 화면 색 따르기)
-        { class: "theme-stage surface-game" },
-        canvas,
-        el(
-          "div",
-          { class: "theme-stage-caption" },
-          el("div", { class: "theme-stage-title" }, name, state),
-          desc,
-          el("div", { class: "theme-stage-actions" }, listen)
-        )
-      ),
-      cards
-    );
-  };
-
   const visualSection = () => {
     const visual = getSettings().visual;
     const scheme = getSettings().scheme;
+    const picker = createThemePicker({
+      visual,
+      ids: [...THEME_IDS, ...openedThemes()],
+      getVolume: () => getSettings().volume,
+      onSelect: theme => update({ visual: { ...getSettings().visual, theme } }),
+      onPreviewTheme,
+    });
+    if (!reducedMotion.matches) {
+      playingPreview = picker.stage;
+      picker.stage.play();
+    }
     return el(
       "section",
       { class: "field-section" },
@@ -606,7 +605,7 @@ export const createSettingsUI = ({
         label: t("게임 테마"),
         hint: t("보드·블록의 색과 모양, 효과가 바뀌어요. 미리보기는 지금 화면 설정을 따라요"),
         className: "is-wide",
-        control: themeCards(visual),
+        control: picker.element,
       }),
       ...visualAccessRows(visual),
       fieldRow({
@@ -702,6 +701,7 @@ export const createSettingsUI = ({
     input.addEventListener("input", () => {
       const v = Number(input.value);
       output.textContent = formatVolume(v);
+      if (v > 0) dialog.querySelector("#theme-sound-notice")?.replaceChildren();
       update({ volume: v });
     });
     // 손을 뗄 때 한 번 들려준다(끄기면 조용).
@@ -720,7 +720,7 @@ export const createSettingsUI = ({
     return fieldRow({
       id: "set-sound",
       label: t("효과음 종류"),
-      hint: t(SOUND_HINTS[value] ?? SOUND_HINTS.theme),
+      hint: ADDITIONAL_THEMES[value]?.sound ?? t(SOUND_HINTS[value] ?? SOUND_HINTS.theme),
       // 다섯 가지라 세그먼트는 휴대폰에서 글자가 두 줄로 찌그러진다 → 목록(설명은 목록 안에)
       control: dropdown({
         id: "set-sound",
@@ -731,7 +731,7 @@ export const createSettingsUI = ({
           ...[...THEME_IDS, ...openedThemes()].map(id => ({
             value: id,
             label: THEMES[id].name,
-            hint: t(SOUND_HINTS[id] ?? ""),
+            hint: ADDITIONAL_THEMES[id]?.sound ?? t(SOUND_HINTS[id] ?? ""),
           })),
         ],
         value,

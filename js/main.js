@@ -2,6 +2,7 @@
 // 로직은 고정 60Hz로 진행하고 화면은 모니터 주사율대로 그린다.
 import { BTN, createGame } from "./core/engine.js";
 import { createRenderer } from "./render/canvas.js";
+import { accentEnabled } from "./render/gameplay-accents.js";
 import { createKeyboard } from "./input/keyboard.js";
 import { createTouch, touchVisible } from "./input/touch.js";
 import { compilePadmap, createGamepad } from "./input/gamepad.js";
@@ -10,17 +11,20 @@ import { RANK_STEPS, isRankedRules, rankLabel, rankOf } from "./modes/ranks.js";
 import { MAX_RULE_SLOTS, createRuleSlots } from "./storage/rule-slots.js";
 import { ACHIEVEMENTS, createAchievements } from "./storage/achievements.js";
 import { createAchievementsUI } from "./ui/achievements.js";
-import { MODES, RECORD_MODES, SURVIVAL_MILESTONES, findMode as findBaseMode } from "./modes/index.js";
+import { ENDLESS, MODES, RECORD_MODES, SURVIVAL_MILESTONES, findMode as findBaseMode } from "./modes/index.js";
 import { dailyMode, dateKey, findDaily, recentDailyKeys } from "./modes/daily.js";
 import { decodeReplayCode, encodeReplayCode, replayLink } from "./replay/share.js";
 import { createDailyUI } from "./ui/daily.js";
-import { formatScore, formatTime } from "./modes/format.js";
+import { createDailyPuzzleUI } from "./ui/daily-puzzle.js";
+import { dailyPuzzleMode } from "./modes/daily-puzzle.js";
+import { createDailyPuzzleProgress } from "./storage/daily-puzzle.js";
+import { formatScore, formatTime, gravityLabel } from "./modes/format.js";
 import { createStore } from "./storage/store.js";
 import { runFingerprint } from "./storage/suspended-run.js";
 import { loadSettings, sanitizeSettings, saveSettings, toEngineHandling } from "./storage/settings.js";
 import { createRecords } from "./storage/records.js";
 import { createSettingsUI } from "./ui/settings.js";
-import { createRulesUI } from "./ui/rules.js";
+import { createRulesUI, noRuleChanges, ruleChanges } from "./ui/rules.js";
 import { createAsk } from "./ui/ask.js";
 import { button, menuRow, segmentButtons } from "./ui/components.js";
 import { el } from "./ui/dom.js";
@@ -32,7 +36,7 @@ import { createExpeditionUI } from "./ui/expedition.js";
 import { EXPEDITION_STAGES } from "./modes/expedition.js";
 import { createExpeditionProgress } from "./storage/expedition-progress.js";
 import { practiceMode } from "./modes/practice.js";
-import { advanceSplits, analyzeSplits, formatDelta, splitDelta } from "./modes/splits.js";
+import { advanceSplits, analyzeSplits, formatDelta, splitDelta, tookSplitLead } from "./modes/splits.js";
 import { hydrateIcons, icon } from "./ui/icons.js";
 import { keycap } from "./ui/keycap.js";
 import {
@@ -52,6 +56,7 @@ import { createSfx } from "./audio/sfx.js";
 import { DOWNSTACK_LESSONS } from "./modes/downstack.js";
 import { BUILD_LESSONS } from "./modes/build-lessons.js";
 import { BATTLE_LESSONS } from "./modes/battle-lessons.js";
+import { GESTURE_LESSONS } from "./modes/gesture-lessons.js";
 import { INTRO_LESSONS } from "./modes/intro-lessons.js";
 import { createPracticeProgress } from "./storage/practice-progress.js";
 import { SPRINT_HISTORY_KEY, createSprintHistory } from "./storage/sprint-history.js";
@@ -68,13 +73,12 @@ import { createUndo } from "./modes/undo.js";
 import { createHelpUI } from "./ui/help.js";
 import { PUZZLES, createPuzzleProgress, findPuzzle, puzzleMode } from "./modes/puzzles.js";
 import { describeSteps } from "./modes/puzzle-hint.js";
-import { createSolver } from "./app/solver.js";
+import { createSolver, SOLVER_UNAVAILABLE } from "./app/solver.js";
 import {
   CHECKED_AUTO,
   CHECKED_TRIED,
   customPuzzleMode,
   decodePuzzle,
-  goalLabel,
   ruleSummary,
   searchOptions,
 } from "./modes/custom-puzzle.js";
@@ -86,6 +90,9 @@ import { createShareUI } from "./ui/share.js";
 import { createVersusUI } from "./ui/versus.js";
 import { lang, t, translateDom } from "./i18n/index.js";
 import { createFeedback } from "./app/feedback.js";
+import { createPuzzleReview, reconstructPuzzleReview, reviewReason } from "./app/puzzle-review.js";
+import { showPuzzleReview } from "./ui/puzzle-review.js";
+import { createPuzzleGoalHud } from "./app/puzzle-goal-hud.js";
 import { createInputDisplay } from "./app/input-display.js";
 import { createKeyHelp } from "./app/key-help.js";
 import { setupBackup } from "./app/backup.js";
@@ -146,6 +153,7 @@ const applyScheme = () => {
 };
 
 const renderer = createRenderer(canvas, { getVisual: () => settings.visual });
+let splitPulse;
 /** 지금 쓸 효과음 묶음(테마 키): 고정했으면 그 테마의 소리, 아니면 게임 테마의 소리 */
 const soundSetFor = (themeId = settings.visual.theme) => (settings.sound === "theme" ? themeId : settings.sound);
 const sfx = createSfx({ getVolume: () => settings.volume, getSet: () => soundSetFor() });
@@ -236,10 +244,19 @@ let last = performance.now();
 
 // ---- 이어서 하기 ----
 /** 이어서 하기(js/app/run-saver.js): 기록·저장·되살리기. 판을 시작하고 진행하는 일은 아래 hooks가 맡는다 */
+let restoredSteps = 0;
 const runs = createRunSaver({
   store,
   findMode,
-  lessons: [INTRO_LESSONS, BATTLE_LESSONS, BUILD_LESSONS, DOWNSTACK_LESSONS, FINESSE_LESSONS, EXPEDITION_STAGES],
+  lessons: [
+    INTRO_LESSONS,
+    GESTURE_LESSONS,
+    BATTLE_LESSONS,
+    BUILD_LESSONS,
+    DOWNSTACK_LESSONS,
+    FINESSE_LESSONS,
+    EXPEDITION_STAGES,
+  ],
   // ask는 아래에서 정의된다: 부를 때 찾는다
   ask: options => ask(options),
   saveInterval: SAVE_INTERVAL,
@@ -251,6 +268,7 @@ const runs = createRunSaver({
       name: runPlayerName,
       resultPbSplits,
       pbSplits,
+      arsSpinFacing: rules.rotation === "ars" && rules.tspin === "threeCorner" && game?.legacyArsSpin === false,
     }),
     game: () => game,
     sceneEnded: () => Boolean(sceneView.current?.ended),
@@ -261,6 +279,7 @@ const runs = createRunSaver({
     canRestore: () => screen === "menu",
     /** 저장된 판과 같은 시드·규칙으로 판(또는 장면 연습)을 연다 */
     prepare(entry, m, handling) {
+      restoredSteps = 0;
       if (entry.scene) {
         const source = sanitizeReplay(entry.scene.source, findMode);
         if (!source || source.mode !== m.id) throw new Error("scene");
@@ -289,7 +308,7 @@ const runs = createRunSaver({
       if (kind === "hint" && !mode.puzzle) applyLessonHint();
     },
     applyInput(held, pressed) {
-      advanceRun(held, pressed, true);
+      advanceRun(held, pressed, restoredSteps++);
       if (game.state.over || sceneView.current?.ended) throw new Error("finished");
     },
     adopted(m) {
@@ -322,9 +341,26 @@ const runs = createRunSaver({
 // ---- 표시 도우미 ----
 
 const menuNotice = $("menu-notice");
-/** 메뉴 알림 칸은 늘 자리를 차지한다(빈 글이면 비어 보일 뿐). */
+const menuNoticeAfter = menuNotice.nextElementSibling;
+const linkNoticeHost = document.querySelector(".home-main");
 const showMenuNotice = text => {
+  if (menuNotice.hasAttribute("data-link-error")) {
+    menuNotice.removeAttribute("data-link-error");
+    menuNoticeAfter?.before(menuNotice);
+  }
   menuNotice.textContent = text;
+};
+const showLinkError = text => {
+  linkNoticeHost?.prepend(menuNotice);
+  menuNotice.setAttribute("data-link-error", "");
+  menuNotice.textContent = text;
+  // 이미 열려 있던 페이지에서는 새로고침이 이전 스크롤 위치를 복원할 수 있다.
+  const reveal = () =>
+    requestAnimationFrame(() => {
+      if (menuNotice.hasAttribute("data-link-error")) menuNotice.scrollIntoView({ block: "nearest" });
+    });
+  if (document.readyState === "complete") reveal();
+  else window.addEventListener("pageshow", reveal, { once: true });
 };
 /** 데이터 작업(백업·리플레이 파일) 결과: 설정이 열려 있으면 설정의 알림 칸, 아니면 첫 화면 알림 줄 */
 const notifyData = text => {
@@ -363,13 +399,26 @@ const keyHelp = createKeyHelp({
   padConnected: () => Boolean(padRef?.connected),
 });
 const keysOf = keyHelp.keysOf;
-const renderKeyHelp = keyHelp.render;
+const renderKeyHelp = () => {
+  keyHelp.render();
+  const rotate180 = /** @type {HTMLButtonElement} */ (document.querySelector('[data-touch="R180"]'));
+  rotate180.disabled = (game?.rules ?? currentRules()).allow180 === false;
+};
 
 /** 프리셋 한 줄 설명(첫 화면 규칙 카드) */
 const RULE_DESCRIPTIONS = {
   modern: t("요즘 표준: SRS 회전, 7-Bag, 홀드·하드 드롭·고스트, 넥스트 5개, T-spin 점수."),
   retro: t("옛날 가정용 게임 느낌: 벽차기·홀드·하드 드롭·고스트 없음, 닿으면 바로 고정, 조작감 고정."),
   arcade: t("아케이드 느낌: ARS 회전, 최근 4개를 피하는 생성기, 생성·줄 삭제 지연, 미리 회전(IRS)."),
+};
+
+const rulesTrial = {
+  ...ENDLESS,
+  id: "rules-trial",
+  name: t("규칙 시험 플레이"),
+  description: t("Endless에서 지금 규칙을 시험해요. 기록은 남지 않아요."),
+  practice: true,
+  noReplay: true,
 };
 
 /** 첫 화면 규칙 카드의 내 규칙 줄(Custom일 때만 보이고, 자리는 늘 차지한다) */
@@ -423,10 +472,30 @@ const renderRuleTabs = () => {
   renderRuleSlotRow();
   // 편집 버튼은 늘 같은 자리에 있다. Custom이 아닐 때는 비활성(원칙 2) — 이유는 설명 줄에.
   /** @type {HTMLButtonElement} */ ($("edit-rules")).disabled = ruleChoice !== "custom";
-  $("rule-desc").textContent =
-    ruleChoice === "custom"
-      ? t('직접 조합한 규칙이에요. "편집"으로 바꿀 수 있고, 조합마다 기록이 따로 쌓여요.')
-      : RULE_DESCRIPTIONS[ruleChoice];
+  const desc = $("rule-desc");
+  desc.removeAttribute("title");
+  if (ruleChoice !== "custom") {
+    desc.textContent = RULE_DESCRIPTIONS[ruleChoice];
+    return;
+  }
+  const changes = ruleChanges(customBody);
+  if (!changes.length) {
+    desc.textContent = noRuleChanges();
+    return;
+  }
+  desc.title = changes.join(" · ");
+  desc.replaceChildren(
+    ...changes
+      .slice(0, 2)
+      .map((change, index) =>
+        el(
+          "span",
+          { class: "rule-desc-line" },
+          el("span", { text: change }),
+          ...(index === 1 && changes.length > 2 ? [el("span", { text: t("외 {n}개", { n: changes.length - 2 }) })] : [])
+        )
+      )
+  );
 };
 
 /** 이 모드·규칙의 최고 기록과 그 리플레이(둘이 같은 판이고, 끝까지 간 판일 때만) */
@@ -483,14 +552,24 @@ const renderMenu = () => {
   renderPuzzleProgress();
   renderAchievementProgress();
   const ruleSet = currentRules();
-  $("active-rules").textContent = t("규칙 · {name}", { name: ruleSet.name });
+  const custom = ruleChoice === "custom";
+  const gravity = gravityLabel(ruleSet.gravity, t);
+  const gravitySetting = ruleSet.gravityMode === "fixed" ? gravity : t("모드별 중력");
+  const active = t("규칙 · {name}", { name: ruleSet.name });
+  $("active-rules").textContent = custom ? `${active} · ${gravitySetting}` : active;
   const list = $("mode-list");
   list.replaceChildren(
     ...MODES.map(m => {
       const best = records.best(m, ruleSet);
       const rank = rankOf(m, best, ruleSet);
-      return menuRow({
+      const appliedGravity = custom
+        ? m.gravityFor && ruleSet.gravityMode !== "fixed"
+          ? t("모드별 중력")
+          : gravity
+        : null;
+      const row = menuRow({
         "data-mode": m.id,
+        "aria-description": appliedGravity,
         title: m.name,
         desc: m.description,
         meta: best
@@ -498,6 +577,8 @@ const renderMenu = () => {
           : "",
         onClick: () => start(m),
       });
+      if (appliedGravity) row.title = appliedGravity;
+      return row;
     }),
     menuRow({
       "data-mode": "expedition",
@@ -594,11 +675,20 @@ $("daily").addEventListener("close", () => {
 });
 const formatSurvivalGoal = frames => formatTime(frames).split(".")[0];
 
+const puzzleReview = createPuzzleReview();
+let failedPuzzleMove = null;
+let reviewPractice = false;
+const puzzleGoalHud = createPuzzleGoalHud($("puzzle-goal-hud"));
 let lastHud;
 const updateHud = () => {
   const frame = game?.state.frame ?? 0;
   if (lastHud?.game === game && lastHud.frame === frame && lastHud.mode === mode && lastHud.screen === screen) return;
   lastHud = { game, frame, mode, screen };
+  puzzleGoalHud.update(
+    game,
+    screen === "menu" || screen === "replay" ? null : mode.puzzle,
+    settings.visual.effects === "full"
+  );
   if (sceneView.current?.split && game) sceneView.updateSplitProgress(game.state);
   const stats = game?.state.stats ?? { pieces: 0, lines: 0 };
   const lines = game ? mode.hudLines(game.state) : { label: t("줄"), value: "0" };
@@ -626,7 +716,7 @@ const updateHud = () => {
   setText(hud.finesse, fin ? `${fin.faults} / ${fin.judged}` : "0 / 0");
   setText(hud.pps, frame ? (stats.pieces / (frame / 60)).toFixed(2) : "0.00");
   const delta = game && mode.splits ? splitDelta(splits, pbSplits) : null;
-  setText(hud.split, formatDelta(delta));
+  setText(hud.split, formatSplitComparison(delta));
   const ahead = delta === null ? undefined : String(delta < 0);
   if (hud.split.dataset.ahead !== ahead) {
     if (ahead === undefined) delete hud.split.dataset.ahead;
@@ -636,12 +726,25 @@ const updateHud = () => {
 
 // ---- 화면 흐름 ----
 
+/** @param {number | null} delta */
+const formatSplitComparison = delta =>
+  delta === null ? formatDelta(delta) : t("{delta}초", { delta: formatDelta(delta) });
+
+const lessonHud = document.querySelector(".stage-side");
+if (lessonHud) {
+  new ResizeObserver(() => {
+    if (screen !== "play" || !hasHintControls(mode)) return;
+    const height = Math.ceil(lessonHud.getBoundingClientRect().height);
+    document.body.style.setProperty("--lesson-hud-h", `${height}px`);
+  }).observe(lessonHud);
+}
+
 const setScreen = next => {
   screen = next;
   document.body.dataset.screen = next;
   keyboard.setEnabled(next === "play" || next === "countdown");
   touch.setEnabled(next === "play" || next === "countdown");
-  gestures.setEnabled((next === "play" || next === "countdown") && gesturesOn());
+  applyTouch();
   document.body.classList.toggle("is-practice", Boolean(mode.practice && !isGuidedPractice()) && next !== "menu");
   document.body.classList.toggle("is-expedition", mode.expedition != null && next !== "menu");
   document.body.classList.toggle("is-trial", Boolean(mode.trialCode) && next !== "menu");
@@ -653,40 +756,33 @@ const setScreen = next => {
   document.body.classList.toggle("is-finesse-lesson", Boolean(mode.lesson) && next !== "menu");
   // 기록이 남는 판(기본 모드·오늘의 도전·CPU 대전): 일시정지 중에는 보드와 다음 피스를 가린다(css/game.css, 5차 검수 G4)
   document.body.classList.toggle("is-ranked", next !== "menu" && playCounts());
-  const modeTitle = mode.versus ? versusTitle(mode.versus) : mode.name;
+  const title = mode.versus ? versusTitle(mode.versus) : mode.name;
+  const modeTitle = reviewPractice ? t("마지막 수 연습 · {name}", { name: title }) : title;
   $("session-title").textContent = next === "menu" ? "" : sceneView.current ? sceneView.title() : modeTitle;
   $("session-title").classList.remove("is-secret");
-  $("mode-objective").textContent =
-    next === "menu" || next === "replay"
-      ? ""
-      : mode.expedition != null
-        ? `${mode.description} ${t("추가 목표 · {goal}", { goal: mode.bonus })}`
-        : mode.puzzle?.custom
-          ? customObjective(mode.puzzle.custom)
-          : mode.puzzle
-            ? mode.puzzle.kind === "pc"
-              ? t("목표 · 주어진 피스로 판 비우기")
-              : mode.puzzle.kind === "quad"
-                ? t("목표 · 우물을 남기고 채운 뒤 마지막 I로 4줄 지우기")
-                : mode.puzzle.kind === "tuck"
-                  ? t("목표 · 소프트 드롭으로 내린 뒤 처마 아래로 밀어 넣어 2줄 지우기")
-                  : mode.puzzle.kind === "combo"
-                    ? t("목표 · 피스마다 한 줄 이상 지워 콤보 끊지 않기")
-                    : mode.puzzle.kind === "spin"
-                      ? t("목표 · 틈 근처까지 내린 뒤 돌려 끼워 넣어 2줄 지우기")
-                      : mode.puzzle.kind === "mini"
-                        ? t("목표 · T를 마지막에 돌려 넣어 T-spin Mini로 줄 지우기")
-                        : t("목표 · T 하나로 {kind} 만들기", { kind: mode.description })
-            : mode.practice
-              ? mode.description
-              : "";
+  $("mode-objective").textContent = next === "menu" || next === "replay" ? "" : modeObjective(mode);
 };
 
-/**
- * 만든 퍼즐의 목표 줄: 목표 · 바뀐 규칙 · 만든 사람이 확인한 것
- * @param {import("./modes/custom-puzzle.js").FullPuzzle} p
- */
-function customObjective(p) {
+const puzzleInstructions = {
+  pc: "주어진 피스로 판 비우기",
+  quad: "우물을 남기고 채운 뒤 마지막 I로 4줄 지우기",
+  tuck: "소프트 드롭으로 내린 뒤 처마 아래로 밀어 넣어 2줄 지우기",
+  combo: "피스마다 한 줄 이상 지워 콤보 끊지 않기",
+  spin: "틈 근처까지 내린 뒤 돌려 끼워 넣어 2줄 지우기",
+  mini: "T를 마지막에 돌려 넣어 T-spin Mini로 줄 지우기",
+};
+
+function modeObjective(m) {
+  if (m.expedition != null) return `${m.description} ${t("추가 목표 · {goal}", { goal: m.bonus })}`;
+  if (m.dailyPuzzle || m.practice) return m.description;
+  if (m.puzzle?.custom) return customPuzzleDetails(m.puzzle.custom);
+  if (!m.puzzle) return "";
+  const instruction = puzzleInstructions[m.puzzle.kind];
+  return instruction ? t(instruction) : t("T 하나로 {kind} 만들기", { kind: m.description });
+}
+
+/** @param {import("./modes/custom-puzzle.js").FullPuzzle} p */
+function customPuzzleDetails(p) {
   const summary = ruleSummary(p);
   const checked =
     p.checked & CHECKED_TRIED
@@ -694,12 +790,13 @@ function customObjective(p) {
       : p.checked & CHECKED_AUTO
         ? t("자동 확인으로 풀 수 있는 퍼즐")
         : "";
-  return [t("목표 · {goal}", { goal: goalLabel(p.goal) }), summary, checked, p.desc].filter(Boolean).join(" · ");
+  return [summary, checked, p.desc].filter(Boolean).join(" · ");
 }
 
 /** @param {boolean} [initial] 처음 열 때 @param {boolean} [keepFocus] 포커스는 옮기지 않는다(대화상자를 닫고 다시 그릴 때) */
 const toMenu = (initial = false, keepFocus = false) => {
   confirming = null;
+  reviewPractice = false;
   game = null;
   race = null;
   racePanel.hidden = true;
@@ -740,13 +837,16 @@ const start = (
 ) => {
   if (runs.restoring) {
     if (!restored) return;
-  } else if (!confirmed && runs.replacesSaved()) {
+  } else if (m !== rulesTrial && !confirmed && runs.replacesSaved()) {
     runs.confirmReplace(() => start(m, selectedRules, target, retrySeed, restored, true));
     return;
   }
   confirming = null;
   if (screen === "replay") replayView.stop();
   mode = m;
+  puzzleReview.reset();
+  failedPuzzleMove = null;
+  reviewPractice = false;
   if (!runs.restoring && !m.practice && m.expedition == null && m.id !== "custom-puzzle") store.set("lastMode", m.id);
   rules = selectedRules;
   runPlayerName = restored?.name ?? records.playerName;
@@ -754,21 +854,28 @@ const start = (
   $("race-label").textContent = target?.friend ? t("{name}의 기록", { name: target.friend }) : t("내 최고 기록");
   race = target ? { target, player: createPlayer(target.replay, findMode) } : null;
   racePanel.hidden = !race;
-  game = createGame({ rules, handling: toEngineHandling(restored?.handling ?? settings.handling), seed, mode: m });
+  const legacyArsSpin = Boolean(restored && restored.arsSpinFacing !== true);
+  game = createGame({
+    rules,
+    handling: toEngineHandling(restored?.handling ?? settings.handling),
+    seed,
+    mode: m,
+    legacyArsSpin,
+  });
   updateRaceProgress();
   // 대전: CPU도 같은 시드(같은 블록 순서)로 시작한다. 상대와 함께라야 재현되므로 리플레이는 남기지 않는다.
   if (m.versus) {
-    const cpu = createGame({ rules, seed, mode: m });
+    const cpu = createGame({ rules, seed, mode: m, legacyArsSpin });
     versus = {
       cpu,
       bot: createBot({ game: cpu, rotation: ROTATIONS[rules.rotation], level: m.versus, seed }),
-      recorder: createRecorder({ seed, mode: m, rules, handling: cpu.handling }),
+      recorder: createRecorder({ seed, mode: m, rules, handling: cpu.handling, legacyArsSpin }),
     };
     $("versus-name").textContent = versusTitle(m.versus);
   } else versus = null;
   versusPanel.hidden = !versus;
   document.body.classList.toggle("is-versus", Boolean(versus));
-  recorder = m.noReplay ? null : createRecorder({ seed, mode: m, rules, handling: game.handling });
+  recorder = m.noReplay ? null : createRecorder({ seed, mode: m, rules, handling: game.handling, legacyArsSpin });
   finesse = createFinesseTracker(game, ROTATIONS[rules.rotation]);
   splits = [];
   showModeHud(m);
@@ -797,6 +904,7 @@ const start = (
   showPanel(null);
   fb.clearAction();
   renderer.clearEffects();
+  splitPulse?.cancel();
   renderKeyHelp();
   setScreen("countdown");
   window.scrollTo(0, 0);
@@ -805,8 +913,10 @@ const start = (
   $("countdown-label").textContent = t("준비");
   // 카운트다운 "없음": 바로 시작
   if (runs.restoring) return;
-  runs.begin(seed, target);
-  runs.save();
+  if (m !== rulesTrial) {
+    runs.begin(seed, target);
+    runs.save();
+  }
   if (countdown <= 0) {
     countdownEl.hidden = true;
     setScreen("play");
@@ -854,6 +964,11 @@ const backList = () => {
     return { label: t("규칙 원정 목록"), open: () => expeditionUI.open(id) };
   }
   if (sceneView.current) return null;
+  if (mode === rulesTrial) return { label: t("규칙 편집"), open: rulesUI.returnFromTrial };
+  if (mode.dailyPuzzle) {
+    const { key } = mode.dailyPuzzle;
+    return { label: t("오늘의 퍼즐"), open: () => dailyPuzzleUI.open(key) };
+  }
   const number = mode.puzzle?.number;
   if (number) return { label: t("퍼즐 목록"), open: () => puzzleUI.open(number) };
   // 만든 퍼즐: 시험 플레이·내 퍼즐이면 내 퍼즐 목록, 받은 퍼즐이면 받은 퍼즐 목록
@@ -862,17 +977,19 @@ const backList = () => {
       label: t("퍼즐 목록"),
       open: () => puzzleUI.open(undefined, mode.trialCode || customs.findByCode(mode.puzzleCode) ? "mine" : "received"),
     };
-  const group = mode.intro
-    ? "intro"
-    : mode.lesson
-      ? "finesse-lesson"
-      : mode.downstack
-        ? "downstack"
-        : mode.buildLesson
-          ? "build-training"
-          : mode.battleLesson
-            ? "battle-training"
-            : null;
+  const group = mode.gestureLesson
+    ? "gesture-training"
+    : mode.intro
+      ? "intro"
+      : mode.lesson
+        ? "finesse-lesson"
+        : mode.downstack
+          ? "downstack"
+          : mode.buildLesson
+            ? "build-training"
+            : mode.battleLesson
+              ? "battle-training"
+              : null;
   const stageId = mode.id;
   if (group) return { label: t("연습 목록"), open: () => practiceUI.open(group, stageId) };
   if (mode.practice) return { label: t("연습 목록"), open: () => practiceUI.open(stageId.replace(/^practice-/, "")) };
@@ -893,6 +1010,7 @@ const updateBackLabels = () => {
 /** 첫 화면으로 — 퍼즐·연습이면 그 목록을 위에 연다 */
 const leaveToMenu = () => {
   const back = backList();
+  if (mode === rulesTrial) mode = findMode(store.get("lastMode", null));
   toMenu(false, Boolean(back));
   // Esc로 왔으면 같은 키 입력이 방금 연 목록을 바로 닫는다(대화상자의 Esc 닫기) → 키 처리가 끝난 뒤에 연다
   if (back) setTimeout(back.open, 0);
@@ -1029,11 +1147,14 @@ const anyDialogOpen = () =>
     practiceUI,
     versusUI,
     dailyUI,
+    dailyPuzzleUI,
     achievementsUI,
     helpUI,
     puzzleUI,
     shareUI,
-  ].some(ui => ui.isOpen);
+  ].some(ui => ui.isOpen) ||
+  puzzleReviewDialog.open ||
+  askDialog.open;
 
 /** 로고: 첫 화면으로. 게임 중이면 먼저 묻는다 */
 $("go-home").addEventListener("click", () => {
@@ -1043,6 +1164,7 @@ $("go-home").addEventListener("click", () => {
     return window.scrollTo(0, 0);
   }
   if (sceneView.current) sceneView.exit();
+  if (mode === rulesTrial) return leaveToMenu();
   if (inProgress()) return askConfirm("menu");
   if (screen === "replay") replayView.stop();
   toMenu();
@@ -1099,7 +1221,7 @@ const renderResultSplits = () => {
       } else segment.textContent = label;
       const priorDelta = index === 0 ? 0 : rows[index - 1].delta;
       row.insertCell().textContent = formatTime(frames - startFrame);
-      row.insertCell().textContent = formatDelta(
+      row.insertCell().textContent = formatSplitComparison(
         delta === null || priorDelta === null ? null : (delta - priorDelta) / 60
       );
       return row;
@@ -1215,7 +1337,9 @@ const renderResultStats = rows =>
 
 const finish = () => {
   if (!game) return;
+  if (mode === rulesTrial) return leaveToMenu();
   const state = game.state;
+  failedPuzzleMove = mode.puzzle ? puzzleReview.failed(state, runs.journal?.entry) : null;
   runs.clear();
   setScreen("results");
   countdownEl.hidden = true;
@@ -1247,10 +1371,11 @@ const finish = () => {
 
   if (mode.versus) addVersusResult(versusStatKey(mode.versus.id, mode.versus.style), state.over === WIN);
   // 퍼즐: 깬 단계를 남기고, 깼으면 "다음 단계"를 보인다(마지막 단계면 다시 하기만)
-  if (mode.puzzle?.number && state.over === "clear") puzzleProgress.markCleared(mode.puzzle.id);
-  if (mode.trialCode && state.over === "clear") puzzleEditor.markCleared(mode.trialCode);
+  if (!reviewPractice && mode.puzzle?.number && state.over === "clear") puzzleProgress.markCleared(mode.puzzle.id);
+  if (!reviewPractice && mode.dailyPuzzle && state.over === "clear") dailyPuzzleProgress.mark(mode.dailyPuzzle.key);
+  if (!reviewPractice && mode.trialCode && state.over === "clear") puzzleEditor.markCleared(mode.trialCode);
   // 받은 퍼즐: 풀었는지·가장 빠른 시간·첫 수 보기를 썼는지
-  if (mode.puzzleCode && !mode.trialCode)
+  if (!reviewPractice && mode.puzzleCode && !mode.trialCode && !mode.dailyPuzzle)
     customs.recordReceived(mode.puzzleCode, {
       solved: state.over === "clear",
       hinted: Boolean(state.puzzle?.hinted),
@@ -1266,14 +1391,17 @@ const finish = () => {
       : "";
   const nextPuzzle = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="next-puzzle"]'));
   const hasNext = nextStage() || (mode.puzzle?.number && mode.puzzle.number < PUZZLES.length);
-  nextPuzzle.hidden = !(hasNext && state.over === "clear");
+  nextPuzzle.hidden = reviewPractice || !(hasNext && state.over === "clear");
   lastReplay = recorder ? recorder.finish(state) : null;
   const survivalRetry = $("survival-retry-seed");
   survivalRetry.hidden = !survival || !lastReplay;
   const rescueButton = $("survival-rescue");
   rescueButton.hidden = !survival || !lastReplay || !state.stats.pieces;
   if (lastReplay && versus) lastReplay.cpu = versus.recorder.finish(versus.cpu.state);
-  /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="watch"]')).disabled = !lastReplay;
+  const watchButton = /** @type {HTMLButtonElement} */ ($("results-watch"));
+  watchButton.disabled = !lastReplay && !failedPuzzleMove;
+  watchButton.querySelector(".btn-label").textContent = failedPuzzleMove ? t("복기") : t("다시 보기");
+  watchButton.title = failedPuzzleMove ? t("마지막 수 다시 보기") : "";
   // 피스 몇 개 만에 막힌 판: 비율 값(PPS)은 뜻이 없고, 공유·"마지막 판"으로 남길 만한 판도 아니다(F11)
   const tooShort = isShortGame(state);
   const exportButton = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="export"]'));
@@ -1291,7 +1419,7 @@ const finish = () => {
   $("results-mode").textContent = `${mode.name} · ${rules.name}`;
   const summary = mode.summary(state);
   $("results-title").textContent = summary.title;
-  $("results-main").textContent = summary.main;
+  $("results-main").textContent = reviewPractice ? t("마지막 수 연습") : summary.main;
   if (!mode.lesson && !survival && !mode.battleLesson) say(`${summary.title} ${summary.main}`);
   fb.clearAction();
   countdownEl.hidden = true;
@@ -1354,7 +1482,7 @@ const finish = () => {
   }
   if (mode.splits) {
     const delta = splitDelta(splits, resultPbSplits);
-    if (delta !== null) rows.push([t("PB 대비"), formatDelta(delta)]);
+    if (delta !== null) rows.push([t("최고 기록 대비"), formatSplitComparison(delta)]);
     if (state.over === "clear") rows.splice(0, 1);
   }
   if (mode.battleLesson) {
@@ -1368,7 +1496,9 @@ const finish = () => {
       [t("시간"), formatTime(state.frame)],
       [t("쓴 피스"), `${state.stats.pieces} / ${mode.puzzle.pieces.length}`],
       [t("줄"), String(state.stats.lines)],
-      [t("깬 단계"), mode.puzzle.number ? `${puzzleProgress.cleared().size} / ${PUZZLES.length}` : "—"]
+      mode.dailyPuzzle
+        ? [t("날짜"), mode.dailyPuzzle.key]
+        : [t("깬 단계"), mode.puzzle.number ? `${puzzleProgress.cleared().size} / ${PUZZLES.length}` : "—"]
     );
   }
   if (mode.lesson) {
@@ -1414,6 +1544,8 @@ const settingsUI = createSettingsUI({
   onChange: next => {
     // 저장소가 막혀 있어도 이번 실행 동안은 반영되도록 메모리 값을 먼저 바꾼다.
     settings = sanitizeSettings(next);
+    if (!accentEnabled(settings.visual, "record")) splitPulse?.cancel();
+    sfx.setVolume();
     saveSettings(store, settings);
     bindings = compileKeymap(settings.keymap);
     padBindings = compilePadmap(settings.padmap);
@@ -1427,8 +1559,7 @@ const settingsUI = createSettingsUI({
     renderKeyHelp();
   },
   onPreviewSound: () => sfx.play("clear2"),
-  // 테마 미리보기의 "소리 들어 보기": 이 테마로 게임하면 들릴 묶음. 소리를 꺼 뒀어도 눌렀을 때는 들려준다
-  onPreviewTheme: themeId => sfx.preview(soundSetFor(themeId), settings.volume || 50),
+  onPreviewTheme: themeId => sfx.preview(soundSetFor(themeId), settings.volume),
   openedThemes: () => (achievements.unlocked()["secret-sharp"] ? ["sharp"] : []),
   // 모드 이름처럼 시작할 때 만든 글자까지 바꾸려면 다시 불러오는 게 가장 확실하다.
   onLanguage: () => location.reload(),
@@ -1459,7 +1590,19 @@ const settingsUI = createSettingsUI({
 });
 
 /** 앱 안 확인 대화상자(브라우저 확인창 대신) */
-const ask = createAsk(/** @type {HTMLDialogElement} */ ($("ask")));
+const askDialog = /** @type {HTMLDialogElement} */ ($("ask"));
+const ask = createAsk(askDialog);
+
+const previewRuleImport = body => {
+  const changes = ruleChanges(body);
+  return ask({
+    title: t("받은 규칙 미리보기"),
+    message: changes.length ? t("Modern 기본값과 다른 설정") : noRuleChanges(),
+    details: changes,
+    okLabel: t("내 규칙에 저장"),
+    okIcon: "folder",
+  });
+};
 
 const rulesUI = createRulesUI({
   dialog: /** @type {HTMLDialogElement} */ ($("rules-editor")),
@@ -1470,8 +1613,7 @@ const rulesUI = createRulesUI({
   },
   // 편집기의 내 규칙 줄(이름·새 규칙·지우기)과 받은 코드: 바꾼 뒤 지금 고른 규칙을 다시 읽는다
   slots: {
-    read: ruleSlots.read,
-    rename: name => ruleSlots.rename(name),
+    ...ruleSlots,
     add: (name, body) => {
       const added = ruleSlots.add(name, body);
       customBody = ruleSlots.active().body;
@@ -1485,8 +1627,11 @@ const rulesUI = createRulesUI({
   },
   onClose: () => {
     renderMenu();
+    renderKeyHelp();
     /** @type {HTMLElement | null} */ ($("edit-rules"))?.focus();
   },
+  onTrial: () => start(rulesTrial, makeCustomRules(customBody)),
+  previewImport: previewRuleImport,
 });
 
 $("active-rules").addEventListener("click", e => {
@@ -1499,19 +1644,21 @@ const hasLessonHints = m => Boolean(m.downstack || m.buildLesson);
 /** 힌트 단추를 보이는 판: 파내기·빌드 연습, 퍼즐(첫 수 보기) */
 const hasHintControls = m => hasLessonHints(m) || Boolean(m.puzzle);
 const lessonHintState = state => state.downstack ?? state.buildLesson;
-const isGuidedPractice = (m = mode) => m.lesson || hasLessonHints(m) || m.intro || m.battleLesson;
+const isGuidedPractice = (m = mode) => m.lesson || hasLessonHints(m) || m.intro || m.battleLesson || m.gestureLesson;
 const nextPracticeLesson = () =>
-  mode.buildLesson
-    ? BUILD_LESSONS[mode.buildLesson]
-    : mode.battleLesson
-      ? BATTLE_LESSONS[mode.battleLesson]
-      : mode.intro
-        ? INTRO_LESSONS[mode.intro]
-        : mode.downstack
-          ? DOWNSTACK_LESSONS[mode.downstack.index + 1]
-          : mode.lesson
-            ? FINESSE_LESSONS[mode.lesson.index + 1]
-            : null;
+  mode.gestureLesson
+    ? GESTURE_LESSONS[mode.gestureLesson]
+    : mode.buildLesson
+      ? BUILD_LESSONS[mode.buildLesson]
+      : mode.battleLesson
+        ? BATTLE_LESSONS[mode.battleLesson]
+        : mode.intro
+          ? INTRO_LESSONS[mode.intro]
+          : mode.downstack
+            ? DOWNSTACK_LESSONS[mode.downstack.index + 1]
+            : mode.lesson
+              ? FINESSE_LESSONS[mode.lesson.index + 1]
+              : null;
 const nextStage = () => (mode.expedition != null ? EXPEDITION_STAGES[mode.expedition + 1] : nextPracticeLesson());
 const downstackHint = $("downstack-hint");
 // 이름만 바꾼다(단추 안의 단축키 표시는 그대로)
@@ -1544,7 +1691,7 @@ const togglePuzzleHint = () => {
   // 아직 나오지 않은 목록 피스: 지금까지 목록에서 나온 피스 = 놓은 것 + 움직이는 것 + 홀드 칸 - 처음 홀드 피스
   const drawn = p.placed + 1 + (hold ? 1 : 0) - (mode.puzzle.holdStart ? 1 : 0);
   const rest = mode.puzzle.pieces.slice(drawn);
-  const asked = { game, placed: p.placed, x: active.x, y: active.y, rot: active.rot, type: active.type, hold };
+  const asked = { game, placed: p.placed, active: { ...active }, hold };
   const search = solver.run({
     type: "first",
     kind: mode.puzzle.kind,
@@ -1552,13 +1699,13 @@ const togglePuzzleHint = () => {
     lines: mode.puzzle.lines ?? 0,
     rotation: rules.rotation,
     board: game.state.board.cells.slice(),
-    active: { type: active.type, x: active.x, y: active.y, rot: active.rot },
-    combo: game.state.combo ?? -1,
+    active: asked.active,
+    combo: p.combo,
     total: p.lines ?? 0,
     hold,
     holdUsed,
     rest,
-    opts: mode.puzzle.custom ? searchOptions(mode.puzzle.custom) : {},
+    opts: { ...(mode.puzzle.custom ? searchOptions(mode.puzzle.custom) : {}), legacyArsSpin: game.legacyArsSpin },
   });
   puzzleHintSearch = search;
   $("downstack-status").textContent = t("첫 수를 찾는 중…");
@@ -1571,13 +1718,20 @@ const togglePuzzleHint = () => {
     const same =
       game === asked.game &&
       game.state.puzzle?.placed === asked.placed &&
-      now?.x === asked.x &&
-      now?.y === asked.y &&
-      now?.rot === asked.rot &&
-      now?.type === asked.type &&
+      now?.x === asked.active.x &&
+      now?.y === asked.active.y &&
+      now?.rot === asked.active.rot &&
+      now?.type === asked.active.type &&
+      now?.lastAction === asked.active.lastAction &&
+      now?.kick === asked.active.kick &&
+      now?.spinMoved === asked.active.spinMoved &&
       game.state.hold === asked.hold;
     if (move === undefined || !same) return resetLessonHint();
     hintLabel.textContent = t("첫 수 보기");
+    if (move === SOLVER_UNAVAILABLE) {
+      $("downstack-status").textContent = t("백그라운드 풀이기를 열 수 없어요. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
     if (!move) {
       $("downstack-status").textContent = t("이 판에서는 더 풀 수 없어요. 다시 시작해 보세요");
       return;
@@ -1624,6 +1778,7 @@ const practiceUI = createPracticeUI({
   onPick: drill => start(practiceMode(drill)),
   progress: practiceProgress,
   onStage: lesson => start(lesson, lesson.rules),
+  isTouch: () => isTouchScreen(),
 });
 $("open-practice").addEventListener("click", () => practiceUI.open());
 
@@ -1638,11 +1793,39 @@ $("expedition").addEventListener("close", () => {
 
 // ---- 퍼즐 ----
 const puzzleProgress = createPuzzleProgress(store);
+const dailyPuzzleProgress = createDailyPuzzleProgress(store);
+const dailyPuzzleDialog = /** @type {HTMLDialogElement} */ ($("daily-puzzle"));
+const dailyPuzzleUI = createDailyPuzzleUI({
+  dialog: dailyPuzzleDialog,
+  solver,
+  progress: dailyPuzzleProgress,
+  getVisual: () => settings.visual,
+  onPlay: day => {
+    const m = dailyPuzzleMode(day.code, day);
+    if (m) start(m, m.rules);
+  },
+});
+/** @param {HTMLDialogElement} dialog @param {string[]} ids @param {() => void} open */
+const bindPuzzleOpeners = (dialog, ids, open) => {
+  const openers = ids.map(id => $(id));
+  let opener = openers[0];
+  for (const button of openers) {
+    button.addEventListener("click", () => {
+      opener = button;
+      open();
+    });
+  }
+  dialog.addEventListener("close", () => {
+    if (!dialog.open && screen === "menu") returnFocus(opener.getClientRects().length ? opener : openers[0]);
+  });
+};
+bindPuzzleOpeners(dailyPuzzleDialog, ["open-daily-puzzle", "quick-daily-puzzle"], () => dailyPuzzleUI.open());
+
 const puzzleDialog = /** @type {HTMLDialogElement} */ ($("puzzles"));
 const playCustomPuzzle = (code, trial = false) => {
   const puzzle = decodePuzzle(code);
   if (!puzzle) {
-    showMenuNotice(t("링크의 퍼즐을 읽을 수 없었어요."));
+    showLinkError(t("링크의 퍼즐을 읽을 수 없었어요."));
     return;
   }
   const custom = customPuzzleMode(puzzle);
@@ -1652,6 +1835,8 @@ const playCustomPuzzle = (code, trial = false) => {
 const customs = createCustomPuzzles(store);
 const puzzleEditor = createPuzzleEditor({
   dialog: puzzleDialog,
+  comparisonDialog: /** @type {HTMLDialogElement} */ ($("puzzle-comparison")),
+  getVisual: () => settings.visual,
   solver,
   customs,
   onTry: code => playCustomPuzzle(code, true),
@@ -1668,9 +1853,8 @@ const puzzleUI = createPuzzleUI({
   onPlayReceived: code => playCustomPuzzle(code),
   onCopyReceived: code => puzzleEditor.openCopy(code),
 });
-$("open-puzzles").addEventListener("click", () => puzzleUI.open());
-$("puzzles").addEventListener("close", () => {
-  if (!puzzleDialog.open && screen === "menu") returnFocus($("open-puzzles"));
+bindPuzzleOpeners(puzzleDialog, ["open-puzzles", "quick-puzzles"], () => puzzleUI.open());
+puzzleDialog.addEventListener("close", () => {
   if (!puzzleDialog.open && screen === "results" && mode.trialCode)
     /** @type {HTMLElement | null} */ (panels.results.querySelector('[data-action="export"]'))?.focus();
 });
@@ -1814,7 +1998,9 @@ const gestures = createGestures({
   cellSize: boardCellPx,
 });
 /** 제스처 방식을 쓰는가: 설정이 제스처이고 터치 조작이 보이는 기기 */
-const gesturesOn = () => settings.touchMode === "gestures" && touchVisible(settings.touch, isTouchScreen());
+const gestureTrainingOn = () => screen !== "menu" && screen !== "replay" && mode.gestureLesson && isTouchScreen();
+const gesturesOn = () =>
+  gestureTrainingOn() || (settings.touchMode === "gestures" && touchVisible(settings.touch, isTouchScreen()));
 
 const undo = createUndo();
 /**
@@ -1888,8 +2074,9 @@ padRef = pad;
 // ---- 도움말 · 처음 오신 분 안내 ----
 const helpUI = createHelpUI({
   dialog: /** @type {HTMLDialogElement} */ ($("help")),
-  getSettings: () => settings,
-  isTouch: () => touchVisible(settings.touch, isTouchScreen()),
+  allows180: () => (game?.rules ?? currentRules()).allow180 !== false,
+  getSettings: () => (gestureTrainingOn() ? { ...settings, touchMode: "gestures" } : settings),
+  isTouch: () => Boolean(gestureTrainingOn()) || touchVisible(settings.touch, isTouchScreen()),
   canStart: () => screen === "menu",
   onStart: () => start(findMode("sprint40"), MODERN),
   onIntro: () => start(INTRO_LESSONS[0], MODERN),
@@ -1939,6 +2126,48 @@ $("open-settings").addEventListener("click", () => {
   settingsUI.open();
 });
 
+const puzzleReviewDialog = /** @type {HTMLDialogElement} */ ($("puzzle-review"));
+const openPuzzleReview = () => {
+  if (screen !== "results" || !mode.puzzle || !failedPuzzleMove) return;
+  const review = failedPuzzleMove;
+  const failedGame = game;
+  showPuzzleReview({
+    dialog: puzzleReviewDialog,
+    review,
+    reason: reviewReason(mode.puzzle, review),
+    visual: settings.visual,
+    onReplay: lastReplay
+      ? () => {
+          puzzleReviewDialog.close();
+          replayView.start(lastReplay, "results", "", true);
+        }
+      : null,
+    onPractice: async () => {
+      const practice = await reconstructPuzzleReview(review, mode, rules);
+      if (!puzzleReviewDialog.open || game !== failedGame) return;
+      puzzleReviewDialog.close();
+      game = practice.game;
+      finesse = createFinesseTracker(game, ROTATIONS[rules.rotation]);
+      reviewPractice = true;
+      recorder = null;
+      undo.reset();
+      puzzleReview.reset();
+      runs.beginPractice(practice.entry);
+      applyRunHandling(settings.handling);
+      runs.journal.action("handling", settings.handling);
+      resetLessonHint();
+      renderer.clearEffects();
+      acc = 0;
+      showPanel(null);
+      setScreen("play");
+      say(t("마지막 수 연습"));
+    },
+  });
+};
+puzzleReviewDialog.addEventListener("close", () => {
+  if (screen === "results") $("results-watch").focus({ preventScroll: true });
+});
+
 for (const btn of document.querySelectorAll("[data-action]")) {
   btn.addEventListener("click", () => {
     const action = btn.getAttribute("data-action");
@@ -1955,17 +2184,20 @@ for (const btn of document.querySelectorAll("[data-action]")) {
     )
       start(mode, rules, null, lastReplay.seed);
     if (action === "race-best" && mode.splits) startRace(mode, rules);
-    if (action === "next-puzzle" && screen === "results" && game?.state.over === "clear") {
+    if (action === "next-puzzle" && !reviewPractice && screen === "results" && game?.state.over === "clear") {
       const next = nextStage();
       if (next) return start(next, next.rules);
       if (mode.puzzle?.number && mode.puzzle.number < PUZZLES.length)
         return start(puzzleMode(PUZZLES[mode.puzzle.number]), MODERN);
     }
     if (action === "menu") {
-      if (inProgress()) askConfirm("menu");
+      if (inProgress() && mode !== rulesTrial) askConfirm("menu");
       else leaveToMenu();
     }
-    if (action === "watch" && lastReplay) replayView.start(lastReplay, "results", "", true);
+    if (action === "watch") {
+      if (failedPuzzleMove) openPuzzleReview();
+      else if (lastReplay) replayView.start(lastReplay, "results", "", true);
+    }
     if (action === "stats" && game)
       statsUI.open(game.state, `${mode.name} · ${rules.name}`, !!mode.splits && splits.length > 0);
     if (action === "export") {
@@ -2190,9 +2422,13 @@ const applyRunHandling = handling => {
   if (!sceneView.current) recorder?.handlingChanged(game.handling);
 };
 
-const advanceRun = (held, pressed, reconstructing = false) => {
+const advanceRun = (held, pressed, restoredStep = null) => {
+  const reconstructing = restoredStep !== null;
   if (sceneView.current) return sceneView.step(held, pressed, reconstructing);
   if (canUndoPieces()) undo.track(game.state);
+  const puzzleStep = restoredStep ?? (runs.journal ? runs.journal.entry.steps - 1 : null);
+  const trackPuzzle = mode.puzzle && puzzleStep !== null;
+  if (trackPuzzle) puzzleReview.track(game.state, puzzleStep);
   recorder?.input(held, pressed);
   const hadActive = Boolean(game.state.active);
   const events = game.step({ held, pressed });
@@ -2202,10 +2438,24 @@ const advanceRun = (held, pressed, reconstructing = false) => {
     versus.cpu.step(cpuInput);
     settleBattleFrame(game, versus.cpu, events);
   }
+  if (trackPuzzle) puzzleReview.finish(game.state, events);
   if (hasHintControls(mode) && events.some(event => event.type === "lock")) resetLessonHint();
   const extra = finesse?.frame(held, pressed, hadActive, events) ?? 0;
   if (!reconstructing && extra > 0 && mode.finesse) announceText([t("피네스 +{n}", { n: extra })]);
-  if (mode.splits) splits = advanceSplits(mode.splits, splits, game.state.stats.lines, game.state.frame);
+  if (mode.splits) {
+    const previous = splits;
+    splits = advanceSplits(mode.splits, splits, game.state.stats.lines, game.state.frame);
+    if (!reconstructing && accentEnabled(settings.visual, "record") && tookSplitLead(previous, splits, pbSplits)) {
+      splitPulse?.cancel();
+      splitPulse = hud.split.parentElement.animate(
+        [
+          { outline: "var(--border-w) solid var(--accent)", outlineOffset: "calc(-1 * var(--border-w))" },
+          { outline: "var(--border-w) solid transparent", outlineOffset: "calc(-1 * var(--border-w))" },
+        ],
+        { id: "split-lead", duration: 420, easing: "ease-out" }
+      );
+    }
+  }
   if (race) {
     if (!race.player.done) race.player.step();
     if (!reconstructing) updateRaceProgress();
@@ -2239,9 +2489,13 @@ const tick = () => {
   if (screen === "replay") return replayView.tick();
   if (screen !== "play" || !game) return;
   if (goTimer > 0 && --goTimer === 0) countdownEl.hidden = true;
-  const allowed = sceneView.current?.target ? ~(BTN.HOLD | BTN.SOFT) : mode.lesson ? ~BTN.SOFT : -1;
-  const held = (keyboard.held | pad.held | touch.held | gestures.held) & allowed;
-  const pressed = (keyboard.takePressed() | touch.takePressed() | gestures.takePressed()) & allowed;
+  const modeMask = sceneView.current?.target ? ~(BTN.HOLD | BTN.SOFT) : mode.lesson ? ~BTN.SOFT : -1;
+  const allowed = rules.allow180 === false ? modeMask & ~BTN.R180 : modeMask;
+  const buttonHeld = keyboard.held | pad.held | touch.held;
+  const buttonPressed = keyboard.takePressed() | touch.takePressed();
+  const training = gestureTrainingOn();
+  const held = (gestures.held | (training ? 0 : buttonHeld)) & allowed;
+  const pressed = (gestures.takePressed() | (training ? 0 : buttonPressed)) & allowed;
   runs.journal?.input(held, pressed);
   advanceRun(held, pressed);
   runs.save(false);
@@ -2310,7 +2564,7 @@ const importReplayFromLink = async () => {
   const raw = await decodeReplayCode(hash);
   const replay = raw && sanitizeReplay(raw, findMode);
   if (!replay) {
-    showMenuNotice(t("링크의 리플레이를 읽을 수 없었어요."));
+    showLinkError(t("링크의 리플레이를 읽을 수 없었어요."));
     return;
   }
   const check = verifyReplay(replay, findMode);
@@ -2331,7 +2585,7 @@ const importDailyFromLink = async () => {
   if (!pasted) return;
   const raw = await decodeReplayCode(pasted);
   if (!(raw && sanitizeReplay(raw, findMode))) {
-    showMenuNotice(t("링크의 결과 코드를 읽을 수 없었어요."));
+    showLinkError(t("링크의 결과 코드를 읽을 수 없었어요."));
     return;
   }
   dailyUI.open({
@@ -2340,25 +2594,26 @@ const importDailyFromLink = async () => {
   });
 };
 
-/** 공유 링크(#rules=…)로 열었으면 그 규칙을 Custom으로 들이고 알린다. 주소의 해시는 지운다. */
-const importRulesFromLink = () => {
-  const hash = takeLinkHash("rules");
-  if (!hash) return false;
+/** 공유 링크의 규칙을 먼저 보여 주고 확인한 뒤 내 규칙에 저장한다. */
+const importRulesFromLink = async hash => {
   const body = decodeRules(hash);
   if (!body) {
-    showMenuNotice(t("링크의 규칙 코드를 읽을 수 없었어요."));
-    return false;
+    showLinkError(t("링크의 규칙 코드를 읽을 수 없었어요."));
+    return;
   }
+  if (!(await previewRuleImport(body))) return;
   // 지금 규칙을 덮어쓰지 않고 내 규칙에 새 칸으로
   if (!ruleSlots.add(t("받은 규칙"), body)) {
-    showMenuNotice(t("내 규칙이 가득 찼어요({n}개). 하나를 지우고 링크를 다시 열어 주세요", { n: MAX_RULE_SLOTS }));
-    return false;
+    showLinkError(t("내 규칙이 가득 찼어요({n}개). 하나를 지우고 링크를 다시 열어 주세요", { n: MAX_RULE_SLOTS }));
+    return;
   }
   customBody = ruleSlots.active().body;
   ruleChoice = "custom";
   store.set("lastRules", "custom");
   showMenuNotice(t("링크로 받은 규칙을 내 규칙에 새로 넣었어요"));
-  return true;
+  renderMenu();
+  renderKeyHelp();
+  $("rule-slot").focus();
 };
 
 document.documentElement.lang = lang;
@@ -2366,9 +2621,9 @@ translateDom(document.documentElement);
 hydrateIcons();
 applyTouch();
 renderKeyHelp();
-// 링크로 규칙을 받았으면 Custom 규칙 기준으로 키 안내를 다시 그린 뒤 메뉴를 연다.
-if (importRulesFromLink()) renderKeyHelp();
 toMenu(true);
+const rulesHash = takeLinkHash("rules");
+if (rulesHash) importRulesFromLink(rulesHash);
 const puzzleHash = takeLinkHash("puzzle");
 if (puzzleHash) {
   // 링크로 받은 퍼즐은 받은 퍼즐 목록에 남긴다(내가 만든 퍼즐이면 남기지 않는다)

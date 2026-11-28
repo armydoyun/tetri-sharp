@@ -14,10 +14,13 @@ import { runScenarios } from "../helpers/ui-scenarios.mjs";
 import { auditInPage } from "../helpers/ui-audit.mjs";
 import { keysFor, solvePuzzle } from "../helpers/puzzle-solve.mjs";
 import { PUZZLES } from "../../js/modes/puzzles.js";
+import { DEFAULT_RULES, encodePuzzle, PUZZLE_CELLS } from "../../js/modes/custom-puzzle.js";
 import { botDailyReplay } from "../helpers/daily.mjs";
 import { dateKey } from "../../js/modes/daily.js";
 import { verifyReplay } from "../../js/replay/replay.js";
 import { findMode } from "../../js/modes/index.js";
+import { decodeRules } from "../../js/rules/share.js";
+import { ALL_SPINS, spinBit, spinMask, spinSettings, T_SPIN } from "../../js/rules/spins.js";
 import { decodeReplayCode, encodeReplayCode } from "../../js/replay/share.js";
 
 let dir, html, result, server, url, browser;
@@ -680,6 +683,117 @@ test("Custom 규칙: 편집 내용이 저장되고 기록표 id가 바뀌며, �
   await context.close();
 });
 
+test("Custom 옵션: 고정 중력의 적용값이 메뉴에 보이고 180도·DCD·즉시 소프트 드롭을 공유한다", async () => {
+  const { context, page, errors } = await openPage(
+    () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" }, touch: "on" })),
+    undefined,
+    { viewport: { width: 390, height: 844 }, hasTouch: true }
+  );
+  try {
+    await page.click('[data-rules="custom"]');
+    const marathon = page.locator('[data-mode="marathon"]');
+    assert.equal(await marathon.getAttribute("aria-description"), "모드별 중력");
+    await page.click("#edit-rules");
+    await page.locator("#rule-allow180").uncheck();
+    await page.click('#rules-editor [data-value="고정·낙하"]');
+    await choose(page, "rule-gravityMode", "fixed");
+    await choose(page, "rule-gravity", "0");
+    await page.click('#rules-editor [data-value="조작"]');
+    await page.locator("#rule-fixedHandlingOn").check();
+    await page.locator("#rule-fixedHandling-instantSoftDrop").check();
+    assert.ok(await page.locator("#rule-fixedHandling-sdf").isDisabled());
+    await choose(page, "rule-fixedHandling-dcd", "3");
+    await page.click('#rules-editor [data-value="공유"]');
+    const exported = decodeRules(await page.locator("#rule-share-code").inputValue());
+    assert.equal(exported.allow180, false);
+    assert.equal(exported.gravityMode, "fixed");
+    assert.equal(exported.gravity, 0);
+    assert.equal(exported.fixedHandling.dcd, 3);
+    assert.equal(exported.fixedHandling.instantSoftDrop, true);
+    await page.click("#rules-close");
+    await page.waitForFunction(() => document.getElementById("active-rules")?.textContent.includes("0G"));
+    assert.match(await marathon.getAttribute("aria-description"), /0G/);
+    await marathon.click();
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    assert.ok(await page.locator('[data-touch="R180"]').isDisabled());
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("올스핀: Custom과 퍼즐 편집에서 미노별로 조정하고 O스핀을 플레이에서 표시한다", async () => {
+  const { context, page, errors } = await openPage(
+    () => {
+      localStorage.setItem(
+        "tetrisharp:settings",
+        JSON.stringify({
+          access: { countdown: "off" },
+          handling: { sdf: 41 },
+          visual: { effects: "full" },
+        })
+      );
+      window.spinArcs = 0;
+      const arc = CanvasRenderingContext2D.prototype.arc;
+      CanvasRenderingContext2D.prototype.arc = function (...args) {
+        if (this.canvas.id === "board" && args[5] === true) window.spinArcs++;
+        return arc.apply(this, args);
+      };
+    },
+    undefined,
+    { frameClock: true, viewport: { width: 320, height: 568 }, hasTouch: true }
+  );
+  try {
+    await page.click('[data-rules="custom"]');
+    await page.click("#edit-rules");
+    await page.click('#rules-editor [data-value="점수"]');
+    assert.equal(await text(page, "rule-spin .select-value"), "T스핀만");
+    await choose(page, "rule-spin", "0");
+    await page.click("#rule-spin-details summary");
+    assert.ok(!(await page.locator("#rule-spin-T").isChecked()));
+    await choose(page, "rule-spin", String(ALL_SPINS));
+    assert.ok(await page.locator("#rule-spin-O").isChecked());
+    await page.locator("#rule-spin-O").uncheck();
+    assert.equal(await text(page, "rule-spin .select-value"), "직접 선택 · I, J, L, S, T, Z");
+    await page.click('#rules-editor [data-value="공유"]');
+    assert.equal(spinMask(decodeRules(await page.locator("#rule-share-code").inputValue())), ALL_SPINS ^ spinBit("O"));
+    await page.click("#rules-close");
+    await openList(page, "#open-puzzles");
+    await page.click("#puzzle-create");
+    await page.click("#puzzle-advanced summary");
+    await page.click("#puzzle-spin-details summary");
+    await page.locator("#puzzle-spin-L").check();
+    assert.equal(await text(page, "puzzle-spin .select-value"), "직접 선택 · L, T");
+    assert.ok(await page.locator("#puzzle-spin-T").isChecked());
+    assert.equal(Number(await page.getAttribute("#puzzle-spin", "data-value")), T_SPIN | spinBit("L"));
+
+    const cells = new Uint8Array(PUZZLE_CELLS);
+    cells.fill(1, cells.length - 10);
+    cells[cells.length - 6] = cells[cells.length - 5] = 0;
+    cells[cells.length - 25] = 1;
+    const code = encodePuzzle({
+      cells,
+      pieces: "OO",
+      goal: { kind: "lines", lines: 2 },
+      rules: { ...DEFAULT_RULES, ...spinSettings(spinBit("O")) },
+    });
+    await page.goto(`${url}#puzzle=${code}`);
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    await runKeys(page, [
+      ["ArrowLeft", 1],
+      ["ArrowDown", 1],
+      ["ArrowUp", 1],
+      ["Space", 1],
+      ["F24", 5],
+    ]);
+    assert.match(await text(page, "action"), /O-SPIN SINGLE/);
+    assert.ok(await page.evaluate(() => window.spinArcs > 0));
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test("리플레이: 결과 화면에서 보기 → 같은 결과로 끝남, 파일 저장 → 메뉴에서 열기", async () => {
   const { context, page, errors } = await openPage();
   // 버틴 시간이 기록인 Survival: 연타로 금방 막혀도 피스가 10개를 넘으면 공유할 수 있는 판이다(짧은 판 판정 F21)
@@ -869,11 +983,20 @@ test("레이아웃 고정: 규칙 편집에서 조건 항목이 비활성이 돼
   await choose(page, "rule-lock-type", "none");
   assert.equal(await page.locator("#rule-lock-delay").isDisabled(), true, "고정 지연은 비활성");
   assert.deepEqual(await rows(), lockRows);
-  assert.match(await page.locator('label[for="rule-lock-delay"] small').textContent(), /즉시 고정/, "이유가 보인다");
+  assert.match(
+    await page.locator('label[for="rule-lock-delay"] small:visible').textContent(),
+    /즉시 고정/,
+    "이유가 보인다"
+  );
 
+  // 한글 글꼴의 폭에 따라 활성 상태의 설명이 두 줄이 되는 경우도 검사한다.
+  await page.addStyleTag({ content: 'label[for="rule-fixedHandling-instantSoftDrop"] small { font-size: 14px; }' });
   await page.click('.dialog-tabs [data-value="조작"]');
   const controlRows = await rows();
   await page.locator("#rule-fixedHandlingOn").check();
+  assert.deepEqual(await rows(), controlRows);
+  await page.locator("#rule-fixedHandling-instantSoftDrop").check();
+  assert.ok(await page.locator("#rule-fixedHandling-sdf").isDisabled());
   assert.deepEqual(await rows(), controlRows);
   for (const t of ["피스", "점수", "공유", "고정·낙하"]) {
     await page.click(`.dialog-tabs [data-value="${t}"]`);
@@ -931,6 +1054,8 @@ test("테마: 라이트에서 UI는 밝고 게임 화면(보드)은 어둡다, �
     const page = await context.newPage();
     await page.goto(url);
     await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+    // 첫 화면 진입 시 진행 중인 배경색 전환까지 끝난 뒤 대비를 잰다.
+    await page.locator("body").evaluate(body => Promise.allSettled(body.getAnimations().map(a => a.finished)));
     const colors = await page.evaluate(() => ({
       body: getComputedStyle(document.body).backgroundColor,
       game: getComputedStyle(document.querySelector(".board-wrap")).backgroundColor,
@@ -962,7 +1087,58 @@ test("접근성: 모든 버튼에 읽을 수 있는 이름이 있고, 화면 글
   await context.close();
 });
 
-test("게임 테마: 아홉 테마가 서로 다르게 그려지고, 설정에서 바꾸면 바로 반영된다", async () => {
+test("줄 삭제 효과 길이: 전체에서만 배율을 바꾸고 0%와 이전 선택을 저장한다", async () => {
+  const { context, page, errors } = await openPage();
+  const openVisual = async () => {
+    await page.click("#open-settings");
+    await page.click('.dialog-tabs [data-value="visual"]');
+  };
+  const slider = page.locator("#set-clear-effect-length");
+  const effect = name => page.locator(`#set-gameplay-effect-${name}`);
+  const select = mode => page.click(`#set-effects [data-value="${mode}"]`);
+  try {
+    await openVisual();
+    await select("full");
+    assert.equal(await slider.inputValue(), "100");
+    assert.equal(await page.getByRole("slider", { name: "줄 삭제 효과 길이" }).count(), 1);
+    for (const name of ["next", "hold", "spin", "perfect", "combo", "danger", "kick", "cancel", "record"])
+      assert.equal(await effect(name).isChecked(), true);
+    await effect("hold").uncheck();
+    await effect("kick").uncheck();
+    await slider.press("End");
+    assert.equal(await slider.inputValue(), "150");
+    await slider.press("ArrowLeft");
+    assert.equal(await slider.inputValue(), "145");
+    for (const mode of ["reduced", "off"]) {
+      await select(mode);
+      assert.equal(await slider.isDisabled(), true);
+      assert.equal(await effect("hold").isDisabled(), true);
+      assert.equal(await effect("kick").isDisabled(), true);
+    }
+    await select("full");
+    assert.equal(await slider.isEnabled(), true);
+    assert.equal(await effect("hold").isEnabled(), true);
+    assert.equal(await effect("hold").isChecked(), false);
+    assert.equal(await effect("kick").isChecked(), false);
+    assert.equal(await slider.inputValue(), "145");
+    await slider.press("Home");
+    assert.equal(await slider.inputValue(), "0");
+    assert.equal(await effect("hold").isChecked(), false);
+    assert.equal(await effect("kick").isChecked(), false);
+    assert.equal(await effect("spin").isChecked(), true);
+    await page.reload();
+    await openVisual();
+    assert.equal(await slider.inputValue(), "0");
+    assert.equal(await effect("hold").isChecked(), false);
+    await page.click('.dialog-tabs [data-value="access"]');
+    assert.equal(await slider.inputValue(), "0");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("게임 테마: 공개 테마 스무 개가 서로 다르게 그려지고, 설정에서 바꾸면 바로 반영된다", async () => {
   const { context, page, errors } = await openPage();
   await startMode(page, "dig");
   const snapshot = () =>
@@ -975,7 +1151,28 @@ test("게임 테마: 아홉 테마가 서로 다르게 그려지고, 설정에�
     });
   await page.keyboard.press("Escape"); // 일시정지해서 화면을 멈춘다
   const seen = new Set();
-  for (const theme of ["retro", "minimal", "graphite", "frame", "stone", "midnight", "forest", "white", "modern"]) {
+  for (const theme of [
+    "retro",
+    "minimal",
+    "graphite",
+    "frame",
+    "stone",
+    "midnight",
+    "forest",
+    "white",
+    "modern",
+    "porcelain",
+    "relay",
+    "tide",
+    "velvet",
+    "press",
+    "film",
+    "post",
+    "carbon",
+    "chestnut",
+    "whiteNight",
+    "ink",
+  ]) {
     await page.click("#open-settings");
     await page.click('.dialog-tabs [data-value="visual"]');
     await page.click(`#set-theme [data-value="${theme}"]`);
@@ -983,7 +1180,7 @@ test("게임 테마: 아홉 테마가 서로 다르게 그려지고, 설정에�
     await page.waitForTimeout(100);
     seen.add(await snapshot());
   }
-  assert.equal(seen.size, 9, "테마마다 다른 그림");
+  assert.equal(seen.size, 20, "테마마다 다른 그림");
   assert.deepEqual(errors, []);
   await context.close();
 });
@@ -1009,21 +1206,60 @@ test("게임 테마: 미리보기는 움직이고, 칩에 올리면 미리보기
     assert.equal(await name.textContent(), "스튜디오");
     assert.equal(await state.textContent(), "사용 중");
     assert.ok(await moves(), "미리보기가 장면을 되풀이한다");
-    assert.equal(await page.locator("#set-theme canvas.theme-swatch").count(), 9, "칩마다 견본");
+    assert.equal(await page.locator("#set-theme canvas.theme-swatch").count(), 20, "칩마다 견본");
 
     // 올리면 미리보기만 바뀌고 선택은 그대로
     const card = page.locator('#set-theme [data-value="retro"]');
+    const layout = () =>
+      stage.evaluate(canvas => ({
+        stageHeight: canvas.closest(".theme-stage").getBoundingClientRect().height,
+        dialogHeight: canvas.closest(".dialog-body").scrollHeight,
+      }));
+    const size = await layout();
     await card.hover();
     assert.equal(await name.textContent(), "페이퍼");
     assert.equal(await state.textContent(), "미리보기");
     assert.equal(await card.getAttribute("aria-pressed"), "false", "올리기만으로는 적용되지 않는다");
-    await page.locator("#settings-close").hover();
-    assert.equal(await name.textContent(), "스튜디오", "벗어나면 사용 중 테마로");
-
+    assert.deepEqual(await layout(), size);
+    const a = await card.boundingBox();
+    const b = await page.locator('#set-theme [data-value="minimal"]').boundingBox();
+    await page.mouse.move((a.x + a.width + b.x) / 2, a.y + a.height / 2);
+    assert.equal(await name.textContent(), "페이퍼", "칩 사이 여백에서 직전 미리보기 유지");
+    await page.locator("#theme-listen").hover();
+    assert.equal(await name.textContent(), "스튜디오", "소리 버튼으로 이동하면 사용 중인 테마로 복귀");
+    assert.equal(await state.textContent(), "사용 중");
+    const heights = await stage.evaluate(canvas => {
+      const panel = canvas.closest(".theme-stage");
+      return Array.from(document.querySelectorAll("#set-theme button"), item => {
+        item.dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse" }));
+        return panel.getBoundingClientRect().height;
+      });
+    });
+    assert.ok(
+      heights.every(height => height === size.stageHeight),
+      "모든 설명의 줄바꿈에서 높이 유지"
+    );
     // 누르면 적용되고 미리보기도 그 테마(사용 중)
     await card.click();
     assert.equal(await page.locator('#set-theme [data-value="retro"]').getAttribute("aria-pressed"), "true");
     assert.equal(await name.textContent(), "페이퍼");
+    assert.equal(await state.textContent(), "사용 중");
+
+    const studio = page.locator('#set-theme [data-value="modern"]');
+    await studio.hover();
+    assert.equal(await name.textContent(), "스튜디오");
+    assert.equal(await state.textContent(), "미리보기");
+    await page.locator(".theme-stage-title").hover();
+    assert.equal(await name.textContent(), "페이퍼", "미리보기 화면으로 이동하면 적용된 테마로 복귀");
+
+    const listen = page.locator("#theme-listen");
+    await listen.focus();
+    await page.keyboard.press("Tab");
+    assert.equal(await studio.evaluate(el => el === document.activeElement), true);
+    assert.equal(await name.textContent(), "스튜디오", "키보드로 칩에 포커스하면 미리보기");
+    await page.keyboard.press("Shift+Tab");
+    assert.equal(await listen.evaluate(el => el === document.activeElement), true);
+    assert.equal(await name.textContent(), "페이퍼", "키보드로 칩 영역을 벗어나면 적용된 테마로 복귀");
     assert.equal(await state.textContent(), "사용 중");
 
     // 모션 줄이기: 바로 멈추고, 다시 그려도 움직이지 않는다
@@ -1033,6 +1269,67 @@ test("게임 테마: 미리보기는 움직이고, 칩에 올리면 미리보기
     await page.click('.dialog-tabs [data-value="control"]');
     await page.click('.dialog-tabs [data-value="visual"]');
     assert.equal(await moves(), false, "다시 열어도 멈춰 있다");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("게임 테마: 소리 미리보기는 0%에서 안내하고 선택된 테마를 설정 음량으로 재생한다", async () => {
+  const { context, page, errors } = await openPage(() => {
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ volume: 0, sound: "theme" }));
+    window.themeAudio = { contexts: 0, oscillators: [], gain: null };
+    const Real = window.AudioContext;
+    window.AudioContext = class extends Real {
+      constructor() {
+        super();
+        window.themeAudio.contexts++;
+      }
+      createGain() {
+        const node = super.createGain();
+        window.themeAudio.gain ??= node.gain;
+        return node;
+      }
+      createOscillator() {
+        const oscillator = super.createOscillator();
+        window.themeAudio.oscillators.push(oscillator);
+        return oscillator;
+      }
+    };
+  });
+  try {
+    await page.click("#open-settings");
+    await page.click('.dialog-tabs [data-value="visual"]');
+    const listen = page.locator("#theme-listen");
+    const notice = page.locator("#theme-sound-notice");
+    await listen.click();
+    assert.equal(await notice.textContent(), "소리가 꺼져 있어요.");
+    assert.equal(await page.evaluate(() => window.themeAudio.contexts), 0);
+
+    const volume = page.locator("#set-volume");
+    await volume.fill("30");
+    assert.equal(await notice.textContent(), "");
+    const tones = () => page.evaluate(() => window.themeAudio.oscillators.map(oscillator => oscillator.type));
+    const volumeTones = (await tones()).length;
+    await listen.click();
+    const studioTones = (await tones()).slice(volumeTones);
+    assert.ok(studioTones.length > 0);
+    assert.ok(Math.abs((await page.evaluate(() => window.themeAudio.gain.value)) - 0.3 ** 2) < 1e-6);
+
+    const name = page.locator(".theme-stage-name");
+    await page.locator('#set-theme [data-value="retro"]').hover();
+    assert.equal(await name.textContent(), "페이퍼");
+    // 버튼에 포커스를 둔 채 마우스만 옮긴 뒤 Enter를 누를 수도 있다.
+    await page.keyboard.press("Enter");
+    assert.equal(await name.textContent(), "스튜디오");
+    assert.deepEqual((await tones()).slice(volumeTones + studioTones.length), studioTones);
+
+    await volume.fill("0");
+    assert.equal(await page.evaluate(() => window.themeAudio.gain.value), 0);
+    const last = await tones();
+    await listen.click();
+    assert.equal(await notice.textContent(), "소리가 꺼져 있어요.");
+    assert.deepEqual(await tones(), last);
     assert.deepEqual(errors, []);
   } finally {
     await context.close();
@@ -1073,6 +1370,53 @@ test("기록 화면: 표는 늘 10줄, 조건을 바꿔도 크기가 그대로, 
   assert.equal(await text(page, "hud-split"), "—");
   assert.deepEqual(errors, []);
   await context.close();
+});
+
+test("Sprint 구간에서 뒤처지다가 앞서면 기록 칸을 한 번 강조한다", async () => {
+  const { replay, record } = JSON.parse(
+    fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8")
+  );
+  record.splits = [120, 270, 390, 455];
+  const { context, page, errors } = await openPage(
+    ({ seed, record }) => {
+      Math.random = () => seed / 2 ** 32;
+      localStorage.setItem(
+        "tetrisharp:settings",
+        JSON.stringify({ access: { countdown: "off" }, visual: { effects: "full" } })
+      );
+      localStorage.setItem("tetrisharp:records", JSON.stringify({ "sprint40|modern": [record] }));
+      window.leadPulses = 0;
+      const animate = Element.prototype.animate;
+      Element.prototype.animate = function (frames, options) {
+        if (this.matches('[data-hud="split"]') && options?.id === "split-lead") window.leadPulses++;
+        return animate.call(this, frames, options);
+      };
+    },
+    { seed: replay.seed, record },
+    { frameClock: true }
+  );
+  try {
+    await startMode(page, "sprint40");
+    await playReplayFrames(page, replay.inputs, 0, 145);
+    assert.equal(await page.locator("#hud-split").getAttribute("data-ahead"), "false");
+    assert.equal(await page.evaluate(() => window.leadPulses), 0);
+    await playReplayFrames(page, replay.inputs, 145, 290);
+    assert.equal(await page.locator("#hud-split").getAttribute("data-ahead"), "true");
+    assert.equal(await page.evaluate(() => window.leadPulses), 1);
+    assert.equal(
+      await page.locator('[data-hud="split"]').evaluate(el => {
+        const pulse = el.getAnimations().find(animation => animation.id === "split-lead");
+        pulse.currentTime = 0;
+        return getComputedStyle(el).outlineStyle;
+      }),
+      "solid"
+    );
+    await playReplayFrames(page, replay.inputs, 290, 420);
+    assert.equal(await page.evaluate(() => window.leadPulses), 1);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
 });
 
 test("Sprint 최고 기록과 달리기: 같은 규칙에서 시작하고 상대 진행을 같이 멈춘다", async () => {
@@ -1219,6 +1563,14 @@ test("규칙 공유: 받은 코드·링크는 지금 규칙을 덮어쓰지 않�
   await page.click('[data-preset="modern"]');
   await page.locator("#rule-share-paste").fill(code);
   await page.click("#rule-share-load");
+  await page.locator("#ask-ok").waitFor();
+  assert.match(await page.locator("#ask .dialog-body").textContent(), /Modern 기본값과 다른 설정.*회전 시스템 킥 없음/);
+  assert.equal(await page.locator("#rule-slot-name").inputValue(), "내 규칙 1");
+  await page.click("#ask-cancel");
+  assert.equal(await page.locator("#rule-share-paste").inputValue(), code, "취소하면 입력값을 유지한다");
+  await page.click("#rule-share-load");
+  await page.click("#ask-ok");
+  await page.waitForFunction(() => document.querySelector("#rule-slot-name")?.value === "받은 규칙");
   assert.match(await text(page, "rules-record"), /새 칸으로 불러왔어요/);
   assert.equal(await page.locator("#rule-slot-name").inputValue(), "받은 규칙");
   await page.click('.dialog-tabs [data-value="피스"]');
@@ -1244,7 +1596,16 @@ test("규칙 공유: 받은 코드·링크는 지금 규칙을 덮어쓰지 않�
   p2.on("pageerror", e => errs2.push(e.message));
   await p2.goto(`${url}#rules=${code.slice(4)}`);
   await p2.waitForFunction(() => document.documentElement.dataset.ready === "1");
-  assert.equal(await p2.locator('[data-rules="custom"]').getAttribute("aria-pressed"), "true");
+  assert.equal(await p2.locator('[data-rules="custom"]').getAttribute("aria-pressed"), "false");
+  await p2.locator("#ask-ok").waitFor();
+  await p2.keyboard.press("Escape");
+  await p2.locator("#ask-ok").waitFor({ state: "hidden" });
+  assert.equal(await p2.locator('[data-rules="custom"]').getAttribute("aria-pressed"), "false");
+  await p2.goto(`${url}#rules=${code.slice(4)}`);
+  await p2.click("#ask-ok");
+  await p2.waitForFunction(
+    () => document.querySelector('[data-rules="custom"]')?.getAttribute("aria-pressed") === "true"
+  );
   assert.match(await p2.locator("#menu-notice").textContent(), /내 규칙에 새로 넣었어요/);
   assert.equal(new URL(p2.url()).hash, "", "주소의 해시는 지운다");
   assert.equal(await p2.locator("#rule-slot .select-value").textContent(), "받은 규칙");
@@ -1252,6 +1613,57 @@ test("규칙 공유: 받은 코드·링크는 지금 규칙을 덮어쓰지 않�
   assert.match(await p2.locator("#rule-rotation .select-value").textContent(), /킥 없음/);
   assert.deepEqual([...errors, ...errs2], []);
   await fresh.close();
+});
+
+test("내 규칙 미리보기·복제·시험 플레이: 긴 이름으로 복제하고 저장된 판을 유지하며 편집으로 돌아간다", async () => {
+  const { context, page, errors } = await openPage(() => {
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
+  });
+  await startMode(page, "sprint40");
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Escape");
+  await page.locator("#resume-save-status").waitFor();
+  const storage = await page.evaluate(() => {
+    const key = "tetrisharp:run:suspended";
+    return [key, localStorage.getItem(key)];
+  });
+  assert.ok(storage[1], "이어 할 판이 있다");
+  await page.reload();
+  await page.click('[data-rules="custom"]');
+  assert.match(await text(page, "rule-desc"), /Modern 기본값과 같아요/);
+  await page.click("#edit-rules");
+  await page.locator("#rule-slot-name").fill("123456789012345678901234");
+  await page.click("#rule-slot-duplicate");
+  assert.match(await page.locator("#rule-slot-name").inputValue(), /복사본$/);
+  await page.locator("#rule-allow180").uncheck();
+  await page.click("#rules-close");
+  await page.waitForFunction(() => document.querySelector("#rule-desc")?.textContent.includes("180도 회전 허용 끄기"));
+  await page.click("#edit-rules");
+  await page.locator("#rule-allow180").focus();
+  await page.click("#rule-trial");
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  assert.match(await text(page, "session-title"), /규칙 시험 플레이/);
+  assert.equal(await page.locator('[data-touch="R180"]').isDisabled(), true);
+  assert.equal(await page.locator("#ask").isVisible(), false);
+  await page.keyboard.press("Escape");
+  await page.click('#pause [data-action="menu"]');
+  await page.locator("#rule-allow180").waitFor();
+  assert.equal(await page.locator("#rule-allow180").evaluate(el => document.activeElement === el), true);
+  assert.equal(await page.locator("#rule-allow180").isChecked(), false);
+  await page.click("#rule-trial");
+  await page.waitForFunction(() => document.body.dataset.screen === "play");
+  for (let i = 0; i < 40 && (await page.evaluate(() => document.body.dataset.screen)) === "play"; i++)
+    await page.keyboard.press("Space", { delay: 40 });
+  await page.locator("#rule-allow180").waitFor();
+  assert.equal(await page.evaluate(key => localStorage.getItem(key), storage[0]), storage[1]);
+  await page.click("#rules-close");
+  await page.waitForFunction(() => document.querySelector("#rule-slot .select-value")?.textContent.endsWith("복사본"));
+  await choose(page, "rule-slot", "0");
+  await page.waitForFunction(() =>
+    document.querySelector("#rule-desc")?.textContent.includes("Modern 기본값과 같아요")
+  );
+  assert.deepEqual(errors, []);
+  await context.close();
 });
 
 test("내 규칙: 첫 화면에서 고르고 공유 탭을 열며, 편집기에서 새 규칙·이름·지우기를 한다", async () => {
@@ -1420,7 +1832,18 @@ test("입문 코스 완료 표시와 수동 Sprint 시도 기록을 볼 수 있�
 });
 
 test("CPU 대전 입문: 즉시 재시도하고 공격·상쇄·전송 수를 비교한다", async () => {
-  const { context, page, errors } = await openPage(null, undefined, { frameClock: true });
+  const { context, page, errors } = await openPage(
+    () => {
+      window.foldingBars = 0;
+      const fill = CanvasRenderingContext2D.prototype.fillRect;
+      CanvasRenderingContext2D.prototype.fillRect = function (x, y, width, height) {
+        if (this.canvas.id === "board" && this.globalAlpha === 0.83 && width < height / 3) window.foldingBars++;
+        return fill.call(this, x, y, width, height);
+      };
+    },
+    undefined,
+    { frameClock: true }
+  );
   const play = codes =>
     page.evaluate(keys => {
       for (const code of keys) {
@@ -1444,11 +1867,13 @@ test("CPU 대전 입문: 즉시 재시도하고 공격·상쇄·전송 수를 �
     assert.equal(await text(page, "hud-lines"), "4");
     await play(["Space"]);
     assert.equal(await text(page, "results-title"), "실패");
+    assert.equal(await page.evaluate(() => window.foldingBars), 0, "그대로 받은 가비지는 접히지 않는다");
     assert.match(await text(page, "results-stats"), /받은 쓰레기4/);
     await page.click('#results [data-action="retry"]');
     assert.equal(await page.locator("body").getAttribute("data-screen"), "play");
     await play(["ArrowUp", ...Array(4).fill("ArrowLeft"), "Space"]);
     assert.equal(await text(page, "race-result"), "공격 4줄 · 상쇄 4줄 · 상대에게 0줄");
+    assert.equal(await page.evaluate(() => window.foldingBars), 4, "상쇄한 네 줄만 접힌다");
 
     await page.click('#results [data-action="next-puzzle"]');
     await play(["ArrowUp", ...Array(3).fill("ArrowRight"), "Space"]);
@@ -3011,6 +3436,7 @@ test("편의: 카운트다운 '없음'이면 바로 시작하고, 연습에서�
   await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "1");
   await page.keyboard.press("KeyU");
   await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "0");
+  assert.equal(await visible(page, "puzzle-goal-hud"), false, "자유 연습에는 퍼즐 목표가 없다");
   await page.keyboard.press("Escape");
   await page.click('#pause [data-action="menu"]');
   await page.click('[data-confirm="ok"]');
@@ -3106,10 +3532,65 @@ test("편의: 제스처 방식이면 보드 아래 버튼 대신 보드를 튕�
   await context.close();
 });
 
-test("퍼즐: 단계를 풀면 성공·다음 단계로 이어지고, 첫 화면에 진행도가 남는다. 틀리면 실패", async () => {
-  const { context, page, errors } = await openPage(() =>
-    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }))
+test("휴대폰 제스처: 두 손가락 탭으로 T를 180도 회전해 판을 비운다", async () => {
+  const { page, context, errors } = await openPage(
+    () =>
+      localStorage.setItem(
+        "tetrisharp:settings",
+        JSON.stringify({ touch: "on", touchMode: "gestures", access: { countdown: "off" } })
+      ),
+    undefined,
+    { frameClock: true, viewport: { width: 390, height: 844 }, hasTouch: true }
   );
+  try {
+    await page.click("#open-help");
+    await page.locator("#help").getByText("두 손가락으로 함께 두드리기", { exact: true }).waitFor();
+    await page.click("#help-close");
+
+    // T가 보는 방향을 뒤집어야 두 줄의 구멍에 맞는다.
+    const cells = new Uint8Array(PUZZLE_CELLS);
+    cells.set(Array.from("11100011111111011111", Number), PUZZLE_CELLS - 20);
+    const code = encodePuzzle({ cells, pieces: "T", goal: { kind: "pc" } });
+    await page.goto(`${url}#puzzle=${code}`);
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    await page.evaluate(() => window.advanceFrame());
+    assert.equal(await visible(page, "touchpad"), false);
+
+    const { x, y, width } = await page.locator(".board-wrap").boundingBox();
+    const session = await context.newCDPSession(page);
+    const touch = (type, touchPoints, timestamp) =>
+      session.send("Input.dispatchTouchEvent", { type, touchPoints, timestamp });
+    const left = { id: 1, x: x + width * 0.25, y: y + 70 };
+    const right = { id: 2, x: x + width * 0.75, y: y + 70 };
+    const now = Date.now() / 1000;
+    await touch("touchStart", [left, right], now);
+    await touch("touchEnd", [], now + 0.06);
+    await page.evaluate(() => window.advanceFrame());
+
+    await touch("touchStart", [left], now + 0.12);
+    for (let i = 1; i <= 4; i++) await touch("touchMove", [{ ...left, y: left.y + i * 36 }], now + 0.12 + i * 0.015);
+    await touch("touchEnd", [], now + 0.19);
+    await page.evaluate(() => window.advanceFrame());
+    assert.equal(await text(page, "results-title"), "성공!");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("퍼즐: 단계를 풀면 성공·다음 단계로 이어지고, 첫 화면에 진행도가 남는다. 틀리면 실패", async () => {
+  const { context, page, errors } = await openPage(() => {
+    localStorage.setItem(
+      "tetrisharp:settings",
+      JSON.stringify({ access: { countdown: "off" }, visual: { theme: "film", effects: "full" } })
+    );
+    window.clearedPaints = 0;
+    const clip = CanvasRenderingContext2D.prototype.clip;
+    CanvasRenderingContext2D.prototype.clip = function (...args) {
+      if (this.canvas.id === "board") window.clearedPaints++;
+      return clip.apply(this, args);
+    };
+  });
   assert.equal(await text(page, "puzzle-progress"), `0 / ${PUZZLES.length}`);
   await openList(page, "#open-puzzles");
   assert.equal(await page.locator(".puzzle-tile").count(), PUZZLES.length);
@@ -3124,6 +3605,7 @@ test("퍼즐: 단계를 풀면 성공·다음 단계로 이어지고, 첫 화면
   }
   await page.waitForFunction(() => !document.getElementById("results")?.hidden, null, { timeout: 3000 });
   assert.equal(await text(page, "results-title"), "성공!");
+  await page.waitForFunction(() => window.clearedPaints > 0);
   assert.equal(await page.locator('[data-action="next-puzzle"]').isVisible(), true);
   await page.click('[data-action="next-puzzle"]');
   await page.waitForFunction(() => document.body.dataset.screen === "play");
@@ -3149,6 +3631,154 @@ const pickTemplate = async (page, value) => {
   await page.click("#puzzle-template");
   await page.click(`#puzzle-template-list [data-value="${value}"]`);
 };
+
+test("퍼즐 만들기: 도장과 피스 순서 단축키는 조작 버튼에 포커스가 있어도 동작한다", async () => {
+  const { context, page } = await openPage();
+  try {
+    await openList(page, "#open-puzzles");
+    await page.click("#puzzle-create");
+    await page.click('#puzzle-tool [data-value="piece"]');
+    await choose(page, "puzzle-stamp", "I");
+    await page.hover('[data-cell="175"]');
+    const preview = () => page.$$eval("[data-stamp]", cells => cells.map(cell => Number(cell.dataset.cell)));
+    const horizontal = await preview();
+    assert.equal(horizontal.length, 4);
+    assert.equal(await page.locator(":focus").getAttribute("id"), "puzzle-stamp");
+
+    await page.keyboard.press("r");
+    assert.deepEqual(await preview(), [165, 175, 185, 195]);
+    await page.locator("#puzzle-stamp").dispatchEvent("keydown", { key: "ㄱ", code: "KeyR" });
+    assert.deepEqual(await preview(), horizontal);
+
+    for (const piece of ["I", "O", "T"]) await page.click(`.puzzle-editor-pieces [data-piece="${piece}"]`);
+    const order = () => page.locator(".puzzle-seq-chip").allTextContents();
+    assert.deepEqual(await order(), ["01 I", "02 O", "03 T"]);
+    await page.keyboard.press("Alt+ArrowLeft");
+    assert.deepEqual(await order(), ["01 I", "02 T", "03 O"]);
+    await page.keyboard.press("Alt+ArrowRight");
+    assert.deepEqual(await order(), ["01 I", "02 O", "03 T"]);
+    await page.keyboard.press("Shift+ArrowLeft");
+    assert.deepEqual(await order(), ["01 I", "02 T", "03 O"]);
+
+    await page.getByRole("button", { name: "2번째 T", exact: true }).focus();
+    await page.keyboard.press("Alt+ArrowRight");
+    assert.deepEqual(await order(), ["01 I", "02 O", "03 T"]);
+    await page.keyboard.press("ArrowLeft");
+    assert.equal(await page.locator(":focus").textContent(), "02 O");
+    assert.deepEqual(await order(), ["01 I", "02 O", "03 T"]);
+
+    await page.focus("#puzzle-title");
+    await page.keyboard.type("ar");
+    await page.keyboard.press("Shift+ArrowLeft");
+    assert.equal(await page.locator("#puzzle-title").inputValue(), "ar");
+    assert.equal(await page.locator("#puzzle-title").evaluate(input => input.selectionStart), 1);
+    assert.deepEqual(await order(), ["01 I", "02 O", "03 T"]);
+  } finally {
+    await context.close();
+  }
+});
+
+test("퍼즐 만들기: 도장에서 피스 글자 키로 모양을 바로 바꾼다", async () => {
+  const { context, page } = await openPage();
+  try {
+    await openList(page, "#open-puzzles");
+    await page.click("#puzzle-create");
+    await page.click('#puzzle-tool [data-value="piece"]');
+    const picker = page.locator("#puzzle-stamp");
+    const cell = page.locator('[data-cell="175"]');
+    const preview = () => page.$$eval("[data-stamp]", cells => cells.map(tile => Number(tile.dataset.cell)));
+    await cell.focus();
+    for (const piece of "IJLOSTZ") {
+      await page.keyboard.press(piece.toLowerCase());
+      assert.equal(await picker.getAttribute("data-value"), piece);
+      assert.equal((await preview()).length, 4);
+    }
+
+    await page.keyboard.press("i");
+    await page.keyboard.press("r");
+    assert.deepEqual(await preview(), [165, 175, 185, 195]);
+    await page.keyboard.press("i");
+    assert.deepEqual(await preview(), [165, 175, 185, 195], "같은 모양은 현재 방향을 유지한다");
+    await cell.dispatchEvent("keydown", { key: "ㅐ", code: "KeyO" });
+    assert.equal(await picker.textContent(), "O");
+    await page.keyboard.press("i");
+    assert.deepEqual(await preview(), [174, 175, 176, 177], "모양을 바꾸면 기본 방향으로 돌아간다");
+    await picker.click();
+    assert.equal(await page.locator('#puzzle-stamp-list [aria-selected="true"]').getAttribute("data-value"), "I");
+    await page.keyboard.press("Escape");
+    await cell.click();
+    assert.deepEqual(
+      await page.$$eval('[data-cell][aria-pressed="true"]', cells => cells.map(tile => Number(tile.dataset.cell))),
+      [174, 175, 176, 177]
+    );
+    const erasePreview = page.locator('[data-stamp="erase"]');
+    assert.equal(await erasePreview.count(), 4);
+    assert.match(
+      await erasePreview.first().evaluate(tile => getComputedStyle(tile).backgroundImage),
+      /linear-gradient/
+    );
+    await page.keyboard.press("ArrowRight");
+    assert.equal(await erasePreview.count(), 0);
+    assert.equal(await page.locator('[data-stamp="place"]').count(), 4, "일부만 차 있으면 채우기");
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("Enter");
+    assert.equal(await page.locator('[data-cell][aria-pressed="true"]').count(), 0);
+    assert.match(await page.locator("#puzzles .dialog-foot .notice-slot").textContent(), /도장으로 4칸을 지웠어요/);
+
+    await page.focus('.puzzle-editor-pieces [data-piece="T"]');
+    await page.keyboard.press("z");
+    assert.equal(await page.locator(".puzzle-seq-chip").textContent(), "01 Z");
+    assert.equal(await picker.getAttribute("data-value"), "I");
+    await page.focus("#puzzle-title");
+    await page.keyboard.type("ost");
+    assert.equal(await page.locator("#puzzle-title").inputValue(), "ost");
+    assert.equal(await picker.getAttribute("data-value"), "I");
+  } finally {
+    await context.close();
+  }
+});
+
+test("좁은 터치 화면: 퍼즐 도구를 읽을 수 있고 색 견본을 44px 이상으로 누를 수 있다", async () => {
+  const { context, page } = await openPage(null, undefined, {
+    locale: "en-US",
+    viewport: { width: 360, height: 740 },
+    hasTouch: true,
+  });
+  try {
+    await page.tap("#open-puzzles");
+    await page.tap("#puzzle-create");
+    assert.equal(await page.getByRole("dialog", { name: "Create puzzle", exact: true }).isVisible(), true);
+    const goalFits = await page
+      .locator("#puzzle-goal .select-value")
+      .evaluate(label => label.scrollWidth <= label.clientWidth);
+    assert.equal(goalFits, true);
+    assert.equal(await page.locator("#puzzle-check").isVisible(), false, "빈 편집기에는 다음 단계 안내가 보인다");
+    await page.tap('#puzzle-tool [data-value="piece"]');
+    assert.equal(await page.locator("#puzzle-stamp").isVisible(), true);
+    await page.setViewportSize({ width: 740, height: 360 });
+    const editor = await page.locator("#puzzles").evaluate(dialog => ({
+      body: dialog.querySelector(".dialog-body").clientHeight,
+      footer: dialog.querySelector(".dialog-foot").clientHeight,
+    }));
+    assert.ok(editor.body > editor.footer);
+    await page.keyboard.press("Escape");
+
+    await page.setViewportSize({ width: 360, height: 740 });
+    await page.tap("#open-settings");
+    await page.tap('#settings [data-value="visual"]');
+    await page.tap('#set-palette [data-value="custom"]');
+    const swatches = await page.locator(".color-swatch").evaluateAll(buttons =>
+      buttons.map(btn => {
+        const { width, height } = btn.getBoundingClientRect();
+        return [width, height];
+      })
+    );
+    assert.equal(swatches.length, 16);
+    assert.ok(swatches.every(([width, height]) => width >= 44 && height >= 44));
+  } finally {
+    await context.close();
+  }
+});
 
 test("퍼즐 만들기: 피스 50개를 넣어도 추가 버튼은 같은 자리에 있고 본문만 스크롤한다", async () => {
   for (const viewport of [
@@ -3417,9 +4047,11 @@ test("퍼즐 만들기: 닫았다 다시 열어도 저장 전 새 퍼즐은 이�
   await page.waitForFunction(() => document.body.dataset.screen === "results");
   assert.equal(await text(page, "results-title"), "실패");
   assert.equal(await visible(page, "undo-piece"), true, "실패 결과에서도 되돌리기");
+  assert.equal(await text(page, "puzzle-goal-hud .goal-status"), "목표 미달성");
   await page.keyboard.press("KeyU");
   await page.waitForFunction(() => document.body.dataset.screen === "play");
   await page.waitForFunction(() => document.getElementById("hud-pieces")?.textContent === "0");
+  assert.equal(await text(page, "puzzle-goal-hud .goal-status"), "시작 전");
   await page.keyboard.press("Escape");
   await page.click('#pause [data-action="menu"]');
   await page.click('[data-confirm="ok"]');
@@ -3511,6 +4143,184 @@ test("퍼즐 만들기 자동 확인: 고치기를 멈추면 저절로 확인하
   await context.close();
 });
 
+test("퍼즐 편집기: Worker 차단 시 상태를 알리고 편집을 계속한다", async () => {
+  const { context, page, errors } = await openPage(() => {
+    window.Worker = class {
+      constructor() {
+        throw new DOMException("Worker blocked", "SecurityError");
+      }
+    };
+  });
+  try {
+    await openList(page, "#open-puzzles");
+    await page.click("#puzzle-create");
+    await pickTemplate(page, "well");
+    await page.getByText(/백그라운드 풀이기를 열 수 없어요/).waitFor();
+    assert.ok(await page.locator("#puzzle-check").isEnabled());
+    assert.ok(await page.locator("#puzzle-trial").isEnabled());
+    await page.click('#puzzles [data-piece="O"]');
+    assert.equal(await page.locator("#puzzles .puzzle-editor-count").textContent(), "2 / 50");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("퍼즐 자동 풀이: 시간이 긴 자동 검색을 멈추고 수동 확인으로 계속한다", async () => {
+  const { context, page, errors } = await openPage(() => {
+    const RealWorker = window.Worker;
+    window.Worker = class extends RealWorker {
+      postMessage(message) {
+        if (!message.task.maxStates) super.postMessage(message);
+      }
+    };
+  });
+  try {
+    await openList(page, "#open-puzzles");
+    await page.click("#puzzle-create");
+    await pickTemplate(page, "well");
+    await page.getByText(/이 퍼즐은 더 살펴봐야 해요/).waitFor();
+    assert.ok(await page.locator("#puzzle-check-stop").isDisabled());
+    await page.click("#puzzle-check");
+    await page.getByText(/풀 수 있어요 · 1수/).waitFor();
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("모바일 퍼즐 풀이: 긴 편집판에서 열어도 보드를 보면서 스크롤 없이 단계 이동", async () => {
+  const { context, page, errors } = await openPage(null, undefined, {
+    viewport: { width: 320, height: 568 },
+    hasTouch: true,
+  });
+  try {
+    await openList(page, "#open-puzzles");
+    await page.click("#puzzle-create");
+    const worker = page.waitForEvent("worker");
+    const stage = PUZZLES.find(p => p.kind === "pc" && p.pieces.length === 3);
+    await pickTemplate(page, `stage-${stage.number}`);
+    assert.ok((await worker).url().startsWith("blob:"));
+    await page.click('#puzzle-height [data-value="20"]');
+    await page.click("label.puzzle-editor-switch");
+    const scroll = () => page.locator("#puzzles .dialog-body").evaluate(el => el.scrollTop);
+    const before = await scroll();
+    const board = page.locator(".puzzle-editor-board");
+    const nav = page.locator(".puzzle-editor-preview-nav");
+    const box = await board.boundingBox();
+    const controls = await nav.boundingBox();
+    const body = await page.locator("#puzzles .dialog-body").boundingBox();
+    assert.ok(controls.y >= body.y - 1 && box.y + box.height <= body.y + body.height + 1);
+    await page.click("#puzzle-solution-next");
+    assert.equal(await text(page, "puzzle-solution-step"), "2 / 3");
+    await page.click("#puzzle-solution-next");
+    assert.equal(await text(page, "puzzle-solution-step"), "3 / 3");
+    await page.click("#puzzle-solution-prev");
+    assert.equal(await text(page, "puzzle-solution-step"), "2 / 3");
+    assert.equal(await scroll(), before);
+    const cdp = await context.newCDPSession(page);
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+    for (let i = 1; i <= 5; i++)
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: y - i * 11 }] });
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    assert.ok(await board.evaluate(el => el.classList.contains("is-viewing")));
+    await page.click("#puzzle-solution-exit");
+    assert.equal(await board.getAttribute("data-rows"), "20");
+    assert.ok(await board.evaluate(el => el.contains(document.activeElement)));
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("모바일 슬라이더: 세로 스와이프는 설정을 스크롤하고 가로 드래그는 값을 바꾼다", async () => {
+  const { context, page, errors } = await openPage(null, undefined, {
+    viewport: { width: 390, height: 650 },
+    hasTouch: true,
+  });
+  const cdp = await context.newCDPSession(page);
+  try {
+    await page.click("#open-settings");
+    const body = page.locator("#settings .dialog-body");
+    const slider = page.locator("#set-arr");
+    const swipe = async (dx, dy, at) => {
+      await slider.scrollIntoViewIfNeeded();
+      const box = await slider.boundingBox();
+      const x = box.x + box.width * at;
+      const y = box.y + box.height / 2;
+      const touch = (type, touchPoints) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints });
+      await touch("touchStart", [{ x, y }]);
+      for (let t = 1; t <= 8; t++) await touch("touchMove", [{ x: x + (dx * t) / 8, y: y + (dy * t) / 8 }]);
+      await touch("touchEnd", []);
+    };
+    await slider.scrollIntoViewIfNeeded();
+    const beforeScroll = await body.evaluate(el => el.scrollTop);
+    const beforeValue = await slider.inputValue();
+    await swipe(4, -140, 0.8);
+    await page.waitForFunction(
+      before => document.querySelector("#settings .dialog-body").scrollTop > before,
+      beforeScroll
+    );
+    assert.equal(await slider.inputValue(), beforeValue);
+    await swipe(85, 3, 0.2);
+    assert.notEqual(await slider.inputValue(), beforeValue);
+    const dragged = Number(await slider.inputValue());
+    await swipe(0, 0, 0.1);
+    const tapped = Number(await slider.inputValue());
+    assert.ok(tapped < dragged);
+    await slider.focus();
+    await page.keyboard.press("ArrowRight");
+    assert.ok(Number(await slider.inputValue()) > tapped);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("퍼즐 편집기 풀이 비교: 다른 첫 배치를 나란히 보고 T스핀 한 경로의 탐색 범위를 읽는다", async () => {
+  const { context, page, errors } = await openPage(null, undefined, {
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+  });
+  try {
+    await openList(page, "#open-puzzles");
+    await page.click("#puzzle-create");
+    await pickTemplate(page, "empty");
+    for (const row of [18, 19]) {
+      for (const col of [0, 1, 4, 5, 8, 9]) await page.click(`[data-cell="${row * 10 + col}"]`);
+    }
+    await page.click('#puzzles [data-piece="O"]');
+    await page.click('#puzzles [data-piece="O"]');
+    const compare = page.locator("#puzzle-compare");
+    await compare.click();
+    const dialog = page.locator("#puzzle-comparison");
+    await dialog.getByText("서로 다른 첫 배치 2가지를 확인했어요.").waitFor();
+    assert.ok(await dialog.locator(".dialog-foot .puzzle-comparison-nav").isVisible());
+    const boards = dialog.getByRole("img");
+    assert.equal(await boards.count(), 2);
+    const [a, b] = await boards.evaluateAll(canvases => canvases.map(canvas => canvas.toDataURL()));
+    assert.notEqual(a, b, "첫 O가 놓이는 위치가 다른 두 보드");
+    assert.ok(await dialog.evaluate(root => root.scrollWidth <= root.clientWidth));
+    await dialog.getByRole("button", { name: "다음 수" }).click();
+    assert.equal(await dialog.getByText("O 피스 · 2줄 삭제", { exact: true }).count(), 2);
+    await page.keyboard.press("Escape");
+    assert.ok(await compare.evaluate(control => control === document.activeElement));
+
+    await pickTemplate(page, "tsd");
+    await compare.click();
+    await dialog.getByText("탐색 범위에서 다른 첫 배치를 찾지 못했어요.").waitFor();
+    assert.equal(await dialog.getByText("T 피스 · 2줄 삭제 · T스핀").count(), 1);
+    assert.ok(await dialog.getByRole("button", { name: "다음 수" }).isDisabled());
+    await dialog.locator("#puzzle-comparison-close").click();
+    assert.ok(await page.locator("#puzzle-copy").isEnabled(), "비교는 편집 내용과 공유 확인을 유지한다");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test("퍼즐 만들기 목표·고급 설정: 목표와 규칙이 링크로 가고, 받는 쪽은 목표·규칙·확인 표시를 보고, '규칙대로'는 확인·첫 수 보기를 끈다", async () => {
   const { context, page, errors } = await openPage(() => {
     localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
@@ -3570,10 +4380,8 @@ test("퍼즐 만들기 목표·고급 설정: 목표와 규칙이 링크로 가�
   const recipient = await other.newPage();
   await recipient.goto(link);
   await recipient.waitForFunction(() => document.body.dataset.screen === "play");
-  assert.equal(
-    await text(recipient, "mode-objective"),
-    "목표 · T-spin Double · 20G · 홀드(처음 I) · 자동 확인으로 풀 수 있는 퍼즐"
-  );
+  assert.equal(await text(recipient, "puzzle-goal-hud .goal-title"), "T스핀 더블");
+  assert.equal(await text(recipient, "mode-objective"), "20G · 홀드(처음 I) · 자동 확인으로 풀 수 있는 퍼즐");
   await other.close();
 
   // 규칙대로 떨어지는 퍼즐: 자동 확인을 쓸 수 없고, 게임 중 첫 수 보기도 꺼진다
@@ -3679,10 +4487,8 @@ test("내 퍼즐·받은 퍼즐: 고치면 저절로 저장되고, 목록에서 
   await friend.goto(link);
   await friend.waitForFunction(() => document.body.dataset.screen === "play");
   assert.equal(await text(friend, "session-title"), "첫 퍼즐");
-  assert.equal(
-    await text(friend, "mode-objective"),
-    "목표 · 판 비우기 · 만든 사람이 직접 풀어 봤어요 · 오른쪽을 보세요"
-  );
+  assert.equal(await text(friend, "puzzle-goal-hud .goal-title"), "퍼펙트 클리어");
+  assert.equal(await text(friend, "mode-objective"), "만든 사람이 직접 풀어 봤어요 · 오른쪽을 보세요");
   await friend.keyboard.press("Space");
   await friend.waitForFunction(() => document.body.dataset.screen === "results");
   await friend.click('#results [data-action="menu"]');
@@ -3769,6 +4575,7 @@ test("만든 퍼즐: 시험 플레이 성공 후에만 공유하고, 휴대폰�
     const trial = page.locator("#puzzle-trial");
     const share = page.locator("#puzzle-copy");
     assert.ok(await trial.isDisabled());
+    await page.fill("#puzzle-desc", "A long sentence explaining the goal and the expected move.");
     for (const cell of [190, 191, 192, 197, 198, 199]) await page.click(`[data-cell="${cell}"]`);
     await page.click('#puzzles [data-piece="I"]');
     assert.ok(await share.isDisabled());
@@ -3807,6 +4614,18 @@ test("만든 퍼즐: 시험 플레이 성공 후에만 공유하고, 휴대폰�
     await recipient.goto(link);
     await recipient.waitForFunction(() => document.body.dataset.screen === "play");
     assert.equal(await text(recipient, "session-title"), "Custom puzzle");
+    assert.equal(await text(recipient, "puzzle-goal-hud .goal-value"), "1 row left");
+    await recipient.waitForFunction(() => document.body.style.getPropertyValue("--lesson-hud-h"));
+    const touchRowFits = () =>
+      recipient.locator("#touchpad").evaluate(pad => pad.getBoundingClientRect().bottom <= innerHeight);
+    assert.equal(await touchRowFits(), true, "받은 퍼즐을 열면 터치 조작 두 줄이 한 화면 안에 들어간다");
+    await recipient.tap("#downstack-hint");
+    await recipient.waitForFunction(() =>
+      document.getElementById("downstack-status").textContent.startsWith("First move")
+    );
+    await recipient.waitForFunction(
+      () => document.getElementById("touchpad").getBoundingClientRect().bottom <= innerHeight
+    );
     await recipient.tap('[data-touch="HARD"]');
     await recipient.waitForFunction(() => document.body.dataset.screen === "results");
     assert.equal(await text(recipient, "results-title"), "Solved!");
@@ -3820,6 +4639,31 @@ test("만든 퍼즐: 시험 플레이 성공 후에만 공유하고, 휴대폰�
     await invalid.goto(`${url}#puzzle=invalid`);
     assert.equal(await invalid.locator("body").getAttribute("data-screen"), "menu");
     assert.equal(await text(invalid, "menu-notice"), "Could not read the puzzle link.");
+    assert.equal(
+      await invalid.locator("#menu-notice").evaluate(notice => {
+        const { top, bottom } = notice.getBoundingClientRect();
+        return top >= 0 && bottom <= innerHeight;
+      }),
+      true,
+      "깨진 링크 안내는 스크롤하기 전에 보인다"
+    );
+    const tools = invalid.locator(".home-tools-link");
+    assert.equal(await tools.evaluate(link => link.getBoundingClientRect().bottom <= innerHeight), true);
+    await tools.tap();
+    await invalid.waitForFunction(() => location.hash === "#training-tools-title");
+    assert.equal(
+      await invalid.locator("#open-puzzles").evaluate(el => el.getBoundingClientRect().bottom <= innerHeight),
+      true
+    );
+    await invalid.evaluate(() => {
+      location.hash = "daily=invalid";
+    });
+    await invalid.waitForFunction(() => {
+      const notice = document.getElementById("menu-notice");
+      if (!notice.textContent.includes("result code")) return false;
+      const { top, bottom } = notice.getBoundingClientRect();
+      return top >= 0 && bottom <= innerHeight;
+    });
   } finally {
     await mobile.close();
     await context.close();
@@ -3909,8 +4753,14 @@ test("휴대폰: 일시정지·결과 카드가 잘리지 않고, 리플레이 �
     await page.tap('[data-confirm="cancel"]');
     await page.tap('#pause [data-action="resume"]');
     await page.waitForFunction(() => document.body.dataset.screen === "play");
-    for (let i = 0; i < 40 && (await page.evaluate(() => document.body.dataset.screen)) !== "results"; i++)
-      await page.tap('[data-touch="HARD"]').catch(() => {});
+    const hardDrop = page.locator('[data-touch="HARD"]');
+    for (let i = 0; i < 40 && (await hardDrop.isVisible()); i++) {
+      try {
+        await hardDrop.tap({ timeout: 1000 });
+      } catch (error) {
+        if ((await page.evaluate(() => document.body.dataset.screen)) !== "results") throw error;
+      }
+    }
     await page.waitForFunction(() => document.body.dataset.screen === "results");
     assert.deepEqual(await reachable("#results .actions .btn"), [], `결과 버튼이 다 보인다 · ${where}`);
     assert.deepEqual(
@@ -4311,6 +5161,251 @@ const openPuzzle = async (page, number) => {
   await page.evaluate(() => window.advanceFrame());
 };
 
+test("본편 퍼즐 목표: 줄 누적을 이어서 복원하고 T스핀 더블은 한 번에 판정한다", async () => {
+  const { context, page, errors } = await openPage(
+    () =>
+      localStorage.setItem(
+        "tetrisharp:settings",
+        JSON.stringify({ access: { countdown: "off" }, handling: { sdf: 41 }, visual: { effects: "off" } })
+      ),
+    undefined,
+    { frameClock: true }
+  );
+  try {
+    const start = async (rows, pieces, goal) => {
+      const cells = new Uint8Array(PUZZLE_CELLS);
+      const terrain = [...rows.join("")].map(cell => Number(cell));
+      cells.set(terrain, cells.length - terrain.length);
+      await page.goto(`${url}#puzzle=${encodePuzzle({ cells, pieces, goal })}`);
+      await page.waitForFunction(() => document.body.dataset.screen === "play");
+      await page.evaluate(() => window.advanceFrame());
+    };
+    const goal = page.locator("#puzzle-goal-hud");
+    const layout = async () => {
+      const card = await goal.boundingBox();
+      const board = await page.locator("#board").boundingBox();
+      return { card, board };
+    };
+    const value = () => goal.locator(".goal-value").textContent();
+    const status = () => goal.locator(".goal-status").textContent();
+    const filled = () => goal.locator('.goal-mark[data-filled="true"]').count();
+
+    await start(["1110000111", "1110000111"], "II", { kind: "lines", lines: 2 });
+    assert.equal(await value(), "0 / 2");
+    assert.equal(await filled(), 0);
+    const initial = await layout();
+    await runKeys(page, [["Space", 1]]);
+    assert.equal(await value(), "1 / 2");
+    assert.equal(await status(), "진행 중");
+    assert.equal(await filled(), 1);
+    assert.deepEqual(await layout(), initial);
+
+    await page.click("#pause-game");
+    await page.reload();
+    assert.ok(await goal.isHidden());
+    await page.click("#continue-run");
+    await page.evaluate(() => window.advanceFrame());
+    assert.equal(await value(), "1 / 2");
+    await runKeys(page, [["Space", 1]]);
+    assert.equal(await value(), "2 / 2");
+    assert.equal(await status(), "목표 달성");
+    assert.equal(await filled(), 2);
+    assert.equal(await goal.evaluate(root => root.getAnimations({ subtree: true }).length), 0);
+
+    await page.click('#results [data-action="retry"]');
+    await page.evaluate(() => window.advanceFrame());
+    assert.equal(await value(), "0 / 2");
+    assert.equal(await status(), "시작 전");
+
+    await page.click("#pause-game");
+    await page.click('#pause [data-action="menu"]');
+    await page.click('[data-confirm="ok"]');
+    await start(["1100001111", "1111000111", "1111101111"], "T", { kind: "tsd" });
+    assert.equal(await filled(), 0);
+    await runKeys(page, [
+      ["ArrowRight", 1],
+      ["KeyZ", 1],
+      ["ArrowDown", 1],
+      ["KeyZ", 1],
+    ]);
+    assert.equal(await filled(), 0);
+    await runKeys(page, [["Space", 1]]);
+    assert.equal(await status(), "목표 달성");
+    assert.equal(await filled(), 6);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("실패 복기에서 마지막 수를 다시 놓아도 퍼즐 완료는 따로 남긴다", async () => {
+  const { page, context, errors } = await openPage(
+    () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } })),
+    undefined,
+    { frameClock: true }
+  );
+  try {
+    const cells = new Uint8Array(PUZZLE_CELLS);
+    cells.set(Array.from("11100001111110000111", Number), PUZZLE_CELLS - 20);
+    const code = encodePuzzle({ cells, pieces: "II", goal: { kind: "lines", lines: 2 } });
+    await page.goto(`${url}#puzzle=${code}`);
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    await page.evaluate(() => window.advanceFrame());
+    await runKeys(page, [
+      ["Space", 1],
+      ["F24", 10],
+      ["ArrowLeft", 1],
+      ["Space", 1],
+    ]);
+    assert.equal(await text(page, "results-title"), "실패");
+    await page.click("#results-watch");
+    const review = page.locator("#puzzle-review");
+    assert.equal(await review.getByRole("img").count(), 2);
+    assert.ok(await review.getByText("2줄 목표 중 1줄을 지웠어요.").isVisible());
+    await review.getByRole("button", { name: "이 수부터 연습" }).click();
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    await page.evaluate(() => window.advanceFrame());
+    assert.equal(await text(page, "puzzle-goal-hud .goal-value"), "1 / 2");
+    assert.match(await text(page, "session-title"), /마지막 수 연습/);
+    assert.equal(await page.evaluate(() => localStorage.getItem("tetrisharp:run:suspended") ?? "null"), "null");
+    await runKeys(page, [["Space", 1]]);
+    assert.equal(await text(page, "results-title"), "성공!");
+    assert.equal(await text(page, "results-main"), "마지막 수 연습");
+    await page.click('#results [data-action="menu"]');
+    await page.locator("#puzzles[open]").waitFor();
+    assert.match(await page.locator("[data-received-play]").textContent(), /아직/);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("본편 상황 연출: 높은 판과 벽 차기를 표시하고 판을 낮추면 위험선을 걷는다", async () => {
+  const { context, page, errors } = await openPage(
+    () => {
+      localStorage.setItem(
+        "tetrisharp:settings",
+        JSON.stringify({ access: { countdown: "off" }, visual: { effects: "full" } })
+      );
+      window.situation = { danger: 0, kick: 0 };
+      const moveTo = CanvasRenderingContext2D.prototype.moveTo;
+      const translate = CanvasRenderingContext2D.prototype.translate;
+      CanvasRenderingContext2D.prototype.moveTo = function (x, y) {
+        if (this.canvas.id === "board" && y === 2 + 0.87) window.situation.danger++;
+        return moveTo.call(this, x, y);
+      };
+      CanvasRenderingContext2D.prototype.translate = function (x, y) {
+        if (this.canvas.id === "board" && x === 5 && this.getTransform().a > 1) window.situation.kick++;
+        return translate.call(this, x, y);
+      };
+    },
+    undefined,
+    { frameClock: true }
+  );
+  try {
+    const cells = new Uint8Array(PUZZLE_CELLS);
+    cells[28] = 1;
+    for (let i = cells.length - 40; i < cells.length; i++) cells[i] = Number(i % 10 !== 5);
+    const code = encodePuzzle({ cells, pieces: "TI", goal: { kind: "lines", lines: 4 } });
+    assert.ok(code);
+    await page.goto(`${url}#puzzle=${code}`);
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    await runKeys(page, [["F24", 16]]);
+    assert.ok((await page.evaluate(() => window.situation.danger)) > 0);
+    await runKeys(page, [["ArrowUp", 1], ...Array.from({ length: 4 }, () => ["ArrowLeft", 1]), ["KeyZ", 1]]);
+    assert.ok((await page.evaluate(() => window.situation.kick)) > 0);
+    await runKeys(page, [
+      ["Space", 1],
+      ["F24", 10],
+      ["ArrowUp", 1],
+      ["Space", 1],
+      ["F24", 24],
+    ]);
+    assert.equal(await text(page, "results-title"), "성공!");
+    const end = await page.evaluate(() => window.situation.danger);
+    await runKeys(page, [["F24", 10]]);
+    assert.equal(await page.evaluate(() => window.situation.danger), end);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("본편 연출: 홀드로 꺼낸 T로 두 줄을 지우고 다음 I로 콤보와 퍼펙트 클리어를 완성한다", async () => {
+  const { context, page, errors } = await openPage(
+    () => {
+      localStorage.setItem(
+        "tetrisharp:settings",
+        JSON.stringify({ access: { countdown: "off" }, visual: { effects: "full" } })
+      );
+      window.seenAccents = {};
+      const canvas = CanvasRenderingContext2D.prototype;
+      const fill = canvas.fillRect;
+      const arc = canvas.arc;
+      const rect = canvas.rect;
+      const text = canvas.fillText;
+      canvas.fillRect = function (x, y, w, h) {
+        if (this.canvas.id === "board" && y === 2.92) window.seenAccents[x < 1 ? "hold" : "next"] = true;
+        return fill.call(this, x, y, w, h);
+      };
+      canvas.arc = function (...args) {
+        if (this.canvas.id === "board" && args[5] === true) window.seenAccents.spin = true;
+        return arc.apply(this, args);
+      };
+      canvas.rect = function (x, y, w, h) {
+        if (this.canvas.id === "board" && w > 9 && w < 10 && h > 19 && h < 20) window.seenAccents.perfect = true;
+        return rect.call(this, x, y, w, h);
+      };
+      canvas.fillText = function (...args) {
+        if (this.canvas.id === "board" && args[0] === "콤보") window.seenAccents.combo = true;
+        return text.apply(this, args);
+      };
+    },
+    undefined,
+    { frameClock: true }
+  );
+  try {
+    const cells = new Uint8Array(PUZZLE_CELLS);
+    cells.set(
+      [..."11....22771112...27711888.8877"].map(value => Number(value !== ".")),
+      cells.length - 30
+    );
+    const code = encodePuzzle({
+      cells,
+      pieces: "ZIOS",
+      holdStart: "T",
+      rules: { ...DEFAULT_RULES, hold: { enabled: true } },
+    });
+    assert.ok(code);
+    await page.goto(`${url}#puzzle=${code}`);
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    await page.evaluate(() => window.advanceFrame());
+    await runKeys(page, [
+      ["KeyC", 1],
+      ["ArrowRight", 1],
+      ["KeyZ", 1],
+      ["ArrowDown", 70],
+      ["KeyZ", 1],
+      ["Space", 1],
+      ["F24", 20],
+      ["ArrowLeft", 1],
+      ["Space", 1],
+      ["F24", 30],
+    ]);
+    assert.equal(await text(page, "results-title"), "성공!");
+    assert.deepEqual(await page.evaluate(() => window.seenAccents), {
+      next: true,
+      hold: true,
+      spin: true,
+      combo: true,
+      perfect: true,
+    });
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test("퍼즐 콤보 이어 가기: 줄을 못 지운 피스가 나오면 남은 피스와 상관없이 바로 실패", async () => {
   const { context, page, errors } = await openPage(
     () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } })),
@@ -4337,7 +5432,18 @@ test("퍼즐 콤보 이어 가기: 줄을 못 지운 피스가 나오면 남은 
 
 test("퍼즐 T-spin Mini: 곧장 떨어뜨리면 실패, 바닥까지 내린 뒤 마지막에 돌려 넣으면 Mini로 성공", async () => {
   const { context, page, errors } = await openPage(
-    () => localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } })),
+    () => {
+      localStorage.setItem(
+        "tetrisharp:settings",
+        JSON.stringify({ access: { countdown: "off" }, visual: { effects: "full" } })
+      );
+      window.spinArcs = 0;
+      const arc = CanvasRenderingContext2D.prototype.arc;
+      CanvasRenderingContext2D.prototype.arc = function (...args) {
+        if (this.canvas.id === "board" && args[5] === true) window.spinArcs++;
+        return arc.apply(this, args);
+      };
+    },
     undefined,
     { frameClock: true }
   );
@@ -4348,6 +5454,7 @@ test("퍼즐 T-spin Mini: 곧장 떨어뜨리면 실패, 바닥까지 내린 뒤
   await runKeys(page, [["Space", 1]]);
   await page.waitForFunction(() => !document.getElementById("results")?.hidden);
   assert.equal(await text(page, "results-title"), "실패");
+  assert.equal(await page.evaluate(() => window.spinArcs), 0);
   await page.click('#results [data-action="menu"]');
   await openPuzzle(page, first.number);
   // 오른쪽 네 칸 → 바닥까지 소프트 드롭 → 반시계로 돌려 넣고, 그대로 두면(고정 지연) 회전이 마지막 동작으로 남는다
@@ -4362,6 +5469,7 @@ test("퍼즐 T-spin Mini: 곧장 떨어뜨리면 실패, 바닥까지 내린 뒤
   ]);
   await page.waitForFunction(() => !document.getElementById("results")?.hidden);
   assert.equal(await text(page, "results-title"), "성공!");
+  assert.ok((await page.evaluate(() => window.spinArcs)) > 0, "판정된 T스핀 자리에서 회전선이 그려진다");
   assert.deepEqual(errors, []);
   await context.close();
 });
@@ -4406,8 +5514,27 @@ test("휴대폰 제스처로 밀어 넣기: 옆으로 한 칸 → 끌어내려 �
     undefined,
     { frameClock: true, viewport: { width: 390, height: 844 }, hasTouch: true }
   );
-  const first = PUZZLES.find(p => p.kind === "tuck");
-  await openPuzzle(page, first.number);
+  await openList(page, "#open-practice");
+  await page.click('[data-drill="gesture-training"]');
+  await page.click('[data-practice-stage="gesture-lesson-1"]');
+  await page.evaluate(() => window.advanceFrame());
+  await runKeys(page, [["KeyA", 1]]);
+  assert.equal(await page.locator("body").getAttribute("data-screen"), "play", "터치에서는 제스처로 연습한다");
+  const { x, y, width } = await page.locator(".board-wrap").boundingBox();
+  const session = await context.newCDPSession(page);
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [
+      { id: 1, x: x + width * 0.25, y: y + 80 },
+      { id: 2, x: x + width * 0.75, y: y + 80 },
+    ],
+  });
+  await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await page.evaluate(() => window.advanceFrame());
+  assert.equal(await text(page, "results-title"), "성공!");
+  await page.click('#results [data-action="next-puzzle"]');
+  assert.equal(await text(page, "session-title"), "손가락을 떼지 않고 밀어 넣기");
+  await page.evaluate(() => window.advanceFrame());
   await page.evaluate(() => {
     const wrap = /** @type {HTMLElement} */ (document.querySelector(".board-wrap"));
     const board = /** @type {HTMLElement} */ (document.getElementById("board"));
@@ -4503,7 +5630,7 @@ test("첫 화면 로고: 여섯 번은 아무 일 없고, 3초 안에 일곱 번
     assert.equal(await text(page, "menu-notice"), "", "여섯 번은 조용하다");
     await page.click("#open-settings");
     await page.click('.dialog-tabs [data-value="visual"]');
-    assert.equal(await themeChips(), 9, "아직 숨어 있다");
+    assert.equal(await themeChips(), 20, "아직 숨어 있다");
     await page.click("#settings-close");
 
     await page.waitForTimeout(3100); // 앞의 여섯 번은 3초가 지나 사라진다
@@ -4521,7 +5648,7 @@ test("첫 화면 로고: 여섯 번은 아무 일 없고, 3초 안에 일곱 번
     );
     await page.click("#open-settings");
     await page.click('.dialog-tabs [data-value="visual"]');
-    assert.equal(await themeChips(), 10);
+    assert.equal(await themeChips(), 21);
     assert.equal(await page.locator('#set-theme [data-value="sharp"]').getAttribute("aria-pressed"), "true");
     assert.equal(await page.locator(".theme-stage-name").textContent(), "샤프");
     await page.click("#settings-close");
@@ -4665,6 +5792,136 @@ test("결과에서 Esc는 퍼즐 목록: 같은 Esc 입력이 방금 연 목록�
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("data-puzzle")), String(first.number));
   assert.deepEqual(errors, []);
   await context.close();
+});
+
+test("모바일 퍼즐 편집판: 스와이프는 스크롤하고 탭과 끌어 칠하기는 편집한다", async () => {
+  const context = await browser.newContext({
+    locale: "ko-KR",
+    viewport: { width: 320, height: 568 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  try {
+    const page = await context.newPage();
+    await page.goto(url);
+    const shortcut = page.locator("#quick-puzzles");
+    assert.ok((await shortcut.boundingBox()).y + (await shortcut.boundingBox()).height <= 568);
+    await shortcut.tap();
+    await page.locator("#puzzle-close").tap();
+    await page.waitForFunction(() => document.activeElement?.id === "quick-puzzles");
+    await shortcut.tap();
+    await page.tap("#puzzle-create");
+    await page.tap('#puzzle-height [data-value="20"]');
+    const tile = page.locator('[data-cell="85"]');
+    await tile.scrollIntoViewIfNeeded();
+    const box = await tile.boundingBox();
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    const body = page.locator("#puzzles .dialog-body");
+    const cells = () => page.locator('[data-cell][aria-pressed="true"]').count();
+    const cdp = await context.newCDPSession(page);
+    const scroll = await body.evaluate(el => el.scrollTop);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+    for (let i = 1; i <= 8; i++) {
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: y - i * 8 }] });
+    }
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await page.waitForFunction(before => document.querySelector("#puzzles .dialog-body").scrollTop > before, scroll);
+    assert.equal(await cells(), 0);
+    await tile.tap();
+    assert.equal(await cells(), 1);
+    await page.locator(".puzzle-touch-paint").tap();
+    assert.equal(await page.locator("#puzzle-drag-paint").isChecked(), true);
+    const nextTile = page.locator('[data-cell="96"]');
+    await nextTile.scrollIntoViewIfNeeded();
+    const next = await nextTile.boundingBox();
+    const nextX = next.x + next.width / 2;
+    const nextY = next.y + next.height / 2;
+    const paintScroll = await body.evaluate(el => el.scrollTop);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: nextX, y: nextY }] });
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: nextX, y: nextY - 22 }] });
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    assert.ok((await cells()) >= 3);
+    assert.equal(await body.evaluate(el => el.scrollTop), paintScroll);
+  } finally {
+    await context.close();
+  }
+});
+
+test("낮은 가로 휴대폰: 퍼즐 보드와 조작을 함께 보고 리플레이 도구를 열어도 타임라인이 보인다", async () => {
+  const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
+  const context = await browser.newContext({
+    locale: "ko-KR",
+    viewport: { width: 568, height: 320 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  await context.addInitScript(({ replay, record }) => {
+    localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
+    localStorage.setItem("tetrisharp:replay:last", JSON.stringify(replay));
+    localStorage.setItem("tetrisharp:records", JSON.stringify({ "sprint40|modern": [record] }));
+  }, fixture);
+  try {
+    const page = await context.newPage();
+    await page.goto(url);
+    const inside = selector =>
+      page.locator(selector).evaluate(el => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && r.top >= 0 && r.bottom <= innerHeight;
+      });
+    await page.tap("#quick-daily-puzzle");
+    await page.tap("#daily-puzzle-play");
+    await page.waitForSelector('body[data-screen="play"]');
+    for (const selector of ["#board", '#touchpad [data-touch="HARD"]', '#touchpad [data-touch="CW"]']) {
+      assert.ok(await inside(selector), selector);
+    }
+    assert.equal(await page.evaluate(() => document.documentElement.scrollHeight), 320);
+    await page.tap('#touchpad [data-touch="CW"]');
+    await page.goto(url);
+    await page.tap("#watch-last");
+    await page.tap('[data-replay="toggle"]');
+    const timeline = page.locator("#replay-progress");
+    const before = await timeline.boundingBox();
+    assert.equal(await page.locator('[data-replay="share"]').isVisible(), false);
+    await page.tap("#replay-more");
+    assert.ok(await inside('[data-replay="share"]'));
+    assert.ok(await inside('[data-replay="race"]'));
+    assert.deepEqual(await timeline.boundingBox(), before);
+  } finally {
+    await context.close();
+  }
+});
+
+test("모바일 테마: 목록 끝을 골라도 미리보기와 소리 버튼이 화면에 남는다", async () => {
+  for (const viewport of [
+    { width: 320, height: 568 },
+    { width: 568, height: 320 },
+  ]) {
+    const context = await browser.newContext({ locale: "ko-KR", viewport, isMobile: true, hasTouch: true });
+    try {
+      const page = await context.newPage();
+      await page.goto(url);
+      await page.tap("#open-settings");
+      await page.tap('#settings [data-value="visual"]');
+      const choice = page.locator("#theme-choice");
+      await choice.tap();
+      const last = page.locator("#theme-choice-list [role=option]").last();
+      const name = await last.innerText();
+      await last.tap();
+      assert.equal(await choice.innerText(), name);
+      assert.equal(await page.locator(".theme-stage-name").textContent(), name);
+      const visible = await page.locator(".theme-stage-canvas, #theme-listen").evaluateAll(nodes =>
+        nodes.every(el => {
+          const body = el.closest(".dialog-body").getBoundingClientRect();
+          const target = el.getBoundingClientRect();
+          return target.top >= body.top && target.bottom <= body.bottom;
+        })
+      );
+      assert.ok(visible, JSON.stringify(viewport));
+    } finally {
+      await context.close();
+    }
+  }
 });
 
 test("규칙 원정: 단계 잠금, 보너스 클리어, 다음 단계, 같은 규칙으로 이어서 하기", async () => {

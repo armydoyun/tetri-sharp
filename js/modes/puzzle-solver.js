@@ -5,9 +5,10 @@
 // DOM·i18n 없이 돈다 — Worker(js/workers/solver.js)에도 그대로 들어간다.
 import { HEIGHT, WIDTH, clearLines, collides, get, inBounds, isEmpty, place } from "../core/board.js";
 import { PIECES } from "../core/pieces.js";
-import { detectTSpin } from "../core/tspin.js";
+import { detectSpin, movedByRotation, spinKicks } from "../core/spins.js";
 import { ROTATIONS } from "../rules/rotation/index.js";
-import { goalOf } from "./puzzle-goals.js";
+import { spinBit, spinMask, T_SPIN } from "../rules/spins.js";
+import { goalOf, puzzleCombo } from "./puzzle-goals.js";
 
 /** 한 번 찾을 때 살펴볼 최대 상태 수(오래 멈추지 않게) */
 const BUDGET = 1500000;
@@ -17,11 +18,11 @@ const BUDGET = 1500000;
  * - sonic: 20G — 움직일 때마다 바닥까지
  * - irs: 20G에서 나올 때 미리 돌린 채로 나올 수 있다(첫 수는 이미 나온 피스라 쓰지 않는다)
  * - lockNone: 고정 지연 없음 — 20G면 나오자마자 그 자리에 고정
- * - tspin: "none"이면 T-spin을 세지 않는다
+ * - tspin, spinPieces: 미노별 스핀 설정
  * - hold: 홀드를 쓸 수 있다
  * - ceilingRows: 아래에서 이 줄 수까지만 놓아 본다(없으면 처음 판의 높이 — 기본 퍼즐)
  * - looseRows: 처음 판의 높이 안에서 먼저 찾고, 못 찾으면 이 줄 수까지 넓혀 다시 찾는다(빠르게 찾되 "못 풀어요"는 넓게 찾아 본 뒤에만)
- * @typedef {{ sonic?: boolean, irs?: boolean, lockNone?: boolean, tspin?: "threeCorner" | "none", hold?: boolean, ceilingRows?: number, looseRows?: number }} SearchOptions
+ * @typedef {{ sonic?: boolean, irs?: boolean, lockNone?: boolean, tspin?: "threeCorner" | "none", spinPieces?: number, hold?: boolean, allow180?: boolean, legacyArsSpin?: boolean, ceilingRows?: number, looseRows?: number, perfectClear?: boolean }} SearchOptions
  */
 
 /**
@@ -29,18 +30,29 @@ const BUDGET = 1500000;
  * @param {{ cells: Uint8Array, width: number, height: number }} board
  * @param {any} rotation  js/rules/rotation 의 회전 시스템
  * @param {string} type
- * @param {Array<{ x: number, y: number, rot: number, first?: string }>} starts  시작 자리(first: 그 자리로 오는 첫 동작, 예: 미리 회전)
- * @param {{ half?: boolean, withPath?: boolean, budget?: { left: number }, sonic?: boolean, lockNone?: boolean }} [options]
+ * @param {Array<{ x: number, y: number, rot: number, first?: string, lastAction?: string, kick?: number, spinMoved?: boolean }>} starts
+ * @param {{ half?: boolean, withPath?: boolean, budget?: { left: number }, sonic?: boolean, lockNone?: boolean, legacyArsSpin?: boolean, spins?: number, minY?: number }} [options]
  */
-const reachable = (
+export const reachable = (
   board,
   rotation,
   type,
   starts,
-  { half = false, withPath = false, budget = { left: BUDGET }, sonic = false, lockNone = false } = {}
+  {
+    half = false,
+    withPath = false,
+    budget = { left: BUDGET },
+    sonic = false,
+    lockNone = false,
+    legacyArsSpin = false,
+    spins = T_SPIN,
+    minY = -Infinity,
+  } = {}
 ) => {
   const fits = (x, y, rot) => !collides(board, rotation.cells(type, rot), x, y);
-  const key = s => `${s.x},${s.y},${s.rot},${s.last === "rotate" ? s.kick : "m"}`;
+  const piece = /** @type {import("../core/pieces.js").PieceType} */ (type);
+  const canSpin = type !== "T" && spins & spinBit(piece);
+  const key = s => `${s.x},${s.y},${s.rot},${s.last === "rotate" ? (s.spinMoved ? "s" : s.kick) : "m"}`;
   /** 20G: 바닥까지 떨어뜨린다(떨어졌으면 마지막 동작은 내려가기) */
   const fall = s => {
     if (!sonic) return s;
@@ -52,7 +64,7 @@ const reachable = (
   const prev = new Map();
   const queue = [];
   for (const start of starts) {
-    const s = fall({ ...start, last: /** @type {string | null} */ (null), kick: 0 });
+    const s = fall({ ...start, last: start.lastAction ?? null, kick: start.kick ?? 0 });
     const k = key(s);
     if (prev.has(k)) continue;
     prev.set(k, start.first ? ["", start.first] : null);
@@ -69,18 +81,22 @@ const reachable = (
   for (let i = 0; i < queue.length && budget.left > 0; i++, budget.left--) {
     const s = queue[i];
     if (!fits(s.x, s.y + 1, s.rot)) {
-      const tspin = detectTSpin(
+      const { tspin, spinPiece } = detectSpin(
         board,
-        /** @type {any} */ ({ type, x: s.x, y: s.y, rot: s.rot, lastAction: s.last, kick: s.kick })
+        rotation,
+        { type: piece, x: s.x, y: s.y, rot: s.rot, lastAction: s.last, kick: s.kick, spinMoved: s.spinMoved },
+        spins,
+        legacyArsSpin
       );
-      const k = `${s.x},${s.y},${s.rot},${tspin}`;
-      const found = { ...s, tspin, key: key(s) };
+      const k = `${s.x},${s.y},${s.rot},${spinPiece ?? tspin}`;
+      const found = { ...s, tspin, spinPiece, key: key(s) };
       // 같은 자리에 가는 길이 여럿이면(이동 뒤 내리기 · 내린 뒤 회전 등) 누를 것이 적은 길을 남긴다(첫 수 보기 안내가 짧게)
       if (!out.has(k) || (withPath && pressCost(pathTo(found)) < pressCost(pathTo(out.get(k))))) out.set(k, found);
       // 20G에 고정 지연이 없으면 바닥에 닿는 순간 고정된다: 더 움직일 수 없다
       if (sonic && lockNone) continue;
     }
     const push = (n, action) => {
+      if (n.y < minY) return;
       n = fall(n);
       const k = key(n);
       if (prev.has(k)) return;
@@ -93,12 +109,23 @@ const reachable = (
     for (const d of half ? [1, 3, 2] : [1, 3]) {
       const to = (s.rot + d) % 4;
       const blocked = (cx, cy) => !inBounds(board, s.x + cx, s.y + cy) || get(board, s.x + cx, s.y + cy) !== 0;
-      const kicks = rotation.kicks(type, s.rot, to, blocked);
+      const kicks =
+        type === "O" && canSpin
+          ? spinKicks(board, rotation, { type: piece, x: s.x, y: s.y, rot: s.rot }, to, spins, blocked)
+          : rotation.kicks(type, s.rot, to, blocked);
       for (let k = 0; k < kicks.length; k++) {
         const [dx, dy] = kicks[k];
         if (fits(s.x + dx, s.y + dy, to)) {
           push(
-            { ...s, x: s.x + dx, y: s.y + dy, rot: to, last: "rotate", kick: k },
+            {
+              ...s,
+              x: s.x + dx,
+              y: s.y + dy,
+              rot: to,
+              last: "rotate",
+              kick: type === "O" && dx ? 1 : k,
+              ...(canSpin ? { spinMoved: movedByRotation(rotation, type, s.rot, to, dx, dy) } : {}),
+            },
             d === 1 ? "CW" : d === 3 ? "CCW" : "180"
           );
           break;
@@ -162,6 +189,31 @@ export const spawnOf = (board, rotation, type) => {
   return s;
 };
 
+/** 선택한 고정 위치로 가는 90° 입력 경로. 위에서 바로 떨어뜨릴 수 있으면 그 경로를 쓴다. */
+export const inputsForPlacement = (board, rotation, { type, cells, tspin }) => {
+  const start = spawnOf(board, rotation, type);
+  const id = cells
+    .map(([x, y]) => y * WIDTH + x)
+    .sort((a, b) => a - b)
+    .join(",");
+  const { placements, pathTo } = reachable(board, rotation, type, [start], { withPath: true });
+  let best = null;
+  for (const placement of placements) {
+    if (placement.tspin !== tspin) continue;
+    const position = rotation
+      .cells(type, placement.rot)
+      .map(([x, y]) => (y + placement.y) * WIDTH + x + placement.x)
+      .sort((a, b) => a - b)
+      .join(",");
+    if (position !== id) continue;
+    const direct = tspin === "none" && straightPath(board, rotation, type, start, placement, false);
+    if (direct) return direct;
+    const path = pathTo(placement);
+    if (!best || pressCost(path) < pressCost(best)) best = path;
+  }
+  return best;
+};
+
 /**
  * 새로 나오는 피스의 시작 자리들: 보통은 나오는 자리 하나, 20G에 미리 회전이 되면 돌린 채로 나오는 자리도(엔진의 IRS와 같다)
  * @param {SearchOptions} opts
@@ -189,26 +241,56 @@ const topRow = board => {
   return board.height;
 };
 
+// 한 줄을 지울 때 각 열에서 블록 하나씩 없어진다. 남은 피스를 모두 쓸 수 없는 경우도
+// 총 블록 수가 열 너비의 배수가 되는 최대 고정 횟수로 열별 상한을 구할 수 있다.
+export const canClearColumns = (board, remaining) => {
+  const columns = Array(WIDTH).fill(0);
+  let occupied = 0;
+  for (let y = topRow(board); y < HEIGHT; y++) {
+    for (let x = 0; x < WIDTH; x++) {
+      if (!board.cells[y * WIDTH + x]) continue;
+      occupied++;
+      columns[x]++;
+    }
+  }
+  const tallest = Math.max(...columns);
+  for (let count = remaining; count >= 0; count--) {
+    const blocks = occupied + 4 * count;
+    if (blocks % WIDTH === 0) return tallest <= blocks / WIDTH;
+  }
+  return false;
+};
+
 /**
  * 피스 하나를 놓은 결과: 다음 판과 그 수의 사건(엔진의 onLock과 같은 모양 + 지운 줄 합계 total)
  * @param {{ cells: Uint8Array, width: number, height: number }} board
  * @param {SearchOptions} opts
  */
-const placeOn = (board, rotation, type, p, combo, total, opts) => {
+export const placeOn = (board, rotation, type, p, combo, total, opts) => {
   const cells = rotation.cells(type, p.rot);
   const next = { ...board, cells: board.cells.slice() };
   place(next, cells, p.x, p.y, 8);
   const lines = clearLines(next).length;
-  const tspin = opts.tspin === "none" ? "none" : p.tspin;
   const ev = {
     lines,
-    tspin,
+    tspin: opts.tspin === "none" ? "none" : p.tspin,
+    ...(p.spinPiece ? { spinPiece: p.spinPiece } : {}),
     perfect: lines > 0 && isEmpty(next),
-    combo: lines ? combo + 1 : -1,
+    combo: puzzleCombo(combo, lines),
     total: total + lines,
   };
   return { next, ev, cells };
 };
+
+/** 같은 피스가 같은 칸을 차지하면 회전 입력이나 홀드 순서가 달라도 첫 배치는 같다. */
+export const placementKey = ({ type, cells }) =>
+  `${type}/${cells
+    .map(([x, y]) => y * WIDTH + x)
+    .sort((a, b) => a - b)
+    .join(",")}`;
+
+/** @typedef {{ budget?: { left: number }, excludeFirst?: string }} SearchControl */
+/** @typedef {{ type: string, hold: boolean, board: Uint8Array, cells: [number, number][], lines: number, tspin: string, spinPiece?: string }} SolutionMove */
 
 /**
  * 첫 수 찾기.
@@ -218,42 +300,60 @@ const placeOn = (board, rotation, type, p, combo, total, opts) => {
  * @param {string[]} rest  지금 피스 다음에 나올 피스들(홀드 칸 제외)
  * @param {any} rotation
  * @param {SearchOptions} [opts]
+ * @param {SearchControl} [control]
  * @returns {null | { exhausted: true } | {
  *   cells: Array<[number, number]>, steps: string[], hold: boolean, type: string,
- *   done: boolean, next: any, combo: number, total: number, rest: string[], holdPiece: string | null,
+ *   lines: number, tspin: string, spinPiece?: string, done: boolean, next: any, combo: number, total: number, rest: string[], holdPiece: string | null,
  * }}
  *   null: 남은 피스로는 풀 수 없다. exhausted: 살펴볼 수 있는 만큼 살폈지만 길을 찾지 못했다(피스가 많은 판) — 풀 수 없다는 뜻은 아니다.
  *   hold: 먼저 홀드하고 나온 피스(type)를 놓는다. done: 이 수로 목표를 이룬다.
  *   next·combo·total·rest·holdPiece: 이 수를 놓은 뒤(풀이를 이어 찾을 때)
  */
-export const findFirstMove = (puzzle, state, rest, rotation, opts = {}) => {
+export const findFirstMove = (puzzle, state, rest, rotation, opts = {}, control = {}) => {
   if (opts.looseRows !== undefined) {
     const { looseRows, ...tightOpts } = opts;
-    const tight = findFirstMove(puzzle, state, rest, rotation, tightOpts);
+    const tight = findFirstMove(puzzle, state, rest, rotation, tightOpts, control);
     if (tight && !("exhausted" in tight)) return tight;
-    return findFirstMove(puzzle, state, rest, rotation, { ...tightOpts, ceilingRows: looseRows });
+    return findFirstMove(puzzle, state, rest, rotation, { ...tightOpts, ceilingRows: looseRows }, control);
   }
   let exhausted = false;
   const total0 = state.total ?? 0;
   const hold0 = state.hold ?? null;
-  for (const half of [false, true]) {
-    const budget = { left: BUDGET };
+  const spins = spinMask(opts);
+  for (const half of opts.allow180 === false ? [false] : [false, true]) {
+    const budget = control.budget ?? { left: BUDGET };
+    if (budget.left <= 0) return { exhausted: true };
     // 여러 피스로 푸는 판은 놓을 높이를 정해 둔다. 기본 퍼즐은 처음 판의 높이 안에서만(판 비우기·4줄·콤보 — 그 위로 쌓는 풀이는 없다,
     // 판 비우기는 아래 두 줄이 다 비어 있을 수도 있어 적어도 두 줄). 만든 퍼즐은 ceilingRows로 받는다.
     const ceiling =
       opts.ceilingRows !== undefined ? HEIGHT - opts.ceilingRows : Math.min(topRow(state.board), HEIGHT - 2);
-    const search = { half, budget, sonic: opts.sonic, lockNone: opts.lockNone };
+    const search = {
+      half,
+      budget,
+      sonic: opts.sonic,
+      lockNone: opts.lockNone,
+      legacyArsSpin: opts.legacyArsSpin,
+      spins,
+    };
+    const deadEnds = new Set();
     /** 다음 피스로 넘어간다: 목록이 끝나면 홀드한 피스가 나온다(만든 퍼즐의 규칙) */
     const advance = (queue, hold) =>
       queue.length ? { cur: queue[0], queue: queue.slice(1), hold } : hold ? { cur: hold, queue, hold: null } : null;
     /** 이 피스(cur)부터 남은 피스로 목표에 닿는가 */
     const solves = (board, cur, queue, hold, combo, total, canSwap) => {
       if (budget.left <= 0) return false;
+      const key = opts.perfectClear
+        ? `${board.cells.slice(topRow(board) * WIDTH).join("")}/${cur}${queue.join("")}/${hold ?? ""}/${canSwap}`
+        : "";
+      if (deadEnds.has(key)) return false;
       const { placements } = reachable(board, rotation, cur, spawnStarts(board, rotation, cur, opts, half), search);
       if (placements.some(p => tryPlace(board, cur, p, queue, hold, combo, total))) return true;
-      if (!opts.hold || !canSwap) return false;
-      if (hold) return solves(board, hold, queue, cur, combo, total, false);
-      return queue.length > 0 && solves(board, queue[0], queue.slice(1), cur, combo, total, false);
+      if (opts.hold && canSwap) {
+        if (hold && solves(board, hold, queue, cur, combo, total, false)) return true;
+        if (!hold && queue.length && solves(board, queue[0], queue.slice(1), cur, combo, total, false)) return true;
+      }
+      if (key && budget.left > 0) deadEnds.add(key);
+      return false;
     };
     const tryPlace = (board, cur, p, queue, hold, combo, total) => {
       const more = queue.length > 0 || Boolean(hold);
@@ -261,27 +361,39 @@ export const findFirstMove = (puzzle, state, rest, rotation, opts = {}) => {
       const { next, ev } = placeOn(board, rotation, cur, p, combo, total, opts);
       if (puzzle.goal(ev)) return true;
       if (puzzle.broken?.(ev) || !more) return false;
+      if (opts.perfectClear && !canClearColumns(next, queue.length + Number(Boolean(hold)))) return false;
       const after = advance(queue, hold);
       return Boolean(after) && solves(next, after.cur, after.queue, after.hold, ev.combo, ev.total, true);
     };
     /** 지금 피스(또는 홀드로 바꾼 피스)의 자리 중 풀리는 첫 자리. 누를 것이 적은 자리부터 본다(첫 수 보기 안내가 짧게) */
     const firstOf = (type, starts, queue, hold, swapped) => {
       const first = reachable(state.board, rotation, type, starts, { ...search, withPath: true });
+      const placementCells = p =>
+        rotation.cells(type, p.rot).map(([x, y]) => /** @type {[number, number]} */ ([p.x + x, p.y + y]));
+      const candidates = control.excludeFirst
+        ? first.placements.filter(p => placementKey({ type, cells: placementCells(p) }) !== control.excludeFirst)
+        : first.placements;
       /** 사람이 보통 하는 길: 위에서 돌리고, 옆으로 옮기고, 곧장 떨어뜨린다. 막히면(처마 밑·스핀) 탐색이 찾은 길 */
       const pathOf = p =>
-        (!opts.sonic && p.tspin === "none" && straightPath(state.board, rotation, type, starts[0], p, half)) ||
+        (!opts.sonic &&
+          p.tspin === "none" &&
+          !(spins !== T_SPIN && spins & spinBit(type)) &&
+          straightPath(state.board, rotation, type, starts[0], p, half)) ||
         first.pathTo(p);
-      const paths = new Map(first.placements.map(p => [p, pathOf(p)]));
-      const cost = new Map(first.placements.map(p => [p, pressCost(paths.get(p))]));
-      for (const p of [...first.placements].sort((a, b) => cost.get(a) - cost.get(b))) {
+      const paths = new Map(candidates.map(p => [p, pathOf(p)]));
+      const cost = new Map(candidates.map(p => [p, pressCost(paths.get(p))]));
+      for (const p of [...candidates].sort((a, b) => cost.get(a) - cost.get(b))) {
         if (!tryPlace(state.board, type, p, queue, hold, state.combo, total0)) continue;
-        const { next, ev, cells } = placeOn(state.board, rotation, type, p, state.combo, total0, opts);
+        const { next, ev } = placeOn(state.board, rotation, type, p, state.combo, total0, opts);
         const after = advance(queue, hold);
         return {
-          cells: cells.map(([cx, cy]) => /** @type {[number, number]} */ ([p.x + cx, p.y + cy])),
+          cells: placementCells(p),
           steps: paths.get(p),
           hold: swapped,
           type,
+          lines: ev.lines,
+          tspin: ev.tspin,
+          ...(ev.spinPiece ? { spinPiece: ev.spinPiece } : {}),
           done: puzzle.goal(ev),
           next,
           combo: ev.combo,
@@ -313,9 +425,10 @@ export const findFirstMove = (puzzle, state, rest, rotation, opts = {}) => {
  * @param {string[]} pieces
  * @param {any} rotation
  * @param {SearchOptions & { holdStart?: string | null }} [opts]
- * @returns {null | { exhausted: true } | { moves: Array<{ type: string, hold: boolean, board: Uint8Array, cells: Array<[number, number]> }> }}
+ * @param {SearchControl} [control]
+ * @returns {null | { exhausted: true } | { moves: SolutionMove[] }}
  */
-const findSolution = (puzzle, board, pieces, rotation, opts = {}) => {
+const findSolution = (puzzle, board, pieces, rotation, opts = {}, control = {}) => {
   const moves = [];
   let combo = -1;
   let total = 0;
@@ -323,10 +436,14 @@ const findSolution = (puzzle, board, pieces, rotation, opts = {}) => {
   let [cur, ...queue] = pieces;
   while (cur) {
     const active = { type: cur, ...spawnOf(board, rotation, cur) };
-    const move = findFirstMove(puzzle, { board, active, combo, total, hold, holdUsed: false }, queue, rotation, opts);
+    const move = findFirstMove(puzzle, { board, active, combo, total, hold, holdUsed: false }, queue, rotation, opts, {
+      budget: control.budget,
+      excludeFirst: moves.length ? undefined : control.excludeFirst,
+    });
     if (!move) return null;
     if ("exhausted" in move) return { exhausted: true };
-    moves.push({ type: move.type, hold: move.hold, board: board.cells, cells: move.cells });
+    const { type, hold: swap, cells, lines, tspin, spinPiece } = move;
+    moves.push({ type, hold: swap, board: board.cells, cells, lines, tspin, ...(spinPiece ? { spinPiece } : {}) });
     if (move.done) return { moves };
     board = move.next;
     combo = move.combo;
@@ -342,22 +459,47 @@ const findSolution = (puzzle, board, pieces, rotation, opts = {}) => {
  * 탐색 한 건(Worker로 보낼 수 있는 값만): 목표는 종류·피스 수로, 회전은 이름으로 받는다.
  * - first: 지금 판·움직이는 피스·남은 피스로 첫 수(게임 중 "첫 수 보기")
  * - solution: 처음 판과 피스 순서로 끝까지 풀이(퍼즐 만들기의 자동 확인)
+ * - comparison: 같은 판에서 기준 풀이의 첫 배치를 제외한 풀이
  * @typedef {{ kind: string, count: number, lines?: number, rotation: string, board: Uint8Array, opts?: SearchOptions }} SolverBase
- * @typedef {SolverBase & { type: "first", active: { type: string, x: number, y: number, rot: number }, combo: number, rest: string[], total?: number, hold?: string | null, holdUsed?: boolean }
- *   | SolverBase & { type: "solution", pieces: string[], holdStart?: string | null }} SolverTask
+ * @typedef {SolverBase & { type: "first", active: { type: string, x: number, y: number, rot: number, lastAction?: string, kick?: number, spinMoved?: boolean }, combo: number, rest: string[], total?: number, hold?: string | null, holdUsed?: boolean }
+ *   | SolutionTask
+ *   | Omit<SolutionTask, "type"> & { type: "comparison", excludeFirst: string }} SolverTask
+ * @typedef {SolverBase & { type: "solution", pieces: string[], holdStart?: string | null, maxStates?: number }} SolutionTask
  */
 
 /**
  * @param {SolverTask} task
- * @returns {null | { exhausted: true } | { cells: Array<[number, number]>, steps: string[], hold: boolean } | { moves: Array<{ type: string, hold: boolean, board: Uint8Array, cells: Array<[number, number]> }> }}
+ * @returns {null | { exhausted: true } | { cells: Array<[number, number]>, steps: string[], hold: boolean }
+ * | { moves: SolutionMove[] } | { comparison: "found", alternative: SolutionMove[] } | { comparison: "checked" | "limit" }}
  */
 export const runSolverTask = task => {
   const puzzle = goalOf(task.kind, task.count, task.lines);
   const rotation = ROTATIONS[task.rotation] ?? ROTATIONS.srs;
   const board = { width: WIDTH, height: HEIGHT, cells: task.board };
-  const opts = task.opts ?? {};
+  const opts = task.kind === "pc" ? { ...task.opts, perfectClear: true } : (task.opts ?? {});
   if (task.type === "solution")
-    return findSolution(puzzle, board, task.pieces, rotation, { ...opts, holdStart: task.holdStart ?? null });
+    return findSolution(
+      puzzle,
+      board,
+      task.pieces,
+      rotation,
+      { ...opts, holdStart: task.holdStart ?? null },
+      task.maxStates === undefined ? {} : { budget: { left: task.maxStates } }
+    );
+  if (task.type === "comparison") {
+    const { looseRows, ...bounds } = opts;
+    const alternative = findSolution(
+      puzzle,
+      board,
+      task.pieces,
+      rotation,
+      { ...bounds, ceilingRows: looseRows ?? bounds.ceilingRows, holdStart: task.holdStart },
+      { budget: { left: BUDGET }, excludeFirst: task.excludeFirst }
+    );
+    return alternative && "moves" in alternative
+      ? { comparison: "found", alternative: alternative.moves }
+      : { comparison: alternative ? "limit" : "checked" };
+  }
   const move = findFirstMove(
     puzzle,
     {

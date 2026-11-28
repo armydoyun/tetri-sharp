@@ -158,3 +158,15 @@ test("백업: 고른 CPU 성향도 옮기고, 모르는 이름은 버린다", ()
   assert.equal(parseBackup(wrap("quad"), findMode)?.data["versus:style"], "quad");
   assert.equal(parseBackup(wrap("<b>"), findMode)?.data["versus:style"], undefined);
 });
+
+test("오늘의 퍼즐 백업: 날짜를 검증하고 기존 완료 기록과 합친다", () => {
+  const key = "daily-puzzle:cleared";
+  const from = createStore(memoryBackend());
+  from.set(key, ["2026-11-26", "2026-02-30", "2026-11-26"]);
+  const to = createStore(memoryBackend());
+  to.set(key, ["2026-11-27"]);
+  const parsed = parseBackup(createBackup(from), findMode);
+  assert.deepEqual(parsed.data[key], ["2026-11-26"]);
+  assert.equal(restoreBackup(to, parsed), true);
+  assert.deepEqual(to.get(key, []), ["2026-11-26", "2026-11-27"]);
+});

@@ -1,0 +1,93 @@
+.goal-hud {
+  display: grid;
+  grid-template-rows: auto minmax(var(--control-h), 1fr) auto;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  min-width: 0;
+  border: var(--border-w) solid var(--border-strong);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+}
+
+.goal-hud[data-complete="true"] {
+  border-color: var(--accent-ledge);
+  background: var(--accent-soft);
+}
+
+.goal-hud p {
+  margin: 0;
+  min-width: 0;
+}
+
+.goal-status {
+  color: var(--text-dim);
+  font-size: var(--text-s);
+  font-weight: 750;
+}
+
+.goal-hud[data-complete="true"] .goal-status {
+  color: var(--accent);
+}
+
+.goal-value {
+  font: 750 var(--text-m) / 1.45 var(--font-num);
+}
+
+.goal-marks {
+  align-self: center;
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.goal-mark {
+  display: block;
+  height: var(--space-1);
+  border-radius: var(--radius-s);
+  border: var(--border-w) solid var(--border-strong);
+  background: var(--surface-3);
+}
+
+.goal-mark[data-filled="true"] {
+  background: var(--accent);
+  border-color: var(--accent-ledge);
+}
+
+.goal-bars {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.goal-marks:is([data-kind="lines"], [data-kind="combo"]) .goal-bars {
+  grid-template-columns: repeat(var(--goal-segments), minmax(0, 1fr));
+}
+
+.goal-marks[data-kind="lines"] .goal-mark {
+  height: var(--space-3);
+}
+
+.goal-marks[data-kind="pc"] .goal-mark[data-filled="true"] {
+  background: var(--text-faint);
+  border-color: var(--text-faint);
+}
+
+.goal-t {
+  width: min(100%, calc(var(--space-3) * 3 + var(--space-1) * 2));
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.goal-t > .goal-mark {
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.goal-t > .goal-mark[data-filled="false"] {
+  background: var(--surface-2);
+  border-color: var(--text-dim);
+}
+
+.goal-t > .goal-mark:last-child {
+  grid-column: 2;
+}

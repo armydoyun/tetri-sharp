@@ -5,7 +5,7 @@
 import { SOUND_SETS } from "./sound-sets.js";
 
 export { SOUND_NAMES, SOUND_SETS } from "./sound-sets.js";
-/** @typedef {import("./sound-sets.js").Part} Part */
+/** @typedef {import("./sound-kit.js").Part} Part */
 
 /**
  * 이벤트 한 프레임 분량 → 낼 소리 이름들(순서대로, 중복 없음)
@@ -27,11 +27,12 @@ export const soundsFor = events => {
       dropped = true;
       add("hardDrop");
     } else if (e.type === "lock") {
+      const spin = e.spinPiece || e.tspin !== "none";
       if (e.perfect) add("perfect");
-      else if (e.tspin !== "none" && e.lines > 0) add("tspin");
+      else if (spin && e.lines > 0) add("tspin");
       else if (e.lines >= 4) add("quad");
       else if (e.lines > 0) add(`clear${e.lines}`);
-      else if (e.tspin !== "none") add("tspinZero");
+      else if (spin) add("tspinZero");
       else if (!dropped) add("lock");
       if (e.b2b) add("b2b");
       if (e.combo >= 1) add(`combo${Math.min(e.combo, 12)}`);
@@ -45,9 +46,10 @@ export const soundsFor = events => {
 };
 
 /**
- * @param {{ getVolume: () => number, getSet?: () => string }} options  getVolume: 0~100, 0이면 소리 없음. getSet: 지금 쓸 묶음 id
+ * @param {{ getVolume: () => number, getSet?: () => string, sets?: Record<string, Record<string, Part[]>> }} options
+ * getVolume: 0~100, 0이면 소리 없음. getSet: 지금 쓸 묶음 id
  */
-export const createSfx = ({ getVolume, getSet = () => "modern" }) => {
+export const createSfx = ({ getVolume, getSet = () => "modern", sets = SOUND_SETS }) => {
   /** @type {AudioContext | null} */
   let ctx = null;
   /** @type {GainNode | null} */
@@ -64,12 +66,14 @@ export const createSfx = ({ getVolume, getSet = () => "modern" }) => {
       } catch {
         return null;
       }
-      master = ctx.createGain();
-      master.connect(ctx.destination);
       noise = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.2), ctx.sampleRate);
       const data = noise.getChannelData(0);
       // 소리 고르기와 상관없는 잡음이라 Math.random을 써도 결정론에 영향이 없다.
       for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    }
+    if (!master) {
+      master = ctx.createGain();
+      master.connect(ctx.destination);
     }
     if (ctx.state === "suspended") ctx.resume().catch(() => {});
     return ctx;
@@ -133,19 +137,27 @@ export const createSfx = ({ getVolume, getSet = () => "modern" }) => {
    */
   const play = (name, mix = 1, options = {}) => {
     const volume = options.volume ?? getVolume();
-    const set = SOUND_SETS[options.set ?? getSet()] ?? SOUND_SETS.modern;
+    const set = sets[options.set ?? getSet()] ?? SOUND_SETS.modern;
     const parts = set[name];
-    if (!parts || volume <= 0) return;
+    if (!parts || volume <= 0) return false;
     const ac = ensure();
-    if (!ac || !master) return;
+    if (!ac || !master) return false;
     // 사람 귀는 로그 단위로 듣는다 → 슬라이더 값을 제곱해 작은 쪽을 더 세밀하게.
     master.gain.value = Math.pow(volume / 100, 2);
     const t0 = ac.currentTime + 0.005 + (options.delay ?? 0);
     for (const p of parts) voice(ac, master, p, t0, mix);
+    return true;
   };
 
   return {
     play,
+    setVolume() {
+      if (master) master.gain.value = Math.pow(getVolume() / 100, 2);
+    },
+    stop() {
+      master?.disconnect();
+      master = null;
+    },
     /** 묶음 하나를 짧게 들려준다(설정의 테마 미리보기): 이동·회전·하드 드롭·2줄 */
     preview(set, volume) {
       for (const [at, name] of /** @type {const} */ ([

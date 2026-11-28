@@ -43,9 +43,9 @@ const LINE_NAMES = ["", "SINGLE", "DOUBLE", "TRIPLE", "QUAD"];
 
 /**
  * 화면에 띄울 이름. 예: "T-SPIN DOUBLE", "MINI T-SPIN", "QUAD"
- * @param {{ lines: number, tspin: string }} r
+ * @param {{ lines: number, tspin: string, spinPiece?: string }} r
  */
-export const clearName = ({ lines, tspin }) => {
-  const spin = tspin === "full" ? "T-SPIN" : tspin === "mini" ? "MINI T-SPIN" : "";
+export const clearName = ({ lines, tspin, spinPiece }) => {
+  const spin = spinPiece ? `${spinPiece}-SPIN` : tspin === "full" ? "T-SPIN" : tspin === "mini" ? "MINI T-SPIN" : "";
   return [spin, LINE_NAMES[lines] ?? ""].filter(Boolean).join(" ");
 };

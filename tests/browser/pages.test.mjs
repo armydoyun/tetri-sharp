@@ -62,8 +62,15 @@ test("배포본 파일: index.html·매니페스트·아이콘·링크 배너·�
   const manifest = JSON.parse(fs.readFileSync(path.join(dir, "manifest.webmanifest"), "utf8"));
   assert.equal(manifest.name, "Tetri#");
   assert.equal(manifest.start_url, "./");
+  assert.match(manifest.icons[0].src, /^icon\.svg\?v=[0-9a-f]{12}$/);
+  assert.equal(manifest.icons[0].purpose, "any maskable");
   const html = fs.readFileSync(path.join(dir, "index.html"), "utf8");
   assert.match(html, /<link rel="manifest" href="\.\/manifest\.webmanifest">/);
+  assert.equal((html.match(/<link rel="icon"/g) ?? []).length, 1);
+  assert.match(html, /<link rel="icon" href="data:image\/svg\+xml;base64,[^"]+"/);
+  const tabIcon = Buffer.from(html.match(/<link rel="icon" href="data:image\/svg\+xml;base64,([^"]+)"/)[1], "base64");
+  const appIcon = fs.readFileSync(path.join(dir, "icon.svg"), "utf8");
+  assert.ok(appIcon.includes(tabIcon.toString().match(/<path\b[^>]*\/>/)[0]), "앱과 탭에 같은 T 표식을 쓴다");
   assert.match(fs.readFileSync(path.join(dir, "sw.js"), "utf8"), /const VERSION = "[0-9a-f]{12}"/);
   // 링크 배너: 메신저가 읽는 태그(이미지는 절대 주소, 1200×630 PNG)
   assert.match(html, /<meta property="og:image" content="https:\/\/[^"]+\/og\.png">/);
@@ -84,7 +91,11 @@ test("설치 캐시로 서버 장애와 오프라인 상태에서도 기록·리
     page.on("pageerror", e => errors.push(e.message));
     await page.goto(base);
     await ready(page);
+    const icon = await page.locator('link[rel="icon"]').getAttribute("href");
+    assert.equal(await page.locator(".logo-mark").evaluate(mark => getComputedStyle(mark).maskImage), `url("${icon}")`);
     await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller), null, { timeout: 5000 });
+    const manifest = JSON.parse(fs.readFileSync(path.join(dir, "manifest.webmanifest"), "utf8"));
+    const iconSrc = manifest.icons[0].src;
     await page.evaluate(({ record, replay }) => {
       localStorage.setItem("tetrisharp:records", JSON.stringify({ "sprint40|modern": [record] }));
       localStorage.setItem("tetrisharp:replay:last", JSON.stringify(replay));
@@ -102,6 +113,8 @@ test("설치 캐시로 서버 장애와 오프라인 상태에서도 기록·리
     offline.on("pageerror", e => errors.push(e.message));
     await offline.goto(new URL("index.html", base).href);
     await ready(offline);
+    const offlineIcon = await offline.evaluate(async src => (await fetch(src)).text(), iconSrc);
+    assert.equal(offlineIcon, fs.readFileSync(path.join(dir, "icon.svg"), "utf8"));
     assert.match(await offline.locator('[data-mode="sprint40"] .mode-best').textContent(), /최고 기록/);
     await offline.click("#watch-last");
     assert.equal(await offline.locator("#replay-bar").isVisible(), true);

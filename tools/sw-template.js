@@ -3,13 +3,13 @@
 // 페이지(내비게이션)는 네트워크를 먼저 보고(새 버전을 바로 받게), 안 되면 저장본을 쓴다.
 const VERSION = "__VERSION__";
 const CACHE = `tetrisharp-${VERSION}`;
-const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
+const FILES = ["./", "./index.html", "./manifest.webmanifest", "./__APP_ICON__"];
 
 self.addEventListener("install", event => {
   event.waitUntil(
     caches
       .open(CACHE)
-      .then(cache => cache.addAll(FILES))
+      .then(cache => cache.addAll(FILES.map(file => new Request(file, { cache: "reload" }))))
       .then(() => self.skipWaiting())
   );
 });

@@ -3,13 +3,14 @@ import { clearName } from "../rules/scoring/guideline.js";
 import { formatScore } from "../modes/format.js";
 import { t } from "../i18n/index.js";
 
-const describeAttack = ({ cleared, tspin, lines, blocked, base, backToBack, combo, perfect }) => {
+const describeAttack = ({ cleared, tspin, spinPiece, lines, blocked, base, backToBack, combo, perfect }) => {
   const outcome = [];
   if (blocked) outcome.push(t("{n}줄 상쇄", { n: blocked }));
   if (lines) outcome.push(t("{n}줄 보냄", { n: lines }));
   if (!outcome.length) outcome.push(t("공격 0줄"));
-  const clear =
-    tspin === "mini"
+  const clear = spinPiece
+    ? t("{piece}-SPIN {n}줄", { piece: spinPiece, n: cleared })
+    : tspin === "mini"
       ? t("T-spin Mini {n}줄", { n: cleared })
       : tspin === "full"
         ? t("T-spin {n}줄", { n: cleared })
@@ -58,7 +59,7 @@ export const createFeedback = ({ actionEl, versusEl, srStatus, getSettings, desc
     let lines = [];
     if (e.type === "lock") {
       const name = clearName(e);
-      const showName = e.tspin !== "none" || e.lines >= 4;
+      const showName = e.spinPiece || e.tspin !== "none" || e.lines >= 4;
       if (e.perfect) lines.push("PERFECT CLEAR");
       if (e.b2b) lines.push("BACK-TO-BACK");
       if (showName && name) lines.push(name);
@@ -91,7 +92,7 @@ export const createFeedback = ({ actionEl, versusEl, srStatus, getSettings, desc
 
   const announceAttack = e => {
     // 매번 싱글이 나올 때 알릴 필요는 없다. T-spin Mini와 상쇄처럼 다른 결과는 매번 설명한다.
-    if (e.tspin === "none" && !e.lines && !e.blocked) {
+    if (!e.spinPiece && e.tspin === "none" && !e.lines && !e.blocked) {
       if (explainedSingle) return "";
       explainedSingle = true;
     }
@@ -117,7 +118,7 @@ export const createFeedback = ({ actionEl, versusEl, srStatus, getSettings, desc
     for (const e of events) {
       if (e.type === "lock") {
         if (e.lines > 0) {
-          buzz(e.lines >= 4 || e.tspin !== "none" ? [25, 30, 25] : 15);
+          buzz(e.lines >= 4 || e.tspin !== "none" || e.spinPiece ? [25, 30, 25] : 15);
           const name = clearName(e);
           const left = describeLeft();
           say(
@@ -125,7 +126,10 @@ export const createFeedback = ({ actionEl, versusEl, srStatus, getSettings, desc
               .filter(Boolean)
               .join(" · ")
           );
-        } else buzz(6);
+        } else {
+          buzz(6);
+          if (e.spinPiece) say(clearName(e));
+        }
       } else if (e.type === "levelUp") say(t("레벨 {n}", { n: e.level }));
       else if (e.type === "garbage") buzz(20);
       else if (e.type === "gameOver") buzz([60, 40, 90]);

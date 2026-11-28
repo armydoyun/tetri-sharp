@@ -24,13 +24,15 @@ const blocked = (board, x, y) => !inBounds(board, x, y) || get(board, x, y) !== 
 /**
  * @param {import("./board.js").Board} board  피스를 놓기 전 보드
  * @param {import("./engine.js").Active} a
+ * @param {string} [rotation] 회전 시스템
  * @returns {"none" | "mini" | "full"}
  */
-export const detectTSpin = (board, a) => {
+export const detectTSpin = (board, a, rotation) => {
   if (a.type !== "T" || a.lastAction !== "rotate") return "none";
   const hit = CORNERS.map(([cx, cy]) => blocked(board, a.x + cx, a.y + cy));
   if (hit.filter(Boolean).length < 3) return "none";
-  const [f1, f2] = FRONT[a.rot];
+  const facing = rotation === "ars" ? (a.rot + 2) % 4 : a.rot;
+  const [f1, f2] = FRONT[facing];
   if (hit[f1] && hit[f2]) return "full";
   return a.kick === 4 ? "full" : "mini";
 };

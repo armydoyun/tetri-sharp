@@ -5,7 +5,7 @@ import { analyzeReplay } from "../replay/analyze.js";
 import { createPlayer } from "../replay/replay.js";
 import { formatTime } from "../modes/format.js";
 import { t } from "../i18n/index.js";
-import { button } from "../ui/components.js";
+import { button, guardRangeTouch } from "../ui/components.js";
 import { el } from "../ui/dom.js";
 import { icon } from "../ui/icons.js";
 
@@ -64,9 +64,17 @@ export const createReplayPlayer = deps => {
   let analysis = null;
 
   const replayBar = $("replay-bar");
+  const replayMore = $("replay-more");
+  const replayActions = $("replay-actions");
+  replayMore.addEventListener("click", () => {
+    const open = replayMore.getAttribute("aria-expanded") === "false";
+    replayMore.setAttribute("aria-expanded", String(open));
+    if (open) replayActions.scrollIntoView({ block: "nearest" });
+  });
   const replayStatus = $("replay-status");
   const replayNote = $("replay-note");
   const replayProgress = /** @type {HTMLInputElement} */ ($("replay-progress"));
+  guardRangeTouch(replayProgress);
   const replayMarkers = $("replay-markers");
   const replayTime = $("replay-time");
   const replayBattleView = $("replay-battle-view");
@@ -344,6 +352,10 @@ export const createReplayPlayer = deps => {
     setScreen("replay");
     showModeHud(session.mode, true);
     replayBar.hidden = false;
+    if (entering) {
+      replayMore.setAttribute("aria-expanded", "false");
+      replayBar.scrollTop = 0;
+    }
     replayPractice.hidden = !ownReplay || replay.mode !== "sprint40";
     replayNote.textContent = note;
     $("replay-title").textContent = `${session.mode.name} · ${session.rules.name}`;
@@ -394,7 +406,7 @@ export const createReplayPlayer = deps => {
     for (let i = 0; i < count && !player.done; i++) {
       const events = player.step();
       inputDisplay.show(player.input.held, player.input.pressed);
-      if (!player.cpu) for (const e of events) fb.announce(e);
+      for (const e of events) if (!player.cpu || (e.type === "lock" && e.spinPiece)) fb.announce(e);
       renderer.addEvents(events);
       if (player.cpu) cpuRenderer.addEvents(player.cpuEvents);
       // 빨리 감기 중에는 소리를 겹쳐 내지 않는다.

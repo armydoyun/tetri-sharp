@@ -10,6 +10,7 @@ import { t } from "../i18n/index.js";
  * @param {{
  *   dialog: HTMLDialogElement,
  *   getSettings: () => any,
+ *   allows180: () => boolean,
  *   isTouch: () => boolean,
  *   onOpenSettings: (tab: string) => void,
  *   onStart: () => void,
@@ -17,7 +18,16 @@ import { t } from "../i18n/index.js";
  *   canStart: () => boolean,
  * }} options
  */
-export const createHelpUI = ({ dialog, getSettings, isTouch, onOpenSettings, onStart, onIntro, canStart }) => {
+export const createHelpUI = ({
+  dialog,
+  getSettings,
+  allows180,
+  isTouch,
+  onOpenSettings,
+  onStart,
+  onIntro,
+  canStart,
+}) => {
   const notice = el("p", { class: "notice-slot", role: "status" });
 
   const keyList = () => {
@@ -25,7 +35,7 @@ export const createHelpUI = ({ dialog, getSettings, isTouch, onOpenSettings, onS
     return el(
       "dl",
       { class: "help-keys" },
-      ...ACTIONS.filter(a => (keymap[a.id] ?? []).length).flatMap(a => [
+      ...ACTIONS.filter(a => (keymap[a.id] ?? []).length && (a.id !== "R180" || allows180())).flatMap(a => [
         el("dt", { text: a.label }),
         el("dd", {}, ...keymap[a.id].map(code => keycap(code)), ...(a.id === "PAUSE" ? [keycap("Escape")] : [])),
       ])
@@ -38,6 +48,7 @@ export const createHelpUI = ({ dialog, getSettings, isTouch, onOpenSettings, onS
       ? [
           [t("좌우로 밀기"), t("한 칸씩 이동")],
           [t("두드리기"), t("회전 (오른쪽 절반은 시계, 왼쪽 절반은 반시계)")],
+          ...(allows180() ? [[t("두 손가락으로 함께 두드리기"), t("180° 회전")]] : []),
           [t("아래로 밀고 있기"), t("소프트 드롭")],
           [t("아래로 빠르게 튕기기"), t("하드 드롭")],
           [t("위로 밀기"), t("홀드")],
@@ -46,7 +57,7 @@ export const createHelpUI = ({ dialog, getSettings, isTouch, onOpenSettings, onS
           [t("좌우 화살표"), t("한 칸씩 이동")],
           [t("아래 화살표"), t("누르는 동안 천천히 내리기")],
           [t("밑줄 있는 아래 화살표"), t("바닥으로 바로 내려놓기")],
-          [t("원형 화살표"), t("반시계 · 180도 · 시계 방향 회전")],
+          [t("원형 화살표"), t(allows180() ? "반시계 · 180도 · 시계 방향 회전" : "반시계 · 시계 방향 회전")],
           [t("겹친 사각형"), t("현재 피스 맡기기")],
         ];
     return el(

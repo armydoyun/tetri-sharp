@@ -7,20 +7,33 @@ import { CELL_ID } from "../core/pieces.js";
 import { VISIBLE_TOP } from "../core/engine.js";
 import { createEffects } from "./effects.js";
 import { createSlide } from "./motion.js";
-import { boxOrigin, drawMark, findTheme, gridDots, gridHashes, paletteFor } from "./themes.js";
+import { boxOrigin, drawMark, findTheme, paletteFor } from "./themes.js";
+import { createBoardGrid } from "./board-grid.js";
+import { accentEnabled, createGameplayAccents } from "./gameplay-accents.js";
+import { drawDangerLine, drawFoldingBar, drawKickLine } from "./situation-effects.js";
+import {
+  accentInk,
+  drawCombo,
+  drawPerfectAccent,
+  drawPieceAccent,
+  drawSlotAccent,
+  drawSpinAccent,
+} from "./motion-accents.js";
 
 const MARGIN_TOP = 2; // 보드 위 여유 줄
 const ROWS = VISIBLE_ROWS + MARGIN_TOP;
 const CSS_CELL = 28;
+const DANGER_ROWS = 3;
 
 /**
- * @typedef {{ theme: string, effects: "full" | "reduced" | "off", palette: "theme" | "contrast" | "custom", pattern?: "on" | "off", ghost?: string, grid?: "on" | "off", colors?: Record<string, string> }} Visual
+ * @typedef {{ theme: string, effects: "full" | "reduced" | "off", clearEffectLength?: number, palette: "theme" | "contrast" | "custom", pattern?: "on" | "off", ghost?: string, grid?: "on" | "off", colors?: Record<string, string>, gameplayEffects?: Partial<Record<import("./gameplay-accents.js").Accent, boolean>> }} Visual
  * @param {HTMLCanvasElement} canvas
  * @param {{ getVisual: () => Visual, compact?: boolean }} options
  */
 export const createRenderer = (canvas, { getVisual, compact = false }) => {
   const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext("2d"));
   const effects = createEffects();
+  const accents = createGameplayAccents();
   const slide = createSlide();
   const emptyBoard = createBoard();
   const labels = compact ? null : document.createElement("canvas");
@@ -34,10 +47,8 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
   const lowLandscape = window.matchMedia("(orientation: landscape) and (max-height: 520px) and (pointer: coarse)");
   let cell = 0;
   let side = 0;
-  let gridPath = new Path2D();
-  /** 점 격자(테마 gridStyle "dots"): 칸 모서리가 만나는 곳마다 작은 네모 */
-  let dotPath = new Path2D();
-  let hashPath = new Path2D();
+  /** @type {ReturnType<typeof createBoardGrid>} */
+  let drawGrid;
   /**
    * devicePixelRatio를 반영해 캔버스 해상도를 정하고 셀 크기를 정수로 맞춘다(번짐 방지).
    * 넓은 화면에서 캔버스가 기본 셀(28px)보다 크게 보이면 보이는 크기에 맞춰 그린다 — 늘려 보이면 흐려진다.
@@ -59,21 +70,7 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       labels.height = 2 * cell;
       labelCtx.textBaseline = "top";
     }
-    const bx = side * cell;
-    const by = MARGIN_TOP * cell;
-    const width = COLS * cell;
-    const height = VISIBLE_ROWS * cell;
-    gridPath = new Path2D();
-    for (let x = 1; x < COLS; x++) {
-      gridPath.moveTo(bx + x * cell + 0.5, by);
-      gridPath.lineTo(bx + x * cell + 0.5, by + height);
-    }
-    for (let y = 1; y < VISIBLE_ROWS; y++) {
-      gridPath.moveTo(bx, by + y * cell + 0.5);
-      gridPath.lineTo(bx + width, by + y * cell + 0.5);
-    }
-    dotPath = gridDots(bx, by, COLS, VISIBLE_ROWS, cell);
-    hashPath = gridHashes(bx, by, COLS, VISIBLE_ROWS, cell);
+    drawGrid = createBoardGrid(side * cell, MARGIN_TOP * cell, COLS, VISIBLE_ROWS, cell);
     return true;
   };
 
@@ -91,26 +88,6 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
 
   /** 이번 그리기에서 블록 무늬를 그릴지(접근성 설정) */
   let pattern = false;
-
-  const drawGrid = ({ board: { bg, grid, edge }, gridStyle }, bx, by, lines = true) => {
-    const width = COLS * cell;
-    const height = VISIBLE_ROWS * cell;
-    ctx.fillStyle = bg;
-    ctx.fillRect(bx, by, width, height);
-    ctx.lineWidth = 1;
-    if (lines && gridStyle === "dots") {
-      ctx.fillStyle = grid;
-      ctx.fill(dotPath);
-    } else if (lines && gridStyle === "hash") {
-      ctx.strokeStyle = grid;
-      ctx.stroke(hashPath);
-    } else if (lines && gridStyle !== "none") {
-      ctx.strokeStyle = grid;
-      ctx.stroke(gridPath);
-    }
-    ctx.strokeStyle = edge;
-    ctx.strokeRect(bx + 0.5, by + 0.5, width - 1, height - 1);
-  };
 
   const previousCells = new Uint8Array(emptyBoard.cells.length);
   const emptyQueue = [];
@@ -151,6 +128,7 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       active?.y,
       active?.rot,
       state?.pieceId,
+      state?.combo,
       lockTimer,
       hold,
       holdUsed,
@@ -182,14 +160,34 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     const bx = side * cell;
     const by = MARGIN_TOP * cell;
     const toY = y => by + (y - VISIBLE_TOP) * cell;
+    const dangerous =
+      game &&
+      motion &&
+      accentEnabled(visual, "danger") &&
+      board.cells.subarray(0, (VISIBLE_TOP + DANGER_ROWS) * board.width).some(Boolean);
+    const feedback = game && motion ? accents.frame(now, visual, theme, dangerous) : null;
+    const ink = accentInk(theme);
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    effects.prune(now, effectLevel);
-    animating = effects.active;
+    effects.prune(now, effectLevel, visual.clearEffectLength);
+    animating = effects.active || Boolean(feedback?.animating);
     pattern = visual.pattern === "on";
-    drawGrid(theme, bx, by, visual.grid !== "off");
+    drawGrid(ctx, theme, visual.grid !== "off");
     effects.drawDrops(ctx, { bx, by, cell, toY }, now, theme.board.ink);
+    const drawBlock = (x, y, size, value) => {
+      theme.block(ctx, x, y, size, palette[value]);
+      if (pattern) drawMark(ctx, x, y, size, value, palette[value]);
+    };
+    // 이전 줄의 잔상 뒤에 현재 보드를 그려 이미 내려온 블록을 가리지 않는다.
+    effects.drawClearedBlocks(
+      ctx,
+      { bx, cell, toY, cols: COLS },
+      now,
+      effectLevel,
+      drawBlock,
+      visual.clearEffectLength
+    );
 
     // 방금 놓인 피스의 아래 모서리를 기준으로 높이만 압축한다.
     for (let y = VISIBLE_TOP - MARGIN_TOP; y < board.height; y++) {
@@ -204,14 +202,36 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
           ctx.scale(1, impact.scale);
           ctx.translate(0, -floor);
         }
-        theme.block(ctx, bx + x * cell, toY(y), cell, palette[value]);
-        if (pattern) drawMark(ctx, bx + x * cell, toY(y), cell, value, palette[value]);
+        drawBlock(bx + x * cell, toY(y), cell, value);
         if (impact) ctx.restore();
       }
     }
 
     // 다음 피스와 고스트는 줄 삭제 효과보다 위에 그린다.
-    effects.draw(ctx, { bx, cell, toY, cols: COLS }, now, theme.board.ink, effectLevel);
+    effects.draw(ctx, { bx, cell, toY, cols: COLS }, now, theme.board.ink, effectLevel, visual.clearEffectLength);
+    if (feedback) {
+      ctx.save();
+      ctx.scale(cell, cell);
+      if (feedback.danger) {
+        const { entered, released } = feedback.danger;
+        drawDangerLine(ctx, feedback.material, theme.palette[CELL_ID.L], side, MARGIN_TOP, COLS, entered, released);
+      }
+      if (feedback.spin) {
+        drawSpinAccent(ctx, feedback.material, {
+          ...feedback.spin,
+          y: toY(feedback.spin.y) / cell,
+          themeId: visual.theme,
+          theme,
+          left: side,
+          right: side + COLS,
+          rows: ROWS,
+          reduced: false,
+        });
+      }
+      ctx.translate(0, MARGIN_TOP);
+      drawPerfectAccent(ctx, feedback.material, ink, side, side + COLS, VISIBLE_ROWS, feedback.perfectAge, false);
+      ctx.restore();
+    }
 
     if (active) {
       const color = palette[CELL_ID[active.type]];
@@ -251,6 +271,18 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
         }
       }
       ctx.globalAlpha = 1;
+      if (feedback?.nextAlpha && feedback.nextPiece === active.type) {
+        ctx.save();
+        ctx.scale(cell, cell);
+        drawPieceAccent(
+          ctx,
+          feedback.material,
+          ink,
+          feedback.nextAlpha * 0.88,
+          cells.filter(([, y]) => y >= VISIBLE_TOP - MARGIN_TOP).map(([x, y]) => [side + x + ox / cell, toY(y) / cell])
+        );
+        ctx.restore();
+      }
     }
 
     if (hintCells?.length && active) {
@@ -264,13 +296,33 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       ctx.restore();
     }
 
+    if (feedback?.kick) {
+      const { x, y, dx, dy, age } = feedback.kick;
+      if (toY(y) >= 0) {
+        ctx.save();
+        ctx.scale(cell, cell);
+        drawKickLine(ctx, feedback.material, ink, { x: side + x, y: toY(y) / cell, dx, dy }, age, false);
+        ctx.restore();
+      }
+    }
+
     // 대기 중인 쓰레기는 한 줄씩 구분한다. CPU의 좁은 캔버스에서는 안쪽에 그린다.
-    if (pending > 0) {
+    if (pending > 0 || feedback?.canceled) {
       const w = Math.max(2, Math.round(cell * 0.18));
       ctx.fillStyle = "#e5484d";
       const x = compact ? bx + 1 : bx - w - 1;
       for (let row = VISIBLE_ROWS - pending; row < VISIBLE_ROWS; row++) {
         ctx.fillRect(x, by + row * cell + 1, w, cell - 2);
+      }
+      if (feedback?.canceled) {
+        const { age, blocked, pending: remaining } = feedback.canceled;
+        const top = Math.min(VISIBLE_ROWS, remaining + blocked);
+        ctx.save();
+        ctx.fillStyle = theme.palette[CELL_ID.Z];
+        for (let row = top - 1; row >= Math.max(pending, remaining); row--) {
+          drawFoldingBar(ctx, x, by + (VISIBLE_ROWS - row) * cell - 1, w, cell - 2, age, top - 1 - row);
+        }
+        ctx.restore();
       }
     }
 
@@ -301,16 +353,50 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       if (game.rules.previewCount > 0) label(big ? t("다음") : t("다음 피스"), nx);
     }
     ctx.drawImage(labels, 0, by - cell);
+    const slotInset = 0.2;
+    const slotWidth = side - slotInset * 2;
+    const slotTop = MARGIN_TOP + 0.92;
+    const slotHeight = (small / cell) * 2 + 0.2;
+    const drawSlot = (left, type, alpha) => {
+      ctx.save();
+      ctx.scale(cell, cell);
+      ctx.fillStyle = theme.board.bg;
+      ctx.globalAlpha = alpha * 0.85;
+      ctx.fillRect(left, slotTop, slotWidth, slotHeight);
+      ctx.globalAlpha = 1;
+      drawSlotAccent(ctx, feedback.material, palette[CELL_ID[type]], alpha, left, slotTop, slotWidth, slotHeight);
+      ctx.restore();
+    };
     if (game.rules.hold.enabled) {
-      if (hold) preview(theme, palette, game, hold, sidePad, by + cell, small, holdUsed);
+      if (hold) {
+        if (feedback?.holdAlpha) drawSlot(slotInset, hold, feedback.holdAlpha);
+        preview(theme, palette, game, hold, sidePad, by + cell + (feedback?.holdOffset ?? 0) * cell, small, holdUsed);
+      }
     }
 
     // 넥스트
     if (game.rules.previewCount > 0) {
+      if (shown > 0 && feedback?.nextAlpha) drawSlot(side + COLS + slotInset, feedback.nextPiece, feedback.nextAlpha);
       // 퍼즐은 주어진 피스만(돌아오는 피스는 보이지 않게): 지금 피스를 뺀 남은 수까지
       queue.slice(0, Math.min(game.rules.previewCount, shown)).forEach((type, i) => {
         preview(theme, palette, game, type, nx, by + cell + i * small * 3, small);
       });
+    }
+    if (feedback?.combo && state.combo >= 0) {
+      ctx.save();
+      ctx.scale(cell, cell);
+      drawCombo(
+        ctx,
+        feedback.material,
+        theme,
+        ink,
+        slotInset,
+        MARGIN_TOP + 3.6,
+        slotWidth,
+        state.combo + 1,
+        feedback.comboAlpha
+      );
+      ctx.restore();
     }
   };
 
@@ -324,9 +410,12 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
       if (compact || !events.length) return;
       const visual = getVisual();
       effects.add(events, visual.effects, now, findTheme(visual.theme).motion);
+      if (visual.effects === "full") accents.add(events, now);
+      else accents.clear();
     },
     clearEffects() {
       effects.clear();
+      accents.clear();
       slide.reset();
       invalidated = true;
     },

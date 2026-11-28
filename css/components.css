@@ -220,6 +220,16 @@
   }
 }
 
+@media (orientation: landscape) and (max-height: 520px) and (min-width: 560px) {
+  .dialog-foot:has(#puzzle-trial) {
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+  }
+
+  .dialog-foot:has(#puzzle-trial) > :is(.notice-slot, #puzzle-editor-close) {
+    grid-column: auto;
+  }
+}
+
 /* 좁은 화면: 알림은 버튼 위 한 줄 전체(좁은 칸에서 두 줄을 넘겨 잘리지 않게), 버튼은 그 아래 오른쪽 */
 @media (max-width: 560px) {
   .dialog-foot {
@@ -307,9 +317,52 @@
   font-size: var(--text-s);
 }
 
+/* 상태별 설명을 같은 칸에 겹쳐 두고, 현재 문구만 읽을 수 있게 한다. */
+.field-hint-stack {
+  display: grid;
+  min-width: 0;
+}
+
+.field-hint-stack > small {
+  grid-area: 1 / 1;
+}
+
 /* 카드형 선택은 한 줄을 다 쓴다 */
 .field-row.is-wide {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.spin-settings {
+  padding-block: var(--space-2);
+  border-bottom: var(--border-w) solid var(--border);
+}
+
+.spin-settings > summary {
+  padding-block: var(--space-2);
+  font-size: var(--text-m);
+  font-weight: 700;
+}
+
+.spin-settings-pieces {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.spin-settings-piece {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+}
+
+.spin-settings > .field-help {
+  margin-block: var(--space-2);
+}
+
+@media (max-width: 560px) {
+  .spin-settings-pieces {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 /* 키 배치 칸 */
@@ -333,7 +386,7 @@
 /* 편집기 머리: 내 규칙(번호 · 이름 · 새 규칙 · 지우기) */
 .rule-slot-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-2);
   margin-bottom: var(--space-2);
@@ -344,22 +397,72 @@
   white-space: nowrap;
 }
 
-/* 좁은 화면: [번호 · 이름] / [새 규칙 · 지우기] 두 줄(한 줄이면 이름 칸이 0으로 찌그러진다) */
-@media (max-width: 480px) {
+.rule-slot-actions {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: var(--space-2);
+}
+
+/* 좁은 화면에서는 이름의 폭을 확보하고 동작 세 개를 아래에 둔다. */
+@media (max-width: 560px) {
   .rule-slot-row {
-    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .rule-slot-row > .text-input {
-    grid-column: 2 / -1;
+  .rule-slot-actions {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(max-content, 1fr));
+    gap: var(--space-1);
   }
 
-  .rule-slot-row > .btn {
-    grid-row: 2;
+  .rule-slot-actions > .btn {
+    --btn-px: var(--space-1);
+    --btn-font: var(--text-s);
+  }
+}
+
+#rules-editor > .dialog-foot {
+  grid-template-columns: minmax(0, 1fr) repeat(3, auto);
+}
+
+.rule-share-summary {
+  padding-block: var(--space-2);
+  border-bottom: var(--border-w) solid var(--border);
+}
+
+.rule-change-list {
+  display: grid;
+  gap: var(--space-1);
+  margin-block: var(--space-2);
+  padding-inline-start: var(--space-5);
+}
+
+@media (max-width: 560px) {
+  #rules-editor > .dialog-head,
+  #rules-editor > .dialog-foot {
+    padding-block: var(--space-2);
   }
 
-  .rule-slot-row > #rule-slot-add {
-    grid-column: 1 / 3;
+  #rules-editor > .dialog-tabs {
+    padding-bottom: var(--space-2);
+  }
+
+  #rules-editor > :is(.dialog-tabs, .dialog-body) {
+    padding-inline: var(--space-4);
+  }
+
+  #rules-editor > .dialog-foot {
+    grid-template-columns: minmax(0, 1fr) repeat(2, auto);
+  }
+
+  #rules-editor > .dialog-foot > .btn,
+  .rule-presets > .btn {
+    --btn-px: var(--space-1);
+    --btn-gap: var(--space-1);
+  }
+
+  #rules-editor > .dialog-foot > #rule-trial {
+    grid-column: 1;
   }
 }
 
@@ -691,13 +794,30 @@
 
 .theme-stage-actions {
   display: flex;
+  align-items: center;
+  gap: var(--space-2);
   margin-top: var(--space-1);
 }
 
-.theme-stage-desc {
+.theme-stage-descriptions {
+  display: grid;
+  min-width: 0;
+}
+
+.theme-stage-descriptions,
+.theme-stage-notice {
   font-size: var(--text-s);
   line-height: 1.45;
   color: var(--text-dim);
+}
+
+.theme-stage-descriptions > small {
+  grid-area: 1 / 1;
+  font-size: inherit;
+}
+
+.theme-stage-descriptions > [aria-hidden="true"] {
+  visibility: hidden;
 }
 
 /* 휴대폰: 미리보기를 줄여 처음 열었을 때 칩 세 줄이 함께 보이게 */
@@ -711,7 +831,7 @@
     max-width: 210px;
   }
 
-  .theme-stage-desc {
+  .theme-stage-descriptions {
     line-height: 1.35;
   }
 }
@@ -720,6 +840,12 @@
 .choice-cards.is-compact {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   align-content: start;
+}
+
+@media (min-width: 600px) {
+  .theme-picker > .choice-cards.is-compact {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 /* 넓은 화면: 미리보기 왼쪽, 칩 오른쪽(칩에 올리면 옆에서 바로 바뀐다) */
@@ -915,6 +1041,57 @@
   margin-top: var(--space-3);
 }
 
+/* 오늘의 퍼즐 */
+.daily-puzzle-body {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+}
+
+.daily-puzzle-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.daily-puzzle-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.daily-puzzle-board {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.daily-puzzle-info {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.daily-puzzle-info :is(h3, p) {
+  margin: 0;
+}
+
+@media (orientation: landscape) and (max-height: 400px) {
+  #daily-puzzle .daily-puzzle-body {
+    gap: var(--space-2);
+  }
+
+  #daily-puzzle .daily-puzzle-picker .select {
+    width: auto;
+  }
+
+  #daily-puzzle .daily-puzzle-info {
+    gap: var(--space-1);
+  }
+}
+
 /* ---- 퍼즐 단계 격자 ---- */
 /* 장: 제목 줄(이름 · 깬 수) + 격자 */
 .puzzle-chapter-title {
@@ -1001,6 +1178,7 @@
 
 /* ---- 블록 색 직접 고르기 ---- */
 .color-picker {
+  container: color-picker / inline-size;
   display: grid;
   gap: var(--space-2);
 }
@@ -1041,6 +1219,14 @@
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: var(--space-1);
+}
+
+@media (pointer: coarse) {
+  @container color-picker (width < 380px) {
+    .color-swatches {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
 }
 
 .color-swatch {
@@ -1145,6 +1331,18 @@
   font-size: var(--text-s);
 }
 
+.puzzle-editor-guide {
+  padding: var(--space-2) var(--space-3);
+  border-inline-start: var(--space-1) solid var(--accent);
+  background: var(--accent-soft);
+}
+
+@media (max-width: 420px) {
+  .puzzle-editor-paint {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* 힌트는 도구마다 길이가 달라도 두 줄 자리를 남긴다(판이 움직이지 않게) */
 .puzzle-editor-hint {
   min-height: calc(2 * 1.45em);
@@ -1160,10 +1358,10 @@
   gap: var(--space-2);
 }
 
-/* 좁은 화면: 이름은 위 한 줄, 아래에 [목표 | 줄 수]. 줄 수 칸은 "20 lines"가 넓은 글꼴에서도 들어가게 */
+/* 좁은 화면: 이름은 위 한 줄, 아래에서는 이름이 긴 목표에 더 넓은 칸을 준다. */
 @media (max-width: 560px) {
   .puzzle-editor-goal {
-    grid-template-columns: minmax(0, 1fr) 8.5em;
+    grid-template-columns: minmax(0, 2fr) minmax(5.5em, 1fr);
   }
 
   .puzzle-editor-goal > .puzzle-editor-label {
@@ -1247,6 +1445,15 @@
   border: 2px dashed var(--accent);
 }
 
+.puzzle-editor-cell[data-stamp="erase"] {
+  border-color: var(--text-dim);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--surface-3) 0 var(--space-1),
+    var(--text-dim) var(--space-1) calc(var(--space-1) + var(--border-w))
+  );
+}
+
 /* [도장 피스 드롭다운 | 돌리기] */
 .puzzle-editor-stamp {
   display: grid;
@@ -1267,10 +1474,29 @@
 
 /* 자동 확인: [확인 · 멈추기] / 결과·경고(두 줄 자리) / [풀이 보기 스위치 ← 1 / 3 →] */
 .puzzle-editor-check {
-  display: grid;
-  gap: var(--space-1);
   padding-block: var(--space-2);
   border-block: var(--border-w) solid var(--border);
+}
+
+.puzzle-editor-context {
+  display: grid;
+}
+
+.puzzle-editor-context > * {
+  grid-area: 1 / 1;
+}
+
+.puzzle-editor-context > .field-help {
+  align-self: center;
+}
+
+.puzzle-editor-context > [aria-hidden="true"] {
+  visibility: hidden;
+}
+
+.puzzle-editor-check-content {
+  display: grid;
+  gap: var(--space-1);
 }
 
 .puzzle-editor-check-actions,
@@ -1301,7 +1527,7 @@
   font-weight: 700;
 }
 
-.puzzle-editor-switch {
+:is(.puzzle-editor-switch, .puzzle-touch-paint) {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -1316,9 +1542,36 @@
 }
 
 .puzzle-editor-step {
-  min-width: 5ch;
+  min-width: 7ch;
   text-align: center;
   white-space: nowrap;
+}
+
+.puzzle-editor-preview {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.puzzle-editor-preview-nav {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1) var(--space-2);
+  background: var(--surface);
+}
+
+.puzzle-editor-preview-hold {
+  flex-basis: 100%;
+  text-align: center;
+}
+
+.puzzle-editor-board.is-viewing {
+  width: min(100%, var(--editor-width), var(--preview-width, 100%));
+  touch-action: pan-y;
 }
 
 .puzzle-editor-palette {
@@ -1618,4 +1871,154 @@
     padding-block: 14px;
     margin-block: -14px;
   }
+}
+
+.daily-archive-dates,
+.daily-archive-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.daily-archive-dates p {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin: 0;
+  text-align: center;
+}
+
+.daily-archive-filters > :last-child {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 600px) {
+  .daily-archive-filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .daily-archive-filters > :last-child {
+    grid-column: auto;
+  }
+}
+
+.puzzle-review-boards figure {
+  margin: 0;
+  min-width: 0;
+}
+
+.puzzle-review-boards figcaption {
+  margin-block-end: var(--space-2);
+  color: var(--text-dim);
+  font-size: var(--text-s);
+  font-weight: 750;
+}
+
+.puzzle-comparison,
+.puzzle-comparison-card {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.puzzle-comparison-card {
+  min-width: 0;
+  grid-template-rows: auto auto 1fr;
+}
+
+.puzzle-comparison-card :is(h3, p) {
+  margin: 0;
+}
+
+.puzzle-comparison-card h3 {
+  font-size: var(--text-l);
+}
+
+.puzzle-comparison-card p {
+  min-block-size: 2lh;
+}
+
+.puzzle-comparison-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.puzzle-comparison-nav output {
+  min-inline-size: 7ch;
+  text-align: center;
+}
+
+/* 터치로 위아래를 쓸 때는 편집판에서 시작해도 본문을 스크롤한다. */
+.puzzle-touch-paint {
+  display: none;
+}
+
+@media (any-pointer: coarse) {
+  .puzzle-touch-paint {
+    display: flex;
+  }
+
+  .puzzle-editor-board:not(.is-touch-painting) {
+    touch-action: pan-y pinch-zoom;
+  }
+}
+
+@container color-picker (width < 332px) {
+  .color-pieces {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* 좁은 터치 화면에서는 목록을 겹쳐 열고 선택 후 바로 미리보기로 돌아온다. */
+.theme-touch-choice {
+  display: none;
+}
+
+@media (pointer: coarse) and (max-width: 899px) {
+  .theme-picker {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .theme-picker .theme-stage {
+    padding: var(--space-2);
+    gap: var(--space-1);
+  }
+
+  .theme-picker .theme-stage-canvas {
+    max-width: 128px;
+  }
+
+  .theme-picker > .choice-cards.is-compact {
+    display: none;
+  }
+
+  .theme-touch-choice {
+    display: block;
+  }
+
+  .theme-touch-choice > .select {
+    width: 100%;
+  }
+}
+
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 520px) and (max-width: 899px) {
+  .theme-picker {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .theme-picker .theme-stage-canvas {
+    max-width: 112px;
+  }
+
+  .theme-picker .theme-stage-actions {
+    flex-wrap: wrap;
+    gap: var(--space-1);
+  }
+
+  .theme-picker .theme-stage-notice {
+    min-height: 1.45em;
+  }
+
 }

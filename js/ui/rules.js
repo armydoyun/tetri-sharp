@@ -1,23 +1,26 @@
 // Custom 규칙 편집 대화상자. 바꿀 때마다 onChange(규칙 내용)를 부르고, 저장·적용은 호출한 쪽이 한다.
-import { PRESET_LIST } from "../rules/presets.js";
+import { gravityLabel } from "../modes/format.js";
+import { MODERN, PRESET_LIST } from "../rules/presets.js";
 import { GRAVITY_OPTIONS, LIMITS, makeCustomRules, sanitizeRuleBody } from "../rules/sanitize.js";
-import { el, fieldRow, fillDialog } from "./dom.js";
+import { el, fieldRow, fillDialog, focusKey, restoreFocus } from "./dom.js";
 import { button, confirmButton, rangeRow, slider, tabBar, textInput, toggle } from "./components.js";
-import { dropdown } from "./select.js";
+import { dropdown, splitOption } from "./select.js";
 import { decodeRules, encodeRules, rulesLink } from "../rules/share.js";
 import { MAX_RULE_NAME, MAX_RULE_SLOTS } from "../storage/rule-slots.js";
 import { t } from "../i18n/index.js";
 import { copyText } from "./clipboard.js";
+import { spinMask, spinSettings, T_SPIN } from "../rules/spins.js";
+import { spinChoiceLabel, spinControls } from "./spin-settings.js";
 
 const ms = frames => `${Math.round((frames * 1000) / 60)}ms`;
-
-const GRAVITY_LABELS = [t("1칸/초"), t("1.25칸/초"), t("2칸/초"), t("6칸/초"), t("1G (60칸/초)"), t("20G (즉시 바닥)")];
+const HANDLING_OFF = t("‘조작감 고정’을 켜면 쓸 수 있어요");
+const SDF_INSTANT_OFF = t("즉시 소프트 드롭을 켜서 배율을 쓰지 않아요.");
 
 /**
  * 편집 항목. path는 규칙 객체 안의 위치.
  * when이 거짓이면 항목을 숨기지 않고 같은 자리에서 비활성으로 두며, 설명 줄에 off(쓸 수 없는 이유)를 보여 준다(원칙 2).
  * @type {ReadonlyArray<{ section?: string, path?: string, label?: string, hint?: string, type?: "select" | "toggle" | "number",
- *   options?: ReadonlyArray<[any, string]>, range?: readonly number[], unit?: (v: number) => string, when?: (r: any) => boolean, off?: string, fallback?: any }>}
+ *   options?: ReadonlyArray<[any, string]>, range?: readonly number[], unit?: (v: number) => string, when?: (r: any) => boolean, off?: string | ((r: any) => string), reserveHints?: string[], fallback?: any }>}
  */
 const FIELDS = [
   { section: t("피스") },
@@ -55,6 +58,14 @@ const FIELDS = [
   { path: "ghost", label: t("고스트"), hint: t("피스가 떨어질 자리를 흐리게 보여 줘요"), type: "toggle" },
   { path: "hardDrop", label: t("하드 드롭"), hint: t("한 번에 바닥까지 떨어뜨리고 바로 고정"), type: "toggle" },
 
+  {
+    path: "allow180",
+    label: t("180도 회전 허용"),
+    hint: t("꺼 두면 플레이와 미리 회전에 180도 입력을 쓰지 않아요."),
+    type: "toggle",
+    fallback: true,
+  },
+
   { section: t("고정·낙하") },
   {
     path: "lock.type",
@@ -86,25 +97,26 @@ const FIELDS = [
     off: t("‘움직이면 리셋’ 방식에서만 써요"),
   },
   {
+    path: "gravityMode",
+    label: t("중력 적용"),
+    type: "select",
+    options: [
+      ["mode", t("모드 기본 — 레벨별 중력이 없는 모드는 아래 값을 써요.")],
+      ["fixed", t("고정 중력 — 기본 플레이 모드에서 아래 값을 유지해요.")],
+    ],
+    fallback: "mode",
+  },
+  {
     path: "gravity",
     label: t("기본 중력"),
-    hint: t("Marathon은 레벨에 따라 따로 정해진다"),
     type: "select",
-    options: GRAVITY_OPTIONS.map((g, i) => [g, GRAVITY_LABELS[i]]),
+    options: GRAVITY_OPTIONS.map(g => [g, gravityLabel(g, t)]),
   },
   { path: "are.spawn", label: t("생성 지연"), type: "number", range: LIMITS.are, unit: v => `${v}F · ${ms(v)}` },
   { path: "are.lineClear", label: t("줄 삭제 지연"), type: "number", range: LIMITS.are, unit: v => `${v}F · ${ms(v)}` },
 
   { section: t("점수") },
-  {
-    path: "tspin",
-    label: t("T-spin 판정"),
-    type: "select",
-    options: [
-      ["threeCorner", t("3-corner (Mini 포함)")],
-      ["none", t("없음")],
-    ],
-  },
+  { path: "spin", label: t("스핀 판정") },
   {
     path: "scoring",
     label: t("점수표"),
@@ -138,7 +150,7 @@ const FIELDS = [
     range: LIMITS.das,
     unit: v => `${v}F · ${ms(v)}`,
     when: r => r.fixedHandling,
-    off: t("‘조작감 고정’을 켜면 쓸 수 있어요"),
+    off: HANDLING_OFF,
     fallback: 16,
   },
   {
@@ -148,7 +160,7 @@ const FIELDS = [
     range: LIMITS.arr,
     unit: v => `${v}F · ${ms(v)}`,
     when: r => r.fixedHandling,
-    off: t("‘조작감 고정’을 켜면 쓸 수 있어요"),
+    off: HANDLING_OFF,
     fallback: 6,
   },
   {
@@ -157,9 +169,35 @@ const FIELDS = [
     type: "number",
     range: LIMITS.sdf,
     unit: v => t("{n}배", { n: v }),
-    when: r => r.fixedHandling,
-    off: t("‘조작감 고정’을 켜면 쓸 수 있어요"),
+    when: r => r.fixedHandling && !r.fixedHandling.instantSoftDrop,
+    off: r => (r.fixedHandling ? SDF_INSTANT_OFF : HANDLING_OFF),
+    reserveHints: [HANDLING_OFF, SDF_INSTANT_OFF],
     fallback: 30,
+  },
+  {
+    path: "fixedHandling.instantSoftDrop",
+    label: t("즉시 소프트 드롭"),
+    type: "toggle",
+    hint: t("소프트 드롭을 누르면 즉시 바닥까지 내려요."),
+    when: r => r.fixedHandling,
+    off: HANDLING_OFF,
+  },
+  {
+    path: "fixedHandling.dcd",
+    label: "DCD",
+    type: "select",
+    hint: t("피스가 나오거나 회전한 뒤 자동 가로 이동을 다시 시작하기까지 기다리는 시간"),
+    options: [
+      [-1, t("개인 설정 따르기")],
+      [0, t("끄기")],
+      ...Array.from(
+        { length: LIMITS.dcd[1] },
+        (_, i) => /** @type {[number, string]} */ ([i + 1, `${i + 1}F · ${ms(i + 1)}`])
+      ),
+    ],
+    when: r => r.fixedHandling,
+    off: HANDLING_OFF,
+    fallback: -1,
   },
 ];
 
@@ -171,7 +209,7 @@ const getPath = (obj, path) => {
 const setPath = (obj, path, value) => {
   const next = structuredClone(obj);
   if (path === "fixedHandlingOn") {
-    next.fixedHandling = value ? { das: 16, arr: 6, sdf: 30 } : null;
+    next.fixedHandling = value ? { das: 16, arr: 6, sdf: 30, dcd: 0 } : null;
     return next;
   }
   const keys = path.split(".");
@@ -179,12 +217,6 @@ const setPath = (obj, path, value) => {
   for (const k of keys.slice(0, -1)) o = o[k] ??= {};
   o[keys.at(-1)] = value;
   return next;
-};
-
-/** "SRS — 벽차기 5단계 (현대 표준)" → ["SRS", "벽차기 5단계 (현대 표준)"] */
-const splitOption = label => {
-  const at = label.indexOf(" — ");
-  return at < 0 ? [label, ""] : [label.slice(0, at), label.slice(at + 3)];
 };
 
 /** 고른 선택지의 설명(있으면) */
@@ -195,17 +227,40 @@ const selectedDescription = (field, rules) => {
   return found ? splitOption(found[1])[1] : "";
 };
 
+const defaultRules = sanitizeRuleBody(MODERN);
+
+/** 편집기와 같은 이름·값·활성 조건으로 Modern 기준 변경점을 보여 준다. */
+export const ruleChanges = rules =>
+  FIELDS.flatMap(field => {
+    if (!field.path || field.path === "gravityMode" || (field.when && !field.when(rules))) return [];
+    if (field.path === "spin") {
+      const mask = spinMask(rules);
+      return mask === T_SPIN ? [] : [`${field.label} · ${spinChoiceLabel(mask)}`];
+    }
+    const value = getPath(rules, field.path) ?? field.fallback;
+    const base = getPath(defaultRules, field.path) ?? field.fallback;
+    const fixedGravity = field.path === "gravity" && rules.gravityMode === "fixed";
+    if (!fixedGravity && value === base && (!field.when || field.when(defaultRules))) return [];
+    // 고정 조작에서 값이 개인 설정을 따라가면 실제 변경점이 없다.
+    if (field.path === "fixedHandling.dcd" && value === -1) return [];
+    const format =
+      field.type === "toggle"
+        ? value => (value ? t("켜기") : t("끄기"))
+        : (field.unit ?? (value => splitOption(field.options.find(([v]) => v === value)[1])[0]));
+    return [`${fixedGravity ? t("고정 중력") : field.label} ${format(value)}`];
+  });
+
+export const noRuleChanges = () => t("Modern 기본값과 같아요.");
+
 /** 탭: FIELDS의 구역 이름 + 공유 */
 const TABS = [...FIELDS.filter(f => f.section).map(f => [f.section, f.section]), [t("공유"), t("공유")]];
 
 /**
- * @param {{ dialog: HTMLDialogElement, getRules: () => any, onChange: (body: any) => void, onClose?: () => void }} options
+ * @param {{ dialog: HTMLDialogElement, getRules: () => any, onChange: (body: any) => void,
+ *   onClose: () => void, onTrial: () => void, previewImport: (body: any) => Promise<boolean>,
+ *   slots: ReturnType<typeof import("../storage/rule-slots.js").createRuleSlots> }} options
  */
-/**
- * slots: 내 규칙(이름 붙인 Custom 규칙 여러 개). 편집기는 지금 고른 하나를 고친다.
- *   read() → { slots: [{ name, body }], active }, rename(name), add(name, body) → 가득 찼으면 false, remove()
- */
-export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) => {
+export const createRulesUI = ({ dialog, getRules, onChange, onClose, onTrial, previewImport, slots }) => {
   const control = (field, rules, disabled) => {
     const id = `rule-${field.path.replace(/\./g, "-")}`;
     const value = getPath(rules, field.path) ?? field.fallback;
@@ -257,6 +312,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
    * @type {null | { body: any, slot: number }}
    */
   let undo = null;
+  let importInput = "";
 
   const shareSection = rules => {
     const code = encodeRules(rules);
@@ -289,32 +345,51 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
     const pasteInput = textInput({
       id: "rule-share-paste",
       num: true,
+      value: importInput,
       placeholder: t("TS1-로 시작하는 코드나 링크"),
       autocomplete: "off",
       spellcheck: false,
     });
+    pasteInput.addEventListener("input", () => (importInput = pasteInput.value));
     const load = button({ label: t("불러오기"), icon: "folder", size: "s", id: "rule-share-load" });
-    const doLoad = () => {
+    let previewing = false;
+    const doLoad = async () => {
+      if (previewing) return;
       const body = decodeRules(pasteInput.value);
       if (!body) {
         notice.textContent = t("읽을 수 없는 코드예요");
         return;
       }
-      // 받은 규칙은 지금 규칙을 덮어쓰지 않고 새 칸으로 들어간다
+      previewing = true;
+      const accepted = await previewImport(body);
+      previewing = false;
+      if (!accepted) return;
       if (!slots.add(t("받은 규칙"), body)) {
         notice.textContent = t("내 규칙이 가득 찼어요({n}개). 하나를 지우고 다시 불러와 주세요", { n: MAX_RULE_SLOTS });
         return;
       }
+      undo = null;
+      importInput = "";
       message = t("새 칸으로 불러왔어요");
       render("rule-share-paste");
     };
     load.addEventListener("click", doLoad);
     pasteInput.addEventListener("keydown", e => {
-      if (e.key === "Enter") doLoad();
+      if (e.key === "Enter") {
+        e.preventDefault();
+        doLoad();
+      }
     });
+    const changes = ruleChanges(rules);
     return el(
       "section",
       { class: "field-section" },
+      el(
+        "div",
+        { class: "rule-share-summary" },
+        el("strong", { text: changes.length ? t("Modern 기본값과 다른 설정") : noRuleChanges() }),
+        ...(changes.length ? [el("ul", { class: "rule-change-list" }, ...changes.map(text => el("li", { text })))] : [])
+      ),
       fieldRow({
         id: "rule-share-code",
         label: t("규칙 코드"),
@@ -330,13 +405,20 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
       fieldRow({
         id: "rule-share-paste",
         label: t("코드 불러오기"),
-        hint: t("받은 코드나 링크를 붙여 넣기"),
+        hint: t("코드나 링크를 붙여 넣고 변경점을 확인해요."),
         control: el("span", { class: "inline-control" }, pasteInput, load),
       })
     );
   };
 
   let tab = TABS[0][0];
+  let spinDetails = null;
+  let lastField = null;
+  let trialScroll = 0;
+  dialog.addEventListener("focusin", e => {
+    if (e.target instanceof HTMLElement && e.target.closest(".field-section"))
+      lastField = focusKey(e.target.closest(".select") ?? e.target);
+  });
   // 좁거나 낮은 화면(휴대폰): 고정 머리가 크면 스크롤 칸이 아래 조금만 남는다 → 내 규칙·프리셋 줄은 몸통과 함께 스크롤, 탭만 고정
   const compact = window.matchMedia("(max-width: 720px), (max-height: 600px)");
 
@@ -358,23 +440,36 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
         autocomplete: "off",
       })
     );
-    // 이름은 change에서만 저장한다(Enter도 change를 일으킨다). 저장하면 편집기를 다시 그리며 이 입력칸이 빠지는데,
-    // 그때 한 번 더 오는 change·blur에서 다시 그리면 그리는 도중에 또 그리게 되므로 한 번만 처리한다.
-    let saved = false;
-    const saveName = () => {
-      if (saved || !nameInput.isConnected || nameInput.value.trim() === current.name) return;
-      saved = true;
-      slots.rename(nameInput.value);
-      message = t("이름을 바꿨어요");
-      render("rule-slot-name");
-    };
-    nameInput.addEventListener("change", saveName);
+    // 다음으로 누른 버튼을 포커스 이동 중에 교체하지 않는다.
+    nameInput.addEventListener("change", () => {
+      nameInput.value = slots.rename(nameInput.value);
+      notice.textContent = t("이름을 바꿨어요");
+    });
     const addSlot = button({ label: t("새 규칙"), icon: "plus", size: "s", id: "rule-slot-add" });
     addSlot.disabled = state.slots.length >= MAX_RULE_SLOTS;
     addSlot.addEventListener("click", () => {
       if (!slots.add(t("내 규칙 {n}", { n: state.slots.length + 1 }), PRESET_LIST[0])) return;
+      undo = null;
       message = t("새 규칙을 만들었어요(Modern 값에서 시작)");
       render("rule-slot-name");
+    });
+    const duplicateSlot = button({
+      label: t("복제"),
+      icon: "copy",
+      size: "s",
+      id: "rule-slot-duplicate",
+      disabled: state.slots.length >= MAX_RULE_SLOTS,
+      onClick: () => {
+        const suffix = t("복사본");
+        const name = slots
+          .active()
+          .name.slice(0, MAX_RULE_NAME - suffix.length - 1)
+          .trimEnd();
+        if (!slots.add(`${name} ${suffix}`, rules)) return;
+        undo = null;
+        message = t("현재 규칙을 복제했어요");
+        render("rule-slot-name");
+      },
     });
     // 지우기는 두 번 눌러 확정(브라우저 확인창 대신). 이 규칙의 기록은 남는다
     const removeSlot = confirmButton({
@@ -397,8 +492,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
       { class: "rule-slot-row" },
       el("span", { class: "field-help num", text: `${state.active + 1} / ${state.slots.length}` }),
       nameInput,
-      addSlot,
-      removeSlot
+      el("div", { class: "rule-slot-actions" }, addSlot, duplicateSlot, removeSlot)
     );
 
     // 프리셋 줄과 탭은 몸통 위에 고정(어느 탭에서든 보인다). 휴대폰에서는 탭만 고정하고 두 줄은 몸통 맨 위로
@@ -412,7 +506,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
           undo = { body: sanitizeRuleBody(rules), slot: state.active };
           onChange(sanitizeRuleBody(p));
           message = t("‘{rule}’을 {name} 값으로 채웠어요. 되돌리기로 전으로 돌아갈 수 있어요.", {
-            rule: current.name,
+            rule: slots.active().name,
             name: p.name,
           });
           render();
@@ -426,6 +520,7 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
       active: tab,
       onSelect: t => {
         tab = t;
+        lastField = null;
         render(undefined, false);
         /** @type {HTMLElement | null} */ (dialog.querySelector(`.dialog-tabs [data-value="${t}"]`))?.focus();
       },
@@ -443,10 +538,36 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
           continue;
         }
         if (current !== tab) continue;
+        if (field.path === "spin") {
+          const { preset, details } = spinControls({
+            prefix: "rule",
+            rules,
+            expanded: spinDetails?.open,
+            onChange: (mask, focusId) => {
+              undo = null;
+              onChange(sanitizeRuleBody({ ...rules, ...spinSettings(mask) }));
+              render(focusId);
+            },
+          });
+          spinDetails = details;
+          section.append(preset, details);
+          continue;
+        }
         const disabled = Boolean(field.when && !field.when(rules));
         const id = `rule-${field.path.replace(/\./g, "-")}`;
-        const hint = disabled ? field.off : selectedDescription(field, rules) || field.hint || "";
-        section.append(fieldRow({ id, label: field.label, hint, control: control(field, rules, disabled), disabled }));
+        const hint = disabled
+          ? typeof field.off === "function"
+            ? field.off(rules)
+            : field.off
+          : selectedDescription(field, rules) || field.hint || "";
+        const reserveHints = [
+          ...(field.reserveHints ?? []),
+          ...(field.when && field.hint ? [field.hint] : []),
+          ...(typeof field.off === "string" ? [field.off] : []),
+        ];
+        section.append(
+          fieldRow({ id, label: field.label, hint, reserveHints, control: control(field, rules, disabled), disabled })
+        );
       }
       body.append(section);
     }
@@ -465,11 +586,22 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
     notice.dataset.recordKey = makeCustomRules(rules).id;
     notice.textContent = message || t("변경은 즉시 저장되며, 규칙 조합마다 기록을 따로 보관해요.");
     message = "";
+    const trial = button({
+      label: t("시험 플레이"),
+      icon: "play",
+      variant: "primary",
+      id: "rule-trial",
+      onClick: () => {
+        trialScroll = body.scrollTop;
+        dialog.close("trial");
+        onTrial();
+      },
+    });
     fillDialog(dialog, {
       title: t("Custom 규칙"),
       body,
       notice,
-      actions: [undoButton],
+      actions: [trial, undoButton],
       closeId: "rules-close",
       tabs: compact.matches
         ? el("div", { class: "rule-tabs-head" }, tabs)
@@ -479,7 +611,9 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
     if (focusId) /** @type {HTMLElement | null} */ (dialog.querySelector(`#${focusId}`))?.focus();
   };
 
-  dialog.addEventListener("close", () => onClose?.());
+  dialog.addEventListener("close", () => {
+    if (dialog.returnValue !== "trial") onClose();
+  });
   // 화면을 돌리거나 창 크기를 바꿔 기준을 넘으면 그 배치로 다시 그린다
   compact.addEventListener("change", () => {
     if (dialog.open) render(undefined, false);
@@ -489,11 +623,21 @@ export const createRulesUI = ({ dialog, getRules, onChange, onClose, slots }) =>
     /** @param {"share"} [startTab] 공유 탭으로 바로 열기(첫 화면 규칙 카드의 공유 버튼) */
     open(startTab) {
       if (startTab === "share") tab = t("공유");
+      lastField = null;
+      dialog.returnValue = "";
       render();
       dialog.showModal();
       /** @type {HTMLElement | null} */ (
         dialog.querySelector(startTab === "share" ? "#rule-share-copy" : "#rules-close")
       )?.focus();
+    },
+    returnFromTrial() {
+      dialog.returnValue = "";
+      message = t("시험 플레이를 마쳤어요");
+      render(undefined, false);
+      dialog.showModal();
+      restoreFocus(dialog, lastField ?? "#rule-trial");
+      dialog.querySelector(".dialog-body").scrollTop = trialScroll;
     },
     get isOpen() {
       return dialog.open;

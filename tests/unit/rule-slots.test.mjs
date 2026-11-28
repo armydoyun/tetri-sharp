@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MAX_RULE_SLOTS, RULE_SLOTS_KEY, createRuleSlots, sanitizeRuleSlots } from "../../js/storage/rule-slots.js";
+import {
+  MAX_RULE_NAME,
+  MAX_RULE_SLOTS,
+  RULE_SLOTS_KEY,
+  createRuleSlots,
+  sanitizeRuleSlots,
+} from "../../js/storage/rule-slots.js";
 import { createStore, memoryBackend } from "../../js/storage/store.js";
 import { PRESETS } from "../../js/rules/presets.js";
 import { sanitizeRuleBody } from "../../js/rules/sanitize.js";
@@ -35,6 +41,10 @@ test("내 규칙: 새 칸은 고른 칸이 되고, 지금 고른 규칙은 이�
   assert.deepEqual(slots.active().body, retro);
   assert.equal(slots.remove(), true);
   assert.equal(slots.read().slots.length, 2);
+  const longName = "x".repeat(MAX_RULE_NAME);
+  assert.equal(slots.add(longName, retro), true);
+  assert.equal(slots.add(longName, arcade), true);
+  assert.equal(slots.active().name, longName.slice(0, -2) + " 2", "이름 끝의 중복 번호도 저장된다");
 });
 
 test("내 규칙: 최대 10개, 마지막 하나는 지우지 않는다", () => {

@@ -7,6 +7,12 @@ import { icon } from "./icons.js";
 /** 지금 열린 목록 하나(다른 목록을 열면 닫는다) */
 let current = /** @type {null | { close: (focus?: boolean) => void }} */ (null);
 
+/** 긴 선택지는 짧은 이름과 목록에 붙일 설명으로 나눈다. */
+export const splitOption = label => {
+  const at = label.indexOf(" — ");
+  return at < 0 ? [label, ""] : [label.slice(0, at), label.slice(at + 3)];
+};
+
 // 열린 목록이 있으면 Esc가 대화상자를 닫지 않고 목록만 닫는다.
 if (typeof document !== "undefined") {
   document.addEventListener(
@@ -29,7 +35,7 @@ if (typeof document !== "undefined") {
  *   onChange: (value: any) => void,
  *   disabled?: boolean,
  * }} o
- * @returns {HTMLButtonElement}  열기 버튼(id가 붙는다). 고른 값은 data-value에 있다.
+ * @returns {HTMLButtonElement & { setValue: (value: any) => void }} 열기 버튼. 고른 값은 data-value에 있다.
  */
 export const dropdown = ({ id, label, options, value, onChange, disabled = false }) => {
   // 고른 항목은 열기 버튼에도 바로 반영한다(부르는 쪽이 대화상자를 다시 그리지 않아도 맞도록)
@@ -193,5 +199,10 @@ export const dropdown = ({ id, label, options, value, onChange, disabled = false
       open();
     }
   });
-  return trigger;
+  return Object.assign(trigger, {
+    setValue(value) {
+      const index = options.findIndex(option => option.value === value);
+      if (index !== -1) choose(index);
+    },
+  });
 };

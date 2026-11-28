@@ -16,10 +16,10 @@ const setup = () => {
   };
   const g = createGestures({ root: /** @type {any} */ (root), cellSize: () => CELL });
   g.setEnabled(true);
-  const fire = (type, x, y, t) =>
+  const fire = (type, x, y, t, pointerId = 1) =>
     listeners[type]({
       type,
-      pointerId: 1,
+      pointerId,
       pointerType: "touch",
       clientX: x,
       clientY: y,
@@ -43,7 +43,7 @@ const setup = () => {
     for (let p = g.takePressed(); p; p = g.takePressed()) pressed |= p;
     return { pressed, held };
   };
-  return { swipe };
+  return { swipe, fire, g };
 };
 
 test("엄지로 내려 쓸며 옆으로 30px 흘러도 하드 드롭만 한다(좌우 이동 없음)", () => {
@@ -146,6 +146,72 @@ test("짧게 두드리면 오른쪽 절반은 시계, 왼쪽 절반은 반시계
     ]).pressed,
     BTN.CCW
   );
+});
+
+test("두 손가락을 함께 탭하면 떼는 순서에 관계없이 180도 입력을 한 번만 보낸다", () => {
+  const { fire, g } = setup();
+  for (const first of [1, 2]) {
+    const x = id => 30 + id * 50;
+    fire("pointerdown", x(1), 100, 0, 1);
+    fire("pointerdown", x(2), 100, 20, 2);
+    fire("pointerup", x(first), 102, 60, first);
+    assert.equal(g.takePressed(), 0);
+    const last = 3 - first;
+    fire("pointerup", x(last), 104, 80, last);
+    assert.equal(g.takePressed(), BTN.R180);
+    assert.equal(g.takePressed(), 0);
+    assert.equal(g.held, 0);
+  }
+});
+
+test("두 손가락이 움직이거나 오래 누르거나 취소되면 회전·이동·드롭을 하지 않는다", () => {
+  for (const interruption of ["move", "release-move", "long", "cancel", "lost-capture", "third"]) {
+    const { fire, g, swipe } = setup();
+    fire("pointerdown", 40, 100, 0, 1);
+    fire("pointerdown", 140, 100, 20, 2);
+    if (interruption === "move") fire("pointermove", 40, 160, 30, 1);
+    if (interruption === "third") {
+      fire("pointerdown", 80, 100, 30, 3);
+      fire("pointerup", 80, 100, 40, 3);
+    }
+    const release = { cancel: "pointercancel", "lost-capture": "lostpointercapture" };
+    fire(release[interruption] ?? "pointerup", 40, 100, 50, 1);
+    fire("pointerup", 140, interruption === "release-move" ? 150 : 100, interruption === "long" ? 300 : 70, 2);
+    assert.equal(g.takePressed(), 0, interruption);
+    assert.equal(g.held, 0, interruption);
+    assert.equal(
+      swipe([
+        [150, 100, 400],
+        [150, 100, 450],
+      ]).pressed,
+      BTN.CW
+    );
+  }
+});
+
+test("소프트 드롭 중에 다른 손가락을 얹어도 먼저 하던 조작을 유지한다", () => {
+  const { fire, g } = setup();
+  fire("pointerdown", 40, 100, 0, 1);
+  fire("pointermove", 40, 145, 50, 1);
+  fire("pointerdown", 140, 100, 75, 2);
+  fire("pointerup", 140, 100, 125, 2);
+  assert.equal(g.held, BTN.SOFT);
+  assert.equal(g.takePressed(), 0);
+  fire("pointerup", 40, 145, 200, 1);
+  assert.equal(g.held, 0);
+  assert.equal(g.takePressed(), 0);
+});
+
+test("제스처를 끄면 떼는 중이던 두 손가락 탭이 지워진다", () => {
+  const { fire, g } = setup();
+  fire("pointerdown", 40, 100, 0, 1);
+  fire("pointerdown", 140, 100, 20, 2);
+  fire("pointerup", 40, 100, 40, 1);
+  g.setEnabled(false);
+  g.setEnabled(true);
+  fire("pointerup", 140, 100, 60, 2);
+  assert.equal(g.takePressed(), 0);
+  assert.equal(g.held, 0);
 });
 
 test("밀어 넣기: 천천히 내려 소프트 드롭한 뒤 더 내려가지 않고 옆으로 밀면 가로로 움직이고 하드 드롭은 없다", () => {

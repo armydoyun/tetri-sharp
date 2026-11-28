@@ -13,7 +13,7 @@ import { WIDTH } from "../core/board.js";
 import { GARBAGE } from "../core/pieces.js";
 import { buildPcExact, buildQuadExact, buildTsd, buildTst } from "./practice.js";
 import { t } from "../i18n/index.js";
-import { goalOf } from "./puzzle-goals.js";
+import { goalOf, puzzleCombo } from "./puzzle-goals.js";
 
 const TYPES = ["I", "J", "L", "O", "S", "T", "Z"];
 
@@ -354,7 +354,7 @@ export const makePuzzleMode = (puzzle, rules = MODERN) => {
     hud: Object.freeze(["time", "lines", "pieces"]),
     sequence: Object.freeze([...puzzle.pieces]),
     setup: state => {
-      state.puzzle = { placed: 0, result: null, need, lines: 0 };
+      state.puzzle = { placed: 0, result: null, need, lines: 0, combo: -1 };
       if (puzzle.holdStart) state.hold = puzzle.holdStart;
       puzzle.build(state.board);
     },
@@ -366,7 +366,8 @@ export const makePuzzleMode = (puzzle, rules = MODERN) => {
       const p = state.puzzle;
       p.placed += 1;
       p.lines += ev.lines;
-      const event = { ...ev, total: p.lines };
+      p.combo = puzzleCombo(p.combo, ev.lines);
+      const event = { ...ev, total: p.lines, combo: p.combo };
       if (puzzle.goal(event)) p.result = "clear";
       else if (p.placed >= need || puzzle.broken?.(event)) p.result = "fail";
       // 목록이 끝나면 홀드한 피스가 다음으로 나온다

@@ -44,9 +44,9 @@ const resultOf = state => ({
 
 /**
  * 한 판을 기록한다. 게임 루프가 step() 직전에 input()을 부른다.
- * @param {{ seed: number, mode: { id: string }, rules: any, handling: any }} options
+ * @param {{ seed: number, mode: { id: string }, rules: any, handling: any, legacyArsSpin?: boolean }} options
  */
-export const createRecorder = ({ seed, mode, rules, handling }) => {
+export const createRecorder = ({ seed, mode, rules, handling, legacyArsSpin = false }) => {
   /** @type {number[][]} */
   const inputs = [];
   /** @type {any[][]} */
@@ -73,6 +73,7 @@ export const createRecorder = ({ seed, mode, rules, handling }) => {
         seed,
         mode: mode.id,
         rules: { ...rules },
+        ...(rules.rotation === "ars" && rules.tspin === "threeCorner" && !legacyArsSpin ? { arsSpinFacing: true } : {}),
         handling: encodeHandling(handling),
         inputs,
         changes,
@@ -96,6 +97,7 @@ export const createPlayer = (replay, findMode, onSpawn) => {
     seed: replay.seed,
     mode,
     onSpawn,
+    legacyArsSpin: replay.arsSpinFacing !== true,
   });
   // 결과 화면에서만 사용하는 대전 기록은 CPU가 실제로 누른 입력도 저장한다.
   const opponent = replay.cpu ? createPlayer(replay.cpu, findMode) : null;
@@ -206,6 +208,7 @@ export const sanitizeReplay = (raw, findMode) => {
     seed,
     mode: mode.id,
     rules,
+    ...(raw.arsSpinFacing === true ? { arsSpinFacing: true } : {}),
     handling: decodeHandling(raw.handling),
     inputs,
     changes,

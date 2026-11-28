@@ -4,11 +4,11 @@ import { MODERN } from "./presets.js";
 import { ROTATIONS } from "./rotation/index.js";
 import { RANDOMIZERS } from "./randomizer/index.js";
 import { SCORINGS } from "./scoring/index.js";
+import { spinMask, spinSettings } from "./spins.js";
 
 export const LOCK_TYPES = Object.freeze(["moveReset", "stepReset", "infinite", "none"]);
-const TSPIN_TYPES = Object.freeze(["threeCorner", "none"]);
 /** 고를 수 있는 기본 중력(프레임당 칸) */
-export const GRAVITY_OPTIONS = Object.freeze([1 / 60, 1 / 48, 2 / 60, 6 / 60, 1, 20]);
+export const GRAVITY_OPTIONS = Object.freeze([1 / 60, 1 / 48, 2 / 60, 6 / 60, 1, 20, 0]);
 
 /** 숫자 범위: [최소, 최대] @type {Readonly<Record<string, [number, number]>>} */
 export const LIMITS = Object.freeze({
@@ -19,6 +19,7 @@ export const LIMITS = Object.freeze({
   das: [0, 30],
   arr: [0, 10],
   sdf: [1, 60],
+  dcd: [0, 10],
 });
 
 const pick = (value, allowed, fallback) => (allowed.includes(value) ? value : fallback);
@@ -29,8 +30,10 @@ const clampInt = (value, [min, max], fallback) => {
 const bool = (value, fallback) => (typeof value === "boolean" ? value : fallback);
 const nearestGravity = value => {
   const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return MODERN.gravity;
-  return GRAVITY_OPTIONS.reduce((best, g) => (Math.abs(g - n) < Math.abs(best - n) ? g : best));
+  if (value == null || value === "" || typeof value === "boolean" || !Number.isFinite(n) || n < 0)
+    return MODERN.gravity;
+  if (n === 0) return 0;
+  return GRAVITY_OPTIONS.reduce((best, g) => (g > 0 && Math.abs(g - n) < Math.abs(best - n) ? g : best));
 };
 
 /**
@@ -43,6 +46,7 @@ export const sanitizeRuleBody = raw => {
   const are = r.are && typeof r.are === "object" ? r.are : {};
   const fixed = r.fixedHandling && typeof r.fixedHandling === "object" ? r.fixedHandling : null;
   const lockType = pick(lock.type, LOCK_TYPES, MODERN.lock.type);
+  const { tspin, spinPieces } = spinSettings(spinMask(r));
   return {
     rotation: pick(r.rotation, Object.keys(ROTATIONS), MODERN.rotation),
     randomizer: pick(r.randomizer, Object.keys(RANDOMIZERS), MODERN.randomizer),
@@ -50,6 +54,7 @@ export const sanitizeRuleBody = raw => {
     hold: { enabled: bool(r.hold?.enabled, MODERN.hold.enabled) },
     ghost: bool(r.ghost, MODERN.ghost),
     hardDrop: bool(r.hardDrop, MODERN.hardDrop),
+    ...(r.allow180 === false ? { allow180: /** @type {const} */ (false) } : {}),
     lock: {
       type: lockType,
       delay: clampInt(lock.delay, LIMITS.lockDelay, MODERN.lock.delay),
@@ -60,7 +65,9 @@ export const sanitizeRuleBody = raw => {
       lineClear: clampInt(are.lineClear, LIMITS.are, 0),
     },
     gravity: nearestGravity(r.gravity),
-    tspin: pick(r.tspin, TSPIN_TYPES, MODERN.tspin),
+    ...(r.gravityMode === "fixed" ? { gravityMode: /** @type {const} */ ("fixed") } : {}),
+    tspin,
+    ...(spinPieces === undefined ? {} : { spinPieces }),
     scoring: pick(r.scoring, Object.keys(SCORINGS), MODERN.scoring),
     irs: bool(r.irs, MODERN.irs),
     ihs: bool(r.ihs, MODERN.ihs),
@@ -69,6 +76,8 @@ export const sanitizeRuleBody = raw => {
           das: clampInt(fixed.das, LIMITS.das, 16),
           arr: clampInt(fixed.arr, LIMITS.arr, 6),
           sdf: clampInt(fixed.sdf, LIMITS.sdf, 30),
+          ...(Number.isFinite(fixed.dcd) && fixed.dcd >= 0 ? { dcd: clampInt(fixed.dcd, LIMITS.dcd, 0) } : {}),
+          ...(fixed.instantSoftDrop === true ? { instantSoftDrop: /** @type {const} */ (true) } : {}),
         }
       : null,
   };

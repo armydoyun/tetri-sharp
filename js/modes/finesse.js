@@ -26,9 +26,10 @@ export const finessePlacement = cells => {
  * @param {import("../rules/rotation/index.js").Rotation} rotation
  * @param {import("../core/pieces.js").PieceType} type
  * @param {number[][]} target  고정된 칸(보드 좌표)
+ * @param {boolean} [allow180]
  * @returns {{ action: string, hold?: boolean }[] | null}  닿을 수 없으면 null
  */
-export const finessePath = (rotation, type, target) => {
+export const finessePath = (rotation, type, target, allow180 = true) => {
   const goal = finessePlacement(target);
   const cellsAt = (x, rot) => rotation.cells(type, rot).map(([cx, cy]) => [x + cx, AIR_Y + cy]);
   const fits = (x, rot) => cellsAt(x, rot).every(([cx]) => cx >= 0 && cx < WIDTH);
@@ -48,6 +49,7 @@ export const finessePath = (rotation, type, target) => {
         moves.push({ x, rot: s.rot, step: { action, hold: true } });
       }
       for (const [d, action] of ROTATE_ACTIONS) {
+        if (d === 2 && !allow180) continue;
         const to = (s.rot + d) % 4;
         const kicks = rotation.kicks(type, s.rot, to, cx => s.x + cx < 0 || s.x + cx >= WIDTH);
         // 공중에서는 벽만 막으므로 위아래 킥은 상관없다. 엔진처럼 맞는 첫 킥을 쓴다.
@@ -66,7 +68,8 @@ export const finessePath = (rotation, type, target) => {
   return null;
 };
 
-export const finesseCost = (rotation, type, target) => finessePath(rotation, type, target)?.length ?? null;
+export const finesseCost = (rotation, type, target, allow180 = true) =>
+  finessePath(rotation, type, target, allow180)?.length ?? null;
 
 /** 새로 눌린 버튼 수 */
 const countBits = n => {
@@ -116,7 +119,7 @@ export const createFinesseTracker = (game, rotation) => {
       const hard = events.some(e => e.type === "hardDrop");
       let extra = 0;
       if (hard && !soft) {
-        const best = finesseCost(rotation, lock.piece, lock.cells);
+        const best = finesseCost(rotation, lock.piece, lock.cells, game.rules.allow180 !== false);
         if (best !== null) {
           result.judged += 1;
           extra = Math.max(0, inputs - best);

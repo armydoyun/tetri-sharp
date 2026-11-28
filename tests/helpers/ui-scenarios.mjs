@@ -41,7 +41,7 @@ const scenarios = async (page, quick) => {
   };
   /** 세그먼트·카드 선택지를 하나씩 눌러 본다 */
   const choices = async (where, dialogSel) => {
-    const groups = await page.$$eval(`${dialogSel} .dialog-body :is(.choice, .choice-cards)`, els =>
+    const groups = await page.$$eval(`${dialogSel} .dialog-body :is(.choice, .choice-cards):visible`, els =>
       els.map(e => e.id).filter(Boolean)
     );
     for (const g of groups) {
@@ -102,6 +102,9 @@ const scenarios = async (page, quick) => {
     await check(`설정/${tab}`);
     await sliders(`설정/${tab}`, "#settings");
     await choices(`설정/${tab}`, "#settings");
+    if (tab === "visual" && (await page.locator("#theme-choice").isVisible())) {
+      await dropdowns(`설정/${tab}`, "#settings");
+    }
     if (tab === "keys") {
       await page.click('.key-slot[data-action="HOLD"][data-slot="1"]');
       await check("설정/keys 키 기다림");
@@ -120,10 +123,17 @@ const scenarios = async (page, quick) => {
   for (const tab of await tabs("#rules-editor")) {
     await page.click(`#rules-editor .dialog-tabs [data-value="${tab}"]`);
     await check(`규칙/${tab}`);
+    const spinDetails = page.locator("#rule-spin-details > summary");
+    const hasSpins = await spinDetails.count();
+    if (hasSpins) {
+      await spinDetails.click();
+      await check(`규칙/${tab} 미노별 스핀 펼침`);
+    }
     await switches(`규칙/${tab}`, "#rules-editor");
     await sliders(`규칙/${tab}`, "#rules-editor");
     await dropdowns(`규칙/${tab}`, "#rules-editor");
     await switches(`규칙/${tab} 되돌림`, "#rules-editor");
+    if (hasSpins) await spinDetails.click();
   }
   for (const p of ["retro", "arcade", "modern"]) {
     await page
@@ -140,6 +150,10 @@ const scenarios = async (page, quick) => {
   await esc();
   await page.click("#open-practice");
   await check("연습");
+  await esc();
+  await page.click("#open-daily-puzzle");
+  await page.locator("#daily-puzzle-play:enabled").waitFor();
+  await check("오늘의 퍼즐");
   await esc();
   await page.click("#open-puzzles");
   await page.click("#puzzle-create");
@@ -160,6 +174,10 @@ const scenarios = async (page, quick) => {
     await page.click(`#puzzle-height [data-value="${h}"]`);
     await check(`퍼즐 만들기 높이=${h}`);
   }
+  await page.click("#puzzle-advanced > summary");
+  await page.click("#puzzle-spin-details > summary");
+  await check("퍼즐 만들기 미노별 스핀 펼침");
+  await switches("퍼즐 만들기 미노별 스핀", "#puzzle-spin-details");
   await esc();
   // 퍼즐 목록의 내 퍼즐(방금 편집기가 저장한 퍼즐 한 줄)·받은 퍼즐(빈 목록) 탭
   await page.click("#open-puzzles");

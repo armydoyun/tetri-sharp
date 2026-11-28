@@ -1,0 +1,289 @@
+.audition-shell {
+  width: min(calc(100% - var(--space-6) * 2), calc(var(--hud-width) * 7.5));
+  margin-inline: auto;
+}
+
+.audition-header {
+  background: var(--surface);
+  border-bottom: var(--border-w) solid var(--border);
+}
+
+.audition-brand {
+  padding-block: var(--space-3);
+}
+
+.audition-brand-name {
+  font-size: var(--text-2xl);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.audition-brand-name span,
+.audition-board-candidate .audition-board-kind {
+  color: var(--accent);
+}
+
+.audition-main {
+  padding-block: var(--space-6) calc(var(--space-6) * 2);
+}
+
+.audition-intro {
+  margin-block-end: var(--space-6);
+}
+
+.audition-intro h1 {
+  margin: 0;
+  font-size: clamp(var(--text-3xl), 5vw, var(--text-5xl));
+  font-weight: 900;
+  letter-spacing: -0.045em;
+  line-height: 1.2;
+}
+
+.audition-intro p {
+  margin: var(--space-2) 0 0;
+  color: var(--text-dim);
+  font-size: var(--text-l);
+}
+
+.audition-layout {
+  display: grid;
+  grid-template-columns: minmax(0, calc(var(--hud-width) * 1.55)) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.audition-picker {
+  grid-row: span 2;
+}
+
+.audition-picker .section-title {
+  margin-block-end: var(--space-3);
+}
+
+.audition-category {
+  margin-block-end: var(--space-2);
+}
+
+.audition-picker .choice-cards.is-compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.audition-swatch {
+  display: block;
+  width: min(100%, calc(var(--hud-width) * 0.7));
+}
+
+.audition-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  margin-block-end: var(--space-3);
+}
+
+.audition-section-head .section-title {
+  margin: 0;
+}
+
+.audition-board-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.audition-board,
+.audition-sounds {
+  background: var(--surface);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-l);
+}
+
+.audition-board {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  min-width: 0;
+}
+
+.audition-board[data-playing="true"] {
+  border-color: var(--accent);
+}
+
+.audition-board-info {
+  display: grid;
+  grid-template-rows: auto minmax(max(var(--control-h), var(--touch-min, 0px)), auto);
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+}
+
+.audition-board-info h3,
+.audition-board-kind,
+.audition-board-desc {
+  margin: 0;
+}
+
+.audition-board-info h3 {
+  font-size: var(--text-2xl);
+  font-weight: 850;
+}
+
+.audition-board-kind {
+  color: var(--text-dim);
+  font-size: var(--text-s);
+  font-weight: 700;
+}
+
+.audition-board-desc {
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  color: var(--text-dim);
+  font-size: var(--text-s);
+}
+
+.audition-stage {
+  padding: var(--space-3) var(--space-1);
+  background: var(--surface-3);
+  border-block: var(--border-w) solid var(--border);
+  color: var(--text-dim);
+}
+
+.audition-sounds {
+  padding: var(--space-4);
+}
+
+.audition-volume,
+.audition-transport,
+.audition-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.audition-volume {
+  width: min(100%, calc(var(--hud-width) * 1.35));
+  font-size: var(--text-m);
+  color: var(--text-dim);
+}
+
+.audition-volume > label {
+  flex: none;
+}
+
+.audition-volume > .range {
+  flex: 1;
+  min-width: 0;
+}
+
+.audition-transport {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  padding: var(--space-2) 0;
+}
+
+.audition-actions {
+  flex-wrap: wrap;
+}
+
+.audition-status {
+  min-height: 2lh;
+  margin: 0 0 var(--space-2);
+  color: var(--text-dim);
+  font-size: var(--text-m);
+}
+
+.audition-status[data-playing="true"] {
+  color: var(--accent);
+}
+
+.audition-sound-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  padding-block-start: var(--space-3);
+  border-top: var(--border-w) solid var(--border);
+}
+
+.audition-preview-controls {
+  display: grid;
+  justify-items: start;
+  margin-block-start: var(--space-3);
+  gap: var(--space-3);
+}
+
+.audition-preview-controls .audition-event-grid {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.audition-sound-group {
+  min-width: 0;
+}
+
+.audition-sound-group h3 {
+  margin: 0 0 var(--space-2);
+  color: var(--text-dim);
+  font-size: var(--text-m);
+}
+
+.audition-event-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.audition-event-grid > .btn {
+  --btn-px: var(--space-1);
+  --btn-gap: var(--space-1);
+  --btn-font: var(--text-s);
+  min-width: 0;
+}
+
+@media (max-width: 960px) {
+  .audition-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .audition-picker {
+    grid-row: auto;
+  }
+
+  .audition-picker .choice-cards.is-compact {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .audition-shell {
+    width: calc(100% - var(--space-4) * 2);
+  }
+
+  .audition-main {
+    padding-block-start: var(--space-5);
+  }
+
+  .audition-intro {
+    margin-block-end: var(--space-5);
+  }
+
+  .audition-picker .choice-cards.is-compact {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .audition-sound-groups {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .audition-board-grid {
+    gap: var(--space-2);
+  }
+}
+
+@media (max-width: 380px) {
+  .audition-picker .choice-cards.is-compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .audition-sound-groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

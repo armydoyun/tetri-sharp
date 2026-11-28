@@ -8,11 +8,13 @@
     <meta name="theme-color" content="#171a17" media="(prefers-color-scheme: dark)" />
     <meta name="description" content="Tetri# — 규칙을 직접 조합하는 낙하 블록 퍼즐." />
     <title>Tetri#</title>
+    <link rel="icon" href="./assets/brand/t-mark.svg" type="image/svg+xml">
     <!-- 스타일시트: 위에서 아래 순서가 곧 우선순위. 빌드는 이 순서대로 이어 붙인다(tools/build.mjs). docs/DESIGN_SYSTEM.md -->
     <link rel="stylesheet" href="./css/tokens.css">
     <link rel="stylesheet" href="./css/base.css">
     <link rel="stylesheet" href="./css/controls.css">
     <link rel="stylesheet" href="./css/components.css">
+    <link rel="stylesheet" href="./css/puzzle-goal.css">
     <link rel="stylesheet" href="./css/game.css">
   </head>
   <body>
@@ -47,6 +49,11 @@
             </div>
           </section>
 
+          <nav class="home-shortcuts" aria-label="연습·퍼즐·기록">
+            <button id="quick-daily-puzzle" class="btn btn-small" type="button"><span class="btn-label">오늘의 퍼즐</span></button>
+            <button id="quick-puzzles" class="btn btn-small" type="button"><span class="btn-label">퍼즐</span></button>
+            <a class="home-tools-link" href="#training-tools-title">연습·기록</a>
+          </nav>
           <section class="home-block home-modes" aria-labelledby="mode-title">
             <div class="block-head">
               <h2 id="mode-title" class="section-title">플레이 모드</h2>
@@ -76,10 +83,11 @@
         <aside class="home-side" aria-label="플레이 도구">
           <section class="home-block" aria-labelledby="training-tools-title">
             <div class="block-head">
-              <h2 id="training-tools-title" class="section-title">연습과 기록</h2>
+              <h2 id="training-tools-title" class="section-title" tabindex="-1">연습과 기록</h2>
             </div>
             <div class="tool-list">
               <button id="open-practice" class="tool-row" type="button"><span class="tool-label">연습</span><span data-icon="chevron-right"></span></button>
+              <button id="open-daily-puzzle" class="tool-row" type="button"><span class="tool-label">오늘의 퍼즐</span><span data-icon="chevron-right"></span></button>
               <button id="open-puzzles" class="tool-row" type="button"><span class="tool-label">퍼즐</span><small id="puzzle-progress" class="tool-meta num"></small><span data-icon="chevron-right"></span></button>
               <button id="open-records" class="tool-row" type="button"><span class="tool-label">기록</span><span data-icon="chevron-right"></span></button>
               <button id="open-achievements" class="tool-row" type="button"><span class="tool-label">업적</span><small id="achievement-progress" class="tool-meta num"></small><span data-icon="chevron-right"></span></button>
@@ -101,7 +109,6 @@
           <input id="backup-file" type="file" accept=".json,application/json" hidden />
 
           <p id="menu-notice" class="notice-slot menu-notice" role="status"></p>
-
           <details class="help-card">
             <summary id="help-title">조작법</summary>
             <p id="key-help" class="keys" aria-label="조작 안내"></p>
@@ -113,6 +120,7 @@
       <section class="stage" aria-label="게임 화면">
         <!-- 정보 칸: 모드마다 필요한 칸만(게임 시작 때 정해지고 게임 중에는 그대로) -->
         <div class="stage-side">
+          <div id="puzzle-goal-hud" hidden></div>
           <p id="mode-objective" class="mode-objective"></p>
           <div class="downstack-controls">
             <div class="actions-row">
@@ -261,7 +269,7 @@
                 <details id="results-splits" class="results-splits">
                   <summary>구간 기록</summary>
                   <table>
-                    <thead><tr><th scope="col">구간</th><th scope="col">구간 시간</th><th scope="col">PB 대비</th></tr></thead>
+                    <thead><tr><th scope="col">구간</th><th scope="col">구간 시간</th><th scope="col">최고 기록 대비</th></tr></thead>
                     <tbody id="results-split-rows"></tbody>
                   </table>
                   <p id="results-split-note" role="status"></p>
@@ -282,7 +290,7 @@
                 </div>
                 <div class="actions-row actions-row-3">
                   <button type="button" class="btn btn-small" data-action="stats"><span data-icon="chart"></span><span class="btn-label">통계</span></button>
-                  <button type="button" class="btn btn-small" data-action="watch"><span data-icon="play"></span><span class="btn-label">다시 보기</span></button>
+                  <button type="button" class="btn btn-small" id="results-watch" data-action="watch"><span data-icon="play"></span><span class="btn-label">다시 보기</span></button>
                   <button type="button" class="btn btn-small" data-action="export" aria-label="리플레이 공유" title="리플레이 공유(링크·파일)"><span data-icon="link"></span><span class="btn-label">공유</span></button>
                 </div>
               </div>
@@ -292,29 +300,31 @@
 
         <!-- 보드 아래 자리: 게임 중에는 터치 버튼, 리플레이 중에는 리플레이 조작 -->
         <div id="replay-bar" class="replay-bar" hidden>
-          <div class="replay-info">
-            <div class="replay-heading">
-              <span class="replay-tag">REPLAY</span>
-              <span id="replay-title" class="replay-title"></span>
-              <span id="replay-status" class="replay-status"></span>
+          <div class="replay-fixed">
+            <div class="replay-info">
+              <div class="replay-heading">
+                <span class="replay-tag">REPLAY</span>
+                <span id="replay-title" class="replay-title"></span>
+                <span id="replay-status" class="replay-status"></span>
+              </div>
+              <button type="button" class="btn btn-ghost" data-replay="exit"><span data-icon="close"></span><span class="btn-label">닫기</span></button>
             </div>
-            <button type="button" class="btn btn-ghost" data-replay="exit"><span data-icon="close"></span><span class="btn-label">닫기</span></button>
-          </div>
-          <p id="replay-note" class="replay-note" role="status"></p>
-          <dl id="replay-battle-tally" class="replay-battle-tally" hidden>
-            <div><dt>내가 받을 쓰레기</dt><dd id="replay-own-pending" class="num">0</dd></div>
-            <div><dt>CPU가 받을 쓰레기</dt><dd id="replay-cpu-pending" class="num">0</dd></div>
-          </dl>
-          <!-- 진행 막대: 눌러서 원하는 시점으로. 위에는 분석 표시(피네스 실수·오래 고민한 피스·주요 장면) -->
-          <div class="replay-timeline">
-            <div class="replay-track range">
-              <div id="replay-markers" class="replay-markers"></div>
-              <input id="replay-progress" type="range" min="0" max="1" step="1" value="0" aria-label="리플레이 위치" />
+            <p id="replay-note" class="replay-note" role="status"></p>
+            <dl id="replay-battle-tally" class="replay-battle-tally" hidden>
+              <div><dt>내가 받을 쓰레기</dt><dd id="replay-own-pending" class="num">0</dd></div>
+              <div><dt>CPU가 받을 쓰레기</dt><dd id="replay-cpu-pending" class="num">0</dd></div>
+            </dl>
+            <!-- 진행 막대: 눌러서 원하는 시점으로. 위에는 분석 표시(피네스 실수·오래 고민한 피스·주요 장면) -->
+            <div class="replay-timeline">
+              <div class="replay-track range">
+                <div id="replay-markers" class="replay-markers"></div>
+                <input id="replay-progress" type="range" min="0" max="1" step="1" value="0" aria-label="리플레이 위치" />
+              </div>
+              <span class="replay-clock num">
+                <span id="replay-time-width" aria-hidden="true"></span>
+                <span id="replay-time"></span>
+              </span>
             </div>
-            <span class="replay-clock num">
-              <span id="replay-time-width" aria-hidden="true"></span>
-              <span id="replay-time"></span>
-            </span>
           </div>
           <div class="replay-analysis">
             <div class="replay-annotations">
@@ -338,8 +348,9 @@
               <button type="button" class="btn btn-ghost num" data-replay="step-back" aria-label="한 프레임 뒤로"><span class="btn-label">-1F</span></button>
               <button type="button" class="btn btn-ghost num" data-replay="step" aria-label="한 프레임 앞으로"><span class="btn-label">+1F</span></button>
               <button type="button" class="btn btn-ghost" data-replay="restart"><span data-icon="restart"></span><span class="btn-label">처음부터</span></button>
+              <button id="replay-more" type="button" class="btn btn-ghost" aria-expanded="false" aria-controls="replay-actions"><span class="btn-label">도구</span><span data-icon="chevron-down"></span></button>
             </div>
-            <div class="replay-actions">
+            <div id="replay-actions" class="replay-actions">
               <button type="button" class="btn btn-ghost" data-replay="practice" hidden><span class="btn-label">장면 연습</span></button>
               <button type="button" class="btn btn-ghost" data-replay="share"><span data-icon="link"></span><span class="btn-label">공유</span></button>
               <button type="button" class="btn btn-ghost" data-replay="puzzle" title="이 장면으로 퍼즐 만들기" aria-label="이 장면으로 퍼즐 만들기"><span data-icon="edit"></span><span class="btn-label">퍼즐로</span></button>
@@ -377,6 +388,9 @@
     <dialog id="stats" class="dialog dialog-wide" aria-label="이번 판 통계"></dialog>
     <dialog id="expedition" class="dialog" aria-label="규칙 원정"></dialog>
     <dialog id="practice" class="dialog" aria-label="연습"></dialog>
+    <dialog id="puzzle-comparison" class="dialog" aria-label="풀이 비교"></dialog>
+    <dialog id="puzzle-review" class="dialog" aria-label="마지막 수 다시 보기"></dialog>
+    <dialog id="daily-puzzle" class="dialog" aria-label="오늘의 퍼즐"></dialog>
     <dialog id="puzzles" class="dialog dialog-wide" aria-label="퍼즐"></dialog>
     <dialog id="help" class="dialog" aria-label="도움말"></dialog>
     <dialog id="share" class="dialog" aria-label="리플레이 공유"></dialog>

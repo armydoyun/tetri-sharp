@@ -55,12 +55,14 @@ const isRowFull = (b, y) => {
 /**
  * 꽉 찬 줄을 지우고 위의 줄을 내린다.
  * @param {Board} b
+ * @param {(y: number, cells: Uint8Array) => void} [onClear] 삭제 직전의 줄 색을 받는다.
  * @returns {number[]} 지운 줄의 y(지우기 전 기준, 위→아래 순)
  */
-export const clearLines = b => {
+export const clearLines = (b, onClear) => {
   const full = [];
   for (let y = 0; y < b.height; y++) if (isRowFull(b, y)) full.push(y);
   for (const y of full) {
+    onClear?.(y, b.cells.slice(y * b.width, (y + 1) * b.width));
     // y 위의 모든 줄을 한 칸씩 내린다.
     b.cells.copyWithin(b.width, 0, y * b.width);
     b.cells.fill(0, 0, b.width);

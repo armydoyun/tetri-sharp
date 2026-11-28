@@ -35,7 +35,7 @@ export const createTouch = ({ root, onSystem, vibrate = () => true }) => {
 
   root.addEventListener("pointerdown", e => {
     const button = /** @type {HTMLElement | null} */ (/** @type {HTMLElement} */ (e.target).closest("[data-touch]"));
-    if (!button || e.button !== 0 || fingers.has(e.pointerId)) return;
+    if (!button || button.matches(":disabled") || e.button !== 0 || fingers.has(e.pointerId)) return;
     const id = button.dataset.touch ?? "";
     if (!SYSTEM[id] && (!enabled || !BIT[id])) return;
     e.preventDefault();

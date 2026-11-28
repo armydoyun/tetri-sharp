@@ -37,8 +37,8 @@ const codeStrings = () => {
   return out;
 };
 
-const htmlStrings = () => {
-  const html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8").replace(/<!--[\s\S]*?-->/g, "");
+const htmlStrings = file => {
+  const html = fs.readFileSync(path.join(ROOT, file), "utf8").replace(/<!--[\s\S]*?-->/g, "");
   const out = new Set();
   for (const m of html.matchAll(/>([^<>]*)</g)) if (HANGUL.test(m[1])) out.add(m[1].trim());
   for (const m of html.matchAll(/(?:aria-label|title|placeholder|content)="([^"]*)"/g))
@@ -51,9 +51,13 @@ test("코드의 한국어 문장은 모두 영어 사전에 있다", () => {
   assert.deepEqual(missing, []);
 });
 
-test("index.html의 한국어 글자도 모두 영어 사전에 있다", () => {
-  const missing = [...htmlStrings()].filter(text => !(text in EN));
-  assert.deepEqual(missing, []);
+test("HTML의 한국어 글자도 모두 영어 사전에 있다", () => {
+  for (const file of ["index.html", "theme-preview.html", "daily-puzzle-preview.html"])
+    assert.deepEqual(
+      [...htmlStrings(file)].filter(text => !(text in EN)),
+      [],
+      file
+    );
 });
 
 test("번역문은 원문과 같은 매개변수를 쓴다", () => {

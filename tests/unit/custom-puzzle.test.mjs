@@ -16,7 +16,8 @@ import {
   searchOptions,
   solutionTask,
 } from "../../js/modes/custom-puzzle.js";
-import { runSolverTask } from "../../js/modes/puzzle-solver.js";
+import { template } from "../../js/modes/puzzle-edit.js";
+import { placementKey, runSolverTask } from "../../js/modes/puzzle-solver.js";
 
 const BOTTOM = PUZZLE_CELLS - WIDTH;
 /** 바닥 줄 앞 n칸을 채운 판 */
@@ -196,4 +197,87 @@ test("자동 확인: 홀드가 있어야 풀리는 판, 20G에서는 못 나오�
   const other = searchOptions({ ...pit });
   assert.equal(other.ceilingRows, undefined);
   assert.equal(other.looseRows, 20);
+});
+
+test("풀이 비교는 첫 피스의 칸이 다른 퍼펙트 클리어와 홀드 경로를 찾는다", () => {
+  const solve = (rows, pieces, rules) => {
+    const cells = new Uint8Array(PUZZLE_CELLS);
+    cells.set(
+      rows.flatMap(row => [...row].map(Number)),
+      PUZZLE_CELLS - rows.length * WIDTH
+    );
+    const task = solutionTask({ cells, pieces, rules });
+    const result = runSolverTask(task);
+    assert.ok(result && "moves" in result);
+    const baseline = result.moves;
+    const other = runSolverTask({ ...task, type: "comparison", excludeFirst: placementKey(baseline[0]) });
+    assert.equal(other.comparison, "found");
+    assert.notEqual(placementKey(other.alternative[0]), placementKey(baseline[0]));
+    return [baseline, other.alternative];
+  };
+  const pc = solve(["1100110011", "1100110011"], "OO");
+  assert.deepEqual(
+    pc.map(path => path.map(move => move.lines)),
+    [
+      [0, 2],
+      [0, 2],
+    ]
+  );
+  const [direct, hold] = solve(["1000010011", "1111110011"], "IO", { ...DEFAULT_RULES, hold: { enabled: true } });
+  assert.equal(direct[0].hold, false);
+  assert.equal(hold[0].hold, true);
+  assert.deepEqual(
+    hold.map(move => [move.type, move.lines]),
+    [
+      ["O", 1],
+      ["I", 1],
+    ]
+  );
+});
+
+test("풀이 비교는 같은 첫 배치를 제외하고 다른 경로를 찾지 못했는지 또는 탐색 제한에 걸렸는지 구분한다", () => {
+  const spinTask = solutionTask(template("tsd"));
+  const spin = runSolverTask(spinTask);
+  assert.equal(spin.moves[0].tspin, "full");
+  assert.equal(spin.moves[0].lines, 2);
+  const key = placementKey(spin.moves[0]);
+  assert.equal(key, placementKey({ ...spin.moves[0], cells: spin.moves[0].cells.toReversed(), hold: true }));
+  assert.deepEqual(runSolverTask({ ...spinTask, type: "comparison", excludeFirst: key }), { comparison: "checked" });
+
+  const limited = solutionTask({ cells: bottomRow(1), pieces: "IIIIIIII", goal: { kind: "lines", lines: 20 } });
+  assert.deepEqual(runSolverTask({ ...limited, type: "comparison", excludeFirst: "I/393,394,395,396" }), {
+    comparison: "limit",
+  });
+});
+
+test("클래식 점수표를 써도 퍼즐의 줄 삭제 연속 횟수는 탐색과 실제 판에서 같다", () => {
+  const cells = new Uint8Array(PUZZLE_CELLS);
+  cells.set(Array.from("11100001111110000111", Number), PUZZLE_CELLS - 2 * WIDTH);
+  const puzzle = { cells, pieces: "II", goal: { kind: "combo" }, rules: { ...DEFAULT_RULES, scoring: "classic" } };
+  const solution = runSolverTask(solutionTask(puzzle));
+  assert.deepEqual(
+    solution.moves.map(move => move.lines),
+    [1, 1]
+  );
+  const mode = customPuzzleMode(puzzle);
+  const game = createGame({ mode, rules: mode.rules, seed: 1 });
+  play(game, [BTN.HARD]);
+  assert.equal(game.state.puzzle.combo, 0);
+  play(game, [BTN.HARD]);
+  assert.equal(game.state.puzzle.combo, 1);
+  assert.equal(game.state.combo, -1, "클래식 점수표의 콤보 보너스는 그대로다");
+  assert.equal(game.state.over, "clear");
+});
+
+test("퍼즐 링크에서도 180도 제한과 고정 DCD·즉시 소프트 드롭이 왕복한다", () => {
+  const rules = {
+    ...DEFAULT_RULES,
+    allow180: false,
+    fixedHandling: { das: 7, arr: 2, sdf: 12, dcd: 0, instantSoftDrop: true },
+  };
+  const source = { cells: bottomRow(6), pieces: "I", rules };
+  const decoded = decodePuzzle(encodePuzzle(source));
+  assert.equal(decoded.rules.allow180, false);
+  assert.deepEqual(decoded.rules.fixedHandling, rules.fixedHandling);
+  assert.equal(solutionTask(decoded).opts.allow180, false);
 });

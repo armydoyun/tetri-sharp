@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ko" data-scheme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tetri# · 테마와 효과음 견본</title>
+    <link rel="stylesheet" href="./css/tokens.css" />
+    <link rel="stylesheet" href="./css/base.css" />
+    <link rel="stylesheet" href="./css/controls.css" />
+    <link rel="stylesheet" href="./css/components.css" />
+    <link rel="stylesheet" href="./css/theme-preview.css" />
+  </head>
+  <body>
+    <header class="audition-header">
+      <div class="audition-shell audition-brand">
+        <span class="audition-brand-name">Tetri<span>#</span></span>
+      </div>
+    </header>
+    <main class="audition-shell audition-main">
+      <header class="audition-intro">
+        <h1>테마와 효과음 견본</h1>
+        <p>테마를 고르고 플레이 연출과 효과음을 원본 보드와 비교해 보세요.</p>
+      </header>
+      <div class="audition-layout">
+        <section class="audition-picker" aria-labelledby="candidate-title">
+          <h2 id="candidate-title" class="section-title">테마 목록</h2>
+          <div class="audition-category" id="theme-category"></div>
+          <div id="candidates"></div>
+        </section>
+        <section class="audition-boards" aria-labelledby="boards-title">
+          <div class="audition-section-head">
+            <h2 id="boards-title" class="section-title">보드 비교</h2>
+            <div id="board-controls"></div>
+          </div>
+          <div class="audition-board-grid">
+            <article class="audition-board audition-board-candidate" id="candidate-card">
+              <div class="audition-board-info">
+                <p class="audition-board-kind">견본</p>
+                <h3 id="candidate-name"></h3>
+              </div>
+              <div class="audition-stage">
+                <canvas
+                  id="candidate-board"
+                  class="theme-stage-canvas"
+                  role="img"
+                  aria-labelledby="candidate-name candidate-desc"
+                ></canvas>
+              </div>
+              <p class="audition-board-desc" id="candidate-desc"></p>
+            </article>
+            <article class="audition-board" id="reference-card">
+              <div class="audition-board-info">
+                <p class="audition-board-kind" id="reference-title">원본</p>
+                <div id="reference-picker"></div>
+              </div>
+              <div class="audition-stage">
+                <canvas
+                  id="reference-board"
+                  class="theme-stage-canvas"
+                  role="img"
+                  aria-labelledby="reference-title reference-desc"
+                ></canvas>
+              </div>
+              <p class="audition-board-desc" id="reference-desc"></p>
+            </article>
+          </div>
+          <div class="audition-preview-controls">
+            <div id="listen-mode"></div>
+            <section class="audition-sound-group" aria-labelledby="motion-title">
+              <h3 id="motion-title">플레이 연출</h3>
+              <div class="audition-event-grid" id="motion-actions"></div>
+            </section>
+            <section class="audition-sound-group" aria-labelledby="situation-title">
+              <h3 id="situation-title">상황별 연출</h3>
+              <div class="audition-event-grid" id="situation-actions"></div>
+            </section>
+            <div id="clear-actions"></div>
+            <p class="audition-status" id="play-status" role="status" aria-atomic="true"></p>
+          </div>
+        </section>
+        <section class="audition-sounds" aria-labelledby="sounds-title">
+          <div class="audition-section-head">
+            <h2 id="sounds-title" class="section-title">효과음 듣기</h2>
+            <div class="audition-volume" id="volume-control"></div>
+          </div>
+          <div class="audition-transport">
+            <div class="audition-actions" id="listen-actions"></div>
+          </div>
+          <div class="audition-sound-groups" id="sound-groups"></div>
+        </section>
+      </div>
+    </main>
+    <noscript>견본을 보려면 자바스크립트를 켜 주세요.</noscript>
+    <!-- ES Modules: 개발용 실행은 http://localhost를 사용한다. -->
+    <script type="module" src="./js/theme-preview/main.js"></script>
+  </body>
+</html>

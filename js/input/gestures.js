@@ -9,12 +9,14 @@
 //  - 아래로 빠르게 튕기기: 하드 드롭
 //  - 위로 밀기: 홀드
 //  - 두드리기: 오른쪽 절반은 시계 방향, 왼쪽 절반은 반시계 방향 회전
+//  - 두 손가락으로 함께 두드리기: 180도 회전
 // 키보드·터치 버튼과 같은 { held, takePressed() } 모양이라 게임 루프가 그대로 합친다.
 import { BTN } from "../core/engine.js";
 import { createPressQueue } from "./press-queue.js";
 
 const TAP_MOVE = 12; // px: 이보다 덜 움직이고 떼면 두드리기
 const TAP_MS = 260;
+const movedPastTap = (start, event) => Math.hypot(event.clientX - start.x0, event.clientY - start.y0) > TAP_MOVE;
 const FLICK_SPEED = 0.9; // px/ms: 아래로 이보다 빠르면 하드 드롭
 const AXIS_RATIO = 2; // 가로 이동량이 세로의 이 배수를 넘어야 가로로 잠근다
 const TUCK_UNLOCK = 1.5; // 칸: 세로로 잠근 뒤 이만큼 옆으로 밀면 밀어 넣기(한 칸 이동)
@@ -26,21 +28,49 @@ export const createGestures = ({ root, cellSize }) => {
   let enabled = false;
   let held = 0;
   const pending = createPressQueue();
-  /** @type {null | { id: number, x0: number, y0: number, ax: number, t0: number, moved: boolean, soft: boolean, axis: null | "x" | "y", anchor: {x: number, y: number}, trail: {y: number, t: number}[] }} */
+  /** @type {null | { id: number, pointerType: string, x0: number, y0: number, ax: number, t0: number, moved: boolean, soft: boolean, axis: null | "x" | "y", anchor: {x: number, y: number}, trail: {y: number, t: number}[] }} */
   let touch = null;
+  /** @type {null | { contacts: Map<number, { x0: number, y0: number }>, t0: number, valid: boolean }} */
+  let twoFingerTap = null;
 
   const press = pending.press;
 
-  const down = e => {
-    if (!enabled || e.pointerType === "mouse" || touch) return;
+  const capture = e => {
     e.preventDefault();
     try {
       root.setPointerCapture(e.pointerId);
     } catch {
       /* 무시 */
     }
+  };
+
+  const down = e => {
+    if (!enabled || e.pointerType === "mouse") return;
+    if (twoFingerTap) {
+      capture(e);
+      twoFingerTap.contacts.set(e.pointerId, { x0: e.clientX, y0: e.clientY });
+      twoFingerTap.valid = false;
+      return;
+    }
+    if (touch) {
+      if (touch.pointerType !== "touch" || e.pointerType !== "touch" || touch.moved || e.timeStamp - touch.t0 >= TAP_MS)
+        return;
+      capture(e);
+      twoFingerTap = {
+        contacts: new Map([
+          [touch.id, { x0: touch.x0, y0: touch.y0 }],
+          [e.pointerId, { x0: e.clientX, y0: e.clientY }],
+        ]),
+        t0: touch.t0,
+        valid: true,
+      };
+      touch = null;
+      return;
+    }
+    capture(e);
     touch = {
       id: e.pointerId,
+      pointerType: e.pointerType,
       x0: e.clientX,
       y0: e.clientY,
       ax: e.clientX,
@@ -55,12 +85,19 @@ export const createGestures = ({ root, cellSize }) => {
   };
 
   const move = e => {
+    if (twoFingerTap) {
+      const start = twoFingerTap.contacts.get(e.pointerId);
+      if (!start) return;
+      e.preventDefault();
+      if (movedPastTap(start, e)) twoFingerTap.valid = false;
+      return;
+    }
     if (!touch || e.pointerId !== touch.id) return;
     e.preventDefault();
     const cell = Math.max(8, cellSize());
     const tdx = e.clientX - touch.x0;
     const dy = e.clientY - touch.y0;
-    if (Math.hypot(tdx, dy) > TAP_MOVE) touch.moved = true;
+    if (movedPastTap(touch, e)) touch.moved = true;
     // 방향 잠그기: 두드리기보다 더 움직였을 때 정한다. 가로가 세로의 2배를 넘으면 가로, 세로가 더 크면 세로.
     // 그 사이(대각선)면 한 칸 반을 넘게 움직일 때까지 미루고, 그래도 애매하면 더 많이 간 쪽으로.
     if (!touch.axis && touch.moved) {
@@ -100,17 +137,29 @@ export const createGestures = ({ root, cellSize }) => {
   };
 
   const up = e => {
+    if (twoFingerTap) {
+      const start = twoFingerTap.contacts.get(e.pointerId);
+      if (!start) return;
+      if (e.type !== "pointerup" || movedPastTap(start, e)) twoFingerTap.valid = false;
+      twoFingerTap.contacts.delete(e.pointerId);
+      // 두 손가락이 모두 떨어질 때 한 번만 입력한다. 취소된 탭도 남은 손가락을 일반 제스처로 넘기지 않는다.
+      if (twoFingerTap.contacts.size === 0) {
+        if (twoFingerTap.valid && e.timeStamp - twoFingerTap.t0 < TAP_MS) press(BTN.R180);
+        twoFingerTap = null;
+      }
+      return;
+    }
     if (!touch || e.pointerId !== touch.id) return;
     const t = touch;
     touch = null;
     held &= ~BTN.SOFT;
-    if (e.type === "pointercancel") return;
+    if (e.type !== "pointerup") return;
     const cell = Math.max(8, cellSize());
     const dy = e.clientY - t.y0;
     const dx = e.clientX - t.x0;
     const first = t.trail[0];
     const speed = first ? (e.clientY - first.y) / Math.max(1, e.timeStamp - first.t) : 0;
-    if (!t.moved && e.timeStamp - t.t0 < TAP_MS) {
+    if (!t.moved && !movedPastTap(t, e) && e.timeStamp - t.t0 < TAP_MS) {
       const r = root.getBoundingClientRect();
       press(e.clientX >= r.left + r.width / 2 ? BTN.CW : BTN.CCW);
     } else if (t.axis !== "x" && dy > cell * 2 && speed > FLICK_SPEED && Math.abs(dx) < dy) {
@@ -122,10 +171,11 @@ export const createGestures = ({ root, cellSize }) => {
 
   root.addEventListener("pointerdown", down);
   root.addEventListener("pointermove", move);
-  for (const type of ["pointerup", "pointercancel"]) root.addEventListener(type, up);
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) root.addEventListener(type, up);
 
   const releaseAll = () => {
     touch = null;
+    twoFingerTap = null;
     held = 0;
     pending.clear();
   };

@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { createBoard, set, HEIGHT, WIDTH, isEmpty } from "../../js/core/board.js";
 import { detectTSpin } from "../../js/core/tspin.js";
 import { BTN, createGame } from "../../js/core/engine.js";
+import { createPlayer, createRecorder, sanitizeReplay } from "../../js/replay/replay.js";
+import { makeCustomRules } from "../../js/rules/sanitize.js";
 import { MODERN } from "../../js/rules/presets.js";
 
 const T = (rot, x, y, extra = {}) => ({ type: "T", rot, x, y, lastAction: "rotate", kick: 0, ...extra });
@@ -100,4 +102,38 @@ test("엔진: 소프트 드롭 1점/칸, 하드 드롭 2점/칸", () => {
   const soft = g.state.active.y - y0;
   assert.ok(soft > 10);
   assert.equal(g.state.score, soft);
+});
+
+test("ARS 앞쪽 판정은 T 방향을 따라가고 기존 리플레이에는 종전 판정을 쓴다", () => {
+  const board = createBoard();
+  for (const [x, y] of [
+    [3, 35],
+    [3, 37],
+    [5, 37],
+  ])
+    set(board, x, y, 8);
+  assert.equal(detectTSpin(board, T(0, 3, 35), "ars"), "full");
+  assert.equal(detectTSpin(board, T(0, 3, 35)), "mini");
+
+  const mode = { id: "ars-test", sequence: ["T"] };
+  const rules = makeCustomRules({ ...MODERN, rotation: "ars" });
+  const game = createGame({ rules, mode, seed: 1 });
+  const recorder = createRecorder({ rules, mode, seed: 1, handling: game.handling });
+  const replay = recorder.finish(game.state);
+  const load = raw =>
+    createPlayer(
+      sanitizeReplay(raw, () => mode),
+      () => mode
+    ).game;
+  const live = load(replay);
+  const legacy = load({ ...replay, arsSpinFacing: undefined });
+  for (const [g, spin] of [
+    [live, "full"],
+    [legacy, "mini"],
+  ]) {
+    g.step();
+    g.state.board.cells.set(board.cells);
+    Object.assign(g.state.active, T(0, 3, 35));
+    assert.equal(g.step({ pressed: BTN.HARD }).find(event => event.type === "lock").tspin, spin);
+  }
 });

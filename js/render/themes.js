@@ -1,6 +1,8 @@
 import { t } from "../i18n/index.js";
+import { createAdditionalThemes } from "./additional-themes.js";
+import { EXISTING_CLEAR_SWEEPS } from "./existing-clear-sweeps.js";
 // 저장된 테마 키는 유지한다. 테마는 보드와 블록의 색·모양을 정의한다.
-export const THEME_IDS = Object.freeze([
+const ORIGINAL_PUBLIC_IDS = Object.freeze([
   "modern",
   "retro",
   "minimal",
@@ -14,8 +16,6 @@ export const THEME_IDS = Object.freeze([
 export const DEFAULT_THEME = "modern";
 /** 처음에는 목록에 없다가 열리는 테마(열렸는지는 업적이 기억한다 — js/storage/achievements.js) */
 const SECRET_THEME_IDS = Object.freeze(["sharp"]);
-/** 저장해도 되는 테마 키 전부 */
-export const ALL_THEME_IDS = Object.freeze([...THEME_IDS, ...SECRET_THEME_IDS]);
 
 export const CONTRAST_PALETTE = Object.freeze([
   "",
@@ -159,44 +159,10 @@ export const drawMark = (ctx, x, y, size, value, color) => {
   ctx.restore();
 };
 
-/**
- * 점 격자 경로: 안쪽 칸 모서리가 만나는 곳마다 작은 네모(선 격자보다 조용하고 종이·도면 느낌)
- * @returns {Path2D}
- */
-export const gridDots = (bx, by, cols, rows, cell) => {
-  const path = new Path2D();
-  const d = Math.max(1, Math.round(cell * 0.09));
-  for (let x = 1; x < cols; x++)
-    for (let y = 1; y < rows; y++) path.rect(bx + x * cell - d / 2, by + y * cell - d / 2, d, d);
-  return path;
-};
-
-/**
- * '#' 격자 경로: 두 칸마다 칸 모서리에 작은 '#'(가로 둘·세로 둘)
- * @returns {Path2D}
- */
-export const gridHashes = (bx, by, cols, rows, cell) => {
-  const path = new Path2D();
-  const r = cell * 0.13;
-  const g = cell * 0.05;
-  for (let x = 2; x < cols; x += 2)
-    for (let y = 2; y < rows; y += 2) {
-      const cx = Math.round(bx + x * cell) + 0.5;
-      const cy = Math.round(by + y * cell) + 0.5;
-      for (const d of [-g, g]) {
-        path.moveTo(cx - r, cy + d);
-        path.lineTo(cx + r, cy + d);
-        path.moveTo(cx + d, cy - r);
-        path.lineTo(cx + d, cy + r);
-      }
-    }
-  return path;
-};
-
 /** 고스트 진하기 → [윤곽 투명도, 채움 투명도] */
 const GHOST_LEVEL = { faint: [0.32, 0], normal: [0.58, 0], strong: [0.95, 0.22] };
 
-const makeTheme = spec => {
+export const makeTheme = spec => {
   const theme = {
     ...spec,
     palette: Object.freeze(["", ...spec.palette]),
@@ -229,7 +195,7 @@ const makeTheme = spec => {
  * 테마마다 보드색·격자(선·점·없음)·블록 마감·모서리·효과를 묶어 성격을 나눈다.
  * 저장 키는 예전 그대로 둔다(minimal = 블루프린트, stone = 샌드).
  */
-export const THEMES = Object.freeze({
+export const ORIGINAL_THEMES = Object.freeze({
   modern: makeTheme({
     name: t("스튜디오"),
     description: t("차콜 보드에 또렷한 무광 블록 · 기본"),
@@ -451,6 +417,29 @@ export const THEMES = Object.freeze({
     },
   }),
 });
+export const ADDITIONAL_THEMES = createAdditionalThemes(makeTheme, ORIGINAL_THEMES.modern.motion);
+export const THEME_IDS = Object.freeze([...ORIGINAL_PUBLIC_IDS, ...Object.keys(ADDITIONAL_THEMES)]);
+/** 저장해도 되는 테마 키 전부 */
+export const ALL_THEME_IDS = Object.freeze([...THEME_IDS, ...SECRET_THEME_IDS]);
+
+const updatedOriginals = Object.fromEntries(
+  Object.entries(ORIGINAL_THEMES).map(([id, theme]) => [
+    id,
+    Object.freeze({
+      ...theme,
+      motion: Object.freeze({
+        ...theme.motion,
+        clearMs: theme.motion.clearMs + 100,
+        clearSweep: EXISTING_CLEAR_SWEEPS[id],
+      }),
+    }),
+  ])
+);
+export const THEMES = Object.freeze({
+  ...updatedOriginals,
+  ...Object.fromEntries(Object.entries(ADDITIONAL_THEMES).map(([id, { theme }]) => [id, theme])),
+});
+
 /** 블록 색 직접 고르기에 쓰는 견본(어두운·밝은 보드 모두에서 잘 보이는 색) */
 export const COLOR_SWATCHES = Object.freeze([
   "#8ed6cd",
