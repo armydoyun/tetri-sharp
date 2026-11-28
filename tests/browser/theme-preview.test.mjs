@@ -98,13 +98,14 @@ test("독립 테마 견본에서 보드를 비교하고 효과음을 재생·정
   await status.filter({ hasText: "릴레이 · 게임 오버 재생 중" }).waitFor();
   await status.filter({ hasText: "스튜디오 · 게임 오버 재생 중" }).waitFor();
   await status.filter({ hasText: "재생 완료" }).waitFor();
+  await page.waitForFunction(() => window.auditionAudio.stops === 1);
   const played = await page.evaluate(() => window.auditionAudio);
   assert.deepEqual(played, { contexts: 1, connections: 1, stops: 1, tones: 7 });
 
   await page.getByRole("button", { name: "연속 재생" }).click();
   await page.getByRole("button", { name: "정지" }).click();
   assert.equal(await status.textContent(), "재생을 멈췄어요.");
-  assert.equal(await page.evaluate(() => window.auditionAudio.stops), 2);
+  await page.waitForFunction(() => window.auditionAudio.stops === 2);
   await page.getByRole("slider", { name: "음량" }).focus();
   await page.keyboard.press("Home");
   await page.getByRole("button", { name: "하드 드롭" }).click();

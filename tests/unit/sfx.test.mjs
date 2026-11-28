@@ -61,7 +61,7 @@ test("효과음 크기 설정: 기본은 음소거(0), 0~100으로 맞춘다", (
 test("같은 프레임의 클리어는 조작과 하드 드롭보다 앞에 들리도록 섞는다", () => {
   const previous = globalThis.AudioContext;
   const peaks = [];
-  const parameter = { setValueAtTime() {}, exponentialRampToValueAtTime() {} };
+  const parameter = { setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {} };
   const source = { connect() {}, start() {}, stop() {}, frequency: parameter };
   globalThis.AudioContext = class {
     currentTime = 0;
