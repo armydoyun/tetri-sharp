@@ -1340,7 +1340,7 @@ test("게임 테마: 소리 미리보기는 0%에서 안내하고 선택된 테�
     assert.deepEqual((await tones()).slice(volumeTones + studioTones.length), studioTones);
 
     await volume.fill("0");
-    assert.equal(await page.evaluate(() => window.themeAudio.gain.value), 0);
+    await page.waitForFunction(() => window.themeAudio.gain.value === 0);
     const last = await tones();
     await listen.click();
     assert.equal(await notice.textContent(), "소리가 꺼져 있어요.");

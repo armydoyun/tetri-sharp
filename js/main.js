@@ -1605,7 +1605,7 @@ const settingsUI = createSettingsUI({
     renderKeyHelp();
   },
   onPreviewSound: () => sfx.play("clear2"),
-  onPreviewTheme: themeId => sfx.preview(soundSetFor(themeId), settings.volume),
+  onPreviewTheme: themeId => sfx.preview(soundSetFor(themeId)),
   openedThemes: () => (achievements.unlocked()["secret-sharp"] ? ["sharp"] : []),
   // 모드 이름처럼 시작할 때 만든 글자까지 바꾸려면 다시 불러오는 게 가장 확실하다.
   onLanguage: () => location.reload(),
@@ -2171,6 +2171,7 @@ welcomeSound.addEventListener("click", () => {
   settings = sanitizeSettings({ ...settings, volume: settings.volume > 0 ? 0 : WELCOME_VOLUME });
   saveSettings(store, settings);
   renderWelcomeSound();
+  sfx.setVolume();
   if (settings.volume > 0) sfx.play("clear2");
 });
 renderWelcomeSound();

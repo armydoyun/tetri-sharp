@@ -4,6 +4,9 @@
 // 소리를 고르는 부분(soundsFor)은 DOM·오디오 없이 돌아서 Node 테스트로 확인한다.
 import { SOUND_SETS } from "./sound-sets.js";
 
+const VOLUME_FADE = 0.016;
+const SILENCE = 0.0001;
+
 export { SOUND_NAMES, SOUND_SETS } from "./sound-sets.js";
 /** @typedef {import("./sound-kit.js").Part} Part */
 
@@ -56,6 +59,19 @@ export const createSfx = ({ getVolume, getSet = () => "modern", sets = SOUND_SET
   let master = null;
   /** @type {AudioBuffer | null} */
   let noise = null;
+  let volumeRamp = { from: 0, to: 0, start: 0, end: 0 };
+
+  const linearVolume = () => (getVolume() / 100) ** 2;
+  const rampVolume = level => {
+    if (!master || level === volumeRamp.to) return;
+    const now = ctx.currentTime;
+    const { from, to, start, end } = volumeRamp;
+    const current = now >= end ? to : from + (to - from) * ((now - start) / (end - start));
+    master.gain.cancelScheduledValues(now);
+    master.gain.setValueAtTime(current, now);
+    master.gain.linearRampToValueAtTime(level, now + VOLUME_FADE);
+    volumeRamp = { from: current, to: level, start: now, end: now + VOLUME_FADE };
+  };
 
   const ensure = () => {
     if (!ctx) {
@@ -73,10 +89,26 @@ export const createSfx = ({ getVolume, getSet = () => "modern", sets = SOUND_SET
     }
     if (!master) {
       master = ctx.createGain();
+      const level = linearVolume();
+      master.gain.value = level;
+      volumeRamp = { from: level, to: level, start: ctx.currentTime, end: ctx.currentTime };
       master.connect(ctx.destination);
     }
     if (ctx.state === "suspended") ctx.resume().catch(() => {});
     return ctx;
+  };
+
+  // 지수 램프는 0으로 갈 수 없으므로 양끝만 짧은 선형 램프로 무음에 연결한다.
+  /** @param {AudioParam} gain */
+  const envelope = (gain, start, tail, attack, peak) => {
+    const rise = Math.min(attack, tail / 2);
+    const release = Math.min(0.004, tail / 4);
+    const floor = Math.min(SILENCE, peak / 10);
+    gain.setValueAtTime(0, start);
+    gain.linearRampToValueAtTime(floor, start + rise / 4);
+    gain.exponentialRampToValueAtTime(peak, start + rise);
+    gain.exponentialRampToValueAtTime(floor, start + tail - release);
+    gain.linearRampToValueAtTime(0, start + tail);
   };
 
   /** 조각 하나: 소리(또는 잡음) → [배음] → 엔벨로프 → [필터] → 전체 크기 */
@@ -84,9 +116,7 @@ export const createSfx = ({ getVolume, getSet = () => "modern", sets = SOUND_SET
     const start = t0 + p.at;
     const tail = p.decay === "slow" ? p.dur * 1.6 : p.dur;
     const env = ac.createGain();
-    env.gain.setValueAtTime(0.0001, start);
-    env.gain.exponentialRampToValueAtTime(Math.max(0.0002, p.gain * mix), start + (p.attack ?? 0.005));
-    env.gain.exponentialRampToValueAtTime(0.0001, start + tail);
+    envelope(env.gain, start, tail, p.attack ?? 0.005, Math.max(0.0002, p.gain * mix));
     /** @type {AudioNode} */
     let last = env;
     if (p.filter && ac.createBiquadFilter) {
@@ -117,9 +147,7 @@ export const createSfx = ({ getVolume, getSet = () => "modern", sets = SOUND_SET
       else {
         // 배음은 더 빨리 사라진다(마림바·종의 울림)
         const g = ac.createGain();
-        g.gain.setValueAtTime(0.0001, start);
-        g.gain.exponentialRampToValueAtTime(level, start + 0.003);
-        g.gain.exponentialRampToValueAtTime(0.0001, start + tail * (p.decay === "fast" ? 0.35 : 0.6));
+        envelope(g.gain, start, tail * (p.decay === "fast" ? 0.35 : 0.6), 0.003, level);
         src.connect(g);
         g.connect(env);
       }
@@ -133,17 +161,16 @@ export const createSfx = ({ getVolume, getSet = () => "modern", sets = SOUND_SET
   /**
    * @param {string} name
    * @param {number} [mix] 같은 프레임의 다른 소리와 섞을 때의 비율
-   * @param {{ set?: string, volume?: number, delay?: number }} [options] set: 이번만 다른 묶음, volume: 이번만 다른 크기(미리 듣기)
+   * @param {{ set?: string, delay?: number }} [options] set: 이번만 다른 묶음
    */
   const play = (name, mix = 1, options = {}) => {
-    const volume = options.volume ?? getVolume();
+    const volume = getVolume();
     const set = sets[options.set ?? getSet()] ?? SOUND_SETS.modern;
     const parts = set[name];
     if (!parts || volume <= 0) return false;
     const ac = ensure();
     if (!ac || !master) return false;
-    // 사람 귀는 로그 단위로 듣는다 → 슬라이더 값을 제곱해 작은 쪽을 더 세밀하게.
-    master.gain.value = Math.pow(volume / 100, 2);
+    rampVolume(linearVolume());
     const t0 = ac.currentTime + 0.005 + (options.delay ?? 0);
     for (const p of parts) voice(ac, master, p, t0, mix);
     return true;
@@ -152,14 +179,22 @@ export const createSfx = ({ getVolume, getSet = () => "modern", sets = SOUND_SET
   return {
     play,
     setVolume() {
-      if (master) master.gain.value = Math.pow(getVolume() / 100, 2);
+      rampVolume(linearVolume());
     },
     stop() {
-      master?.disconnect();
+      if (!master) return;
+      const output = master;
+      rampVolume(0);
       master = null;
+      // 오디오 시계가 페이드 끝에 도달한 뒤에만 이전 출력과 예약된 소리를 떼어 낸다.
+      const cleanup = ctx.createBufferSource();
+      cleanup.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+      cleanup.connect(output);
+      cleanup.onended = () => output.disconnect();
+      cleanup.start(ctx.currentTime + VOLUME_FADE);
     },
     /** 묶음 하나를 짧게 들려준다(설정의 테마 미리보기): 이동·회전·하드 드롭·2줄 */
-    preview(set, volume) {
+    preview(set) {
       for (const [at, name] of /** @type {const} */ ([
         [0, "move"],
         [0.13, "move"],
@@ -167,7 +202,7 @@ export const createSfx = ({ getVolume, getSet = () => "modern", sets = SOUND_SET
         [0.55, "hardDrop"],
         [0.55, "clear2"],
       ]))
-        play(name, name === "clear2" ? 1 : 0.6, { set, volume, delay: at });
+        play(name, name === "clear2" ? 1 : 0.6, { set, delay: at });
     },
     /** 엔진 이벤트 한 프레임 분량을 소리로 */
     events(events) {
