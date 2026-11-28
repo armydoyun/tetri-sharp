@@ -40,6 +40,7 @@ export const EN = {
   "규칙 원정": "Rules Expedition",
   "규칙 원정 완료 {n}단계": "{n} Expedition stages cleared",
   "규칙 원정 목록": "Expedition stages",
+  목록으로: "Back to list",
   "홀드·회전·쓰레기 규칙을 익히는 3개 챕터": "Three chapters on hold, rotation, and garbage",
   "홀드 금지": "No hold",
   "홀드 없이 쌓기": "Stacking without hold",

@@ -1029,7 +1029,7 @@ const backList = () => {
 const updateBackLabels = () => {
   const back = backList();
   /** @type {HTMLElement} */ (panels.results.querySelector('[data-action="menu"] .btn-label')).textContent =
-    back?.label ?? t("첫 화면");
+    mode.expedition != null ? t("목록으로") : (back?.label ?? t("첫 화면"));
   if (!sceneView.current)
     /** @type {HTMLElement} */ (panels.pause.querySelector('[data-action="menu"] .btn-label')).textContent = back
       ? t("{list}으로", { list: back.label })
