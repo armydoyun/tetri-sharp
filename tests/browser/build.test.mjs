@@ -1269,6 +1269,16 @@ test("게임 테마: 미리보기는 움직이고, 칩에 올리면 미리보기
     await page.click('.dialog-tabs [data-value="control"]');
     await page.click('.dialog-tabs [data-value="visual"]');
     assert.equal(await moves(), false, "다시 열어도 멈춰 있다");
+    await page.click('#set-effects [data-value="off"]');
+    await page.click('#set-effects [data-value="full"]');
+    assert.equal(await moves(), false, "전체 효과를 골라도 자동 재생은 멈춰 있다");
+    const play = page.locator("#theme-play");
+    assert.equal(await play.getAttribute("aria-pressed"), "false");
+    await play.click();
+    assert.equal(await play.getAttribute("aria-pressed"), "true");
+    assert.ok(await moves(), "동작 줄이기가 켜져 있어도 직접 재생할 수 있다");
+    await play.click();
+    assert.equal(await moves(), false, "다시 누르면 멈춘다");
     await page.emulateMedia({ reducedMotion: "no-preference" });
     assert.ok(await moves(), "모션 줄이기를 해제하면 열려 있는 미리보기가 다시 움직인다");
     assert.deepEqual(errors, []);
@@ -5894,7 +5904,7 @@ test("낮은 가로 휴대폰: 퍼즐 보드와 조작을 함께 보고 리플�
   }
 });
 
-test("모바일 테마: 목록 끝을 골라도 미리보기와 소리 버튼이 화면에 남는다", async () => {
+test("모바일 테마: 목록 끝을 골라도 미리보기와 재생·소리 버튼이 화면에 남는다", async () => {
   for (const viewport of [
     { width: 320, height: 568 },
     { width: 568, height: 320 },
@@ -5912,7 +5922,7 @@ test("모바일 테마: 목록 끝을 골라도 미리보기와 소리 버튼이
       await last.tap();
       assert.equal(await choice.innerText(), name);
       assert.equal(await page.locator(".theme-stage-name").textContent(), name);
-      const visible = await page.locator(".theme-stage-canvas, #theme-listen").evaluateAll(nodes =>
+      const visible = await page.locator(".theme-stage-canvas, #theme-play, #theme-listen").evaluateAll(nodes =>
         nodes.every(el => {
           const body = el.closest(".dialog-body").getBoundingClientRect();
           const target = el.getBoundingClientRect();
@@ -5920,6 +5930,12 @@ test("모바일 테마: 목록 끝을 골라도 미리보기와 소리 버튼이
         })
       );
       assert.ok(visible, JSON.stringify(viewport));
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      const play = page.locator("#theme-play");
+      await play.tap();
+      assert.equal(await play.getAttribute("aria-pressed"), "true");
+      await play.tap();
+      assert.equal(await play.getAttribute("aria-pressed"), "false");
     } finally {
       await context.close();
     }
