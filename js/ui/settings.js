@@ -174,14 +174,16 @@ export const createSettingsUI = ({
   const notice = el("p", { class: "notice-slot", role: "status", id: "settings-notice" });
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   /** @type {ReturnType<typeof createThemePicker>["stage"] | null} */
-  let playingPreview = null;
+  let themePreview = null;
   const stopThemePreview = () => {
-    playingPreview?.stop();
-    playingPreview = null;
+    themePreview?.stop();
+    themePreview = null;
   };
-  reducedMotion.addEventListener("change", () => {
-    if (reducedMotion.matches) stopThemePreview();
-  });
+  const syncThemePreview = () => {
+    if (!dialog.open || reducedMotion.matches) themePreview?.stop();
+    else themePreview?.play();
+  };
+  reducedMotion.addEventListener("change", syncThemePreview);
 
   const update = patch => onChange({ ...getSettings(), ...patch });
 
@@ -551,10 +553,7 @@ export const createSettingsUI = ({
       onSelect: theme => update({ visual: { ...getSettings().visual, theme } }),
       onPreviewTheme,
     });
-    if (!reducedMotion.matches) {
-      playingPreview = picker.stage;
-      picker.stage.play();
-    }
+    themePreview = picker.stage;
     return el(
       "section",
       { class: "field-section" },
@@ -940,6 +939,7 @@ export const createSettingsUI = ({
     const body = el("div", {}, sectionFor(tab));
     fillDialog(dialog, { title: t("설정"), body, notice, actions: [reset], closeId: "settings-close", tabs });
     body.scrollTop = scroll;
+    syncThemePreview();
     if (dialog.open && !dialog.contains(document.activeElement)) restoreFocus(dialog, focused);
   };
 
@@ -1032,6 +1032,7 @@ export const createSettingsUI = ({
       if (startTab) tab = startTab;
       render();
       dialog.showModal();
+      syncThemePreview();
       /** @type {HTMLElement | null} */ (dialog.querySelector("#settings-close"))?.focus();
     },
     get isOpen() {
