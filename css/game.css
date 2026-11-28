@@ -1811,6 +1811,8 @@ body.gestures-mode {
   order: -1;
 }
 
+#time-shift-reset { grid-column: 1 / -1; }
+
 /* ---- 키 입력 표시: 2줄 × 4칸, 누르고 있는 칸에 불 ---- */
 .input-display {
   display: none;

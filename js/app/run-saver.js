@@ -6,7 +6,7 @@ import { createRunJournal, readSuspendedRun, replayRunJournal, SUSPENDED_RUN_KEY
 import { sanitizeSettings } from "../storage/settings.js";
 import { customPuzzleMode, decodePuzzle } from "../modes/custom-puzzle.js";
 import { packStageMode } from "../modes/puzzle-pack.js";
-import { TIME_SHIFT_ID, timeShiftMode, validTimeShiftMoves } from "../modes/time-shift.js";
+import { TIME_SHIFT_ID, findTimeShiftStage, timeShiftMode, validTimeShiftMoves } from "../modes/time-shift.js";
 import { dailyPuzzleMode } from "../modes/daily-puzzle.js";
 import { formatTime } from "../modes/format.js";
 import { t } from "../i18n/index.js";
@@ -35,6 +35,7 @@ const newId = () => Array.from(crypto.getRandomValues(new Uint32Array(4))).join(
  *     applyInput: (held: number, pressed: number) => void,
  *     adopted: (mode: any) => void,
  *     failed: () => void,
+ *     unavailable: () => void,
  *     restored: () => void,
  *   },
  * }} deps
@@ -52,9 +53,17 @@ export const createRunSaver = ({ store, findMode, lessons, ask, saveInterval, li
 
   /** 저장된 판의 모드(연습 단계·만든 퍼즐 포함). 지금 버전에 없는 모드면 null */
   const runMode = entry => {
-    if (entry.mode === TIME_SHIFT_ID) {
-      if (entry.timeShiftPast == null) return timeShiftMode();
-      return validTimeShiftMoves(entry.timeShiftPast) ? timeShiftMode(entry.timeShiftPast) : null;
+    if (entry.mode.startsWith("time-shift-")) {
+      const stage = findTimeShiftStage(entry.mode);
+      // 첫 합주의 최초 저장 형식에는 스테이지 버전 필드가 없었다.
+      const legacy = entry.mode === TIME_SHIFT_ID && entry.timeShiftVersion === undefined;
+      if (!stage || (legacy ? stage.version !== 1 : entry.timeShiftVersion !== stage.version)) return null;
+      if (entry.timeShiftBoundary !== undefined) {
+        if (entry.timeShiftBoundary !== "rewind" || entry.timeShiftPast !== null || legacy) return null;
+      }
+      if (entry.timeShiftPast === null || (legacy && entry.timeShiftPast === undefined))
+        return timeShiftMode(null, stage);
+      return validTimeShiftMoves(entry.timeShiftPast, stage) ? timeShiftMode(entry.timeShiftPast, stage) : null;
     }
     if (entry.mode === "custom-puzzle") {
       if (entry.packStage) {
@@ -73,9 +82,11 @@ export const createRunSaver = ({ store, findMode, lessons, ask, saveInterval, li
 
   /** 첫 화면 "이어서 하기" 단추: 저장된 판이 있으면 모드·시간·줄 수와 함께 보인다 */
   const renderContinue = () => {
-    const entry = savedRun();
+    const raw = store.get(SUSPENDED_RUN_KEY, null);
+    const entry = readSuspendedRun(raw);
     const m = entry && runMode(entry);
     button.hidden = !m;
+    if (!m && typeof raw?.mode === "string" && raw.mode.startsWith("time-shift-")) hooks.unavailable();
     if (m)
       $("continue-run-info").textContent = t("{mode} · {time} · {lines}줄", {
         mode: m.name,
@@ -103,7 +114,7 @@ export const createRunSaver = ({ store, findMode, lessons, ask, saveInterval, li
       puzzle: mode.puzzleCode,
       dailyPuzzle: mode.dailyPuzzle,
       packStage: mode.packStage,
-      ...(mode.timeShift ? { timeShiftPast: mode.past } : {}),
+      ...(mode.timeShift ? { timeShiftVersion: mode.timeShift.version, timeShiftPast: mode.past } : {}),
       trial: Boolean(mode.trialCode),
       scene,
       resultPbSplits,
@@ -114,7 +125,8 @@ export const createRunSaver = ({ store, findMode, lessons, ask, saveInterval, li
   /** 지금 판을 저장한다. force가 아니면 마지막 저장 뒤 saveInterval 걸음이 지났을 때만 */
   const save = (force = true) => {
     const game = live.game();
-    if (practice || restoring || !journal || !game || game.state.over || live.sceneEnded()) return;
+    const rewind = game?.state.over === "rewind" && game.state.timeShift;
+    if (practice || restoring || !journal || !game || (game.state.over && !rewind) || live.sceneEnded()) return;
     const entry = journal.entry;
     if (!force && entry.steps - lastSavedStep < saveInterval) return;
     const current = savedRun();
@@ -128,6 +140,7 @@ export const createRunSaver = ({ store, findMode, lessons, ask, saveInterval, li
     }
     const snapshot = {
       ...entry,
+      ...(rewind ? { timeShiftBoundary: "rewind" } : {}),
       frame: game.state.frame,
       lines: game.state.stats.lines,
       fingerprint: live.fingerprint(),
@@ -179,11 +192,20 @@ export const createRunSaver = ({ store, findMode, lessons, ask, saveInterval, li
     try {
       hooks.prepare(entry, m, handling);
       await replayRunJournal(entry, { applyAction: hooks.applyAction, applyInput: hooks.applyInput });
-      if (savedRun()?.id !== entry.id || live.fingerprint() !== entry.fingerprint) throw new Error("checkpoint");
+      if (
+        savedRun()?.id !== entry.id ||
+        live.fingerprint() !== entry.fingerprint ||
+        live.game().state.over !== (entry.timeShiftBoundary ?? null)
+      )
+        throw new Error("checkpoint");
       hooks.adopted(m);
       savedRunId = entry.id;
       practice = false;
-      journal = createRunJournal(null, { ...entry, id: newId() });
+      journal = createRunJournal(null, {
+        ...entry,
+        id: newId(),
+        ...(m.timeShift ? { timeShiftVersion: m.timeShift.version, timeShiftPast: m.past } : {}),
+      });
       lastSavedStep = -1;
       success = true;
     } catch {

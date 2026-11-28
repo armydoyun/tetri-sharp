@@ -86,7 +86,9 @@ import { sceneToPuzzle } from "./modes/puzzle-edit.js";
 import { createPuzzleEditor } from "./ui/puzzle-editor.js";
 import { createCustomPuzzles } from "./storage/custom-puzzles.js";
 import { createPuzzleUI } from "./ui/puzzles.js";
-import { TIME_SHIFT_ID, timeShiftMode } from "./modes/time-shift.js";
+import { TIME_SHIFT_ID, TIME_SHIFT_STAGES, timeShiftMode } from "./modes/time-shift.js";
+import { createTimeShiftProgress } from "./storage/time-shift-progress.js";
+import { createTimeShiftUI } from "./ui/time-shift.js";
 import { decodePack, packStageMode } from "./modes/puzzle-pack.js";
 import { createPuzzlePacks, MAX_PACKS } from "./storage/puzzle-packs.js";
 import { createPuzzlePacksUI } from "./ui/puzzle-packs.js";
@@ -141,6 +143,7 @@ const store = createStore();
 const records = createRecords(store);
 const practiceProgress = createPracticeProgress(store);
 const expeditionProgress = createExpeditionProgress(store);
+const timeShiftProgress = createTimeShiftProgress(store);
 const sprintHistory = createSprintHistory(store);
 let settings = loadSettings(store);
 let bindings = compileKeymap(settings.keymap);
@@ -312,8 +315,9 @@ const runs = createRunSaver({
       if (kind === "hint" && !mode.puzzle) applyLessonHint();
     },
     applyInput(held, pressed) {
+      if (game.state.over) throw new Error("finished");
       advanceRun(held, pressed, restoredSteps++);
-      if (game.state.over || sceneView.current?.ended) throw new Error("finished");
+      if ((game.state.over && game.state.over !== "rewind") || sceneView.current?.ended) throw new Error("finished");
     },
     adopted(m) {
       if (m.trialCode) puzzleEditor.load(m.trialCode);
@@ -325,14 +329,18 @@ const runs = createRunSaver({
       countdownEl.hidden = true;
       showMenuNotice(t("저장된 판을 이어서 할 수 없어요."));
     },
+    unavailable() {
+      showMenuNotice(t("저장된 시간차 판의 단계나 기록이 현재 버전과 맞지 않아요."));
+    },
     /** 되살린 뒤: 화면 시계를 새로 맞추고 카운트다운부터 */
     restored() {
+      if (game.state.over === "rewind") return finish();
       if (race) updateRaceProgress();
       if (sceneView.current?.split) sceneView.updateSplitProgress(game.state);
       renderer.clearEffects();
       acc = 0;
       last = performance.now();
-      countdown = COUNTDOWN_FRAMES[settings.access.countdown] ?? READY_FRAMES;
+      countdown = mode.timeShift ? 0 : (COUNTDOWN_FRAMES[settings.access.countdown] ?? READY_FRAMES);
       countdownEl.hidden = !countdown;
       $("countdown-label").textContent = t("준비");
       setScreen(countdown ? "countdown" : "play");
@@ -562,6 +570,7 @@ const renderMenu = () => {
   const active = t("규칙 · {name}", { name: ruleSet.name });
   $("active-rules").textContent = custom ? `${active} · ${gravitySetting}` : active;
   const list = $("mode-list");
+  const timeShiftCleared = timeShiftProgress.read().length;
   list.replaceChildren(
     ...MODES.map(m => {
       const best = records.best(m, ruleSet);
@@ -597,8 +606,9 @@ const renderMenu = () => {
     menuRow({
       "data-mode": TIME_SHIFT_ID,
       title: t("시간차"),
-      desc: t("6수를 되감아 과거의 블록과 한 줄을 완성하세요."),
-      onClick: () => startTimeShift(),
+      desc: t("6수를 되감아 과거 블록과 함께 5개의 퍼즐을 푸세요."),
+      meta: t("{n} / {total}단계 완료", { n: timeShiftCleared, total: TIME_SHIFT_STAGES.length }),
+      onClick: () => (timeShiftCleared ? timeShiftUI.open() : startTimeShift()),
     }),
     versusRow(),
     dailyRow()
@@ -826,7 +836,8 @@ const toMenu = (initial = false, keepFocus = false) => {
   /** @type {HTMLButtonElement} */ ($("watch-last")).disabled = !replays.last();
   showPanel("menu");
   // 이어 할 판이 있으면 Enter로 복원하고, 없으면 마지막 모드에 포커스를 둔다.
-  const defaultMode = /** @type {HTMLElement | null} */ (panels.menu.querySelector(`[data-mode="${mode.id}"]`));
+  const menuMode = mode.timeShift ? TIME_SHIFT_ID : mode.id;
+  const defaultMode = /** @type {HTMLElement | null} */ (panels.menu.querySelector(`[data-mode="${menuMode}"]`));
   // 처음 열 때는 포커스만 두고(Enter로 바로 시작) 테두리는 그리지 않는다 — "골라 둔 모드"처럼 보이지 않게.
   // 게임에서 돌아올 때는 키보드로 오가는 중일 수 있으니 브라우저가 정한 대로 보인다.
   if (!keepFocus)
@@ -947,9 +958,21 @@ const start = (
 
 let pausedFrom = /** @type {"play" | "countdown"} */ ("play");
 
-const startTimeShift = (past = null) => {
-  const stage = timeShiftMode(past);
-  start(stage, stage.rules);
+const startTimeShift = (stage = TIME_SHIFT_STAGES[0], past = null) => {
+  const m = timeShiftMode(past, stage);
+  start(m, m.rules);
+};
+
+const rewindTimeShift = () => {
+  const recording = game;
+  startTimeShift(mode.timeShift, recording.state.timeShift.moves);
+  if (
+    game === recording ||
+    settings.visual.effects !== "full" ||
+    matchMedia("(prefers-reduced-motion: reduce)").matches
+  )
+    return;
+  canvas.animate([{ opacity: 0.3 }, { opacity: 1 }], { id: "time-shift-rewind", duration: 260, easing: "ease-out" });
 };
 
 const pause = () => {
@@ -984,6 +1007,10 @@ const inProgress = () => screen === "play" || screen === "countdown" || screen =
  * 목록은 첫 화면 위에 열리므로, 목록을 닫으면 그대로 첫 화면이다.
  */
 const backList = () => {
+  if (mode.timeShift) {
+    const id = mode.id;
+    return { label: t("시간차 단계 목록"), open: () => timeShiftUI.open(id) };
+  }
   if (mode.expedition != null) {
     const id = mode.id;
     return { label: t("규칙 원정 목록"), open: () => expeditionUI.open(id) };
@@ -1029,7 +1056,7 @@ const backList = () => {
 const updateBackLabels = () => {
   const back = backList();
   /** @type {HTMLElement} */ (panels.results.querySelector('[data-action="menu"] .btn-label')).textContent =
-    mode.expedition != null ? t("목록으로") : (back?.label ?? t("첫 화면"));
+    mode.timeShift || mode.expedition != null ? t("목록으로") : (back?.label ?? t("첫 화면"));
   if (!sceneView.current)
     /** @type {HTMLElement} */ (panels.pause.querySelector('[data-action="menu"] .btn-label')).textContent = back
       ? t("{list}으로", { list: back.label })
@@ -1369,7 +1396,9 @@ const finish = () => {
   if (mode === rulesTrial) return leaveToMenu();
   const state = game.state;
   failedPuzzleMove = mode.puzzle ? puzzleReview.failed(state, runs.journal?.entry) : null;
-  runs.clear();
+  const rewind = mode.timeShift && state.over === "rewind";
+  if (rewind) runs.save();
+  else runs.clear();
   setScreen("results");
   countdownEl.hidden = true;
   if (mode.id === "sprint40" && state.stats.pieces > 0)
@@ -1378,6 +1407,7 @@ const finish = () => {
     practiceProgress.mark(mode.id, lessonHintState(state)?.usedHint);
   }
 
+  const timeShiftSaved = !mode.timeShift || state.over !== "clear" || timeShiftProgress.mark(mode.id);
   if (state.over === "clear" && mode.expedition != null) {
     expeditionProgress.mark(mode.id, mode.earnsBonus(state));
   }
@@ -1423,15 +1453,28 @@ const finish = () => {
       : "";
   const nextPuzzle = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="next-puzzle"]'));
   const hasNext = nextStage() || (mode.puzzle?.number && mode.puzzle.number < PUZZLES.length);
-  const rewind = mode.timeShift && state.over === "rewind";
-  nextPuzzle.hidden = reviewPractice || !(rewind || mode.past || (hasNext && state.over === "clear"));
-  nextPuzzle.querySelector(".btn-label").textContent = rewind
-    ? t("되감기")
-    : mode.past
-      ? t("처음부터 다시 하기")
-      : t("다음 단계");
-  const retry = panels.results.querySelector('[data-action="retry"] .btn-label');
-  retry.textContent = mode.past ? t("두 번째 플레이 다시 하기") : t("다시 하기");
+  nextPuzzle.hidden = reviewPractice || !(rewind || (hasNext && state.over === "clear"));
+  nextPuzzle.querySelector(".btn-label").textContent = rewind ? t("되감기") : t("다음 단계");
+  $("time-shift-reset")?.remove();
+  if (mode.timeShift && mode.past) {
+    const stage = mode.timeShift;
+    panels.results.querySelector('[data-action="menu"]').before(
+      button({
+        id: "time-shift-reset",
+        label: t("처음부터 다시 하기"),
+        icon: "restart",
+        wrap: true,
+        onClick: () => startTimeShift(stage),
+      })
+    );
+  }
+  const retry = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="retry"]'));
+  retry.classList.toggle("btn-wrap", Boolean(mode.timeShift));
+  retry.querySelector(".btn-label").textContent = mode.timeShift
+    ? mode.past
+      ? t("두 번째 플레이 다시 하기")
+      : t("처음부터 다시 하기")
+    : t("다시 하기");
   lastReplay = recorder ? recorder.finish(state) : null;
   const survivalRetry = $("survival-retry-seed");
   survivalRetry.hidden = !survival || !lastReplay;
@@ -1486,7 +1529,8 @@ const finish = () => {
     : pack
       ? t("{n} / {total}단계 완료", { n: pack.cleared.length, total: pack.pack.puzzles.length })
       : "";
-  $("race-result").textContent = [resultNote, packNote, shortNote].filter(Boolean).join(" · ");
+  const timeShiftNote = timeShiftSaved ? "" : t("시간차 완료 진행도를 저장하지 못했어요.");
+  $("race-result").textContent = [resultNote, packNote, shortNote, timeShiftNote].filter(Boolean).join(" · ");
   if (survival || mode.battleLesson) say(`${summary.title} ${summary.main}. ${resultNote}`);
 
   const seconds = state.frame / 60;
@@ -1707,6 +1751,10 @@ const nextPracticeLesson = () =>
               : null;
 const nextStage = () => {
   if (mode.packStage) return packStageMode(mode.packStage.code, mode.packStage.index + 1);
+  if (mode.timeShift) {
+    const stage = TIME_SHIFT_STAGES[TIME_SHIFT_STAGES.indexOf(mode.timeShift) + 1];
+    return stage ? timeShiftMode(null, stage) : null;
+  }
   return mode.expedition != null ? EXPEDITION_STAGES[mode.expedition + 1] : nextPracticeLesson();
 };
 const downstackHint = $("downstack-hint");
@@ -1838,6 +1886,16 @@ const expeditionUI = createExpeditionUI({
 });
 $("expedition").addEventListener("close", () => {
   if (screen === "menu") returnFocus(document.querySelector('[data-mode="expedition"]'));
+});
+
+const timeShiftDialog = /** @type {HTMLDialogElement} */ ($("time-shift-stages"));
+const timeShiftUI = createTimeShiftUI({
+  dialog: timeShiftDialog,
+  progress: timeShiftProgress,
+  onStage: stage => startTimeShift(stage),
+});
+timeShiftDialog.addEventListener("close", () => {
+  if (screen === "menu") returnFocus(document.querySelector(`[data-mode="${TIME_SHIFT_ID}"]`));
 });
 
 // ---- 퍼즐 ----
@@ -2112,8 +2170,8 @@ noHover?.addEventListener?.("change", applyTouch);
 
 /** 메뉴·결과·일시정지 화면에서 게임패드로 버튼 사이를 옮겨 다니고 누른다. */
 const handlePadMenu = action => {
-  if (anyDialogOpen()) return;
-  const panel = Object.values(panels).find(p => !p.hidden);
+  if (anyDialogOpen() && !timeShiftDialog.open) return;
+  const panel = timeShiftDialog.open ? timeShiftDialog : Object.values(panels).find(p => !p.hidden);
   if (!panel || screen === "play" || screen === "countdown" || screen === "replay") return;
   const buttons = /** @type {HTMLButtonElement[]} */ ([...panel.querySelectorAll("button")]).filter(
     b => !b.disabled && b.offsetParent !== null
@@ -2122,7 +2180,10 @@ const handlePadMenu = action => {
   const at = buttons.indexOf(/** @type {any} */ (document.activeElement));
   if (action === "select") {
     if (at >= 0) buttons[at].click();
-    else buttons[0].focus();
+    else {
+      const next = mode.timeShift && screen === "results" && buttons.find(b => b.dataset.action === "next-puzzle");
+      (next || buttons[0]).focus();
+    }
   } else {
     const next = at < 0 ? 0 : (at + (action === "down" ? 1 : -1) + buttons.length) % buttons.length;
     buttons[next].focus();
@@ -2246,9 +2307,8 @@ for (const btn of document.querySelectorAll("[data-action]")) {
     )
       start(mode, rules, null, lastReplay.seed);
     if (action === "race-best" && mode.splits) startRace(mode, rules);
-    if (action === "next-puzzle" && screen === "results" && mode.past) return startTimeShift();
     if (action === "next-puzzle" && screen === "results" && mode.timeShift && game?.state.over === "rewind")
-      return startTimeShift(game.state.timeShift.moves);
+      return rewindTimeShift();
     if (action === "next-puzzle" && !reviewPractice && screen === "results" && game?.state.over === "clear") {
       const next = nextStage();
       if (next) return start(next, next.rules);

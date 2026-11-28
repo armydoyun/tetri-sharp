@@ -3,18 +3,51 @@
 /** @type {Record<string, string>} */
 export const EN = {
   시간차: "Time Shift",
-  "시간차 · 첫 합주": "Time Shift · First duet",
-  "6수를 되감아 과거의 블록과 한 줄을 완성하세요.": "Rewind six moves and clear a line with your past pieces.",
-  "과거 블록으로 한 줄을 완성하세요. 점선은 예상 착지예요.":
-    "Clear a line with a past piece. The dashed outline shows where it will land.",
+  "시간차 · {stage}": "Time Shift · {stage}",
+  "시간차 단계 목록": "Time Shift stages",
+  "시간차 완료 {n}단계": "{n} Time Shift stages cleared",
+  "시간차 완료 진행도를 저장하지 못했어요.": "Could not save Time Shift progress.",
+  "저장된 시간차 판의 단계나 기록이 현재 버전과 맞지 않아요.":
+    "The saved Time Shift stage or moves are incompatible with this version.",
+  "6수를 되감아 과거 블록과 함께 5개의 퍼즐을 푸세요.":
+    "Rewind six moves and solve five puzzles with your past pieces.",
+  "첫 합주": "First duet",
+  "먼저 지워야 열리는 길": "Clear the way",
+  받침대: "The platform",
+  "한 턴에 두 번": "Two clears, one turn",
+  "빈 판으로 돌아가기": "Back to empty",
   "첫 O를 왼쪽 끝에 놓고 6수를 기록하세요.": "Place the first O on the far left and record six moves.",
+  "첫 O를 회색 칸 위에 놓고 6수를 기록하세요.": "Place the first O over the gray blocks and record six moves.",
+  "첫 I를 왼쪽 틈에 가로로 놓고 6수를 기록하세요.": "Place the first I flat in the left gap and record six moves.",
+  "첫 I를 오른쪽 통로에 가로로 놓고 6수를 기록하세요.":
+    "Place the first I flat in the right lane and record six moves.",
+  "두 플레이의 12개 블록으로 빈칸을 채울 계획을 세우세요.":
+    "Plan how to fill the gaps with all 12 pieces from both passes.",
+  "과거 블록으로 한 줄을 완성하세요.": "Clear a line with a past piece.",
+  "먼저 줄을 지워 과거 블록을 더 아래에 떨어뜨리세요.": "Clear a line first so a past piece can fall farther.",
+  "현재 블록을 받침으로 놓아 위쪽 줄을 과거 블록으로 채우세요.":
+    "Use a present piece as a platform so a past piece can fill the upper row.",
+  "한 턴에 현재 블록과 과거 블록으로 각각 줄을 지우세요.":
+    "Clear a line with each of the present and past pieces on the same turn.",
+  "여섯 번째 과거 블록까지 놓아 판을 완전히 비우세요.": "Empty the board after the sixth past piece lands.",
+  "점선은 과거 블록의 착지예요.": "The dashed outline shows where the past piece will land.",
   "두 번째 플레이": "Second pass",
   "첫 번째 플레이": "First pass",
   "6수를 기록했어요": "Six moves recorded",
-  "되감으면 과거의 수가 하나씩 돌아와요.": "Rewind to bring back your past moves one at a time.",
+  "되감으면 시작 판으로 돌아가요. 현재 블록을 놓을 때마다 과거 블록 하나가 떨어져요.":
+    "Rewind to reset the board. One past piece drops each time you place a present piece.",
   "과거 블록이 한 줄을 완성했어요!": "A past piece completed a line!",
-  "{n}번째 과거 블록이 들어갈 자리가 막혔어요.": "Past piece {n} has no room to enter.",
-  "과거 블록으로 줄을 완성하지 못했어요.": "No line was completed by a past piece.",
+  "현재 블록이 길을 열어 과거 블록이 더 아래에 닿았어요!":
+    "The present piece cleared a path for the past piece to fall farther!",
+  "과거 블록이 받침 위에 내려앉아 위쪽 줄을 채웠어요!":
+    "The past piece landed on the platform and filled the upper row!",
+  "같은 턴에 현재 블록과 과거 블록이 각각 줄을 지웠어요!":
+    "The present and past pieces each cleared a line on the same turn!",
+  "여섯 번째 과거 블록까지 놓아 판을 비웠어요!": "The sixth past piece landed and emptied the board!",
+  "{n}번째 과거 블록의 진입이 막혔어요. 막힌 열: {columns}번.":
+    "Past piece {n} was blocked at the top in columns {columns}.",
+  "{n}번째 현재 블록을 놓을 공간이 부족해요.": "Present piece {n} ran out of space.",
+  "{n}턴 안에 목표를 달성하지 못했어요. {goal}": "The goal was missed after {n} turns. {goal}",
   "지금 놓으면 과거 블록의 진입이 막혀요.": "Placing here would block the past piece.",
   되감기: "Rewind",
   "두 번째 플레이 다시 하기": "Retry second pass",
@@ -1073,8 +1106,8 @@ export const EN = {
     "Settings, records and replays are replaced. If missing from the backup, settings reset to defaults and records and replays are cleared.",
   "내 퍼즐, 받은 퍼즐, 퍼즐 팩은 이 기기의 목록과 합쳐요.":
     "Created and received puzzles and puzzle packs are merged with those on this device.",
-  "연습·기본 퍼즐·Sprint·규칙 원정 진행도, 달성한 업적과 내 규칙은 백업에 있을 때만 바뀌어요.":
-    "Practice, built-in puzzle, Sprint, and Expedition progress, unlocked achievements, and saved rules change only if present in the backup.",
+  "연습·기본 퍼즐·Sprint·규칙 원정·시간차 진행도, 달성한 업적과 내 규칙은 백업에 있을 때만 바뀌어요.":
+    "Practice, built-in puzzle, Sprint, Expedition, and Time Shift progress, unlocked achievements, and saved rules change only if present in the backup.",
   "백업을 저장하지 못했어요. 기존 데이터는 그대로예요.": "Could not save the backup. Your existing data is intact.",
   "백업을 불러왔어요 · 기록 {records}개, 리플레이 {replays}개": "Backup loaded · {records} records, {replays} replays",
 

@@ -81,7 +81,7 @@ test("배포본 파일: index.html·매니페스트·아이콘·링크 배너·�
   assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1200, 630]);
 });
 
-test("설치 캐시로 서버 장애와 오프라인 상태에서도 기록·리플레이·Sprint에 접근한다", async () => {
+test("설치 캐시로 서버 장애와 오프라인 상태에서도 기록·리플레이·Sprint·시간차에 접근한다", async () => {
   const context = await browser.newContext({ locale: "ko-KR" });
   const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/sprint-pb.json", import.meta.url), "utf8"));
   const errors = [];
@@ -128,6 +128,17 @@ test("설치 캐시로 서버 장애와 오프라인 상태에서도 기록·리
     await offline.click("#continue-run");
     await offline.waitForFunction(() => document.body.dataset.screen === "play");
     assert.equal(await offline.locator("#hud-pieces").textContent(), "1");
+
+    await offline.click("#go-home");
+    await offline.click('#confirm [data-confirm="ok"]');
+    await offline.click('[data-mode="time-shift-1"]');
+    await offline.keyboard.press("Space");
+    await offline.waitForFunction(() => document.getElementById("hud-lines")?.textContent === "1 / 6");
+    await offline.reload();
+    await ready(offline);
+    await offline.click("#continue-run");
+    await offline.waitForFunction(() => document.body.dataset.screen === "play");
+    assert.equal(await offline.locator("#hud-lines").textContent(), "1 / 6");
     assert.deepEqual(errors, []);
   } finally {
     shellStatus = 200;

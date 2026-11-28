@@ -13,6 +13,7 @@ import { launchOptions } from "../helpers/browser.mjs";
 import { runScenarios } from "../helpers/ui-scenarios.mjs";
 import { auditInPage } from "../helpers/ui-audit.mjs";
 import { keysFor, solvePuzzle } from "../helpers/puzzle-solve.mjs";
+import { timeShiftInputs, timeShiftSolutions } from "../helpers/time-shift-solutions.mjs";
 import { PUZZLES } from "../../js/modes/puzzles.js";
 import { DEFAULT_RULES, encodePuzzle, PUZZLE_CELLS } from "../../js/modes/custom-puzzle.js";
 import { botDailyReplay } from "../helpers/daily.mjs";
@@ -2192,7 +2193,7 @@ test("전체 흐름: Survival 한 판 → 결과·새 기록 → 기록표 리�
   await context.close();
 });
 
-test("단일 HTML 파일을 처음부터 오프라인에서 열어 Sprint를 시작한다", async t => {
+test("단일 HTML 파일을 처음부터 오프라인에서 열어 Sprint와 시간차를 시작한다", async t => {
   const context = await browser.newContext({ locale: "ko-KR", offline: true });
   try {
     const page = await context.newPage();
@@ -2204,6 +2205,11 @@ test("단일 HTML 파일을 처음부터 오프라인에서 열어 Sprint를 시
     }
     await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
     await startMode(page, "sprint40");
+    await page.click(".logo-btn");
+    await page.click('#confirm [data-confirm="ok"]');
+    await page.click('[data-mode="time-shift-1"]');
+    await page.keyboard.press("Space");
+    await page.waitForFunction(() => document.getElementById("hud-lines")?.textContent === "1 / 6");
   } finally {
     await context.close();
   }
@@ -6165,8 +6171,8 @@ test("시간차: 기록을 되감고 첫 합주를 완성한 뒤 두 범위로 �
     await advance();
     assert.equal(await text(page, "hud-lines-label"), "두 번째 플레이");
     await solve();
-    assert.match(await next.textContent(), /처음부터 다시 하기/);
-    await next.click();
+    assert.match(await next.textContent(), /다음 단계/);
+    await page.click("#time-shift-reset");
     await advance();
     assert.equal(await text(page, "hud-lines-label"), "첫 번째 플레이");
     assert.equal(await text(page, "hud-lines"), "0 / 6");
@@ -6176,27 +6182,219 @@ test("시간차: 기록을 되감고 첫 합주를 완성한 뒤 두 범위로 �
   }
 });
 
-test("시간차: 모바일에서 터치로 떨어뜨리고 보드와 안내를 한 화면에 본다", async () => {
-  for (const viewport of [
-    { width: 360, height: 740 },
-    { width: 844, height: 390 },
+test("시간차: 모바일 세로·가로에서 터치로 풀고 보드와 안내를 한 화면에 본다", async () => {
+  for (const { viewport, locale, first, second, solved } of [
+    {
+      viewport: { width: 360, height: 740 },
+      locale: "en-US",
+      first: "First pass",
+      second: "Second pass",
+      solved: "Solved!",
+    },
+    {
+      viewport: { width: 844, height: 390 },
+      locale: "ko-KR",
+      first: "첫 번째 플레이",
+      second: "두 번째 플레이",
+      solved: "성공!",
+    },
   ]) {
-    const { context, page } = await openPage(null, undefined, { viewport, hasTouch: true });
+    const { context, page } = await openPage(null, undefined, { viewport, locale, hasTouch: true, frameClock: true });
+    const advance = () => page.evaluate(() => window.advanceFrame());
+    const tap = async action => {
+      await page.tap(`[data-touch="${action}"]`);
+      await advance();
+    };
     try {
       await page.tap('[data-mode="time-shift-1"]');
-      await page.tap('[data-touch="HARD"]');
-      await page.waitForFunction(() => document.getElementById("hud-lines")?.textContent === "1 / 6");
+      await advance();
+      assert.equal(await text(page, "hud-lines-label"), first);
       assert.deepEqual(await page.evaluate(auditInPage), []);
-      for (let turn = 2; turn <= 6; turn++) {
-        await page.tap('[data-touch="HARD"]');
-        if (turn < 6)
-          await page.waitForFunction(n => document.getElementById("hud-lines")?.textContent === `${n} / 6`, turn);
+      for (let move = 0; move < 4; move++) await tap("LEFT");
+      for (let turn = 0; turn < 6; turn++) {
+        await tap("HARD");
+        await advance();
       }
       await page.locator('#results [data-action="next-puzzle"]').tap();
-      await page.waitForFunction(() => document.getElementById("hud-lines-label")?.textContent === "두 번째 플레이");
+      await advance();
+      assert.equal(await text(page, "hud-lines-label"), second);
       assert.deepEqual(await page.evaluate(auditInPage), []);
+      await tap("LEFT");
+      await tap("LEFT");
+      await tap("HARD");
+      assert.equal(await text(page, "results-title"), solved);
+      assert.deepEqual(await page.evaluate(auditInPage), []);
+      await page.locator('#results [data-action="next-puzzle"]').tap();
+      await advance();
+      assert.equal(await text(page, "hud-lines-label"), first);
     } finally {
       await context.close();
     }
+  }
+});
+
+test("시간차: 다섯 단계를 완주하고 이어하기와 백업으로 같은 진행을 되살린다", async () => {
+  const { context, page, errors, blocked } = await openPage(null, undefined, { frameClock: true, locale: "en-US" });
+  const advance = () => page.evaluate(() => window.advanceFrame());
+  const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:run:suspended")));
+  const keys = { left: "ArrowLeft", right: "ArrowRight", rotate: "KeyA", drop: "Space" };
+  const placeAt = async move => {
+    for (const input of timeShiftInputs(move)) {
+      await page.keyboard.press(keys[input]);
+      await advance();
+    }
+    await advance();
+  };
+  const active = phase => page.waitForFunction(value => document.body.dataset.screen === value, phase);
+  const restore = async phase => {
+    await page.reload();
+    await page.click("#continue-run");
+    await active(phase);
+    await advance();
+  };
+  const menuRow = '[data-mode="time-shift-1"]';
+  const next = page.locator('#results [data-action="next-puzzle"]');
+  try {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.click(menuRow);
+    for (const [index, solution] of timeShiftSolutions.entries()) {
+      await advance();
+      assert.equal(await text(page, "hud-lines-label"), "First pass");
+      for (let turn = 0; turn < 6; turn++) {
+        await placeAt(solution.record[turn]);
+        if (index === 0 && turn === 1) {
+          // PR #101 형식에는 버전 필드가 없었다.
+          await page.click("#pause-game");
+          await page.evaluate(() => {
+            const key = "tetrisharp:run:suspended";
+            const entry = JSON.parse(localStorage.getItem(key));
+            delete entry.timeShiftVersion;
+            localStorage.setItem(key, JSON.stringify(entry));
+          });
+          await restore("play");
+          assert.equal(await text(page, "hud-lines"), "2 / 6");
+        }
+      }
+      assert.equal(await text(page, "results-title"), "Six moves recorded");
+      if (index === 0) {
+        assert.equal((await saved()).timeShiftBoundary, "rewind");
+        await restore("results");
+      }
+      await page.keyboard.press("KeyN");
+      if (index === 0) {
+        const rewound = await saved();
+        assert.equal(rewound.steps, 0);
+        assert.equal(rewound.timeShiftBoundary, undefined);
+        assert.equal(rewound.timeShiftPast.length, 6);
+        assert.equal(
+          await page.locator("#board").evaluate(board => board.getAnimations().some(a => a.id === "time-shift-rewind")),
+          false
+        );
+        await restore("play");
+      } else await advance();
+      assert.equal(await text(page, "hud-lines-label"), "Second pass");
+      assert.equal(await text(page, "hud-lines"), "0 / 6");
+      for (const [turn, move] of solution.play.entries()) {
+        await placeAt(move);
+        if (index === 4 && turn === 2) {
+          await page.click("#pause-game");
+          const before = await saved();
+          await restore("play");
+          assert.equal(await text(page, "hud-lines"), "3 / 6");
+          assert.equal((await saved()).fingerprint, before.fingerprint);
+        }
+      }
+      assert.equal(await text(page, "results-title"), "Solved!");
+      if (index < timeShiftSolutions.length - 1) {
+        assert.match(await next.textContent(), /Next stage/);
+        await page.keyboard.press("KeyN");
+      }
+    }
+    assert.equal(await next.isVisible(), false);
+    assert.match(await text(page, "results-main"), /sixth past piece/);
+    await page.click('#results [data-action="menu"]');
+    await page.locator("#time-shift-stages[open]").waitFor();
+    assert.equal(await page.locator("#time-shift-stages .menu-row:not(:disabled)").count(), 5);
+    assert.deepEqual(await page.evaluate(auditInPage), []);
+    await page.keyboard.press("Escape");
+    assert.match(await page.locator(menuRow).textContent(), /5 \/ 5 stages cleared/);
+
+    await page.click("#open-settings");
+    await page.click('#settings .dialog-tabs [data-value="data"]');
+    const [download] = await Promise.all([page.waitForEvent("download"), page.click("#export-backup")]);
+    const file = path.join(dir, "time-shift-backup.json");
+    await download.saveAs(file);
+    assert.equal(JSON.parse(fs.readFileSync(file, "utf8")).data["time-shift:progress"].length, 5);
+
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await page.setInputFiles("#backup-file", file);
+    await page.click("#ask-ok");
+    assert.match(await page.locator(menuRow).textContent(), /5 \/ 5 stages cleared/);
+    assert.deepEqual(errors, []);
+    assert.deepEqual(blocked, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("시간차: 게임패드로 놓고 되감아 다음 단계로 간다", async () => {
+  const { context, page } = await openPage(
+    () => {
+      window.padButtons = [];
+      Object.defineProperty(navigator, "getGamepads", {
+        value: () => [{ buttons: Array.from({ length: 17 }, (_, i) => window.padButtons.includes(i)), axes: [] }],
+      });
+    },
+    undefined,
+    { frameClock: true }
+  );
+  const advance = () => page.evaluate(() => window.advanceFrame());
+  const tap = async button => {
+    await page.evaluate(i => {
+      window.padButtons = [i];
+      window.advanceFrame();
+      window.padButtons = [];
+      window.advanceFrame();
+    }, button);
+  };
+  try {
+    await page.click('[data-mode="time-shift-1"]');
+    await advance();
+    for (let i = 0; i < 4; i++) await tap(14);
+    for (let i = 0; i < 6; i++) await tap(12);
+    assert.equal(await text(page, "results-title"), "6수를 기록했어요");
+    await tap(0);
+    await tap(0);
+    assert.equal(await text(page, "hud-lines-label"), "두 번째 플레이");
+    await tap(14);
+    await tap(14);
+    await tap(12);
+    assert.equal(await text(page, "results-title"), "성공!");
+    await tap(0);
+    await tap(0);
+    assert.match(await text(page, "session-title"), /먼저 지워야 열리는 길/);
+  } finally {
+    await context.close();
+  }
+});
+
+test("시간차: 저장된 단계 버전이 다르면 이유를 표시한다", async () => {
+  const { context, page } = await openPage();
+  try {
+    await page.click('[data-mode="time-shift-1"]');
+    await page.click("#pause-game");
+    await page.evaluate(() => {
+      const key = "tetrisharp:run:suspended";
+      const saved = JSON.parse(localStorage.getItem(key));
+      saved.id += "-incompatible";
+      saved.timeShiftVersion++;
+      localStorage.setItem(key, JSON.stringify(saved));
+    });
+    await page.reload();
+    assert.equal(await page.locator("#continue-run").isVisible(), false);
+    assert.match(await text(page, "menu-notice"), /현재 버전과 맞지 않아요/);
+  } finally {
+    await context.close();
   }
 });

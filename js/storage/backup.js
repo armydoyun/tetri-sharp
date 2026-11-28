@@ -5,6 +5,7 @@ import { PUZZLES } from "../modes/puzzles.js";
 import { STYLES } from "../modes/versus.js";
 import { PRACTICE_PROGRESS_KEY, sanitizePracticeProgress } from "./practice-progress.js";
 import { EXPEDITION_PROGRESS_KEY, sanitizeExpeditionProgress } from "./expedition-progress.js";
+import { TIME_SHIFT_PROGRESS_KEY, sanitizeTimeShiftProgress } from "./time-shift-progress.js";
 import { SPRINT_HISTORY_KEY, sanitizeSprintHistory } from "./sprint-history.js";
 import { ACHIEVEMENTS_KEY, ACHIEVEMENT_TOTALS_KEY, sanitizeAchievements, sanitizeTotals } from "./achievements.js";
 import { RULE_SLOTS_KEY, sanitizeRuleSlots } from "./rule-slots.js";
@@ -35,6 +36,7 @@ const BACKUP_KEYS = Object.freeze([
   DAILY_PUZZLE_CLEARED,
   PRACTICE_PROGRESS_KEY,
   EXPEDITION_PROGRESS_KEY,
+  TIME_SHIFT_PROGRESS_KEY,
   SPRINT_HISTORY_KEY,
   ACHIEVEMENTS_KEY,
   ACHIEVEMENT_TOTALS_KEY,
@@ -86,6 +88,8 @@ export const parseBackup = (raw, findMode) => {
   }
   if (src[EXPEDITION_PROGRESS_KEY] !== undefined)
     data[EXPEDITION_PROGRESS_KEY] = sanitizeExpeditionProgress(src[EXPEDITION_PROGRESS_KEY]);
+  if (Array.isArray(src[TIME_SHIFT_PROGRESS_KEY]))
+    data[TIME_SHIFT_PROGRESS_KEY] = sanitizeTimeShiftProgress(src[TIME_SHIFT_PROGRESS_KEY]);
   if (src[SPRINT_HISTORY_KEY] !== undefined) data[SPRINT_HISTORY_KEY] = sanitizeSprintHistory(src[SPRINT_HISTORY_KEY]);
   if (src[ACHIEVEMENTS_KEY] !== undefined) data[ACHIEVEMENTS_KEY] = sanitizeAchievements(src[ACHIEVEMENTS_KEY]);
   if (src[ACHIEVEMENT_TOTALS_KEY] !== undefined)
@@ -189,6 +193,7 @@ export const restoreBackup = (store, parsed) => {
       (key === "puzzle:cleared" ||
         key === PRACTICE_PROGRESS_KEY ||
         key === EXPEDITION_PROGRESS_KEY ||
+        key === TIME_SHIFT_PROGRESS_KEY ||
         key === SPRINT_HISTORY_KEY ||
         key === ACHIEVEMENTS_KEY ||
         key === RULE_SLOTS_KEY) &&
