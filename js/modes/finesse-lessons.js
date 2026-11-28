@@ -54,8 +54,8 @@ export const FINESSE_LESSONS = Object.freeze(
       isRecordable: () => false,
       formatRecord: () => "",
       summary: state => ({
-        title: state.over === "clear" ? t("목표에 놓았어요") : t("목표와 다른 칸에 놓았어요"),
-        main: label,
+        title: state.over === "clear" ? t("성공!") : t("실패"),
+        detail: state.over === "clear" ? t("목표에 놓았어요") : t("목표와 다른 칸에 놓았어요"),
       }),
     });
   })

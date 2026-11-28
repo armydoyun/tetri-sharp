@@ -23,7 +23,7 @@ import { t } from "../i18n/index.js";
  * @property {(state: any) => number} [gravityFor]
  * @property {(state: any) => { label: string, value: string }} hudLines
  * @property {(state: any) => { label: string, frames: number }} hudTime   경과 또는 남은 시간
- * @property {(state: any) => { title: string, main: string }} summary    결과 화면 제목·큰 글씨
+ * @property {(state: any) => { title: string, metric?: string, detail?: string }} summary    결과 상태·핵심 기록·상세 안내
  * @property {{ metric: "frames" | "lines" | "score" | "level", order: "asc" | "desc" }} record  순위 기준
  * @property {(state: any) => string} [hudLevel]  HUD 레벨 칸 (기본: 레벨 숫자)
  * @property {readonly number[]} [splits]  구간 기록을 남길 줄 수
@@ -72,8 +72,8 @@ export const SPRINT_40 = Object.freeze({
   hudTime: elapsed,
   summary: state =>
     state.over === "clear"
-      ? { title: t("완료!"), main: formatTime(state.frame) }
-      : { title: t("게임 오버"), main: t("{n} / {goal}줄", { n: state.stats.lines, goal: SPRINT_GOAL }) },
+      ? { title: t("완료!"), metric: formatTime(state.frame) }
+      : { title: t("게임 오버"), metric: t("{n} / {goal}줄", { n: state.stats.lines, goal: SPRINT_GOAL }) },
   record: Object.freeze({ metric: "frames", order: "asc" }),
   formatRecord: recordTime,
   isRecordable: state => state.over === "clear",
@@ -104,7 +104,7 @@ export const MARATHON = Object.freeze({
   hudTime: elapsed,
   summary: state => ({
     title: state.over === "clear" ? t("완료!") : t("게임 오버"),
-    main: t("{n}점", { n: formatScore(state.score) }),
+    metric: t("{n}점", { n: formatScore(state.score) }),
   }),
   record: Object.freeze({ metric: "score", order: "desc" }),
   formatRecord: recordScore,
@@ -126,7 +126,7 @@ export const ULTRA = Object.freeze({
   hudTime: state => ({ label: t("남은 시간"), frames: ULTRA_FRAMES - state.frame }),
   summary: state => ({
     title: state.over === "timeUp" ? t("시간 종료!") : t("게임 오버"),
-    main: t("{n}점", { n: formatScore(state.score) }),
+    metric: t("{n}점", { n: formatScore(state.score) }),
   }),
   record: Object.freeze({ metric: "score", order: "desc" }),
   formatRecord: recordScore,
@@ -221,7 +221,7 @@ export const MASTER = Object.freeze({
   hudTime: elapsed,
   summary: state => ({
     title: state.over === "clear" ? t("완료!") : t("게임 오버"),
-    main: t("레벨 {n} · {grade}", { n: state.level, grade: masterGrade(state.level) }),
+    metric: t("레벨 {n} · {grade}", { n: state.level, grade: masterGrade(state.level) }),
   }),
   record: Object.freeze({ metric: "level", order: "desc" }),
   formatRecord: e => t("레벨 {n} · {grade}", { n: e.level ?? 0, grade: masterGrade(e.level ?? 0) }),
@@ -271,10 +271,10 @@ export const DIG = Object.freeze({
   hudTime: elapsed,
   summary: state =>
     state.over === "clear"
-      ? { title: t("완료!"), main: formatTime(state.frame) }
+      ? { title: t("완료!"), metric: formatTime(state.frame) }
       : {
           title: t("게임 오버"),
-          main: t("{n} / {goal}줄", { n: DIG_ROWS - garbageRows(state.board), goal: DIG_ROWS }),
+          metric: t("{n} / {goal}줄", { n: DIG_ROWS - garbageRows(state.board), goal: DIG_ROWS }),
         },
   record: Object.freeze({ metric: "frames", order: "asc" }),
   formatRecord: recordTime,
@@ -333,7 +333,7 @@ export const SURVIVAL = Object.freeze({
   check: () => null,
   hudLines: state => ({ label: t("받을 쓰레기"), value: String(state.garbage.pending) }),
   hudTime: elapsed,
-  summary: state => ({ title: t("게임 오버"), main: formatTime(state.frame) }),
+  summary: state => ({ title: t("게임 오버"), metric: formatTime(state.frame) }),
   record: Object.freeze({ metric: "frames", order: "desc" }),
   formatRecord: recordTime,
   isRecordable: state => state.stats.pieces > 0,
@@ -354,7 +354,7 @@ export const ZEN = Object.freeze({
   check: () => null,
   hudLines: state => ({ label: t("줄"), value: String(state.stats.lines) }),
   hudTime: elapsed,
-  summary: state => ({ title: t("게임 오버"), main: t("{n}줄", { n: state.stats.lines }) }),
+  summary: state => ({ title: t("게임 오버"), metric: t("{n}줄", { n: state.stats.lines }) }),
   record: Object.freeze({ metric: "lines", order: "desc" }),
   formatRecord: recordLines,
   isRecordable: state => state.stats.lines > 0,
@@ -379,7 +379,7 @@ export const ENDLESS = Object.freeze({
   gravityFor: state => guidelineGravity(state.level),
   hudLines: state => ({ label: t("줄"), value: String(state.stats.lines) }),
   hudTime: elapsed,
-  summary: state => ({ title: t("게임 오버"), main: t("{n}줄", { n: state.stats.lines }) }),
+  summary: state => ({ title: t("게임 오버"), metric: t("{n}줄", { n: state.stats.lines }) }),
   record: Object.freeze({ metric: "lines", order: "desc" }),
   formatRecord: recordLines,
   isRecordable: state => state.stats.lines > 0,

@@ -94,6 +94,9 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
   let previous = [];
   let invalidated = true;
   let animating = false;
+  let echoDrop = null;
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const echoDuration = 165;
 
   /**
    * @param {ReturnType<typeof import("../core/engine.js").createGame> | null} game  null이면 빈 보드만
@@ -102,7 +105,16 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     const resized = fit();
     const visual = getVisual();
     const state = game?.state;
-    const board = state?.board ?? emptyBoard;
+    if (
+      echoDrop &&
+      (!state?.timeShift ||
+        state.stats.pieces !== echoDrop.event.turn ||
+        now - echoDrop.at >= echoDuration ||
+        visual.effects !== "full" ||
+        reducedMotion.matches)
+    )
+      echoDrop = null;
+    const board = echoDrop?.event.beforeEcho ?? state?.board ?? emptyBoard;
     const active = state?.active;
     const hold = state?.hold;
     const holdUsed = state?.holdUsed;
@@ -177,7 +189,7 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     effects.prune(now, effectLevel, visual.clearEffectLength);
-    animating = effects.active || Boolean(feedback?.animating);
+    animating = Boolean(echoDrop) || effects.active || Boolean(feedback?.animating);
     pattern = visual.pattern === "on";
     drawGrid(ctx, theme, visual.grid !== "off");
     effects.drawDrops(ctx, { bx, by, cell, toY }, now, theme.board.ink);
@@ -211,6 +223,17 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
         drawBlock(bx + x * cell, toY(y), cell, value);
         if (impact) ctx.restore();
       }
+    }
+
+    if (echoDrop) {
+      const { event, at } = echoDrop;
+      const progress = Math.min(1, Math.max(0, (now - at) / echoDuration));
+      const offset = event.distance * (1 - progress ** 2);
+      ctx.globalAlpha = 0.8;
+      for (const [x, y] of event.cells) {
+        drawBlock(bx + x * cell, toY(y - offset), cell, CELL_ID[event.piece]);
+      }
+      ctx.globalAlpha = 1;
     }
 
     // 다음 피스와 고스트는 줄 삭제 효과보다 위에 그린다.
@@ -416,11 +439,14 @@ export const createRenderer = (canvas, { getVisual, compact = false }) => {
     addEvents: (events, now = performance.now()) => {
       if (compact || !events.length) return;
       const visual = getVisual();
+      const echo = events.findLast(event => event.type === "echoLock");
+      if (echo && visual.effects === "full" && !reducedMotion.matches) echoDrop = { event: echo, at: now };
       effects.add(events, visual.effects, now, findTheme(visual.theme).motion);
       if (visual.effects === "full") accents.add(events, now);
       else accents.clear();
     },
     clearEffects() {
+      echoDrop = null;
       effects.clear();
       accents.clear();
       slide.reset();

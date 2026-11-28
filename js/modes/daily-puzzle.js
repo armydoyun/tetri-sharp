@@ -67,7 +67,6 @@ export const dailyPuzzleMode = (code, dailyPuzzle) => {
     name,
     fixedSeed: dailyPuzzleSeed(dailyPuzzle.key),
     description: info.description,
-    summary: state => ({ ...custom.summary(state), main: t("오늘의 퍼즐") }),
     puzzleCode: code,
     dailyPuzzle: { key: dailyPuzzle.key, family: dailyPuzzle.family },
   };

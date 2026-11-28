@@ -27,8 +27,9 @@ const expeditionMode = (index, stage) =>
     summary: state => {
       const progress = stage.hudLines(state);
       return {
-        title: state.over !== "clear" ? t("실패") : stage.earnsBonus(state) ? t("추가 목표까지 달성!") : t("성공!"),
-        main: `${progress.label} · ${progress.value}`,
+        title: state.over === "clear" ? t("성공!") : t("실패"),
+        metric: `${progress.label} · ${progress.value}`,
+        detail: state.over === "clear" && stage.earnsBonus(state) ? t("추가 목표 달성") : "",
       };
     },
   });

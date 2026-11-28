@@ -240,12 +240,12 @@
             <div class="panel-card scene-result-card">
               <div class="scene-result-content">
                 <p id="scene-result-range" class="results-mode"></p>
-                <h2 id="scene-result-title" class="panel-title"></h2>
+                <h2 id="scene-result-title" class="panel-title result-heading"></h2>
+                <p id="scene-result-delta" class="result-detail" role="status"></p>
                 <dl class="scene-result-times">
                   <div><dt>원래 판</dt><dd id="scene-result-original" class="num"></dd></div>
                   <div><dt>이번 시도</dt><dd id="scene-result-attempt" class="num"></dd></div>
                 </dl>
-                <p id="scene-result-delta" role="status"></p>
                 <p id="scene-result-best" class="scene-result-best"></p>
               </div>
               <div class="actions-row scene-result-actions">
@@ -259,8 +259,9 @@
             <div class="panel-card results-card">
               <div class="results-content">
                 <p id="results-mode" class="results-mode"></p>
-                <h2 id="results-title" class="panel-title"></h2>
-                <p id="results-main" class="results-main"></p>
+                <h2 id="results-title" class="panel-title result-heading"></h2>
+                <p id="results-main" class="result-detail"></p>
+                <p id="results-metric" class="result-metric"></p>
                 <!-- 새 기록일 때만 보이지만 자리는 늘 차지한다(원칙 2) -->
                 <p id="results-badge" class="badge is-invisible"><span data-icon="star"></span>새 기록</p>
                 <p id="race-result" class="race-result"></p>
@@ -275,7 +276,7 @@
                   </table>
                   <p id="results-split-note" role="status"></p>
                   <div class="actions-row">
-                    <button type="button" class="btn btn-small" data-action="retry-seed"><span class="btn-label">같은 블록 순서로 재시작</span></button>
+                    <button type="button" class="btn btn-small" data-action="retry-seed"><span class="btn-label">같은 순서로 다시</span></button>
                     <button type="button" class="btn btn-small" id="results-race-best" data-action="race-best" disabled><span class="btn-label">최고 기록과 달리기</span></button>
                   </div>
                 </details>
@@ -287,7 +288,7 @@
                   <button type="button" class="btn" id="survival-retry-seed" data-action="survival-retry-seed" hidden><span data-icon="restart"></span><span class="btn-label">같은 조건으로 재도전</span></button>
                   <button type="button" class="btn btn-small" id="results-practice-scene" hidden><span class="btn-label">밀린 구간 연습</span></button>
                   <button type="button" class="btn btn-primary" data-action="next-puzzle" hidden><span data-icon="chevron-right"></span><span class="btn-label">다음 단계</span><kbd data-key="NEXT"></kbd></button>
-                  <button type="button" class="btn btn-wrap" data-action="menu"><span data-icon="menu"></span><span class="btn-label">첫 화면</span><kbd><kbd class="keycap">Esc</kbd></kbd></button>
+                  <button type="button" class="btn" data-action="menu"><span data-icon="menu"></span><span class="btn-label">첫 화면</span><kbd><kbd class="keycap">Esc</kbd></kbd></button>
                 </div>
                 <div class="actions-row actions-row-3">
                   <button type="button" class="btn btn-small" data-action="stats"><span data-icon="chart"></span><span class="btn-label">통계</span></button>
@@ -388,6 +389,7 @@
     <dialog id="records" class="dialog dialog-wide" aria-label="기록"></dialog>
     <dialog id="stats" class="dialog dialog-wide" aria-label="이번 판 통계"></dialog>
     <dialog id="expedition" class="dialog" aria-label="규칙 원정"></dialog>
+    <dialog id="time-shift-stages" class="dialog" aria-label="시간차 단계 목록"></dialog>
     <dialog id="practice" class="dialog" aria-label="연습"></dialog>
     <dialog id="puzzle-comparison" class="dialog" aria-label="풀이 비교"></dialog>
     <dialog id="puzzle-review" class="dialog" aria-label="마지막 수 다시 보기"></dialog>

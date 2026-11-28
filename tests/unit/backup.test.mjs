@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createStore, memoryBackend } from "../../js/storage/store.js";
 import { createBackup, parseBackup, restoreBackup } from "../../js/storage/backup.js";
+import { createTimeShiftProgress, TIME_SHIFT_PROGRESS_KEY } from "../../js/storage/time-shift-progress.js";
 import { DEFAULT_SETTINGS, saveSettings, loadSettings } from "../../js/storage/settings.js";
 import { createRecords } from "../../js/storage/records.js";
 import { createRecorder, createReplayStore } from "../../js/replay/replay.js";
@@ -169,4 +170,23 @@ test("오늘의 퍼즐 백업: 날짜를 검증하고 기존 완료 기록과 �
   assert.deepEqual(parsed.data[key], ["2026-11-26"]);
   assert.equal(restoreBackup(to, parsed), true);
   assert.deepEqual(to.get(key, []), ["2026-11-26", "2026-11-27"]);
+});
+
+test("시간차 완료 단계만 백업하고 이전 백업을 불러와도 시간차 진행도는 보존한다", () => {
+  const from = filledStore();
+  const legacy = createBackup(from);
+  const progress = createTimeShiftProgress(from);
+  assert.equal(progress.mark("time-shift-1"), true);
+  assert.equal(progress.mark("time-shift-1"), true);
+  assert.equal(progress.mark("time-shift-4"), true);
+  assert.equal(progress.mark("time-shift-9"), false);
+  assert.deepEqual(progress.read(), ["time-shift-1", "time-shift-4"]);
+
+  const file = JSON.parse(JSON.stringify(createBackup(from)));
+  file.data[TIME_SHIFT_PROGRESS_KEY].push("time-shift-1", "time-shift-9", 5);
+  const to = createStore(memoryBackend());
+  assert.equal(restoreBackup(to, parseBackup(file, findMode)), true);
+  assert.deepEqual(createTimeShiftProgress(to).read(), ["time-shift-1", "time-shift-4"]);
+  assert.equal(restoreBackup(to, parseBackup(legacy, findMode)), true);
+  assert.deepEqual(createTimeShiftProgress(to).read(), ["time-shift-1", "time-shift-4"]);
 });

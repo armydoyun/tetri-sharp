@@ -3,10 +3,12 @@ import test from "node:test";
 import { HEIGHT, WIDTH, set } from "../../js/core/board.js";
 import { BTN, createGame } from "../../js/core/engine.js";
 import { GARBAGE } from "../../js/core/pieces.js";
-import { timeShiftMode, validTimeShiftMoves } from "../../js/modes/time-shift.js";
+import { TIME_SHIFT_STAGES, timeShiftMode, validTimeShiftMoves } from "../../js/modes/time-shift.js";
 
-const play = past => {
-  const mode = timeShiftMode(past);
+import { timeShiftInputs, timeShiftSolutions } from "../helpers/time-shift-solutions.mjs";
+
+const play = (past, stage) => {
+  const mode = timeShiftMode(past, stage);
   const game = createGame({ mode, rules: mode.rules });
   game.step();
   return game;
@@ -71,4 +73,65 @@ test("과거 블록 진입이 막히면 다음 턴 없이 실패한다", () => {
   assert.equal(game.state.timeShift.preview, null);
   assert.ok(press(game, BTN.HARD).some(event => event.type === "finish" && event.result === "echoBlocked"));
   assert.equal(game.state.active, null);
+  assert.match(timeShiftMode(game.state.timeShift.past).summary(game.state).detail, /1번째.*막힌 열: 1번/);
 });
+
+const inputs = { left: BTN.LEFT, right: BTN.RIGHT, rotate: BTN.R180, drop: BTN.HARD };
+const placeAt = (game, move) => {
+  const actions = timeShiftInputs(move);
+  for (const action of actions.slice(0, -1)) press(game, inputs[action]);
+  const preview = game.state.timeShift.preview;
+  const events = press(game, BTN.HARD);
+  return { preview, current: events.find(e => e.type === "lock"), echo: events.find(e => e.type === "echoLock") };
+};
+
+for (const [index, stage] of TIME_SHIFT_STAGES.entries()) {
+  test(`공식 시간차 ${index + 1}단계의 두 플레이를 실제 입력으로 푼다`, () => {
+    const solution = timeShiftSolutions[index];
+    const first = play(null, stage);
+    for (let turn = 0; turn < 6; turn++) {
+      placeAt(first, solution.record[turn]);
+      first.step();
+    }
+    assert.equal(first.state.over, "rewind");
+    const moves = first.state.timeShift.moves;
+    assert.ok(validTimeShiftMoves(moves, stage));
+    const second = play(moves, stage);
+
+    if (index === 4) {
+      const cells = second.state.board.cells.filter(Boolean).length;
+      assert.equal((cells + 12 * 4) % WIDTH, 0);
+    }
+    for (const [turn, move] of solution.play.entries()) {
+      const { preview, current, echo } = placeAt(second, move);
+      assert.deepEqual(preview.cells, echo.cells);
+      assert.equal(echo.turn, turn + 1);
+      if (index === 3) {
+        assert.equal(current.lines, 1);
+        assert.equal(echo.lines, 1);
+        assert.equal(second.state.stats.lines, 2);
+      }
+      assert.equal(second.state.over, turn === solution.play.length - 1 ? "clear" : null);
+      second.step();
+    }
+
+    const other = play(moves, stage);
+    for (const move of solution.play.slice(0, -1)) {
+      placeAt(other, move);
+      other.step();
+    }
+    placeAt(other, index === 3 ? [2] : []);
+    assert.notEqual(other.state.over, "clear");
+    if (index === 4) assert.equal(other.state.over, "fail");
+
+    if ([2, 3, 4].includes(index)) {
+      const differentPast = moves.map((move, i) => (i === 0 ? { ...move, x: index === 3 ? 1 : 2 } : move));
+      const retry = play(differentPast, stage);
+      for (const move of solution.play) {
+        placeAt(retry, move);
+        retry.step();
+      }
+      assert.notEqual(retry.state.over, "clear");
+    }
+  });
+}

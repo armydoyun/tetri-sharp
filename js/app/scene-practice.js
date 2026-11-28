@@ -98,7 +98,7 @@ export const createScenePractice = deps => {
       target.cells.every(([x, y]) => lock.cells.some(([cx, cy]) => cx === x && cy === y));
     const delta = target.inputs - inputs;
     $("scene-result-range").textContent = t("{piece} 피네스 연습", { piece: target.piece });
-    $("scene-result-title").textContent = same ? t("목표에 놓았어요") : t("목표와 다른 칸에 놓았어요");
+    $("scene-result-title").textContent = same ? t("성공!") : t("실패");
     $("scene-result-original").textContent = t("{n}회 입력", { n: target.inputs });
     $("scene-result-attempt").textContent = t("{n}회 입력", { n: inputs });
     const feedback = $("scene-result-delta");
@@ -118,7 +118,7 @@ export const createScenePractice = deps => {
     const { originalFrame, originalBlocked } = scene.rescue;
     const delta = game.state.frame - originalFrame;
     $("scene-result-range").textContent = t("Survival 구조 연습");
-    $("scene-result-title").textContent = t("구조 시도 결과");
+    $("scene-result-title").textContent = delta > 0 ? t("더 버텼어요") : delta < 0 ? t("덜 버텼어요") : t("같은 시간");
     $("scene-result-original").textContent = formatTime(originalFrame - scene.startFrame);
     $("scene-result-attempt").textContent = formatTime(game.state.frame - scene.startFrame);
     $("scene-result-delta").dataset.comparison = delta > 0 ? "faster" : delta === 0 ? "even" : "slower";

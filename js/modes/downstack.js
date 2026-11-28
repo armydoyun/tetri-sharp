@@ -135,8 +135,8 @@ export const DOWNSTACK_LESSONS = Object.freeze(
       isRecordable: () => false,
       formatRecord: () => "",
       summary: state => ({
-        title: state.over === "clear" ? t("쓰레기 줄을 모두 지웠어요!") : t("쓰레기 줄이 남았어요"),
-        main: label,
+        title: state.over === "clear" ? t("성공!") : t("실패"),
+        detail: state.over === "clear" ? t("쓰레기 줄을 모두 지웠어요!") : t("쓰레기 줄이 남았어요"),
       }),
     });
   })

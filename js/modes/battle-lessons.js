@@ -43,7 +43,7 @@ export const BATTLE_LESSONS = Object.freeze(
       hudTime: state => ({ label: t("시간"), frames: state.frame }),
       isRecordable: () => false,
       formatRecord: () => "",
-      summary: state => ({ title: state.over === "clear" ? t("성공!") : t("실패"), main: name }),
+      summary: state => ({ title: state.over === "clear" ? t("성공!") : t("실패") }),
     });
   })
 );
