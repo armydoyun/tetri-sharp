@@ -6,7 +6,13 @@ import { createRunJournal, readSuspendedRun, replayRunJournal, SUSPENDED_RUN_KEY
 import { sanitizeSettings } from "../storage/settings.js";
 import { customPuzzleMode, decodePuzzle } from "../modes/custom-puzzle.js";
 import { packStageMode } from "../modes/puzzle-pack.js";
-import { TIME_SHIFT_ID, findTimeShiftStage, timeShiftMode, validTimeShiftMoves } from "../modes/time-shift.js";
+import {
+  TIME_SHIFT_ID,
+  findTimeShiftStage,
+  timeShiftDemo,
+  timeShiftMode,
+  validTimeShiftMoves,
+} from "../modes/time-shift.js";
 import { dailyPuzzleMode } from "../modes/daily-puzzle.js";
 import { formatTime } from "../modes/format.js";
 import { t } from "../i18n/index.js";
@@ -58,6 +64,14 @@ export const createRunSaver = ({ store, findMode, lessons, ask, saveInterval, li
       // 첫 합주의 최초 저장 형식에는 스테이지 버전 필드가 없었다.
       const legacy = entry.mode === TIME_SHIFT_ID && entry.timeShiftVersion === undefined;
       if (!stage || (legacy ? stage.version !== 1 : entry.timeShiftVersion !== stage.version)) return null;
+      const source = entry.timeShiftSource ?? "official";
+      if (!["official", "friend", "demo"].includes(source)) return null;
+      if (source !== "official") {
+        if (legacy || entry.timeShiftBoundary !== undefined || !validTimeShiftMoves(entry.timeShiftPast, stage))
+          return null;
+        if (source === "demo") return stage.id === TIME_SHIFT_ID ? timeShiftDemo() : null;
+        return timeShiftMode(entry.timeShiftPast, stage, "friend");
+      }
       if (entry.timeShiftBoundary !== undefined) {
         if (entry.timeShiftBoundary !== "rewind" || entry.timeShiftPast !== null || legacy) return null;
       }
@@ -114,7 +128,13 @@ export const createRunSaver = ({ store, findMode, lessons, ask, saveInterval, li
       puzzle: mode.puzzleCode,
       dailyPuzzle: mode.dailyPuzzle,
       packStage: mode.packStage,
-      ...(mode.timeShift ? { timeShiftVersion: mode.timeShift.version, timeShiftPast: mode.past } : {}),
+      ...(mode.timeShift
+        ? {
+            timeShiftVersion: mode.timeShift.version,
+            timeShiftPast: mode.past,
+            timeShiftSource: mode.timeShiftSource,
+          }
+        : {}),
       trial: Boolean(mode.trialCode),
       scene,
       resultPbSplits,

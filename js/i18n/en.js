@@ -3,14 +3,40 @@
 /** @type {Record<string, string>} */
 export const EN = {
   시간차: "Time Shift",
+  "과거의 배치와 맞춰 퍼즐 풀기 · 친구 도전": "Solve puzzles with your past moves · Friend challenges",
+  "한 수 체험": "One-move demo",
+  "공식 스테이지": "Official stages",
+  "같은 과거 블록도 내가 놓는 위치에 따라 다른 곳에 떨어져요.":
+    "Move your piece and watch the same past piece land somewhere else.",
+  "첫 판에 놓은 블록이 두 번째 판에 한 수씩 돌아와요. 두 판의 배치를 맞춰 목표를 푸세요.":
+    "Your pieces return one at a time in the second pass. Make the two passes work together to solve the puzzle.",
+  "현재 O를 옮겨 점선이 바뀌는지 보고, 두 O로 아래 줄을 채우세요.":
+    "Move your O to see the outline change. Fill the bottom row with both O pieces.",
+  "현재 O와 과거 O가 빈칸 네 칸을 나눠 채웠어요.": "Your two O pieces filled the four gaps together.",
+  "왼쪽에서 세 번째 칸에 현재 O의 왼쪽을 맞춰 보세요.": "Try lining up the left edge of your O with the third column.",
+  "친구 도전 · {stage}": "Friend challenge · {stage}",
+  "받은 시간차 도전": "Time Shift challenge",
+  도전하기: "Play challenge",
+  "친구가 기록한 6수를 받아 두 번째 플레이부터 시작해요.":
+    "Use your friend's six moves and start with the second pass.",
+  "시간차 도전 코드 또는 링크": "Time Shift challenge code or link",
+  "코드 또는 링크": "Code or link",
+  "도전 코드 열기": "Open challenge code",
+  "시간차 도전 코드를 읽을 수 없어요. 코드나 단계 버전을 확인해 주세요.":
+    "Could not read the challenge. Check the code or stage version.",
+  "시간차 도전 공유": "Share Time Shift challenge",
+  "친구가 내 첫 판의 6수로 두 번째 플레이를 풀 수 있어요.": "A friend can use your six moves to solve the second pass.",
+  "링크의 시간차 도전을 읽을 수 없었어요.": "Could not read the Time Shift challenge in this link.",
+  "코드 복사": "Copy code",
+  "복사했어요.": "Copied.",
+  "선택된 내용을 직접 복사해 주세요.": "Copy the selected text.",
+  열기: "Open",
   "시간차 · {stage}": "Time Shift · {stage}",
   "시간차 단계 목록": "Time Shift stages",
   "시간차 완료 {n}단계": "{n} Time Shift stages cleared",
   "시간차 완료 진행도를 저장하지 못했어요.": "Could not save Time Shift progress.",
   "저장된 시간차 판의 단계나 기록이 현재 버전과 맞지 않아요.":
     "The saved Time Shift stage or moves are incompatible with this version.",
-  "6수를 되감아 과거 블록과 함께 5개의 퍼즐을 푸세요.":
-    "Rewind six moves and solve five puzzles with your past pieces.",
   "첫 합주": "First duet",
   "먼저 지워야 열리는 길": "Clear the way",
   받침대: "The platform",

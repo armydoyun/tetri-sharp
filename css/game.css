@@ -2881,3 +2881,8 @@ body[data-battle-replay] .replay-info {
     gap: var(--space-1);
   }
 }
+
+.time-shift-overview {
+  display: grid;
+  gap: var(--space-3);
+}
