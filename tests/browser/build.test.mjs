@@ -1269,6 +1269,8 @@ test("게임 테마: 미리보기는 움직이고, 칩에 올리면 미리보기
     await page.click('.dialog-tabs [data-value="control"]');
     await page.click('.dialog-tabs [data-value="visual"]');
     assert.equal(await moves(), false, "다시 열어도 멈춰 있다");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    assert.ok(await moves(), "모션 줄이기를 해제하면 열려 있는 미리보기가 다시 움직인다");
     assert.deepEqual(errors, []);
   } finally {
     await context.close();
