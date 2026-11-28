@@ -125,7 +125,16 @@ test("본편 오늘의 퍼즐: 날짜 시드로 플레이하고 새로고침 뒤
   await page.tap("#quick-daily-puzzle");
   await play.and(page.locator(":enabled")).waitFor();
   assert.equal(await page.locator("#daily-puzzle-level").textContent(), "어려움");
-  assert.equal(await page.locator("#daily-puzzle-difficulty").textContent(), "판단 어려움 · 조작 입문");
+  const difficulty = page.locator("#daily-puzzle-difficulty");
+  assert.equal(await difficulty.textContent(), "판단 어려움 · 조작 입문");
+  await page.setViewportSize({ width: 568, height: 320 });
+  assert.ok(
+    await difficulty.evaluate(el => {
+      const rating = el.getBoundingClientRect();
+      const body = el.closest(".dialog-body").getBoundingClientRect();
+      return rating.top >= body.top && rating.bottom <= body.bottom;
+    })
+  );
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
   await play.tap();
   await page.locator("#ask-ok").tap();

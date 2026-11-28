@@ -112,9 +112,9 @@ export const createDailyPuzzleUI = ({ dialog, solver, progress, getVisual, onPla
           "div",
           { class: "daily-puzzle-info" },
           title,
-          detail,
           level,
           difficulty,
+          detail,
           objective,
           el("div", {}, el("p", { class: "field-help", text: t("피스 순서") }), pieces)
         )
