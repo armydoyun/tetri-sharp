@@ -1,5 +1,6 @@
 // 저장 데이터 백업: 설정·기록·리플레이를 한 파일로 내려받고, 그 파일을 다시 들인다.
 import { createBackup, parseBackup, restoreBackup } from "../storage/backup.js";
+import { EXPEDITION_PROGRESS_KEY } from "../storage/expedition-progress.js";
 import { downloadJson } from "./download.js";
 import { t } from "../i18n/index.js";
 
@@ -40,6 +41,7 @@ export const setupBackup = ({ store, findMode, fileInput, canImport, confirmImpo
       return;
     }
     const { records: count, replays: replayCount, puzzles, practice, attempts } = parsed.summary;
+    const expedition = Object.keys(parsed.data[EXPEDITION_PROGRESS_KEY] ?? {}).length;
     const when = parsed.date ? ` (${parsed.date.slice(0, 10)})` : "";
     const message =
       t("백업{when}에는 기록 {records}개, 리플레이 {replays}개가 있어요.", {
@@ -50,7 +52,8 @@ export const setupBackup = ({ store, findMode, fileInput, canImport, confirmImpo
       "\n" +
       t("퍼즐 완료 {puzzles}개 · 훈련 완료 {practice}개 · Sprint 시도 {attempts}개", { puzzles, practice, attempts }) +
       "\n" +
-      t("백업에 포함되지 않은 연습·퍼즐·Sprint 진행도는 유지돼요.") +
+      (expedition ? t("규칙 원정 완료 {n}단계", { n: expedition }) + "\n" : "") +
+      t("백업에 포함되지 않은 연습·퍼즐·Sprint·규칙 원정 진행도는 유지돼요.") +
       "\n" +
       t("이 브라우저에 저장된 데이터를 백업 내용으로 바꿀까요?");
     if (!(await confirmImport(message))) return;

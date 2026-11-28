@@ -28,6 +28,9 @@ import { dropdown } from "./ui/select.js";
 import { createRecordsUI } from "./ui/records.js";
 import { createStatsUI } from "./ui/stats.js";
 import { createPracticeUI } from "./ui/practice.js";
+import { createExpeditionUI } from "./ui/expedition.js";
+import { EXPEDITION_STAGES } from "./modes/expedition.js";
+import { createExpeditionProgress } from "./storage/expedition-progress.js";
 import { practiceMode } from "./modes/practice.js";
 import { advanceSplits, analyzeSplits, formatDelta, splitDelta } from "./modes/splits.js";
 import { hydrateIcons, icon } from "./ui/icons.js";
@@ -126,6 +129,7 @@ const hud = {
 const store = createStore();
 const records = createRecords(store);
 const practiceProgress = createPracticeProgress(store);
+const expeditionProgress = createExpeditionProgress(store);
 const sprintHistory = createSprintHistory(store);
 let settings = loadSettings(store);
 let bindings = compileKeymap(settings.keymap);
@@ -235,7 +239,7 @@ let last = performance.now();
 const runs = createRunSaver({
   store,
   findMode,
-  lessons: [INTRO_LESSONS, BATTLE_LESSONS, BUILD_LESSONS, DOWNSTACK_LESSONS, FINESSE_LESSONS],
+  lessons: [INTRO_LESSONS, BATTLE_LESSONS, BUILD_LESSONS, DOWNSTACK_LESSONS, FINESSE_LESSONS, EXPEDITION_STAGES],
   // ask는 아래에서 정의된다: 부를 때 찾는다
   ask: options => ask(options),
   saveInterval: SAVE_INTERVAL,
@@ -267,7 +271,9 @@ const runs = createRunSaver({
         if (!sceneView.current) throw new Error("scene");
       } else {
         const savedRules =
-          m.puzzle || isGuidedPractice(m) ? m.rules : (PRESETS[entry.rules.id] ?? makeCustomRules(entry.rules));
+          m.puzzle || m.expedition != null || isGuidedPractice(m)
+            ? m.rules
+            : (PRESETS[entry.rules.id] ?? makeCustomRules(entry.rules));
         const replay = entry.target && sanitizeReplay(entry.target.replay, findMode);
         if (entry.target && (!replay || replay.mode !== m.id)) throw new Error("race");
         start(m, savedRules, replay ? { ...entry.target, replay } : null, entry.seed, { ...entry, handling });
@@ -493,6 +499,16 @@ const renderMenu = () => {
         onClick: () => start(m),
       });
     }),
+    menuRow({
+      "data-mode": "expedition",
+      title: t("규칙 원정"),
+      desc: t("홀드·회전·쓰레기 규칙을 익히는 3개 챕터"),
+      meta: t("{n} / {total}단계 완료", {
+        n: Object.keys(expeditionProgress.read()).length,
+        total: EXPEDITION_STAGES.length,
+      }),
+      onClick: () => expeditionUI.open(),
+    }),
     versusRow(),
     dailyRow()
   );
@@ -627,6 +643,7 @@ const setScreen = next => {
   touch.setEnabled(next === "play" || next === "countdown");
   gestures.setEnabled((next === "play" || next === "countdown") && gesturesOn());
   document.body.classList.toggle("is-practice", Boolean(mode.practice && !isGuidedPractice()) && next !== "menu");
+  document.body.classList.toggle("is-expedition", mode.expedition != null && next !== "menu");
   document.body.classList.toggle("is-trial", Boolean(mode.trialCode) && next !== "menu");
   document.body.classList.toggle(
     "is-trial-failed",
@@ -642,25 +659,27 @@ const setScreen = next => {
   $("mode-objective").textContent =
     next === "menu" || next === "replay"
       ? ""
-      : mode.puzzle?.custom
-        ? customObjective(mode.puzzle.custom)
-        : mode.puzzle
-          ? mode.puzzle.kind === "pc"
-            ? t("목표 · 주어진 피스로 판 비우기")
-            : mode.puzzle.kind === "quad"
-              ? t("목표 · 우물을 남기고 채운 뒤 마지막 I로 4줄 지우기")
-              : mode.puzzle.kind === "tuck"
-                ? t("목표 · 소프트 드롭으로 내린 뒤 처마 아래로 밀어 넣어 2줄 지우기")
-                : mode.puzzle.kind === "combo"
-                  ? t("목표 · 피스마다 한 줄 이상 지워 콤보 끊지 않기")
-                  : mode.puzzle.kind === "spin"
-                    ? t("목표 · 틈 근처까지 내린 뒤 돌려 끼워 넣어 2줄 지우기")
-                    : mode.puzzle.kind === "mini"
-                      ? t("목표 · T를 마지막에 돌려 넣어 T-spin Mini로 줄 지우기")
-                      : t("목표 · T 하나로 {kind} 만들기", { kind: mode.description })
-          : mode.practice
-            ? mode.description
-            : "";
+      : mode.expedition != null
+        ? `${mode.description} ${t("추가 목표 · {goal}", { goal: mode.bonus })}`
+        : mode.puzzle?.custom
+          ? customObjective(mode.puzzle.custom)
+          : mode.puzzle
+            ? mode.puzzle.kind === "pc"
+              ? t("목표 · 주어진 피스로 판 비우기")
+              : mode.puzzle.kind === "quad"
+                ? t("목표 · 우물을 남기고 채운 뒤 마지막 I로 4줄 지우기")
+                : mode.puzzle.kind === "tuck"
+                  ? t("목표 · 소프트 드롭으로 내린 뒤 처마 아래로 밀어 넣어 2줄 지우기")
+                  : mode.puzzle.kind === "combo"
+                    ? t("목표 · 피스마다 한 줄 이상 지워 콤보 끊지 않기")
+                    : mode.puzzle.kind === "spin"
+                      ? t("목표 · 틈 근처까지 내린 뒤 돌려 끼워 넣어 2줄 지우기")
+                      : mode.puzzle.kind === "mini"
+                        ? t("목표 · T를 마지막에 돌려 넣어 T-spin Mini로 줄 지우기")
+                        : t("목표 · T 하나로 {kind} 만들기", { kind: mode.description })
+            : mode.practice
+              ? mode.description
+              : "";
 };
 
 /**
@@ -728,7 +747,7 @@ const start = (
   confirming = null;
   if (screen === "replay") replayView.stop();
   mode = m;
-  if (!runs.restoring && !m.practice && m.id !== "custom-puzzle") store.set("lastMode", m.id);
+  if (!runs.restoring && !m.practice && m.expedition == null && m.id !== "custom-puzzle") store.set("lastMode", m.id);
   rules = selectedRules;
   runPlayerName = restored?.name ?? records.playerName;
   const seed = target?.replay.seed ?? retrySeed ?? m.fixedSeed ?? (Math.random() * 2 ** 32) >>> 0;
@@ -830,6 +849,10 @@ const inProgress = () => screen === "play" || screen === "countdown" || screen =
  * 목록은 첫 화면 위에 열리므로, 목록을 닫으면 그대로 첫 화면이다.
  */
 const backList = () => {
+  if (mode.expedition != null) {
+    const id = mode.id;
+    return { label: t("규칙 원정 목록"), open: () => expeditionUI.open(id) };
+  }
   if (sceneView.current) return null;
   const number = mode.puzzle?.number;
   if (number) return { label: t("퍼즐 목록"), open: () => puzzleUI.open(number) };
@@ -1202,6 +1225,10 @@ const finish = () => {
     practiceProgress.mark(mode.id, lessonHintState(state)?.usedHint);
   }
 
+  if (state.over === "clear" && mode.expedition != null) {
+    expeditionProgress.mark(mode.id, mode.earnsBonus(state));
+  }
+
   let outcome = null;
   if (mode.isRecordable(state)) {
     outcome = records.add(mode, rules, {
@@ -1238,8 +1265,7 @@ const finish = () => {
       ? t("Custom 규칙 판은 플레이 업적만 쌓여요")
       : "";
   const nextPuzzle = /** @type {HTMLButtonElement} */ (panels.results.querySelector('[data-action="next-puzzle"]'));
-  const nextLesson = nextPracticeLesson();
-  const hasNext = nextLesson || (mode.puzzle?.number && mode.puzzle.number < PUZZLES.length);
+  const hasNext = nextStage() || (mode.puzzle?.number && mode.puzzle.number < PUZZLES.length);
   nextPuzzle.hidden = !(hasNext && state.over === "clear");
   lastReplay = recorder ? recorder.finish(state) : null;
   const survivalRetry = $("survival-retry-seed");
@@ -1283,7 +1309,9 @@ const finish = () => {
         ? raceResultText(state, race.target.best, race.target.friend)
         : "";
   const shortNote =
-    tooShort && !mode.trialCode ? t("너무 일찍 끝난 판이라 공유하지 않고 마지막 판으로 남기지 않아요") : "";
+    tooShort && !mode.trialCode && mode.expedition == null
+      ? t("너무 일찍 끝난 판이라 공유하지 않고 마지막 판으로 남기지 않아요")
+      : "";
   $("race-result").textContent = [resultNote, shortNote].filter(Boolean).join(" · ");
   if (survival || mode.battleLesson) say(`${summary.title} ${summary.main}. ${resultNote}`);
 
@@ -1484,6 +1512,7 @@ const nextPracticeLesson = () =>
           : mode.lesson
             ? FINESSE_LESSONS[mode.lesson.index + 1]
             : null;
+const nextStage = () => (mode.expedition != null ? EXPEDITION_STAGES[mode.expedition + 1] : nextPracticeLesson());
 const downstackHint = $("downstack-hint");
 // 이름만 바꾼다(단추 안의 단축키 표시는 그대로)
 const hintLabel = /** @type {HTMLElement} */ (downstackHint.querySelector(".btn-label"));
@@ -1597,6 +1626,15 @@ const practiceUI = createPracticeUI({
   onStage: lesson => start(lesson, lesson.rules),
 });
 $("open-practice").addEventListener("click", () => practiceUI.open());
+
+const expeditionUI = createExpeditionUI({
+  dialog: /** @type {HTMLDialogElement} */ ($("expedition")),
+  progress: expeditionProgress,
+  onStage: stage => start(stage, stage.rules),
+});
+$("expedition").addEventListener("close", () => {
+  if (screen === "menu") returnFocus(document.querySelector('[data-mode="expedition"]'));
+});
 
 // ---- 퍼즐 ----
 const puzzleProgress = createPuzzleProgress(store);
@@ -1917,13 +1955,11 @@ for (const btn of document.querySelectorAll("[data-action]")) {
     )
       start(mode, rules, null, lastReplay.seed);
     if (action === "race-best" && mode.splits) startRace(mode, rules);
-    if (action === "next-puzzle" && isGuidedPractice()) {
-      const next = nextPracticeLesson();
-      if (next) start(next, next.rules);
-    }
-    if (action === "next-puzzle" && mode.puzzle?.number) {
-      const next = PUZZLES[mode.puzzle.number] ?? puzzleProgress.next();
-      start(puzzleMode(next), MODERN);
+    if (action === "next-puzzle" && screen === "results" && game?.state.over === "clear") {
+      const next = nextStage();
+      if (next) return start(next, next.rules);
+      if (mode.puzzle?.number && mode.puzzle.number < PUZZLES.length)
+        return start(puzzleMode(PUZZLES[mode.puzzle.number]), MODERN);
     }
     if (action === "menu") {
       if (inProgress()) askConfirm("menu");

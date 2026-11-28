@@ -173,6 +173,10 @@ const scenarios = async (page, quick) => {
     await check("CPU 대전 난이도");
     await esc();
   }
+  await page.click('[data-mode="expedition"]');
+  await check("규칙 원정");
+  await page.click("#expedition-close");
+
   if (await page.$('[data-mode="daily"]')) {
     await page.click('[data-mode="daily"]');
     await page.waitForTimeout(100);
@@ -182,7 +186,7 @@ const scenarios = async (page, quick) => {
 
   // ---- 게임 화면: 모드마다 계기판, 일시정지, 확인, 결과, 통계 ----
   const modes = await page.$$eval("#mode-list [data-mode]", els =>
-    els.map(e => e.getAttribute("data-mode")).filter(m => m !== "versus" && m !== "daily")
+    els.map(e => e.getAttribute("data-mode")).filter(m => !["versus", "daily", "expedition"].includes(m))
   );
   for (const m of quick ? modes.slice(0, 2) : modes) {
     await page.click(`[data-mode="${m}"]`);

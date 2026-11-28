@@ -2,6 +2,45 @@
 // tests/unit/i18n.test.mjs가 코드와 index.html의 한국어 문장이 모두 여기 있는지 확인한다.
 /** @type {Record<string, string>} */
 export const EN = {
+  "규칙 원정": "Rules Expedition",
+  "규칙 원정 완료 {n}단계": "{n} Expedition stages cleared",
+  "규칙 원정 목록": "Expedition stages",
+  "홀드·회전·쓰레기 규칙을 익히는 3개 챕터": "Three chapters on hold, rotation, and garbage",
+  "홀드 금지": "No hold",
+  "홀드 없이 쌓기": "Stacking without hold",
+  "회전이 다른 판": "A different rotation",
+  "빨라지는 바닥": "Rising garbage",
+  "홀드가 있는 판": "Hold available",
+  "같은 순서, 홀드 없이": "Same sequence, no hold",
+  "우물을 남겨라": "Leave a well",
+  "우물을 다시 열어라": "Reopen the well",
+  "{n}줄을 지우세요.": "Clear {n} lines.",
+  "홀드를 한 번도 쓰지 않기": "Finish without using hold",
+  "4줄 지우기 {n}회": "Clear four lines at once {n} times",
+  "지운 줄": "Lines cleared",
+  "{rule} · 벽 옆 우물": "{rule} · Wall-side well",
+  "{rule} · T자 홈": "{rule} · T-shaped gap",
+  "I를 세로로 돌려 오른쪽 끝에 넣으세요.": "Rotate the I vertically and fit it against the right wall.",
+  "ARS의 I는 벽 킥이 없어요. 먼저 I를 세로로 돌리고 오른쪽 끝으로 옮기세요.":
+    "The ARS I has no wall kicks. Rotate it vertically before moving it to the right wall.",
+  "T의 뾰족한 쪽이 아래로 향하게 돌려 2줄을 지우세요.": "Rotate the T to point down and clear two lines.",
+  "ARS에서 T는 뾰족한 쪽이 아래를 향한 채 나와요. 그대로 홈에 넣으세요.":
+    "The ARS T spawns pointing down. Drop it into the gap as it is.",
+  "첫 피스로 끝내기": "Finish with the first piece",
+  "첫 파도": "First wave",
+  "구멍을 따라": "Follow the openings",
+  "좁아지는 여유": "Less room to spare",
+  "마지막 파도": "Final wave",
+  "쓰레기 {n}줄을 파내세요. 한 파도를 지우면 다음 줄이 올라오고 낙하가 빨라져요.":
+    "Dig through {n} garbage lines. Each cleared wave brings more garbage and faster gravity.",
+  "ARS 회전으로 진행해요.": "Uses ARS rotation.",
+  "{n}초 안에 끝내기": "Finish within {n} seconds",
+  "추가 목표 · {goal}": "Bonus · {goal}",
+  "추가 목표까지 달성!": "Bonus objective complete!",
+  "추가 목표 달성": "Bonus earned",
+  잠김: "Locked",
+  "{n} / {total}단계 완료": "{n} / {total} stages cleared",
+
   "이어서 하기": "Continue saved game",
   "창을 닫아도 이 판은 이 기기에 남아요.": "This game stays on this device even if you close the window.",
   "{mode} · {time} · {lines}줄": "{mode} · {time} · {lines} lines",
@@ -775,8 +814,8 @@ export const EN = {
     "The backup{when} has {records} records and {replays} replays.",
   "퍼즐 완료 {puzzles}개 · 훈련 완료 {practice}개 · Sprint 시도 {attempts}개":
     "Puzzles cleared {puzzles} · Practice stages cleared {practice} · Sprint runs {attempts}",
-  "백업에 포함되지 않은 연습·퍼즐·Sprint 진행도는 유지돼요.":
-    "Practice, puzzle and Sprint progress missing from the backup will be kept.",
+  "백업에 포함되지 않은 연습·퍼즐·Sprint·규칙 원정 진행도는 유지돼요.":
+    "Practice, puzzle, Sprint, and Expedition progress missing from the backup will be kept.",
   "백업을 저장하지 못했어요. 기존 데이터는 그대로예요.": "Could not save the backup. Your existing data is intact.",
   "이 브라우저에 저장된 데이터를 백업 내용으로 바꿀까요?": "Replace the data stored in this browser with the backup?",
   "백업을 불러왔어요 · 기록 {records}개, 리플레이 {replays}개": "Backup loaded · {records} records, {replays} replays",

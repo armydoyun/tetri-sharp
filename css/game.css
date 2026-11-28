@@ -2162,6 +2162,12 @@ body.show-inputs:not([data-screen="menu"]) .input-display {
   font-size: var(--text-s);
 }
 .mode-objective { max-width: 100%; overflow-wrap: anywhere; }
+
+@media (max-width: 720px) and (orientation: portrait) {
+  body.is-expedition {
+    --chrome-h: 240px;
+  }
+}
 body.is-versus [data-hud="lines"] dd { color: var(--accent); }
 body[data-screen="results"] #action { display: none; }
 

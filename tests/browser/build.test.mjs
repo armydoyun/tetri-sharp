@@ -11,6 +11,7 @@ import { chromium } from "playwright";
 import { build } from "../../tools/build.mjs";
 import { launchOptions } from "../helpers/browser.mjs";
 import { runScenarios } from "../helpers/ui-scenarios.mjs";
+import { auditInPage } from "../helpers/ui-audit.mjs";
 import { keysFor, solvePuzzle } from "../helpers/puzzle-solve.mjs";
 import { PUZZLES } from "../../js/modes/puzzles.js";
 import { botDailyReplay } from "../helpers/daily.mjs";
@@ -598,9 +599,9 @@ test("설정: 슬라이더 값과 키 변경이 저장되고 새로고침 후에
   await context.close();
 });
 
-test("Ultra: 남은 시간이 줄어들고 하드 드롭으로 점수가 오른다, 메뉴에 일곱 모드", async () => {
+test("Ultra: 남은 시간이 줄어들고 하드 드롭으로 점수가 오른다, 메뉴에 규칙 원정을 포함한 열 가지 선택지", async () => {
   const { context, page, errors } = await openPage();
-  assert.equal(await page.locator("#mode-list .menu-row").count(), 9);
+  assert.equal(await page.locator("#mode-list .menu-row").count(), 10);
   await startMode(page, "ultra");
   assert.equal(await text(page, "hud-time-label"), "남은 시간");
   await page.waitForTimeout(300);
@@ -4664,4 +4665,89 @@ test("결과에서 Esc는 퍼즐 목록: 같은 Esc 입력이 방금 연 목록�
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("data-puzzle")), String(first.number));
   assert.deepEqual(errors, []);
   await context.close();
+});
+
+test("규칙 원정: 단계 잠금, 보너스 클리어, 다음 단계, 같은 규칙으로 이어서 하기", async () => {
+  const { context, page, errors } = await openPage(
+    () => {
+      localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
+      if (!localStorage.getItem("tetrisharp:expedition:progress")) {
+        const cleared = Object.fromEntries(Array.from({ length: 4 }, (_, i) => [`expedition-${i + 1}`, "clear"]));
+        localStorage.setItem("tetrisharp:expedition:progress", JSON.stringify(cleared));
+      }
+    },
+    undefined,
+    { frameClock: true, viewport: { width: 390, height: 844 }, hasTouch: true }
+  );
+  const row = stage => page.locator(`[data-expedition-stage="expedition-${stage}"]`);
+  const next = page.locator('[data-action="next-puzzle"]');
+  const advance = () => page.evaluate(() => window.advanceFrame());
+  const play = async (...keys) => {
+    for (const key of keys) {
+      await page.keyboard.press(key);
+      await advance();
+    }
+  };
+  try {
+    await page.click('[data-mode="expedition"]');
+    assert.equal(await page.locator("#expedition [data-expedition-stage]").count(), 12);
+    assert.equal(await row(5).isEnabled(), true);
+    assert.equal(await row(6).isDisabled(), true);
+    await row(5).click();
+    await advance();
+    await play("ArrowUp", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "Space");
+    assert.equal(await text(page, "results-title"), "추가 목표까지 달성!");
+    assert.equal(await next.isVisible(), true);
+
+    await next.click();
+    await advance();
+    await play("ArrowUp", "ArrowRight");
+    const checkpoint = () =>
+      page.evaluate(() => JSON.parse(localStorage.getItem("tetrisharp:run:suspended")).fingerprint);
+    await page.click("#pause-game");
+    const saved = await checkpoint();
+    await page.reload();
+    await page.click("#continue-run");
+    await page.waitForFunction(() => document.body.dataset.screen === "play");
+    assert.equal(await checkpoint(), saved);
+
+    await play("ArrowRight", "ArrowRight", "ArrowRight", "Space");
+    assert.equal(await text(page, "results-title"), "추가 목표까지 달성!");
+    await page.keyboard.press("Escape");
+    await page.locator("#expedition[open]").waitFor();
+    assert.match(await row(6).textContent(), /추가 목표 달성/);
+    assert.equal(await row(7).isEnabled(), true);
+    assert.equal(await row(8).isDisabled(), true);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("규칙 원정: 작은 터치 화면에서 긴 목표와 보드·조작이 함께 보인다", async () => {
+  for (const [width, height, locale] of [
+    [360, 740, "ko-KR"],
+    [390, 844, "en-US"],
+    [844, 390, "en-US"],
+    [1280, 800, "ko-KR"],
+  ]) {
+    const { context, page } = await openPage(
+      () => {
+        localStorage.setItem("tetrisharp:settings", JSON.stringify({ access: { countdown: "off" } }));
+        const cleared = Object.fromEntries(Array.from({ length: 11 }, (_, i) => [`expedition-${i + 1}`, "bonus"]));
+        localStorage.setItem("tetrisharp:expedition:progress", JSON.stringify(cleared));
+      },
+      undefined,
+      { viewport: { width, height }, locale, hasTouch: width < 1000 }
+    );
+    try {
+      await page.click('[data-mode="expedition"]');
+      assert.deepEqual(await page.evaluate(auditInPage), [], `${width}×${height} ${locale} 원정 목록`);
+      await page.click('[data-expedition-stage="expedition-12"]');
+      await page.waitForFunction(() => document.body.dataset.screen === "play");
+      assert.deepEqual(await page.evaluate(auditInPage), [], `${width}×${height} ${locale} 원정 게임`);
+    } finally {
+      await context.close();
+    }
+  }
 });
