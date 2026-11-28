@@ -5977,6 +5977,19 @@ test("규칙 원정: 단계 잠금, 보너스 클리어, 다음 단계, 같은 �
     assert.equal(await text(page, "results-title"), "추가 목표까지 달성!");
     assert.equal(await next.isVisible(), true);
 
+    await page.setViewportSize({ width: 958, height: 951 });
+    const menu = page.locator('#results [data-action="menu"]');
+    assert.match(await menu.textContent(), /규칙 원정 목록.*Esc/);
+    const layout = await menu.evaluate(button => {
+      const range = document.createRange();
+      range.selectNodeContents(button.querySelector(".btn-label"));
+      const label = range.getBoundingClientRect();
+      const shortcut = button.querySelector(".keycap").getBoundingClientRect();
+      return { labelRight: label.right, shortcutLeft: shortcut.left, shortcutWidth: shortcut.width };
+    });
+    assert.ok(layout.shortcutWidth > 0 && layout.labelRight <= layout.shortcutLeft, JSON.stringify(layout));
+    await page.setViewportSize({ width: 390, height: 844 });
+
     await next.click();
     await advance();
     await play("ArrowUp", "ArrowRight");

@@ -1409,6 +1409,11 @@ body[data-screen="replay"] .touchpad {
   right: var(--space-3);
 }
 
+/* 목록 이름과 Esc가 좁은 결과 카드에서도 한 버튼 안에 들어간다. */
+.results-card [data-action="menu"] {
+  --btn-px: var(--space-2);
+}
+
 .results-card .panel-title {
   font-size: var(--text-2xl);
 }
@@ -1459,8 +1464,12 @@ body[data-screen="replay"] .touchpad {
     padding: 3px 0;
   }
 
-  .results-card .btn:not(.btn-small) {
+  .results-card .btn:not(.btn-small, .btn-wrap) {
     --btn-size: 34px;
+  }
+
+  .results-card [data-action="menu"] {
+    --btn-min: 34px;
   }
 }
 
